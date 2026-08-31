@@ -17,9 +17,9 @@ use config::ider;
 use sea_orm::{ActiveValue::Unchanged, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
 use serde::{Deserialize, Serialize};
 
-use super::{entity::re_patterns::*, get_lock};
+use super::entity::re_patterns::*;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
@@ -78,24 +78,18 @@ pub async fn add(entry: PatternEntry) -> Result<(), errors::Error> {
         pattern: Set(entry.pattern),
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     match Entity::insert(record).exec(client).await {
         Ok(_) => {}
-        Err(e) => {
-            drop(_lock);
-            match e.sql_err() {
-                Some(SqlErr::UniqueConstraintViolation(_)) => {
-                    return Err(errors::Error::DbError(errors::DbError::UniqueViolation));
-                }
-                _ => {
-                    return Err(e.into());
-                }
+        Err(e) => match e.sql_err() {
+            Some(SqlErr::UniqueConstraintViolation(_)) => {
+                return Err(errors::Error::DbError(errors::DbError::UniqueViolation));
             }
-        }
+            _ => {
+                return Err(e.into());
+            }
+        },
     }
-    drop(_lock);
 
     Ok(())
 }
@@ -109,35 +103,27 @@ pub async fn update_pattern(id: &str, new_pattern: &str) -> Result<(), errors::E
         ..Default::default()
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update(record)
         .filter(Column::Id.eq(id))
         .exec(client)
         .await?;
-    drop(_lock);
 
     Ok(())
 }
 
 pub async fn remove(id: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Id.eq(id))
         .exec(client)
         .await?;
 
-    drop(_lock);
-
     Ok(())
 }
 
 pub async fn get(id: &str) -> Result<Option<PatternEntry>, errors::DbError> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     Entity::find()
         .filter(Column::Id.eq(id))
         .into_model::<Model>()
@@ -148,7 +134,7 @@ pub async fn get(id: &str) -> Result<Option<PatternEntry>, errors::DbError> {
 }
 
 pub async fn list_by_org(org: &str) -> Result<Vec<PatternEntry>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let res = Entity::find()
         .filter(Column::Org.eq(org))
@@ -164,7 +150,7 @@ pub async fn list_by_org(org: &str) -> Result<Vec<PatternEntry>, errors::Error> 
 }
 
 pub async fn list_all() -> Result<Vec<PatternEntry>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let records = Entity::find().into_model::<Model>().all(client).await?;
 
@@ -176,9 +162,7 @@ pub async fn list_all() -> Result<Vec<PatternEntry>, errors::Error> {
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many().exec(client).await?;
 
     Ok(())
@@ -186,8 +170,7 @@ pub async fn clear() -> Result<(), errors::Error> {
 
 /// Deletes all re_pattern entries belonging to the given org.
 pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org))
         .exec(client)

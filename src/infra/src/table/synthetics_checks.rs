@@ -180,7 +180,6 @@ pub async fn get<C: ConnectionTrait>(
     org_id: &str,
     id: &str,
 ) -> Result<Option<Synthetic>, errors::Error> {
-    let _lock = super::get_lock().await;
     let maybe = get_model(conn, org_id, id).await?;
     maybe.map(Synthetic::try_from).transpose()
 }
@@ -259,7 +258,6 @@ pub async fn list<C: ConnectionTrait>(
     org_id: &str,
     params: &ListSyntheticsParams,
 ) -> Result<Vec<Synthetic>, errors::Error> {
-    let _lock = super::get_lock().await;
     let models = list_models(conn, org_id, params).await?;
     // A single unreadable row used to 500 the whole org's list — the UI renders
     // that as "no checks yet", so a total outage looked like an empty state.
@@ -276,7 +274,6 @@ pub async fn count<C: ConnectionTrait>(
     org_id: &str,
     params: &ListSyntheticsParams,
 ) -> Result<u64, errors::Error> {
-    let _lock = super::get_lock().await;
     let q = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .apply_filters(params);
@@ -315,7 +312,6 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
     org_id: &str,
     location_id: &str,
 ) -> Result<Vec<Synthetic>, errors::Error> {
-    let _lock = super::get_lock().await;
     let models = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .all(conn)
@@ -354,7 +350,6 @@ pub async fn create<C: TransactionTrait>(
     check: Synthetic,
     use_given_id: bool,
 ) -> Result<Synthetic, errors::Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
     let id = new_check_id(&check, use_given_id);
@@ -372,11 +367,6 @@ pub async fn create<C: TransactionTrait>(
     let model = am.insert(&txn).await?.try_into_model()?;
     let result = Synthetic::try_from(model)?;
     txn.commit().await?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
 }
@@ -387,7 +377,6 @@ pub async fn update<C: TransactionTrait>(
     id: &str,
     check: Synthetic,
 ) -> Result<Synthetic, errors::Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
     let Some(m) = get_model(&txn, org_id, id).await? else {
@@ -401,11 +390,6 @@ pub async fn update<C: TransactionTrait>(
     let model = am.update(&txn).await?.try_into_model()?;
     let result = Synthetic::try_from(model)?;
     txn.commit().await?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
 }
@@ -415,7 +399,6 @@ pub async fn put<C: TransactionTrait>(
     org_id: &str,
     check: Synthetic,
 ) -> Result<Synthetic, errors::Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
 
@@ -441,11 +424,6 @@ pub async fn put<C: TransactionTrait>(
     };
 
     txn.commit().await?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish(&result.org_id, &result.id).await;
     Ok(result)
 }
@@ -455,17 +433,11 @@ pub async fn delete<C: ConnectionTrait>(
     org_id: &str,
     id: &str,
 ) -> Result<bool, errors::Error> {
-    let _lock = super::get_lock().await;
     let res = Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Id.eq(id))
         .exec(conn)
         .await?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish_delete(org_id, id).await;
     Ok(res.rows_affected > 0)
 }
@@ -477,7 +449,6 @@ pub async fn move_to_folder<C: ConnectionTrait>(
     ids: &[String],
     dst_folder_id: &str,
 ) -> Result<u64, errors::Error> {
-    let _lock = super::get_lock().await;
     if ids.is_empty() {
         return Ok(0);
     }
@@ -491,11 +462,6 @@ pub async fn move_to_folder<C: ConnectionTrait>(
         .filter(Column::Id.is_in(ids.to_vec()))
         .exec(conn)
         .await?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     for id in ids {
         invalidate_and_publish(org_id, id).await;
     }
@@ -509,7 +475,6 @@ pub async fn set_enabled<C: ConnectionTrait>(
     id: &str,
     enabled: bool,
 ) -> Result<bool, errors::Error> {
-    let _lock = super::get_lock().await;
     let res = Entity::update_many()
         .col_expr(Column::Enabled, Expr::value(enabled))
         .col_expr(
@@ -520,11 +485,6 @@ pub async fn set_enabled<C: ConnectionTrait>(
         .filter(Column::Id.eq(id))
         .exec(conn)
         .await?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish(org_id, id).await;
     Ok(res.rows_affected > 0)
 }
@@ -547,6 +507,9 @@ pub struct DueCheck {
     pub next_run_at: i64,
     /// Populated only for browser checks (parsed from config.browser_devices).
     pub browser_devices: Vec<config::meta::synthetics::BrowserDevice>,
+    /// Steps the journey defines right now — 1 for protocol checks. The scheduler
+    /// freezes it onto each job so a mid-flight edit cannot move the ack's ceiling.
+    pub steps_configured: i32,
     pub tags: Vec<String>,
 }
 
@@ -574,11 +537,19 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
 
         let frequency: SyntheticFrequency = serde_json::from_value(m.frequency).unwrap_or_default();
 
-        let browser_devices = if check_type == SyntheticType::Browser {
+        // One parse, two answers: `m.config` is moved into `from_value`, so the
+        // devices and the frozen step count must come out of the same call.
+        let (browser_devices, steps_configured) = if check_type == SyntheticType::Browser {
             let cfg: BrowserConfig = serde_json::from_value(m.config).unwrap_or_default();
-            cfg.browser_devices
+            // `unwrap_or_default()` makes an unreadable config ZERO steps, and
+            // `validate_browser_config` rejects an empty journey — so a 0 means
+            // "could not read the row". A 0 ceiling bills real work as nothing,
+            // hence the floor of 1; saturating stops a negative ceiling.
+            let steps = i32::try_from(cfg.steps.len().max(1)).unwrap_or(i32::MAX);
+            (cfg.browser_devices, steps)
         } else {
-            vec![]
+            // §1.1: a protocol check is one step per attempt, never zero.
+            (vec![], 1)
         };
 
         let tags: Vec<String> = serde_json::from_value(m.tags).unwrap_or_default();
@@ -593,6 +564,7 @@ impl TryFrom<synthetics_checks::Model> for DueCheck {
             tz_offset: m.tz_offset,
             next_run_at: m.next_run_at,
             browser_devices,
+            steps_configured,
             tags,
         })
     }
@@ -621,7 +593,6 @@ pub async fn fetch_due<C: ConnectionTrait>(
     now_us: i64,
     limit: u64,
 ) -> Result<Vec<DueCheck>, errors::Error> {
-    let _lock = super::get_lock().await;
     let models = due_checks_query(now_us, limit).all(conn).await?;
 
     let (due, _skipped) = convert_batch(models, "fetch_due");
@@ -698,7 +669,6 @@ pub async fn fetch_overdue<C: ConnectionTrait>(
     now_us: i64,
     limit: u64,
 ) -> Result<Vec<OrphanCandidate>, errors::Error> {
-    let _lock = super::get_lock().await;
     let rows = due_checks_query(now_us, limit)
         .select_only()
         .column(Column::Id)
@@ -754,7 +724,6 @@ pub async fn claim_due<C>(
 where
     C: ConnectionTrait + TransactionTrait,
 {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
     let mut query = due_checks_query(now_us, limit);
@@ -1055,13 +1024,10 @@ fn build_active_model(check: &Synthetic) -> Result<ActiveModel, errors::Error> {
 fn check_type_to_str(t: &SyntheticType) -> &'static str {
     match t {
         SyntheticType::Http => "http",
-        SyntheticType::Api => "api",
         SyntheticType::Tcp => "tcp",
         SyntheticType::Tls => "tls",
         SyntheticType::Ssh => "ssh",
         SyntheticType::Browser => "browser",
-        SyntheticType::Ping => "ping",
-        SyntheticType::Dns => "dns",
     }
 }
 
@@ -1088,11 +1054,13 @@ impl ApplyCheckFilters for sea_orm::Select<Entity> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::table::entity::synthetics_checks::Model;
 
-    fn make_model() -> Model {
+    /// `pub(crate)` for `table::synthetics_jobs`' freezing test, which enqueues
+    /// from a REAL check row: a second fixture there would drift from this one.
+    pub(crate) fn make_model() -> Model {
         Model {
             id: "mon-1".to_string(),
             org_id: "org1".to_string(),
@@ -1151,12 +1119,133 @@ mod tests {
     fn test_monitor_type_to_str() {
         assert_eq!(check_type_to_str(&SyntheticType::Http), "http");
         assert_eq!(check_type_to_str(&SyntheticType::Browser), "browser");
-        assert_eq!(check_type_to_str(&SyntheticType::Api), "api");
         assert_eq!(check_type_to_str(&SyntheticType::Tcp), "tcp");
         assert_eq!(check_type_to_str(&SyntheticType::Tls), "tls");
         assert_eq!(check_type_to_str(&SyntheticType::Ssh), "ssh");
-        assert_eq!(check_type_to_str(&SyntheticType::Ping), "ping");
-        assert_eq!(check_type_to_str(&SyntheticType::Dns), "dns");
+    }
+
+    /// `check_type_to_str` writes the column and serde reads it back; if they
+    /// disagree, every stored row of that type turns unreadable on the next read.
+    #[test]
+    fn test_check_type_to_str_round_trips_through_serde() {
+        for t in [
+            SyntheticType::Http,
+            SyntheticType::Browser,
+            SyntheticType::Tcp,
+            SyntheticType::Tls,
+            SyntheticType::Ssh,
+        ] {
+            let stored = check_type_to_str(&t);
+            let back: SyntheticType =
+                serde_json::from_value(serde_json::Value::String(stored.to_string()))
+                    .unwrap_or_else(|e| panic!("{stored} did not read back: {e}"));
+            assert_eq!(back, t, "{stored}");
+        }
+    }
+
+    /// `Api`, `Ping` and `Dns` were removed, so a row still holding one is now
+    /// unreadable. Both conversions are on live paths, so both are checked.
+    #[test]
+    fn test_removed_check_types_make_a_stored_row_unreadable() {
+        for dead in ["api", "ping", "dns"] {
+            let mut m = make_model();
+            m.synthetics_type = dead.to_string();
+
+            // serde already quotes the unknown variant, so `contains(dead)` alone proves nothing.
+            let err = Synthetic::try_from(m.clone())
+                .err()
+                .unwrap_or_else(|| panic!("{dead} must not convert into Synthetic"));
+            let err = err.to_string();
+            assert!(
+                err.contains("invalid synthetics_type"),
+                "{dead}: the error must name the offending column, got: {err}"
+            );
+            assert!(
+                err.contains(dead),
+                "{dead}: the error must name the offending value, got: {err}"
+            );
+
+            let err = DueCheck::try_from(m.clone())
+                .err()
+                .unwrap_or_else(|| panic!("{dead} must not convert into DueCheck"));
+            let err = err.to_string();
+            assert!(
+                err.contains("invalid synthetics_type"),
+                "{dead}: the error must name the offending column, got: {err}"
+            );
+            assert!(
+                err.contains(dead),
+                "{dead}: the error must name the offending value, got: {err}"
+            );
+            // The scheduler converts whole batches; an error without the row id is useless.
+            assert!(
+                err.contains(&m.id),
+                "{dead}: the DueCheck error must name the check id, got: {err}"
+            );
+        }
+    }
+
+    /// Rewrites `config.steps` to `n` placeholder steps. `pub(crate)` for the
+    /// freezing test in `table::synthetics_jobs`, which edits a journey.
+    pub(crate) fn with_steps(mut m: Model, n: usize) -> Model {
+        m.config["steps"] = serde_json::Value::Array(
+            (0..n)
+                .map(|i| serde_json::json!({"name": format!("step {i}")}))
+                .collect(),
+        );
+        m
+    }
+
+    /// The frozen count must be the number of steps the journey DEFINES, read
+    /// from the same `BrowserConfig` parse that produces `browser_devices`.
+    #[test]
+    fn a_browser_check_freezes_the_step_count_its_journey_defines() {
+        let due = DueCheck::try_from(with_steps(make_model(), 14)).unwrap();
+
+        assert_eq!(due.steps_configured, 14);
+        assert_eq!(
+            due.browser_devices.len(),
+            1,
+            "the one parse must still yield the devices"
+        );
+    }
+
+    /// A protocol check is ONE step per attempt. Freezing 0 would give the ack a
+    /// ceiling of `0 * (retries + 1) == 0` and bill nothing for work that ran.
+    #[test]
+    fn a_protocol_check_freezes_one_step_not_zero() {
+        for t in ["http", "tcp", "tls", "ssh"] {
+            let mut m = make_model();
+            m.synthetics_type = t.to_string();
+            let due = DueCheck::try_from(m).unwrap();
+
+            assert_eq!(due.steps_configured, 1, "{t} must freeze one step");
+            assert!(
+                due.browser_devices.is_empty(),
+                "{t} has no browser fan-out to freeze"
+            );
+        }
+    }
+
+    /// A browser row whose config does not parse degrades to an empty `steps`, so
+    /// a 0 means "could not read the journey" — `validate_browser_config` rejects
+    /// an empty one on create and update. So it takes the same floor of 1.
+    #[test]
+    fn a_browser_check_whose_steps_cannot_be_read_still_freezes_one() {
+        let empty = with_steps(make_model(), 0);
+        assert_eq!(
+            DueCheck::try_from(empty).unwrap().steps_configured,
+            1,
+            "an empty steps array must not become a ceiling of zero"
+        );
+
+        let mut unreadable = make_model();
+        unreadable.config = serde_json::json!("not a browser config at all");
+        assert_eq!(
+            DueCheck::try_from(unreadable).unwrap().steps_configured,
+            1,
+            "an unparseable config must not become a ceiling of zero"
+        );
     }
 
     #[test]

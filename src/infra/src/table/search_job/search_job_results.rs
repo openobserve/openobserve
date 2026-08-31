@@ -16,9 +16,9 @@
 use sea_orm::{ColumnTrait, EntityTrait, Order, QueryFilter, QueryOrder};
 use serde::{Deserialize, Serialize};
 
-use super::super::{entity::search_job_results::*, get_lock};
+use super::super::entity::search_job_results::*;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors, orm_err,
 };
 
@@ -28,10 +28,7 @@ pub enum JobResultOperator {
 }
 
 pub async fn get(job_id: &str) -> Result<Vec<Model>, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let res = Entity::find()
         .filter(Column::JobId.eq(job_id))
@@ -46,10 +43,7 @@ pub async fn get(job_id: &str) -> Result<Vec<Model>, errors::Error> {
 }
 
 pub async fn clean_deleted_job_result(job_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let res = Entity::delete_many()
         .filter(Column::JobId.eq(job_id))

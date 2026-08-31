@@ -28,9 +28,11 @@ use arrow_schema::Schema;
 #[cfg(feature = "enterprise")]
 use config::meta::promql::DownsamplingRule;
 use config::{
-    FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config, meta::stream::StreamType,
+    FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
+    meta::stream::{FileKey, StreamType},
     utils::util::is_trace_time_index_stream,
 };
+use metrics_index::{MetricsFileLayout, metrics_index_stream};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
 
@@ -40,13 +42,20 @@ use crate::datafusion::sort_order::FileSortOrder;
 #[derive(Debug, Clone)]
 pub enum MergeMode {
     /// `SELECT * FROM tbl ORDER BY _timestamp DESC` into one file: logs,
-    /// traces, plain metrics — the ingester and the compactor default.
+    /// traces and plain metrics — the default merge.
     Classic,
     /// The trace time-index metadata stream: one row per `trace_id`
     /// (`MIN(_timestamp)`, `MIN(min_ts)`, `MAX(max_ts)`, …), one file.
     TraceTimeIndex,
     /// The file-list stream has no `_timestamp`; order by `min_ts DESC`.
     FileList,
+    /// Metrics index stream, hour still open: the ingester and the incremental
+    /// compactor merges write one `hash-sorted-v1-*` file
+    /// ordered by `(__hash__, _timestamp)`.
+    MetricsHashSorted,
+    /// Metrics index stream, closed hour: the whole hour merges into
+    /// size-split `indexed-v1-*` files in the same order.
+    MetricsIndexed,
     /// Metrics downsampling (enterprise): aggregate every series by the rule's
     /// step, size-split output files. Only for a closed hour, which is merged
     /// as a whole.
@@ -63,23 +72,32 @@ impl MergeMode {
     pub fn for_compactor(
         stream_type: StreamType,
         stream_name: &str,
-        max_ts: i64,
+        schema: &Schema,
+        _max_ts: i64,
         finalize: bool,
     ) -> Self {
         #[cfg(feature = "enterprise")]
         if finalize
             && stream_type == StreamType::Metrics
-            && let Some(rule) = get_largest_downsampling_rule(stream_name, max_ts)
+            && let Some(rule) = get_largest_downsampling_rule(stream_name, _max_ts)
         {
             return Self::Downsampling(rule.clone());
         }
-        #[cfg(not(feature = "enterprise"))]
-        let _ = (max_ts, finalize);
+        if metrics_index_stream(stream_type, schema) {
+            return if finalize {
+                Self::MetricsIndexed
+            } else {
+                Self::MetricsHashSorted
+            };
+        }
         Self::for_stream(stream_type, stream_name)
     }
 
-    /// Mode for the ingester movers: never downsamples.
-    pub fn for_ingester(stream_type: StreamType, stream_name: &str) -> Self {
+    /// Mode for the ingester movers: never downsamples, never finalizes.
+    pub fn for_ingester(stream_type: StreamType, stream_name: &str, schema: &Schema) -> Self {
+        if metrics_index_stream(stream_type, schema) {
+            return Self::MetricsHashSorted;
+        }
         Self::for_stream(stream_type, stream_name)
     }
 
@@ -91,6 +109,11 @@ impl MergeMode {
         }
     }
 
+    /// True for the indexed metrics hour-end merge.
+    pub fn is_metrics_indexed(&self) -> bool {
+        matches!(self, Self::MetricsIndexed)
+    }
+
     /// True when the whole hour must be merged as one batch — every file of
     /// the hour, including ones already above the size target, and regardless
     /// of `ZO_COMPACT_MAX_FILE_SIZE` (the writer splits the output itself).
@@ -98,13 +121,52 @@ impl MergeMode {
         match self {
             #[cfg(feature = "enterprise")]
             Self::Downsampling(_) => true,
+            Self::MetricsIndexed => true,
             _ => false,
         }
     }
 
-    /// Physical order of the input files the merge query may rely on.
-    pub fn input_sort_order(&self) -> FileSortOrder {
-        FileSortOrder::TimestampDesc
+    /// Row order the merge writes.
+    pub fn output_sort_order(&self) -> FileSortOrder {
+        match self {
+            Self::MetricsHashSorted | Self::MetricsIndexed => FileSortOrder::HashTimestampAsc,
+            _ => FileSortOrder::TimestampDesc,
+        }
+    }
+
+    /// Metrics-specific layout of the file(s) the merge writes.
+    pub fn metrics_file_layout(&self) -> Option<MetricsFileLayout> {
+        match self {
+            Self::MetricsHashSorted => Some(MetricsFileLayout::HashSorted),
+            Self::MetricsIndexed => Some(MetricsFileLayout::Indexed),
+            _ => None,
+        }
+    }
+
+    /// Physical order of the input `files` the merge query may rely on.
+    ///
+    /// A hash-ordered merge whose inputs are all hash-ordered declares that
+    /// order, so DataFusion merges the pre-sorted files instead of a full
+    /// sort. Any mix with other layouts declares no order; otherwise the
+    /// classic `_timestamp DESC`.
+    pub fn input_sort_order(&self, files: &[FileKey]) -> FileSortOrder {
+        let hash_ordered = files
+            .iter()
+            .filter(|f| MetricsFileLayout::of(&f.key).is_some())
+            .count();
+        match self {
+            Self::MetricsHashSorted | Self::MetricsIndexed => {
+                if hash_ordered == files.len() {
+                    FileSortOrder::HashTimestampAsc
+                } else {
+                    FileSortOrder::None
+                }
+            }
+            // hash-ordered files under any other mode: declare no order so
+            // the merge re-sorts instead of trusting `_timestamp DESC`
+            _ if hash_ordered > 0 => FileSortOrder::None,
+            _ => FileSortOrder::TimestampDesc,
+        }
     }
 
     /// The merge query over the union table `tbl`.
@@ -129,6 +191,12 @@ impl MergeMode {
             Self::Downsampling(rule) => {
                 super::downsampling::generate_downsampling_sql(schema, rule)
             }
+            Self::MetricsHashSorted | Self::MetricsIndexed => format!(
+                "SELECT * FROM tbl ORDER BY {}",
+                FileSortOrder::HashTimestampAsc
+                    .order_by_clause()
+                    .expect("hash order has sort columns")
+            ),
         }
     }
 }
@@ -141,6 +209,8 @@ impl fmt::Display for MergeMode {
             Self::FileList => write!(f, "file_list"),
             #[cfg(feature = "enterprise")]
             Self::Downsampling(rule) => write!(f, "downsampling(step={}s)", rule.step),
+            Self::MetricsHashSorted => write!(f, "metrics_hash_sorted"),
+            Self::MetricsIndexed => write!(f, "metrics_indexed"),
         }
     }
 }
@@ -197,21 +267,74 @@ mod tests {
 
     #[test]
     fn mode_by_stream() {
+        let schema = Schema::empty();
         assert!(matches!(
-            MergeMode::for_ingester(StreamType::Logs, "app"),
+            MergeMode::for_ingester(StreamType::Logs, "app", &schema),
             MergeMode::Classic
         ));
         assert!(matches!(
-            MergeMode::for_compactor(StreamType::Traces, "app", 0, true),
+            MergeMode::for_compactor(StreamType::Traces, "app", &schema, 0, true),
             MergeMode::Classic
         ));
         assert!(matches!(
-            MergeMode::for_compactor(StreamType::Filelist, "x", 0, false),
+            MergeMode::for_ingester(StreamType::Metrics, "cpu", &schema),
+            MergeMode::Classic
+        ));
+        assert!(matches!(
+            MergeMode::for_compactor(StreamType::Filelist, "x", &schema, 0, false),
             MergeMode::FileList
         ));
         assert!(!MergeMode::Classic.merges_whole_batch());
+        assert!(MergeMode::MetricsIndexed.merges_whole_batch());
+        assert!(!MergeMode::MetricsHashSorted.merges_whole_batch());
         assert_eq!(
-            MergeMode::Classic.input_sort_order(),
+            MergeMode::Classic.input_sort_order(&[]),
+            FileSortOrder::TimestampDesc
+        );
+        assert_eq!(MergeMode::Classic.metrics_file_layout(), None);
+        assert_eq!(
+            MergeMode::MetricsHashSorted.metrics_file_layout(),
+            Some(MetricsFileLayout::HashSorted)
+        );
+        assert_eq!(
+            MergeMode::MetricsIndexed.output_sort_order(),
+            FileSortOrder::HashTimestampAsc
+        );
+    }
+
+    #[test]
+    fn input_sort_order_by_file_layout() {
+        let legacy = FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/1.parquet");
+        let sorted =
+            FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/hash-sorted-v1-2.parquet");
+        let major = FileKey::from_file_name("files/o/metrics/m/2026/08/18/10/indexed-v1-3.parquet");
+        // all inputs hash ordered: the hash modes merge them pre-sorted
+        for mode in [MergeMode::MetricsHashSorted, MergeMode::MetricsIndexed] {
+            assert_eq!(
+                mode.input_sort_order(std::slice::from_ref(&sorted)),
+                FileSortOrder::HashTimestampAsc
+            );
+            assert_eq!(
+                mode.input_sort_order(&[sorted.clone(), major.clone()]),
+                FileSortOrder::HashTimestampAsc
+            );
+            // a legacy file in the batch: nothing can be assumed
+            assert_eq!(
+                mode.input_sort_order(&[sorted.clone(), legacy.clone()]),
+                FileSortOrder::None
+            );
+        }
+        // classic merge over hash-ordered files (layout switched off): no order
+        assert_eq!(
+            MergeMode::Classic.input_sort_order(&[legacy.clone(), sorted.clone()]),
+            FileSortOrder::None
+        );
+        assert_eq!(
+            MergeMode::Classic.input_sort_order(std::slice::from_ref(&sorted)),
+            FileSortOrder::None
+        );
+        assert_eq!(
+            MergeMode::Classic.input_sort_order(std::slice::from_ref(&legacy)),
             FileSortOrder::TimestampDesc
         );
     }
@@ -263,6 +386,10 @@ mod tests {
         assert_eq!(
             MergeMode::FileList.sql(&without_session),
             "SELECT * FROM tbl ORDER BY min_ts DESC"
+        );
+        assert_eq!(
+            MergeMode::MetricsIndexed.sql(&without_session),
+            "SELECT * FROM tbl ORDER BY __hash__ ASC, _timestamp ASC"
         );
         assert!(
             MergeMode::TraceTimeIndex

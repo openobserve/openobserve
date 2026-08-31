@@ -72,7 +72,7 @@ pub(super) async fn write_files(
     Ok(bufs
         .into_iter()
         .zip(file_metas)
-        .map(|(buf, meta)| MergedFile { buf, meta })
+        .map(|(buf, meta)| MergedFile::Standard { data: buf, meta })
         .collect())
 }
 

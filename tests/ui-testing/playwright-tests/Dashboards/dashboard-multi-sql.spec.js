@@ -145,11 +145,20 @@ test.describe("Multi-SQL Query Support", () => {
 
       await buildPanel(page, pm, dashboardName, { chartType: "bar" });
       await expect(msql.queryTab(0)).toBeVisible();
-      await expect(msql.sqlModeSubtitle).not.toBeVisible();
+
+      // The tab bar is what this test is about, so assert the ADD button is
+      // offered too — every one of these chart types supports multiple queries.
+      // This replaces a `sqlModeSubtitle` not-visible check that could never
+      // fail: its locator keyed off the Quasar classes
+      // `.text-subtitle2.text-weight-bold`, and `text-subtitle2` no longer
+      // exists anywhere in web/src after the v1 UX revamp, so the element it
+      // looked for was permanently absent.
+      await expect(msql.addQueryBtn).toBeVisible();
 
       for (const type of ["line", "area", "table", "pie", "gauge"]) {
         await pm.chartTypeSelector.selectChartType(type);
         await expect(msql.queryTab(0)).toBeVisible();
+        await expect(msql.addQueryBtn).toBeVisible();
       }
 
       await msql.applyAndSave(pm);
@@ -1653,6 +1662,7 @@ test.describe("Multi-SQL Query Support", () => {
           // forces do_partitioned_search to run and set function_error.
           const stream = "e2e_max_query_range_first";
           await ingestion(page, stream);
+          await mqr.waitForStreamReady(stream);
 
           await buildPanel(page, pm, dashboardName, {
             chartType: "bar",
@@ -1669,6 +1679,7 @@ test.describe("Multi-SQL Query Support", () => {
           const searchDone = mqr.createSearchResponsePromise();
           await pm.dateTimeHelper.setRelativeTimeRange("2-d");
           await searchDone;
+          await mqr.waitForPanelsIdle();
 
           await expect(mqr.warningIcon.first()).toBeVisible({ timeout: 30000 });
 
@@ -1690,6 +1701,8 @@ test.describe("Multi-SQL Query Support", () => {
           const streamB = "e2e_max_query_range_third";
           await ingestion(page, streamA);
           await ingestion(page, streamB);
+          await mqr.waitForStreamReady(streamA);
+          await mqr.waitForStreamReady(streamB);
 
           // Build a 2-query panel: Q1=streamA, Q2=streamB
           await buildPanel(page, pm, dashboardName, {
@@ -1718,22 +1731,37 @@ test.describe("Multi-SQL Query Support", () => {
           const allSearchDone = mqr.createSearchResponsePromise();
           await pm.dateTimeHelper.setRelativeTimeRange("2-d");
           await allSearchDone;
+          await mqr.waitForPanelsIdle();
 
           // Warning icon must be visible
           const warningIcon = mqr.warningIcon.first();
           await expect(warningIcon).toBeVisible({ timeout: 30000 });
 
-          // Hover to read tooltip
-          const tooltipText = await mqr.getWarningTooltipText();
-          expect(tooltipText).toContain(
-            "Query duration is modified due to query range restriction"
-          );
+          // Both queries are restricted — "Data returned for:" must appear twice.
+          // Poll: the queries share one _search_multi_stream call and the text is
+          // rebuilt as each query's metadata lands, so a single read can catch it
+          // mid-build with only Q1's message.
+          let tooltipText = "";
+          await expect
+            .poll(
+              async () => {
+                tooltipText = await mqr.getWarningTooltipText().catch(() => "");
+                return (tooltipText.match(/Data returned for:/g) || []).length;
+              },
+              {
+                timeout: 20000,
+                intervals: [500, 1000, 2000, 3000],
+                message:
+                  'tooltip never listed both restricted queries ("Data returned for:" twice)',
+              }
+            )
+            .toBeGreaterThanOrEqual(2);
 
-          // Both queries are restricted — "Data returned for:" must appear at least twice
-          const dataReturnedMatches = (
-            tooltipText.match(/Data returned for:/g) || []
-          ).length;
-          expect(dataReturnedMatches).toBeGreaterThanOrEqual(2);
+          // Accept either backend wording. This literal is the non-streaming
+          // message only; a streaming deployment says "reached max query range
+          // limit" instead, so asserting it directly would pass on a
+          // non-streaming alpha and fail in streaming CI.
+          mqr.expectRangeRestrictionTooltip(expect, tooltipText);
 
           await cleanupTestDashboard(page, pm, dashboardName);
         }
@@ -1753,6 +1781,8 @@ test.describe("Multi-SQL Query Support", () => {
           const streamB = "e2e_max_query_range_fifth";
           await ingestion(page, streamA);
           await ingestion(page, streamB);
+          await mqr.waitForStreamReady(streamA);
+          await mqr.waitForStreamReady(streamB);
 
           // 2-query panel
           await buildPanel(page, pm, dashboardName, {
@@ -1781,16 +1811,29 @@ test.describe("Multi-SQL Query Support", () => {
           const searchDone = mqr.createSearchResponsePromise();
           await pm.dateTimeHelper.setRelativeTimeRange("2-d");
           await searchDone;
+          await mqr.waitForPanelsIdle();
 
           await expect(mqr.warningIcon.first()).toBeVisible({ timeout: 30000 });
 
-          const tooltipText = await mqr.getWarningTooltipText();
+          // Only Q1 is restricted: exactly one "Data returned for:" occurrence.
+          // Polled for the same reason as the two-stream test above.
+          let tooltipText = "";
+          await expect
+            .poll(
+              async () => {
+                tooltipText = await mqr.getWarningTooltipText().catch(() => "");
+                return (tooltipText.match(/Data returned for:/g) || []).length;
+              },
+              {
+                timeout: 20000,
+                intervals: [500, 1000, 2000, 3000],
+                message:
+                  'tooltip never settled on exactly one "Data returned for:" entry',
+              }
+            )
+            .toBe(1);
+
           expect(tooltipText).toContain("Data returned for:");
-          // Only Q1 is restricted: exactly one "Data returned for:" occurrence
-          const occurrences = (
-            tooltipText.match(/Data returned for:/g) || []
-          ).length;
-          expect(occurrences).toBe(1);
 
           await cleanupTestDashboard(page, pm, dashboardName);
         }
@@ -1810,6 +1853,8 @@ test.describe("Multi-SQL Query Support", () => {
           const streamB = "e2e_max_query_range_seventh";
           await ingestion(page, streamA);
           await ingestion(page, streamB);
+          await mqr.waitForStreamReady(streamA);
+          await mqr.waitForStreamReady(streamB);
 
           await buildPanel(page, pm, dashboardName, {
             chartType: "bar",
@@ -1837,8 +1882,13 @@ test.describe("Multi-SQL Query Support", () => {
           const searchDone = mqr.createSearchResponsePromise();
           await pm.dateTimeHelper.setRelativeTimeRange("1-h");
           await searchDone;
+          await mqr.waitForPanelsIdle();
           await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
 
+          // Only meaningful because the wait above is a stream-COMPLETION wait:
+          // the warning is driven by result metadata that arrives at the end of
+          // the search body, so a header-only wait would have made this assert
+          // "no warning yet" rather than "no warning".
           await expect(
             mqr.warningIcon.first()
           ).not.toBeVisible({ timeout: 5000 });
@@ -1862,6 +1912,8 @@ test.describe("Multi-SQL Query Support", () => {
           const streamB = "e2e_max_query_range_ninth";
           await ingestion(page, streamA);
           await ingestion(page, streamB);
+          await mqr.waitForStreamReady(streamA);
+          await mqr.waitForStreamReady(streamB);
 
           await buildPanel(page, pm, dashboardName, {
             chartType: "bar",
@@ -1888,6 +1940,7 @@ test.describe("Multi-SQL Query Support", () => {
           const searchDoneWide = mqr.createSearchResponsePromise();
           await pm.dateTimeHelper.setRelativeTimeRange("2-d");
           await searchDoneWide;
+          await mqr.waitForPanelsIdle();
 
           // Warning must be visible with the wide range
           await expect(mqr.warningIcon.first()).toBeVisible({ timeout: 30000 });
@@ -1897,6 +1950,7 @@ test.describe("Multi-SQL Query Support", () => {
           const searchDoneNarrow = mqr.createSearchResponsePromise();
           await pm.dateTimeHelper.setRelativeTimeRange("1-h");
           await searchDoneNarrow;
+          await mqr.waitForPanelsIdle();
           await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
 
           // Warning must disappear

@@ -36,7 +36,7 @@ use super::{
     folders::folder_type_into_i16,
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, GetDashboardError},
 };
 
@@ -117,7 +117,7 @@ pub async fn get_from_folder(
     folder_id: &str,
     dashboard_id: &str,
 ) -> Result<Option<Dashboard>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let model = get_model_from_folder(client, org_id, folder_id, dashboard_id)
         .await?
         .and_then(|(_folder, maybe_dash)| maybe_dash);
@@ -139,7 +139,7 @@ pub async fn get_by_id(
     org_id: &str,
     dashboard_id: &str,
 ) -> Result<Option<(Folder, Dashboard)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let Some((folder_m, dash_m)) = get_model_by_id(client, org_id, dashboard_id).await? else {
         return Ok(None);
     };
@@ -150,7 +150,7 @@ pub async fn get_by_id(
 
 /// Lists dashboards.
 pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let dashboards = list_models(client, params)
         .await?
         .into_iter()
@@ -165,7 +165,7 @@ pub async fn list(params: ListDashboardsParams) -> Result<Vec<(Folder, Dashboard
 
 /// Lists all existing dashboards
 pub async fn list_all() -> Result<Vec<(String, Dashboard)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let dashboards = list_all_models(client)
         .await?
         .into_iter()
@@ -187,7 +187,7 @@ pub async fn put(
     mut dashboard: Dashboard,
     clone: bool,
 ) -> Result<Dashboard, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Get the fields that will be inserted into or updated in the database.
     let dashboard_id = dashboard
@@ -305,7 +305,7 @@ pub async fn delete_from_folder(
     folder_id: &str,
     dashboard_id: &str,
 ) -> Result<(), errors::Error> {
-    let txn = ORM_CLIENT.get_or_init(connect_to_orm).await.begin().await?;
+    let txn = get_orm_client_rw().await.begin().await?;
     let maybe_dashboard_model = get_model_from_folder(&txn, org_id, folder_id, dashboard_id)
         .await?
         .and_then(|(_folder, maybe_dash)| maybe_dash);
@@ -330,7 +330,7 @@ pub async fn delete_from_folder(
 
 /// Deletes all dashboards.
 pub async fn delete_all() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let dashboards = list_all().await?;
     let ids: Vec<_> = dashboards
@@ -532,7 +532,7 @@ fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> 
 
 /// Deletes all dashboards belonging to the given org (via folder join).
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     // Collect folder PKs for this org
     let folder_ids: Vec<String> = folders::Entity::find()
         .filter(folders::Column::Org.eq(org_id))
@@ -607,7 +607,7 @@ mod tests {
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::Postgres,
-                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "dashboards"."updated_at" AS "A_updated_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = $1 AND "folders"."type" = $2 AND "folders"."folder_id" = $3 AND LOWER("title") LIKE $4 ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT $5 OFFSET $6"#,
+                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "dashboards"."updated_at" AS "A_updated_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."icon" AS "B_icon", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = $1 AND "folders"."type" = $2 AND "folders"."folder_id" = $3 AND LOWER("title") LIKE $4 ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT $5 OFFSET $6"#,
                 [
                     "orgId".into(),
                     0i16.into(),
@@ -637,7 +637,7 @@ mod tests {
             db.into_transaction_log(),
             vec![Transaction::from_sql_and_values(
                 DatabaseBackend::Sqlite,
-                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "dashboards"."updated_at" AS "A_updated_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = ? AND "folders"."type" = ? AND "folders"."folder_id" = ? AND LOWER("title") LIKE ? ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT ? OFFSET ?"#,
+                r#"SELECT "dashboards"."id" AS "A_id", "dashboards"."dashboard_id" AS "A_dashboard_id", "dashboards"."folder_id" AS "A_folder_id", "dashboards"."owner" AS "A_owner", "dashboards"."role" AS "A_role", "dashboards"."title" AS "A_title", "dashboards"."description" AS "A_description", "dashboards"."data" AS "A_data", "dashboards"."version" AS "A_version", "dashboards"."created_at" AS "A_created_at", "dashboards"."updated_at" AS "A_updated_at", "folders"."id" AS "B_id", "folders"."org" AS "B_org", "folders"."folder_id" AS "B_folder_id", "folders"."name" AS "B_name", "folders"."description" AS "B_description", "folders"."icon" AS "B_icon", "folders"."type" AS "B_type" FROM "dashboards" LEFT JOIN "folders" ON "dashboards"."folder_id" = "folders"."id" WHERE "folders"."org" = ? AND "folders"."type" = ? AND "folders"."folder_id" = ? AND LOWER("title") LIKE ? ORDER BY "dashboards"."title" ASC, "folders"."name" ASC LIMIT ? OFFSET ?"#,
                 [
                     "orgId".into(),
                     0i16.into(),

@@ -331,6 +331,7 @@ import {
   extractWhereClause,
 } from "@/utils/query/sqlUtils";
 import { buildColumnIdentifierAst, quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { replaceSelectFieldList } from "@/utils/query/quickModeFieldList";
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
@@ -1560,9 +1561,7 @@ export default defineComponent({
             .join(",");
         }
         if (searchObj.meta.sqlMode == true) {
-          searchObj.data.query = searchObj.data.query.replace(/SELECT\s+(.*?)\s+FROM/gi, () => {
-            return `SELECT ${field_list} FROM`;
-          });
+          searchObj.data.query = replaceSelectFieldList(searchObj.data.query, field_list);
           setQuery(searchObj.meta.quickMode);
           updateUrlQueryParams();
         }

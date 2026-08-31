@@ -63,6 +63,9 @@ if (import.meta.env.DEV && !form) {
         <template v-if="$slots.tooltip" #tooltip>
           <slot name="tooltip" />
         </template>
+        <template v-if="$slots['icon-left']" #icon-left>
+          <slot name="icon-left" />
+        </template>
       </OSelect>
     </template>
   </component>

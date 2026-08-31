@@ -20,71 +20,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   alert payload, with the After-Flattening (RAF/RBF) toggle, or creates one
   inline. Data payload -> NodeData::Function { name, after_flatten }.
 
-  "Set up later" (same as the Destination node) is a section-level toggle: turning
-  it on greys out the picker and lets the node be saved as a PLACEHOLDER (empty
-  function name, flagged `meta.incomplete`). Draft + test still run; Publish is
-  blocked until a function is set. WorkflowNodeDrawer's Save calls submit().
+  Dummy-node model (C1): there is NO "Set up later" toggle. Leaving the picker
+  empty simply saves the node as a PLACEHOLDER (empty function name, flagged
+  `meta.incomplete`) — an unconfigured node IS a dummy node. Draft + test still
+  run; Publish is blocked until a function is set. WorkflowNodeDrawer's Save calls
+  submit(), which sets `incomplete` from whether a function was picked.
 -->
 <template>
-  <div data-test="workflow-function-body" class="flex w-full flex-col gap-4">
-    <!-- Section-level "Set up later" toggle — left-aligned with the picker below and
-         separated by a divider, so it reads as a parent choice. Hidden while the
-         inline create editor is expanded (it owns the full drawer). -->
-    <div
-      v-if="!workflowObj.dialog.expand"
-      class="border-border-default flex flex-col gap-1.5 border-b pb-4"
-    >
-      <OSwitch
-        v-model="setUpLater"
-        :label="t('workflow.node.functionSetUpLater')"
-        data-test="workflow-function-set-up-later"
+  <div data-test="workflow-function-body" class="flex min-h-0 w-full flex-1 flex-col gap-2">
+    <!-- Config pane header (shared) — hidden in the inline "Create New Function"
+         editor, which owns the whole width. The info icon RIGHT AFTER the title
+         explains before- vs after-flattening (same pattern as the Condition node). -->
+    <WorkflowConfigHeader v-if="!workflowObj.dialog.expand">
+      <span
+        class="text-text-secondary hover:text-text-body inline-flex cursor-help items-center"
+        data-test="workflow-function-flatten-info"
+      >
+        <OIcon name="info" size="sm" />
+        <OTooltip side="right" align="start" :side-offset="8" max-width="22rem">
+          <template #content>
+            <div class="flex flex-col gap-1.5 p-1 text-left">
+              <div class="text-xs font-semibold">
+                {{ t("workflow.node.functionFlattenTitle") }}
+              </div>
+              <div class="text-xs leading-snug">
+                <span class="font-semibold">{{ t("flow.function.rbf") }}</span>
+                {{ t("flow.function.rbfDesc") }}
+              </div>
+              <div class="text-xs leading-snug">
+                <span class="font-semibold">{{ t("flow.function.raf") }}</span>
+                {{ t("flow.function.rafDesc") }}
+              </div>
+            </div>
+          </template>
+        </OTooltip>
+      </span>
+    </WorkflowConfigHeader>
+    <!-- Optional: an empty selection saves a placeholder (dummy node). Wrapped so the
+         picker/editor fills the space below the header. -->
+    <div class="flex min-h-0 flex-1 flex-col">
+      <FunctionPicker
+        ref="picker"
+        :initial-name="savedData.name || ''"
+        :initial-raw-fn="savedData.raw_fn || ''"
+        :initial-after-flatten="savedData.after_flatten ?? false"
+        :sample-events="sampleEvents"
+        language="javascript"
+        optional
+        create-button
+        :default-code="JS_DEFAULT_CODE"
+        @expand="onExpand"
       />
-      <div class="text-text-secondary text-xs leading-snug">
-        {{
-          setUpLater
-            ? t("workflow.node.functionSetUpLaterActive")
-            : t("workflow.node.functionSetUpLaterPrompt")
-        }}
-      </div>
     </div>
-
-    <!-- Greyed + faded while "Set up later" is on so it's clearly governed by the
-         toggle above. -->
-    <FunctionPicker
-      ref="picker"
-      class="transition-opacity"
-      :class="{ 'pointer-events-none opacity-50': setUpLater }"
-      :initial-name="savedData.name || ''"
-      :initial-after-flatten="savedData.after_flatten ?? false"
-      :sample-events="sampleEvents"
-      language="javascript"
-      :default-code="JS_DEFAULT_CODE"
-      @expand="onExpand"
-    />
   </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, onBeforeUnmount } from "vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { useI18nTyped } from "@/types/i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import FunctionPicker from "@/components/flow/forms/FunctionPicker.vue";
+import WorkflowConfigHeader from "./WorkflowConfigHeader.vue";
 import {
   workflowObj,
   currentTriggerKind,
   setNodeIncomplete,
-  isNodeIncomplete,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import { triggerDef } from "@/plugins/workflows/triggers";
 
 const { t } = useI18nTyped();
-
 const savedData: any = workflowObj.currentSelectedNodeData?.data || {};
 const picker = ref<any>(null);
-
-// Selected state for the "Set up later" toggle. Defaults ON when reopening a node
-// already saved as a placeholder (flagged incomplete); otherwise OFF.
-const setUpLater = ref(isNodeIncomplete(workflowObj.currentSelectedNodeData));
 
 // Seed code for a brand-new workflow function. Workflow functions are
 // JavaScript: the whole trigger event arrives as `row`; mutate it in place.
@@ -110,21 +117,25 @@ onBeforeUnmount(() => {
   workflowObj.dialog.expand = false;
 });
 
-// Drawer "Save":
-//  • Set up later ON  → commit a PLACEHOLDER (empty function name, flag incomplete).
-//  • Set up later OFF → require a real function via the picker (null blocks Save
-//    with the picker's inline error, or means the inline create form is open).
+// Drawer "Save": the picker is optional, so submit() resolves a payload even with
+// no function selected (empty name = placeholder). It only returns null while the
+// inline "Create New Function" editor is open. Flag the node incomplete when no saved
+// function is referenced — inline `raw_fn` has an empty name, so it's treated the same
+// as an unconfigured dummy ("Set up later"): runs in Test, but blocks Publish until
+// the function is saved (the backend rejects raw_fn / empty name on publish too).
 const submit = async () => {
   const node = workflowObj.currentSelectedNodeData;
-  if (setUpLater.value) {
-    setNodeIncomplete(node, true);
-    return { name: "", after_flatten: savedData.after_flatten ?? false };
-  }
   const payload = (await picker.value?.submit()) ?? null;
   if (!payload) return null;
-  setNodeIncomplete(node, false);
+  setNodeIncomplete(node, !payload.name);
   return payload;
 };
 
-defineExpose({ submit, setUpLater });
+// Exposed for WorkflowNodeDrawer's save-or-discard exit prompt (unsaved inline/edited
+// function code must be resolved before leaving the node — never auto-saved).
+const isDirty = () => !!picker.value?.isDirty?.();
+const discardChanges = () => picker.value?.discardChanges?.();
+const saveChanges = () => picker.value?.saveChanges?.();
+
+defineExpose({ submit, isDirty, discardChanges, saveChanges });
 </script>

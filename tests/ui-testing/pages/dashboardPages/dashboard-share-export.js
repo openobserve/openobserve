@@ -70,11 +70,47 @@ export default class DashboardShareExportPage {
     while (Date.now() - start < timeout) {
       lastValue = await target.evaluate(() => navigator.clipboard.readText());
       if (lastValue && lastValue.includes("/short/")) {
-        return lastValue;
+        return this.normalizeShareHost(lastValue);
       }
       await target.waitForTimeout(250);
     }
-    return lastValue;
+    return this.normalizeShareHost(lastValue);
+  }
+
+  /**
+   * Rewrite a copied share URL onto the host the test is actually running against.
+   *
+   * The backend's short-URL service bakes in its own externally-facing hostname,
+   * which is NOT the host under test: on alpha it hands back
+   * `alpha.common-dev.external.zinclabs.dev` while the suite runs against
+   * `alpha.common-dev.internal.zinclabs.dev`. The saved SSO session is scoped to
+   * the host that issued it, so following the returned link lands on an
+   * unauthenticated origin and the app bounces to the Dex login page — the
+   * dashboard never renders, and every test here failed waiting for
+   * `dashboard-back-btn`. Two of them additionally leaked their dashboard,
+   * because cleanup's in-app "back" button does not exist on the login screen.
+   *
+   * dashboardPage.verifyShareDashboardLink() already does this rewrite for the
+   * same reason; this is the same fix for the share/export page object.
+   *
+   * The path (including `/short/<id>`) is preserved, so assertions on it still
+   * hold — only the origin changes.
+   */
+  normalizeShareHost(url) {
+    const baseUrl = process.env.ZO_BASE_URL || "";
+    if (!url || !baseUrl) return url;
+    try {
+      const target = new URL(url);
+      const base = new URL(baseUrl);
+      if (target.host === base.host) return url;
+      target.protocol = base.protocol;
+      target.host = base.host;
+      return target.toString();
+    } catch {
+      // Not an absolute URL (e.g. the clipboard never populated) — hand it back
+      // unchanged so the caller's own assertion reports the real problem.
+      return url;
+    }
   }
 
   //Wait for the dashboard view page to be fully loaded

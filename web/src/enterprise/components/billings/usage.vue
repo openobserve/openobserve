@@ -38,35 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("billing.aiContractExhaustedMessage") }}
       </div>
       <!-- tab-info-section -->
-      <!-- this will be unlocked when we get the actionscripts , rum sessions , error tracking from BE -->
-      <div v-if="false" class="grid w-full grid-cols-3 gap-4">
-        <div
-          class="bg-card-glass-bg border-card-glass-border rounded-default flex min-h-32 flex-col justify-between border p-4 transition-shadow duration-200 ease-in-out"
-        >
-          <div class="rounded-default flex h-full flex-col justify-between gap-4">
-            <!-- Top Section (60%) -->
-            <div class="flex flex-col justify-between">
-              <!-- Title row -->
-              <div class="flex items-center justify-between">
-                <div
-                  class="text-text-heading text-left text-(length:--text-sm) leading-(--leading-base) font-semibold tracking-normal"
-                >
-                  {{ t("billing.actionScripts") }}
-                </div>
-                <div class="opacity-80">
-                  <img :src="actionScriptIcon" />
-                </div>
-              </div>
-            </div>
-
-            <!-- Bottom Section (40%) -->
-            <div
-              class="text-text-body flex items-end text-left text-(length:--text-2xl) leading-(--leading-xl) font-semibold tracking-normal"
-            >
-              {{ "2" }}
-            </div>
-          </div>
-        </div>
+      <!-- this will be unlocked when we get the rum sessions , error tracking from BE -->
+      <div v-if="false" class="grid w-full grid-cols-2 gap-4">
         <div
           class="bg-card-glass-bg border-card-glass-border rounded-default flex min-h-32 flex-col justify-between border p-4 transition-shadow duration-200 ease-in-out"
         >
@@ -508,7 +481,6 @@ export default defineComponent({
       chartData.value = {};
       getUsage();
     };
-    const actionScriptIcon = getImageURL("images/usage/action_script.svg");
     const errorTrackingIcon = getImageURL("images/usage/error_tracking.svg");
     const rumSessionIcon = getImageURL("images/usage/rum_session.svg");
     const ingestionIcon = getImageURL("images/usage/ingestion.svg");
@@ -860,7 +832,6 @@ export default defineComponent({
       usageDataType,
       lastUsageUpdated,
       elapsedText,
-      actionScriptIcon,
       errorTrackingIcon,
       rumSessionIcon,
       pipelinesPanelDataKey,

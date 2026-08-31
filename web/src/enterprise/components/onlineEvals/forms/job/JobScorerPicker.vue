@@ -43,11 +43,15 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 const options = computed(() =>
-  props.scorers.map((scorer) => ({
-    label: raw(scorer.name),
-    value: entityId(scorer),
-    badge: `${scorerTypeOf(scorer).replace("_", " ")} · v${scorer.version}`,
-  })),
+  props.scorers.map((scorer) => {
+    const referenceBased = scorer.referenceBased ?? scorer.reference_based ?? false;
+    return {
+      label: raw(scorer.name),
+      value: entityId(scorer),
+      badge: `${scorerTypeOf(scorer).replace("_", " ")} · v${scorer.version}${referenceBased ? " · experiment only" : ""}`,
+      disabled: referenceBased,
+    };
+  }),
 );
 
 function onChange(value: unknown) {

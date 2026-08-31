@@ -287,6 +287,7 @@ members = [
     "src/usage_reporting",
     "src/audit",
     "src/promql",
+    "src/metrics_index",
     "src/promql_service",
     "src/jobs",
     "src/mcp",
@@ -343,6 +344,7 @@ search_service = { path = "src/search_service" }
 usage_reporting = { path = "src/usage_reporting" }
 audit = { path = "src/audit" }
 promql = { path = "src/promql" }
+metrics_index = { path = "src/metrics_index" }
 promql-service = { path = "src/promql_service" }
 openobserve-api-common = { path = "src/api/common" }
 openobserve-api-grpc = { path = "src/api/grpc" }
@@ -357,11 +359,11 @@ o2_dex = { path = "src/enterprise/o2_dex" }
 o2_enterprise = { path = "src/enterprise/o2_enterprise", default-features = false }
 o2_openfga = { path = "src/enterprise/o2_openfga" }
 o2_ratelimit = { path = "src/enterprise/o2_ratelimit" }
-vortex = { git = "https://github.com/openobserve/vortex", rev = "1cb48912c14d9c7bd29832d9aff5666d730e1f0e", features = [
+vortex = { git = "https://github.com/openobserve/vortex", rev = "3c77193fa8fb90d055f95d8a3e1f6748a4d15f8c", features = [
     "tokio",
 ] }
-vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "1cb48912c14d9c7bd29832d9aff5666d730e1f0e" }
-vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "1cb48912c14d9c7bd29832d9aff5666d730e1f0e" }
+vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "3c77193fa8fb90d055f95d8a3e1f6748a4d15f8c" }
+vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "3c77193fa8fb90d055f95d8a3e1f6748a4d15f8c" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }

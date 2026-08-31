@@ -47,6 +47,7 @@ where
 {
     let id = active_string(&definition.id, "composite id")?;
     validate_child_ownership(&children, &id)?;
+
     let txn = conn.begin().await?;
     let definition = definition.insert(&txn).await?;
     if !children.is_empty() {
@@ -73,6 +74,7 @@ where
     let id = active_string(&replacement.id, "composite id")?;
     let org = active_string(&replacement.org, "composite org")?;
     validate_child_ownership(&children, &id)?;
+
     let txn = conn.begin().await?;
     let mut current_query =
         alert_composites::Entity::find_by_id(&id).filter(alert_composites::Column::Org.eq(&org));

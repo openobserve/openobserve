@@ -801,6 +801,7 @@ mod tests {
             folder_id: "f1".to_string(),
             name: "Folder".to_string(),
             description: String::new(),
+            icon: None,
         };
         let item = ListAlertsResponseBodyItem::try_from((folder, alert, None)).unwrap();
         assert_eq!(item.alert_type, "realtime");

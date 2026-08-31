@@ -389,15 +389,17 @@ pub async fn delete_all(
 
     let cfg = get_config();
     if is_local_disk_storage() {
-        let data_dir = format!(
-            "{}files/{org_id}/{stream_type}/{stream_name}",
-            cfg.common.data_stream_dir
-        );
-        let path = std::path::Path::new(&data_dir);
-        if path.exists() {
-            tokio::fs::remove_dir_all(path).await?;
+        for path in generate_local_stream_dirs(
+            &cfg.common.data_stream_dir,
+            org_id,
+            stream_type,
+            stream_name,
+        ) {
+            if path.exists() {
+                tokio::fs::remove_dir_all(&path).await?;
+            }
+            log::info!("deleted all files: {path:?}");
         }
-        log::info!("deleted all files: {path:?}");
     }
 
     // delete from file list
@@ -410,6 +412,28 @@ pub async fn delete_all(
     log::info!("deleted stream all: {org_id}/{stream_type}/{stream_name}");
 
     Ok(())
+}
+
+fn generate_local_stream_dirs(
+    data_stream_dir: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+) -> Vec<PathBuf> {
+    let mut dirs = vec![
+        PathBuf::from(format!(
+            "{data_stream_dir}files/{org_id}/{stream_type}/{stream_name}"
+        )),
+        PathBuf::from(format!(
+            "{data_stream_dir}files/{org_id}/index/{stream_name}_{stream_type}"
+        )),
+    ];
+    if stream_type == StreamType::Metrics {
+        dirs.push(PathBuf::from(format!(
+            "{data_stream_dir}files/{org_id}/midx/{stream_name}"
+        )));
+    }
+    dirs
 }
 
 pub async fn delete_by_date(
@@ -661,26 +685,20 @@ fn generate_local_dirs(
     date_end: DateTime<Utc>,
 ) -> Vec<PathBuf> {
     let cfg = get_config();
+    let stream_dirs = generate_local_stream_dirs(
+        &cfg.common.data_stream_dir,
+        org_id,
+        stream_type,
+        stream_name,
+    );
     let mut dirs_to_delete = Vec::new();
     while date_start < date_end {
-        let day_dir = format!(
-            "{}files/{org_id}/{stream_type}/{stream_name}/{}",
-            cfg.common.data_stream_dir,
-            date_start.format("%Y/%m/%d")
-        );
-        let day_path = std::path::Path::new(&day_dir);
-        if day_path.exists() {
-            dirs_to_delete.push(day_path.to_path_buf());
-        }
-        // index data
-        let day_dir = format!(
-            "{}files/{org_id}/index/{stream_name}_{stream_type}/{}",
-            cfg.common.data_stream_dir,
-            date_start.format("%Y/%m/%d")
-        );
-        let day_path = std::path::Path::new(&day_dir);
-        if day_path.exists() {
-            dirs_to_delete.push(day_path.to_path_buf());
+        let date = date_start.format("%Y/%m/%d").to_string();
+        for stream_dir in &stream_dirs {
+            let day_path = stream_dir.join(&date);
+            if day_path.exists() {
+                dirs_to_delete.push(day_path);
+            }
         }
         date_start += Duration::days(1); // Move to the next day
     }
@@ -809,6 +827,25 @@ mod tests {
         let stream_type = config::meta::stream::StreamType::Logs;
         let res = delete_all(org_id, stream_type, stream_name).await;
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_generate_local_stream_dirs_includes_derived_indexes() {
+        assert_eq!(
+            generate_local_stream_dirs("/data/", "org", StreamType::Metrics, "cpu"),
+            vec![
+                PathBuf::from("/data/files/org/metrics/cpu"),
+                PathBuf::from("/data/files/org/index/cpu_metrics"),
+                PathBuf::from("/data/files/org/midx/cpu"),
+            ]
+        );
+        assert_eq!(
+            generate_local_stream_dirs("/data/", "org", StreamType::Logs, "app"),
+            vec![
+                PathBuf::from("/data/files/org/logs/app"),
+                PathBuf::from("/data/files/org/index/app_logs"),
+            ]
+        );
     }
 
     #[tokio::test]

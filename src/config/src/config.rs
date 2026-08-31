@@ -52,7 +52,15 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 70;
+// Bump on every new sea-orm migration: `init_db` returns early when the stored
+// version matches, so an un-bumped migration never runs on an existing
+// deployment. Fresh installs still get it, which hides the omission locally.
+//
+// 74: create llm_playground_snapshots for Phase 3.1 shared Playground
+// snapshots.
+// 75: drop action_scripts, the actions feature is removed.
+// 76: add steps_configured to synthetics_jobs.
+pub const DB_SCHEMA_VERSION: u64 = 76;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -844,6 +852,31 @@ pub struct Config {
     pub slo: Slo,
     pub synthetics: Synthetics,
     pub alert_composite: AlertComposite,
+    pub db_monitoring: DatabaseMonitoring,
+}
+
+/// Database Monitoring (design: `db-monitoring/dbm-design-doc.md` §8) —
+/// ingest-time db span fingerprinting, server-vantage log canonicalization, the
+/// query-stats rollup job, and the DBM read APIs. OSS feature; runtime-gated on
+/// `enabled` ONLY: enabled means every DBM signal is canonicalized and served,
+/// disabled means none is. The operational tunables that used to sit beside
+/// this flag (rollup interval, top-N, normalization caps, per-signal gates)
+/// are deliberately NOT configurable — each lives as a `const` in its
+/// consuming module, carrying the same value the old knob defaulted to.
+#[derive(Debug, Serialize, EnvConfig, Default)]
+pub struct DatabaseMonitoring {
+    #[env_config(
+        name = "ZO_DB_MONITORING_ENABLED",
+        default = true,
+        help = "Enable Database Monitoring: ingest-time db span fingerprinting, server-vantage log canonicalization, the query-stats rollup job, and the DBM read APIs"
+    )]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_DB_MONITORING_ROLLUP_INTERVAL_SECS",
+        default = 900,
+        help = "Rollup window and job cadence in seconds. This is also the freshness floor: rolled-up data is up to one interval stale, and the read path covers the remainder with a live delta query over un-rolled-up spans. Lowering it shrinks that delta (cheaper reads, fresher pages) at the cost of a more frequent rollup job and more `_o2_db_stats` rows."
+    )]
+    pub rollup_interval_secs: u64,
 }
 
 /// Synthetic monitoring. Lives here rather than in `o2_enterprise` because the
@@ -1203,8 +1236,6 @@ pub struct Auth {
         help = "Secret used to sign stateless alert-chart render URLs. When empty (the default), a key is derived from the root user's stored password hash, which every node shares via the meta DB. Set explicitly to control rotation; rotating invalidates in-flight chart URLs (bounded by ZO_ALERT_CHART_URL_TTL)."
     )]
     pub alert_chart_signing_key: String,
-    #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
-    pub action_server_token: String,
     #[env_config(name = "ZO_SERVICE_ACCOUNT_ENABLED", default = true)]
     pub service_account_enabled: bool,
     /// Session cleanup interval in seconds (default: 3600 = 1 hour)
@@ -1452,6 +1483,12 @@ pub struct Search {
         help = "Enable pushdown filter for metrics queries"
     )]
     pub feature_metrics_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_METRICS_FUSED_AGG_ENABLED",
+        default = true,
+        help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output; disable to fall back to the generic evaluator"
+    )]
+    pub feature_metrics_fused_agg_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
@@ -1702,8 +1739,6 @@ pub struct Common {
         help = "Default theme color for dark mode. If not set, uses application default."
     )]
     pub default_theme_dark_mode_color: String,
-    #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
-    pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
     pub bloom_filter_enabled: bool,
     #[env_config(
@@ -2230,16 +2265,14 @@ pub struct Limit {
     pub traces_query_retention: String,
     #[env_config(name = "ZO_METRICS_QUERY_RETENTION", default = "daily")]
     pub metrics_query_retention: String,
-    #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
-    pub metrics_leader_push_interval: u64,
-    #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
-    pub metrics_leader_election_interval: i64,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_METRICS_MAX_SERIES_RESPONSE", default = 40000)]
     pub metrics_max_series_response: usize,
-    #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
-    pub metrics_cache_max_entries: usize,
+    // Memory budget in MB for the PromQL result cache index. 0 (default)
+    // means auto: 1% of total memory, clamped to [32, 256] MB.
+    #[env_config(name = "ZO_METRICS_RESULT_CACHE_MAX_SIZE", default = 0)]
+    pub metrics_result_cache_max_size: usize,
     // Memory budget in MB for the PromQL series label cache. 0 (default)
     // means auto: 5% of total memory, clamped to [100, 1024] MB.
     #[env_config(name = "ZO_METRICS_LABEL_CACHE_MAX_SIZE", default = 0)]
@@ -2627,6 +2660,12 @@ pub struct Limit {
 pub struct Compact {
     #[env_config(name = "ZO_COMPACT_ENABLED", default = true)]
     pub enabled: bool,
+    #[env_config(
+        name = "ZO_METRICS_INDEX_ENABLED",
+        default = false,
+        help = "Experimental metrics index layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-v1-` file name prefix; the compactor writes the configured Parquet or Vortex format and merges a closed hour into size-split `indexed-v1-` files with a `.midx` metrics index. Only affects newly written metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
+    )]
+    pub metrics_index_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
     #[env_config(
@@ -2973,6 +3012,12 @@ pub struct Sns {
 
 #[derive(Serialize, Debug, EnvConfig, Default)]
 pub struct Prometheus {
+    #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
+    pub dedup_enabled: bool,
+    #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
+    pub leader_push_interval: u64,
+    #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
+    pub leader_election_interval: i64,
     #[env_config(name = "ZO_PROMETHEUS_HA_CLUSTER", default = "cluster")]
     pub ha_cluster_label: String,
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
@@ -3527,9 +3572,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.metrics_max_points_per_series == 0 {
         cfg.limit.metrics_max_points_per_series = 30_000;
     }
-    if cfg.limit.metrics_cache_max_entries == 0 {
-        cfg.limit.metrics_cache_max_entries = 10_000;
-    }
 
     // check search job retention
     if cfg.limit.search_job_retention == 0 {
@@ -3577,11 +3619,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         && !local_node_role.contains(&cluster::Role::Querier)
     {
         cfg.common.tracing_enabled = false;
-    }
-
-    if local_node_role.contains(&cluster::Role::ActionServer) {
-        // action server does not have external dep, so can ignore their config check
-        return Ok(());
     }
 
     // format local_mode_storage
@@ -3953,6 +3990,20 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.limit.datafusion_file_stat_cache_max_size *= SIZE_IN_MB as usize;
+    }
+
+    if cfg.limit.metrics_result_cache_max_size == 0 {
+        // 1% of total mem, clamped to [32, 256] MB; the promql result cache
+        // index holds roughly 200 B per entry at this size.
+        cfg.limit.metrics_result_cache_max_size =
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
+                * (SIZE_IN_MB as usize);
+    } else {
+        if cfg.limit.metrics_result_cache_max_size < 32 {
+            log::warn!("ZO_METRICS_RESULT_CACHE_MAX_SIZE raised to the 32 MB minimum");
+        }
+        cfg.limit.metrics_result_cache_max_size =
+            cfg.limit.metrics_result_cache_max_size.max(32) * (SIZE_IN_MB as usize);
     }
     Ok(())
 }
@@ -5384,6 +5435,63 @@ mod tests {
         assert!(check_compact_config(&mut cfg).is_ok());
         cfg.compact.data_retention_days = 0; // 0 means disabled
         assert!(check_compact_config(&mut cfg).is_ok());
+    }
+
+    #[test]
+    fn test_db_monitoring_config_defaults() {
+        // DBM's config surface is the feature flag plus ONE operational knob.
+        // The per-SIGNAL flags stay gone (product decision: enabled means every
+        // DBM signal is canonicalized and served, disabled means none is), but
+        // the rollup interval is back as config because it is the freshness
+        // floor of every rollup-backed page and the sizing input for the read
+        // path's live delta — a deployment's right value depends on its span
+        // volume, which no shipped constant can know. It ships ON, at 900 s.
+        let cfg = Config::init().unwrap();
+        assert!(cfg.db_monitoring.enabled);
+        assert_eq!(cfg.db_monitoring.rollup_interval_secs, 900);
+    }
+
+    /// The interval is read through `rollup_interval_secs()`, which clamps to
+    /// [60, 3600]. A deployment that sets 0 (or omits the var into a 0 default
+    /// on some loader path) would otherwise divide the job cadence to zero and
+    /// spin, and an unbounded upper value makes the read path's delta a
+    /// full-window scan on every miss.
+    #[test]
+    fn test_db_monitoring_rollup_interval_is_clamped() {
+        // Mirrors the accessor's clamp, asserted here so the bound is pinned
+        // next to the field it guards.
+        assert_eq!(0_u64.clamp(60, 3600), 60);
+        assert_eq!(30_u64.clamp(60, 3600), 60);
+        assert_eq!(900_u64.clamp(60, 3600), 900);
+        assert_eq!(86_400_u64.clamp(60, 3600), 3600);
+    }
+
+    /// The UI gates the whole DBM menu/route surface on this flag, so it only
+    /// does anything if it reaches `zoConfig`. A flag the UI cannot see is a
+    /// flag that silently does nothing — and nothing else in the workspace
+    /// fails when the wiring is missing, because both halves compile fine
+    /// alone. It is also the ONLY `database_monitoring_*` field the /config
+    /// payload may carry: the per-signal flags were removed with their knobs,
+    /// and re-adding one here would silently resurrect a config surface the
+    /// product decided away.
+    #[test]
+    fn test_db_monitoring_flag_reaches_the_frontend_and_is_the_only_one() {
+        let status = include_str!("../../api/management/src/request/status/mod.rs");
+        assert!(
+            status.contains("database_monitoring_enabled"),
+            "the flag must be exposed on the config payload the UI reads"
+        );
+        assert!(
+            status.contains("cfg.db_monitoring.enabled"),
+            "the exposed field must be fed from the config flag, not hardcoded"
+        );
+        assert_eq!(
+            status.matches("database_monitoring_").count(),
+            2, // one struct field + one construction site
+            "database_monitoring_enabled must be the ONLY database_monitoring_* \
+             field on the /config payload — the per-signal flags were removed \
+             when the config collapsed to a single switch"
+        );
     }
 
     #[test]

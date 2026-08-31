@@ -16,11 +16,7 @@
 use std::sync::Arc;
 
 use arrow::array::RecordBatch;
-use config::{
-    FileFormat, get_config,
-    meta::stream::FileMeta,
-    utils::parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
-};
+use config::{get_config, meta::stream::FileMeta};
 use datafusion::{
     arrow::datatypes::Schema,
     catalog::TableProvider,
@@ -32,57 +28,19 @@ use parquet::{
     arrow::{AsyncArrowWriter, async_writer::AsyncFileWriter},
     file::metadata::KeyValue,
 };
-use vortex::{
-    VortexSessionDefault,
-    array::ArrayRef,
-    arrow::{FromArrowArray, FromArrowType},
-    dtype::DType,
-    file::VortexWriteOptions,
-    io::session::RuntimeSessionExt,
-    session::VortexSession,
-};
 
 use super::table_provider::uniontable::NewUnionTable;
-use crate::datafusion::{
-    exec::DataFusionContextBuilder,
-    sort_order::FileSortOrder,
-    vortex::{VORTEX_RUNTIME, vortex_write_strategy},
-};
+use crate::datafusion::{exec::DataFusionContextBuilder, sort_order::FileSortOrder};
 
 #[cfg(feature = "enterprise")]
 pub mod downsampling;
+mod metrics;
 pub mod mode;
+mod result;
+mod single_file;
 
 pub use mode::{MergeMode, MergeOutput};
-
-/// One file written by [`merge_parquet_files`].
-pub struct MergedFile {
-    pub buf: Vec<u8>,
-    pub meta: FileMeta,
-}
-
-pub struct MergeParquetResult {
-    pub files: Vec<MergedFile>,
-    pub file_format: FileFormat,
-}
-
-impl MergeParquetResult {
-    /// The merged file, for callers that always merge into exactly one file
-    /// (the ingester movers).
-    pub fn into_single(self) -> Result<(MergedFile, FileFormat)> {
-        let Self {
-            mut files,
-            file_format,
-        } = self;
-        if files.len() != 1 {
-            return Err(DataFusionError::Execution(format!(
-                "merge_parquet_files produced {} files, expected exactly one",
-                files.len()
-            )));
-        }
-        Ok((files.pop().unwrap(), file_format))
-    }
-}
+pub use result::{MergeResult, MergedFile};
 
 /// Merge `tables` (the union of the input files) into one or more files
 /// according to `mode`, written as `output` says.
@@ -90,17 +48,44 @@ pub async fn merge_parquet_files(
     schema: Arc<Schema>,
     tables: Vec<Arc<dyn TableProvider>>,
     bloom_filter_fields: &[String],
-    mut metadata: FileMeta,
+    metadata: FileMeta,
     mode: &MergeMode,
     output: MergeOutput,
-) -> Result<MergeParquetResult> {
+) -> Result<MergeResult> {
     let start = std::time::Instant::now();
     let sql = mode.sql(&schema);
     log::debug!("merge_parquet_files [{mode}] sql: {sql}");
-    let (schema, mut rx, read_task) =
-        run_merge_query(&sql, mode.input_sort_order(), schema, tables).await?;
+    let (schema, rx, read_task) =
+        run_merge_query(&sql, mode.output_sort_order(), schema, tables).await?;
 
     let files = match mode {
+        MergeMode::MetricsIndexed => {
+            metrics::write_files(
+                &schema,
+                bloom_filter_fields,
+                &metadata,
+                output.file_format,
+                get_config().compact.max_file_size,
+                rx,
+                read_task,
+            )
+            .await?
+        }
+        MergeMode::Classic
+        | MergeMode::TraceTimeIndex
+        | MergeMode::FileList
+        | MergeMode::MetricsHashSorted => {
+            single_file::write(
+                schema,
+                bloom_filter_fields,
+                metadata,
+                mode,
+                output,
+                rx,
+                read_task,
+            )
+            .await?
+        }
         #[cfg(feature = "enterprise")]
         MergeMode::Downsampling(_) => {
             downsampling::write_files(
@@ -113,27 +98,6 @@ pub async fn merge_parquet_files(
             )
             .await?
         }
-        _ => {
-            let buf = match output.file_format {
-                FileFormat::Parquet => {
-                    write_parquet(
-                        &schema,
-                        bloom_filter_fields,
-                        &metadata,
-                        output.parquet_compression,
-                        &mut rx,
-                        read_task,
-                    )
-                    .await?
-                }
-                FileFormat::Vortex => write_vortex(schema, &metadata, rx, read_task).await?,
-            };
-            metadata.compressed_size = buf.len() as i64;
-            vec![MergedFile {
-                buf,
-                meta: metadata,
-            }]
-        }
     };
 
     log::debug!(
@@ -141,7 +105,7 @@ pub async fn merge_parquet_files(
         files.len(),
         start.elapsed().as_millis()
     );
-    Ok(MergeParquetResult {
+    Ok(MergeResult {
         files,
         file_format: output.file_format,
     })
@@ -149,9 +113,11 @@ pub async fn merge_parquet_files(
 
 /// Plan and start `sql` over the union of `tables`; the record batches arrive
 /// on the returned channel, the task reports the stream's completion / error.
+/// `sort_order` only enables `split_file_groups_by_statistics` for that
+/// order; the input tables declare what the files really carry.
 async fn run_merge_query(
     sql: &str,
-    input_sort_order: FileSortOrder,
+    sort_order: FileSortOrder,
     schema: Arc<Schema>,
     tables: Vec<Arc<dyn TableProvider>>,
 ) -> Result<(
@@ -162,7 +128,7 @@ async fn run_merge_query(
     let cfg = get_config();
     let ctx = DataFusionContextBuilder::new()
         .trace_id("merge_parquet_files")
-        .sort_order(input_sort_order)
+        .sort_order(sort_order)
         .build(cfg.limit.datafusion_min_partition_num)
         .await?;
     // register union table
@@ -209,86 +175,6 @@ async fn run_merge_query(
     Ok((schema, rx, read_task))
 }
 
-async fn write_parquet(
-    schema: &Arc<Schema>,
-    bloom_filter_fields: &[String],
-    metadata: &FileMeta,
-    compression: Option<&str>,
-    rx: &mut tokio::sync::mpsc::Receiver<RecordBatch>,
-    read_task: tokio::task::JoinHandle<Result<()>>,
-) -> Result<Vec<u8>> {
-    let mut buf = Vec::new();
-    let mut writer = new_parquet_writer(
-        &mut buf,
-        schema,
-        bloom_filter_fields,
-        metadata,
-        false,
-        compression,
-    );
-
-    let mut new_file_meta = metadata.clone();
-    new_file_meta.records = 0;
-    while let Some(batch) = rx.recv().await {
-        new_file_meta.records += batch.num_rows() as i64;
-        if let Err(e) = writer.write(&batch).await {
-            log::error!("merge_parquet_files write error: {e}");
-            return Err(e.into());
-        }
-    }
-
-    read_task
-        .await
-        .map_err(|e| DataFusionError::External(Box::new(e)))??;
-    append_metadata(&mut writer, &new_file_meta)?;
-    writer.close().await?;
-    Ok(buf)
-}
-
-async fn write_vortex(
-    schema: Arc<Schema>,
-    metadata: &FileMeta,
-    mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
-    read_task: tokio::task::JoinHandle<Result<()>>,
-) -> Result<Vec<u8>> {
-    // metadata segments belong to the write options, they can't be appended at
-    // close time like parquet's, so `records` may drift from the rows written
-    let file_meta = encode_vortex_file_meta(metadata);
-    let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
-        VORTEX_RUNTIME.block_on(async move {
-            let mut buf = Vec::new();
-            let session = VortexSession::default().with_tokio();
-            let dtype = DType::from_arrow(schema.as_ref());
-            let write_options = VortexWriteOptions::new(session.clone())
-                .with_strategy(vortex_write_strategy())
-                .with_metadata_segment(VORTEX_FILE_META_KEY, file_meta);
-            let mut writer = write_options.writer(&mut buf, dtype);
-
-            while let Some(batch) = rx.recv().await {
-                let array: ArrayRef = ArrayRef::from_arrow(batch, false).map_err(|e| {
-                    DataFusionError::Execution(format!(
-                        "Failed to convert arrow array to vortex array: {e}"
-                    ))
-                })?;
-                writer.push(array).await?;
-            }
-
-            writer.finish().await?;
-
-            Ok::<Vec<u8>, anyhow::Error>(buf)
-        })
-    });
-
-    read_task
-        .await
-        .map_err(|e| DataFusionError::External(Box::new(e)))??;
-
-    writer_task
-        .await
-        .map_err(|e| DataFusionError::Execution(format!("Vortex runtime task failed: {e}")))?
-        .map_err(|e| DataFusionError::Execution(format!("Failed to write vortex file: {e}")))
-}
-
 pub fn append_metadata<W: AsyncFileWriter>(
     writer: &mut AsyncArrowWriter<W>,
     file_meta: &FileMeta,
@@ -318,13 +204,41 @@ mod tests {
 
     use arrow::array::{Array, Int64Array, StringArray};
     use arrow_schema::{DataType, Field, Schema};
-    use bytes::Bytes;
-    use config::{TIMESTAMP_COL_NAME, meta::stream::StreamType};
+    use config::{FileFormat, TIMESTAMP_COL_NAME, meta::stream::StreamType};
     use datafusion::datasource::MemTable;
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
-    use vortex::file::OpenOptionsSessionExt;
 
     use super::*;
+
+    #[test]
+    fn merged_file_names_only_mark_metrics_layouts() {
+        let standard = MergedFile::Standard {
+            data: Vec::new(),
+            meta: FileMeta::default(),
+        };
+        assert_eq!(standard.file_name("1", FileFormat::Vortex), "1.vortex");
+        assert_eq!(
+            standard.mark_file_key("files/o/logs/s/1.parquet"),
+            "files/o/logs/s/1.parquet"
+        );
+
+        let metrics = MergedFile::MetricsHashSorted {
+            data: Vec::new(),
+            meta: FileMeta::default(),
+        };
+        assert_eq!(
+            metrics.file_name("1", FileFormat::Parquet),
+            "hash-sorted-v1-1.parquet"
+        );
+        assert_eq!(
+            metrics.file_name("1", FileFormat::Vortex),
+            "hash-sorted-v1-1.vortex"
+        );
+        assert_eq!(
+            metrics.mark_file_key("files/o/metrics/s/1.parquet"),
+            "files/o/metrics/s/hash-sorted-v1-1.parquet"
+        );
+    }
 
     fn create_test_schema() -> Arc<Schema> {
         Arc::new(Schema::new(vec![
@@ -378,7 +292,7 @@ mod tests {
         .unwrap();
         let table = Arc::new(MemTable::try_new(schema.clone(), vec![vec![batch]]).unwrap());
 
-        let mode = MergeMode::for_ingester(StreamType::Metadata, "trace_time_index_test");
+        let mode = MergeMode::for_ingester(StreamType::Metadata, "trace_time_index_test", &schema);
         assert!(matches!(mode, MergeMode::TraceTimeIndex));
         let merged = merge_parquet_files(
             schema,
@@ -396,7 +310,8 @@ mod tests {
         .await
         .unwrap();
         let (merged, _) = merged.into_single().unwrap();
-        let batches = ParquetRecordBatchReaderBuilder::try_new(Bytes::from(merged.buf))
+        let (data, _) = merged.into_buffered().unwrap();
+        let batches = ParquetRecordBatchReaderBuilder::try_new(bytes::Bytes::from(data))
             .unwrap()
             .build()
             .unwrap()
@@ -451,51 +366,5 @@ mod tests {
         // MAX(session_id) ignores NULLs: trace a keeps the one known session.
         assert_eq!(rows["a"], (100, Some("session-a".to_string()), 80, 140));
         assert_eq!(rows["b"], (120, None, 120, 125));
-    }
-
-    #[tokio::test]
-    async fn test_write_vortex_carries_file_meta() {
-        let schema = create_test_schema();
-        let batch = RecordBatch::try_new(
-            schema.clone(),
-            vec![
-                Arc::new(Int64Array::from(vec![100, 200, 300])),
-                Arc::new(StringArray::from(vec!["a", "b", "c"])),
-                Arc::new(Int64Array::from(vec![1, 2, 3])),
-            ],
-        )
-        .unwrap();
-
-        let metadata = FileMeta {
-            min_ts: 100,
-            max_ts: 300,
-            records: 3,
-            original_size: 1024,
-            ..Default::default()
-        };
-
-        let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
-        tx.send(batch).await.unwrap();
-        drop(tx);
-        let read_task = tokio::task::spawn(async { Ok(()) });
-
-        let buf = write_vortex(schema, &metadata, rx, read_task)
-            .await
-            .unwrap();
-
-        let session = VortexSession::default().with_tokio();
-        let vxf = session
-            .open_options()
-            .include_metadata()
-            .open_buffer(vortex::buffer::Buffer::from(buf))
-            .unwrap();
-        let segment = vxf.metadata_segment(VORTEX_FILE_META_KEY).unwrap();
-        let file_meta: config::utils::json::Value =
-            config::utils::json::from_slice(segment.as_slice()).unwrap();
-        assert_eq!(file_meta["min_ts"], metadata.min_ts);
-        assert_eq!(file_meta["max_ts"], metadata.max_ts);
-        assert_eq!(file_meta["records"], metadata.records);
-        assert_eq!(file_meta["original_size"], metadata.original_size);
-        assert_eq!(vxf.row_count(), 3);
     }
 }

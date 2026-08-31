@@ -2238,3 +2238,142 @@ describe("dashboardAutoQueryBuilder", () => {
     });
   });
 });
+
+describe("buildSQLQueryFromInput — cast", () => {
+  const defaultStream = "aws_cost_cur";
+  const fieldArg = { type: "field", value: { field: "lineitem_usageamount" } };
+
+  it("renders a safe cast as TRY_CAST", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [fieldArg, { type: "castType", value: "DOUBLE" }],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE)");
+  });
+
+  it("renders a strict cast as CAST", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "cast",
+        args: [fieldArg, { type: "castType", value: "BIGINT" }],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("CAST(aws_cost_cur.lineitem_usageamount AS BIGINT)");
+  });
+
+  it("nests inside an aggregation", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "sum",
+        args: [
+          {
+            type: "function",
+            value: {
+              functionName: "try_cast",
+              args: [fieldArg, { type: "castType", value: "DOUBLE" }],
+            },
+          },
+        ],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("sum(TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE))");
+  });
+
+  it("nests inside a percentile, which appends its own argument", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "p95",
+        args: [
+          {
+            type: "function",
+            value: {
+              functionName: "try_cast",
+              args: [fieldArg, { type: "castType", value: "DOUBLE" }],
+            },
+          },
+        ],
+      },
+      defaultStream,
+    );
+    expect(result).toBe(
+      "approx_percentile_cont(TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE), 0.95)",
+    );
+  });
+
+  it("reads the target type by kind, not by position", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [{ type: "castType", value: "BIGINT" }, fieldArg],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS BIGINT)");
+  });
+
+  it("still casts when a saved panel carries no target type", () => {
+    const result = buildSQLQueryFromInput(
+      { functionName: "try_cast", args: [fieldArg] },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE)");
+  });
+
+  it("ignores a stray argument that is not a value or a type", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [
+          fieldArg,
+          { type: "string", value: "DOUBLE) FROM secrets --" },
+          { type: "castType", value: "DOUBLE" },
+        ],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE)");
+  });
+
+  it("returns an empty string when only a target type is present", () => {
+    const result = buildSQLQueryFromInput(
+      { functionName: "try_cast", args: [{ type: "castType", value: "DOUBLE" }] },
+      defaultStream,
+    );
+    expect(result).toBe("");
+  });
+
+  it("falls back to the default type rather than emitting an unknown one", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [fieldArg, { type: "castType", value: "DOUBLE) FROM secrets --" }],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE)");
+  });
+
+  it("returns an empty string when the value argument is missing", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [
+          { type: "field", value: {} },
+          { type: "castType", value: "DOUBLE" },
+        ],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("");
+  });
+
+  it("adds the target type argument when a saved panel omits it", () => {
+    const result = addMissingArgs({ functionName: "try_cast", args: [fieldArg] });
+    expect(result.args[1]).toEqual({ type: "castType", value: "DOUBLE" });
+  });
+});

@@ -617,6 +617,11 @@ export default defineComponent({
           console.error("Error while parsing panel data", e);
         }
 
+        const queryCount = dashboardPanelData.data.queries?.length ?? 0;
+        if (dashboardPanelData.layout.currentQueryIndex >= queryCount) {
+          dashboardPanelData.layout.currentQueryIndex = queryCount > 0 ? queryCount - 1 : 0;
+        }
+
         // Set the VRL toggle for the active query: on iff it has a VRL function.
         dashboardPanelData.layout.vrlFunctionToggle = isQueryVrlEnabled(
           dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex],

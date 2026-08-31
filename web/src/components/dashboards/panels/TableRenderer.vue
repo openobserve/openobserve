@@ -38,13 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :horizontal-scroll="true"
       :row-height="22"
       :virtual-scroll="virtualizeRows"
+      :window-row-model="virtualizeRows"
       :default-columns="false"
       :show-global-filter="false"
       :enable-column-filter="enableFiltering"
       :enable-column-format="enableColumnFormat"
       @format-column="onFormatColumn"
       :enable-column-reorder="false"
-      :enable-cell-copy="true"
+      :enable-cell-copy="false"
       :class="{ 'wrap-enabled': wrapCells }"
       data-test="dashboard-panel-table"
       @row-click="
@@ -80,6 +81,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ formatCellValue(value, column, row) }}
         </a>
         <span v-else>{{ formatCellValue(value, column, row) }}</span>
+      </template>
+
+      <template #cell-hover-actions="{ row, column, value }">
+        <OButton
+          v-if="isCopyableCellValue(value)"
+          variant="ghost"
+          size="icon-xs-circle"
+          :data-test="`dashboard-table-cell-copy-${column.id}`"
+          :data-copied="copiedCellKey === cellKey(column, row) ? 'true' : undefined"
+          @click.stop="copyCellValue(value, column, row)"
+        >
+          <OIcon
+            :name="copiedCellKey === cellKey(column, row) ? 'check' : 'content-copy'"
+            size="xs"
+          />
+          <OTooltip :content="t('common.copy')" />
+        </OButton>
+        <OButton
+          v-if="isCellDrillable(column.id)"
+          variant="ghost"
+          size="icon-xs-circle"
+          :data-test="`dashboard-table-cell-drilldown-${column.id}`"
+          @click.stop="onCellDrilldown({ columnId: column.id, row, value })"
+        >
+          <OIcon name="search" size="xs" />
+          <OTooltip :content="t('dashboard.tableCellDrilldownTooltip')" />
+        </OButton>
       </template>
 
       <!-- PanelSchemaRenderer excludes `table` panels from its own OEmptyState,
@@ -128,16 +156,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from "vue";
+import { defineComponent, ref, computed, watch, type PropType } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import JsonFieldRenderer from "@/components/dashboards/panels/JsonFieldRenderer.vue";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import { isColorDark } from "@/utils/dashboard/chartColorUtils";
 import { buildValueMappingCache, lookupValueMappingFull } from "@/utils/dashboard/tableConfigUtils";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 
 export default defineComponent({
@@ -145,6 +177,9 @@ export default defineComponent({
   components: {
     OTable,
     OEmptyState,
+    OButton,
+    OIcon,
+    OTooltip,
     TablePaginationControls,
     JsonFieldRenderer,
   },
@@ -185,8 +220,20 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** Column ids drillable → Logs (group-by fields); empty hides the button. */
+    drilldownColumns: {
+      required: false,
+      type: Array as PropType<string[]>,
+      default: () => [],
+    },
+    /** SELECT * / dynamic-columns tables: every cell is drillable. */
+    drilldownAllColumns: {
+      required: false,
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["row-click", "format-column"],
+  emits: ["row-click", "format-column", "explore-cell"],
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18nTyped();
@@ -341,6 +388,35 @@ export default defineComponent({
 
     // Colour engine, in precedence order: auto-color palette → value-mapping →
     // conditional rules → column override.
+    const drilldownColumnSet = computed(() => new Set(props.drilldownColumns));
+    const isCellDrillable = (columnId: string) =>
+      props.drilldownAllColumns || drilldownColumnSet.value.has(columnId);
+
+    // Dedicated drilldown event (the search icon), independent of row-click, so it fires even when
+    // a panel drilldown config would otherwise own plain cell clicks.
+    const onCellDrilldown = (params: { columnId: string; row: any; value: any }) => {
+      if (!isCellDrillable(params.columnId)) return;
+      emit("explore-cell", params, sortedRows.value.indexOf(params.row));
+    };
+
+    const isCopyableCellValue = (value: any) =>
+      value !== null && value !== undefined && String(value).trim() !== "";
+
+    const copiedCellKey = ref<string | null>(null);
+    let copiedTimer: ReturnType<typeof setTimeout> | null = null;
+    const cellKey = (column: any, row: any) => `${column?.id}#${sortedRows.value.indexOf(row)}`;
+
+    const copyCellValue = async (value: any, column: any, row: any) => {
+      const text = String(formatCellValue(value, column, row) ?? "");
+      const ok = await copyToClipboard(text, t, { silent: true });
+      if (!ok) return;
+      copiedCellKey.value = cellKey(column, row);
+      if (copiedTimer) clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => {
+        copiedCellKey.value = null;
+      }, 2000);
+    };
+
     const cellStyleFn = computed(
       () =>
         (params: { columnId: string; row: any; value: any }): Record<string, any> => {
@@ -492,7 +568,12 @@ export default defineComponent({
     };
 
     const downloadTableAsJSON = (title?: string) => {
-      const rows = tableRef.value?.getRows() ?? [];
+      // Strip the internal per-query marker (`__q`) so it never leaks into exports.
+      const rows = (tableRef.value?.getRows() ?? []).map((row: any) => {
+        const copy = { ...row };
+        delete copy.__q;
+        return copy;
+      });
       const content = JSON.stringify({ columns: props.data?.columns, rows }, null, 2);
       const blob = new Blob([content], { type: "application/json" });
       const url = URL.createObjectURL(blob);
@@ -533,6 +614,12 @@ export default defineComponent({
       handleSortChange,
       onOTableSortChange,
       onFormatColumn,
+      onCellDrilldown,
+      isCellDrillable,
+      isCopyableCellValue,
+      copyCellValue,
+      copiedCellKey,
+      cellKey,
       getTableCsvString,
       downloadTableAsCSV,
       downloadTableAsJSON,

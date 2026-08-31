@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod action;
 #[cfg(feature = "enterprise")]
 pub mod ai;
 pub mod alerts;
@@ -31,9 +30,17 @@ pub mod destinations;
 pub mod discovery;
 #[cfg(feature = "enterprise")]
 pub mod eval_jobs;
+#[cfg(feature = "enterprise")]
+pub mod experiment_comparison;
+#[cfg(feature = "enterprise")]
+pub mod experiments;
 pub mod folders;
 #[cfg(feature = "enterprise")]
+pub mod playground;
+#[cfg(feature = "enterprise")]
 pub mod providers;
+#[cfg(feature = "enterprise")]
+pub mod remote_tasks;
 pub mod reports;
 #[cfg(feature = "enterprise")]
 pub mod score_configs;

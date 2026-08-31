@@ -22,9 +22,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       :title="t('alerts.header')"
-      :subtitle="t('alerts.subtitle')"
       icon="shield-alert-outline"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
     >
+      <!-- The header names the GROUP the four tabs form — "Alerts" — not the
+           page; the active tab says which sibling you are on. Same title,
+           subtitle and icon on all four (PipelineSectionTabs makes the same
+           trade). -->
+      <template #header-tabs>
+        <AlertSectionTabs />
+      </template>
+
       <template #actions>
         <!-- The provider behind the Terraform export tab, which is otherwise
              only discoverable once the export dialog is already open. -->
@@ -51,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-list-add-alert-btn"
           variant="primary"
           size="sm"
+          icon-left="add"
           :disabled="!destinations.length || !templates.length"
           :title="!destinations.length ? t('alerts.noDestinations') : ''"
           @click="
@@ -79,14 +89,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right: Table -->
         <div class="h-full min-w-0 flex-1">
           <div class="bg-card-glass-bg flex h-full flex-col">
-            <div class="border-border-default shrink-0 border-b px-3 py-2">
-              <AppTabs
-                :tabs="alertTabs"
-                :active-tab="activeTab"
-                size="sm"
-                @update:active-tab="onAlertTabChange"
-              />
-            </div>
             <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
             <OTable
               class="min-h-0 flex-1"
@@ -134,6 +136,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
               <template #toolbar>
                 <div class="flex w-full items-center gap-2">
+                  <OToggleGroup
+                    :model-value="activeTab"
+                    data-test="alert-list-tabs"
+                    @update:model-value="(v) => onAlertTabChange(v as string)"
+                  >
+                    <OToggleGroupItem
+                      v-for="tab in alertTabs"
+                      :key="tab.value"
+                      :value="tab.value"
+                      size="sm"
+                      :icon-left="tab.icon"
+                      :data-test="`alert-list-tab-${tab.value}`"
+                    >
+                      {{ tab.label }}
+                    </OToggleGroupItem>
+                  </OToggleGroup>
                   <div class="min-w-0 flex-1">
                     <OInput
                       v-model="dynamicQueryModel"
@@ -889,8 +907,8 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
-import AppTabs from "@/components/common/AppTabs.vue";
 import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
+import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
 import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
 import { alertsToTerraform } from "@/utils/alerts/alertTerraform";
@@ -932,10 +950,10 @@ export default defineComponent({
     OUserCell,
     OTag,
     OStatStrip,
-    AppTabs,
     CompositeReferencesDrawer,
     ExportResourceDialog,
     IacRegistryLinks,
+    AlertSectionTabs,
   },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
@@ -2418,6 +2436,40 @@ export default defineComponent({
         page: "Add Alert",
       });
     };
+    // A delete is one row leaving a list the server has already confirmed. Splice
+    // it out — of the rows, the filtered view, the selection AND the per-folder
+    // cache a folder revisit is served from — instead of refetching every alert in
+    // the folder behind a loading toast and the table's skeleton, which reads as a
+    // page reload and takes the user's scroll and page with it.
+    const dropAlerts = (alertIds: any[]) => {
+      const gone = new Set(alertIds.filter(Boolean).map((id: any) => String(id)));
+      if (!gone.size) return;
+
+      const keep = (row: any) => !gone.has(String(row?.alert_id));
+      allAlerts.value = allAlerts.value.filter(keep);
+      filteredResults.value = filteredResults.value.filter(keep);
+      // Anything that failed to delete stays selected, so a bulk retry is one click.
+      selectedAlertIds.value = selectedAlertIds.value.filter((id: string) => !gone.has(String(id)));
+
+      // Without this the row returns the moment the user leaves the folder and
+      // comes back — that path reads the store, never the API. EVERY cached
+      // folder, not just the active one: a cross-folder search deletes alerts
+      // that live elsewhere, and that folder's own cache still holds them.
+      const byFolder = store.state.organizationData.allAlertsListByFolderId;
+      if (byFolder && typeof byFolder === "object") {
+        const pruned = Object.fromEntries(
+          Object.entries(byFolder).map(([folderId, rows]) => [
+            folderId,
+            Array.isArray(rows) ? rows.filter(keep) : rows,
+          ]),
+        );
+        store.dispatch("setAllAlertsListByFolderId", pruned);
+      }
+
+      // The alert is gone from every destination and template that referenced it.
+      invalidateDependencyGraphCache();
+    };
+
     const deleteAlertByAlertId = () => {
       alertsService
         .delete_by_alert_id(
@@ -2431,10 +2483,7 @@ export default defineComponent({
               variant: "success",
               message: res.data.message,
             });
-            await getAlertsFn(store, activeFolderId.value);
-            if (filterQuery.value) {
-              filterAlertsByQuery(filterQuery.value);
-            }
+            dropAlerts([selectedDelete.value.alert_id]);
           } else {
             toast({
               variant: "error",
@@ -3178,12 +3227,19 @@ export default defineComponent({
           });
         }
 
-        selectedAlerts.value = [];
-        // Refresh alerts
-        await getAlertsFn(store, activeFolderId.value);
-
-        if (filterQuery.value) {
-          filterAlertsByQuery(filterQuery.value);
+        // `successful` carries the ids the server actually deleted; the shape has
+        // varied, so accept a bare id or an object carrying one. An unrecognised
+        // shape is NOT taken as "all of them" — splicing rows the server may have
+        // kept would show a delete that never happened; refetch and let the
+        // server say.
+        if (Array.isArray(response.data?.successful)) {
+          dropAlerts(
+            response.data.successful.map((entry: any) => entry?.alert_id ?? entry?.id ?? entry),
+          );
+        } else {
+          selectedAlerts.value = [];
+          await getAlertsFn(store, activeFolderId.value);
+          if (filterQuery.value) filterAlertsByQuery(filterQuery.value);
         }
       } catch (error: any) {
         dismiss();

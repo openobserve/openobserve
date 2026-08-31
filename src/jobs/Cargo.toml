@@ -29,6 +29,7 @@ cloud = [
     "enterprise",
     "o2_enterprise/cloud",
     "openobserve-core/cloud",
+    "openobserve-synthetics/cloud",
     "stream/cloud",
 ]
 vectorscan = [
@@ -70,6 +71,7 @@ hashbrown.workspace = true
 infra.workspace = true
 ingester.workspace = true
 log.workspace = true
+metrics_index.workspace = true
 transform.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }

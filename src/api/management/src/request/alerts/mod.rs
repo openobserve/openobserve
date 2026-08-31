@@ -28,7 +28,7 @@ use config::meta::{
 };
 use db::scheduler;
 use hashbrown::HashMap;
-use infra::db::{ORM_CLIENT, connect_to_orm};
+use infra::db::{get_orm_client_ro, get_orm_client_rw};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     alerts::{
@@ -80,6 +80,8 @@ pub mod external_events;
 pub mod history;
 pub mod incident_integrations;
 pub mod incidents;
+#[cfg(feature = "cloud")]
+pub mod slack_oauth;
 pub mod templates;
 
 /// CreateAlert
@@ -132,7 +134,7 @@ pub async fn create_alert(
     }
     alert.last_edited_by = Some(user_email.user_id);
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match alert::create(client, &org_id, &folder_id, alert, overwrite).await {
         Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Alert saved")
@@ -335,7 +337,7 @@ async fn composite_detail_response(
     )
     .await
     .is_ok();
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
 
     // Evaluate exactly as the scheduler would (system context, no child query).
     // Inaccessible children are masked below; a failed evaluation degrades to
@@ -693,7 +695,7 @@ pub async fn validate_composite_alert(
             inaccessible.push(id.clone());
         }
     }
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     // Resolve every reference in one batched query instead of per-ID round trips.
     let resolutions = infra::table::alert_composites::resolve_many(db, &org_id, &references)
         .await
@@ -835,7 +837,7 @@ pub async fn get_composite_references(
     Path((org_id, alert_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let subject = openobserve_core::alerts::composite::get_composite(&org_id, &alert_id)
         .await
         .ok()
@@ -850,25 +852,22 @@ pub async fn get_composite_references(
     if subject.is_none() {
         // The subject is a regular alert (or missing): authorize it too, so a
         // caller who cannot read it doesn't learn which composites reference it.
-        match infra::table::alert_composites::resolve_by_id(db, &org_id, &alert_id).await {
-            Ok(infra::table::alert_composites::Resolution::Alert(alert)) => {
-                if !check_permissions(
-                    &alert_id,
-                    &org_id,
-                    &user_email.user_id,
-                    "alerts",
-                    "GET",
-                    Some(&alert.folder_id),
-                    false,
-                    true,
-                    false,
-                )
-                .await
-                {
-                    return MetaHttpResponse::forbidden("Unauthorized Access");
-                }
-            }
-            _ => {}
+        if let Ok(infra::table::alert_composites::Resolution::Alert(alert)) =
+            infra::table::alert_composites::resolve_by_id(db, &org_id, &alert_id).await
+            && !check_permissions(
+                &alert_id,
+                &org_id,
+                &user_email.user_id,
+                "alerts",
+                "GET",
+                Some(&alert.folder_id),
+                false,
+                true,
+                false,
+            )
+            .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
         }
     }
     let kind = if subject.is_some() {
@@ -953,7 +952,7 @@ pub async fn get_composite_timeline(
     Query(query): Query<HashMap<String, String>>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let Some(composite) = openobserve_core::alerts::composite::get_composite(&org_id, &alert_id)
         .await
         .ok()
@@ -1226,7 +1225,7 @@ pub async fn list_alert_groups(Path((org_id, alert_id)): Path<(String, String)>)
     let Ok(ksuid) = Ksuid::from_str(&alert_id) else {
         return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     // Resolve through the alert itself so this endpoint inherits the same
     // org scoping and not-found behaviour as every other alert read — a raw
     // state-table query would happily serve another org's group labels, which
@@ -1332,7 +1331,7 @@ pub async fn list_alert_group_transitions(
     let Ok(ksuid) = Ksuid::from_str(&alert_id) else {
         return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     if let Err(e) = alert::get_by_id(client, &org_id, ksuid).await {
         return e.into();
     }
@@ -1410,7 +1409,7 @@ pub async fn get_alert(
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((_, alert)) => {
             let key = alert.get_unique_key();
@@ -1491,7 +1490,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok((_, alert)) => {
             let key = alert.get_unique_key();
@@ -1589,7 +1588,7 @@ pub async fn clone_alert(
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Check if this is a regular alert first
     match alert::get_by_id(client, &org_id, alert_id).await {
@@ -1742,7 +1741,7 @@ pub async fn update_alert(
     alert.last_edited_by = Some(user_email.user_id.clone());
     alert.id = Some(alert_id);
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match alert::update(client, &org_id, None, alert).await {
         Ok(_) => MetaHttpResponse::ok("Alert Updated"),
         Err(AlertError::AlertNotFound) => {
@@ -1868,7 +1867,7 @@ pub async fn delete_alert(
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Check whether this ID belongs to a regular alert before attempting delete.
     // delete_by_id silently returns Ok(()) when the record is not found (required
@@ -2065,7 +2064,7 @@ pub async fn delete_alert_bulk(
     let mut err = None;
     let mut conflicts = Vec::new();
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     for id in req.ids {
         // already checked this is valid, so ok to unwrap
         let alert_id = Ksuid::from_str(&id).unwrap();
@@ -2224,7 +2223,7 @@ pub async fn list_alert_tags(
     if let Some(folder) = query.folder.clone() {
         params = params.in_folder(&folder);
     }
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let visible_ids: Vec<String> = match alert::list_v2(client, user_id, params).await {
         Ok(list) => list
             .into_iter()
@@ -2389,7 +2388,7 @@ pub async fn list_alerts(
     // Composite definitions are fetched once here — used both to decide whether
     // the `All` filter must merge (and so drop SQL pagination) and to build the
     // merged rows below.
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let composite_definitions = if matches!(
         alert_type,
         AlertTypeFilter::All | AlertTypeFilter::Composite
@@ -2439,7 +2438,7 @@ pub async fn list_alerts(
         alert_type,
         AlertTypeFilter::AnomalyDetection | AlertTypeFilter::Composite
     ) {
-        let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let client = get_orm_client_ro().await;
         let mut scheduled_jobs: HashMap<String, Trigger> =
             scheduler::list_by_org(&org_id, Some(TriggerModule::Alert))
                 .await
@@ -2656,7 +2655,7 @@ async fn enrich_with_composite_metadata(
     visibility: &Option<(bool, hashbrown::HashSet<String>)>,
     list: &mut [ListAlertsResponseBodyItem],
 ) {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
 
     // Split the page by kind and resolve everything in bulk: one child-count
     // query for composites and two reverse-reference queries, instead of a
@@ -2857,7 +2856,7 @@ pub async fn enable_alert(
         }
     };
     let should_enable = query.value;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match alert::enable_by_id(client, &org_id, alert_id, should_enable).await {
         Ok(_) => {
             let resp_body = EnableAlertResponseBody {
@@ -2995,7 +2994,7 @@ pub async fn enable_alert_bulk(
     let mut unsuccessful = Vec::with_capacity(req.ids.len());
     let mut err = None;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     for id in req.ids {
         match alert::enable_by_id(client, &org_id, id, should_enable).await {
             Ok(_) => {
@@ -3113,7 +3112,7 @@ pub async fn trigger_alert(
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     match alert::trigger_by_id(client, &org_id, alert_id).await {
         Ok(_) => MetaHttpResponse::ok("Alert triggered"),
         Err(AlertError::AlertNotFound) => {
@@ -3207,7 +3206,7 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     // Check if this is a regular alert — if so, return 400
     match alert::get_by_id(client, &org_id, alert_id).await {
         Ok(_) => {
@@ -3270,7 +3269,7 @@ pub async fn move_alerts(
     Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<MoveAlertsRequestBody>,
 ) -> Response {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let total_ids = req_body.alert_ids.len() + req_body.anomaly_config_ids.len();
 
     // anomaly_config_ids is now a required Vec (defaults to empty), so no

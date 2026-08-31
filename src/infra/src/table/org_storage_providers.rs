@@ -19,9 +19,9 @@ use hashbrown::HashMap;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, sea_query::OnConflict};
 use serde::{Deserialize, Serialize};
 
-use super::{entity::org_storage_providers::*, get_lock};
+use super::entity::org_storage_providers::*;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
     table::cipher,
 };
@@ -143,8 +143,7 @@ pub async fn add(entry: OrgStorageProvider) -> Result<(), errors::Error> {
         data: Set(encrypted_data),
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     Entity::insert(model)
         .on_conflict(
@@ -171,15 +170,12 @@ pub async fn get_for_org(org_id: &str) -> Result<Option<OrgStorageProvider>, err
         }
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     let res = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .one(client)
         .await?;
-    // we must drop lock here, as the get_dek itself can attempt lock, which results in deadlock
-    drop(_lock);
 
     let dek = cipher::get_dek(org_id).await?;
     let ret = res
@@ -225,7 +221,7 @@ pub fn remove_from_cache(org_id: &str) {
 }
 
 pub async fn list_all() -> Result<Vec<OrgStorageProvider>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let res = Entity::find().all(client).await?;
     let temp: Vec<OrgStorageProvider> = res.into_iter().map(|v| v.into()).collect();
@@ -252,8 +248,7 @@ pub async fn prime_cache() -> Result<(), anyhow::Error> {
 
 /// Deletes the storage provider entry for the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .exec(client)

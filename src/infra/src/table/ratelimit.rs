@@ -26,7 +26,7 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     orm_err,
     table::{
         entity::rate_limit_rules::{ActiveModel, Column, Entity},
@@ -57,7 +57,7 @@ pub async fn fetch_rules(
     org_id: Option<String>,
     user_role: Option<String>,
 ) -> Result<Vec<RatelimitRule>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut res = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -90,7 +90,7 @@ pub async fn fetch_rules(
 }
 
 pub async fn fetch_rules_by_id(rule_id: &str) -> Result<Option<RatelimitRule>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -124,7 +124,7 @@ async fn add_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Collect all rule IDs and validate
     let rule_ids: Vec<String> = rules
@@ -208,7 +208,7 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
         return Ok(());
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let current_time = config::utils::time::now_micros();
 
     // Start transaction
@@ -316,7 +316,7 @@ async fn add_single(rule: RatelimitRule) -> Result<(), anyhow::Error> {
     let rule_id = rule.rule_id.clone();
     match fetch_rules_by_id(rule_id.unwrap().as_str()).await {
         Ok(None) => {
-            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            let client = get_orm_client_rw().await;
             let active_rule = ActiveModel {
                 org: Set(rule.org),
                 rule_id: Set(rule.rule_id.unwrap()),
@@ -365,7 +365,7 @@ async fn update_single(rule: RatelimitRule) -> Result<(), anyhow::Error> {
 
     match fetch_rules_by_id(rule_id.as_str()).await {
         Ok(Some(_)) => {
-            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            let client = get_orm_client_rw().await;
             match Entity::update_many()
                 .col_expr(Column::Org, Expr::value(&rule.org))
                 .col_expr(
@@ -411,7 +411,7 @@ async fn update_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let txn = client
         .begin()
         .await
@@ -501,7 +501,7 @@ async fn update_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error> {
 pub async fn delete(rule_id: String) -> Result<(), anyhow::Error> {
     match fetch_rules_by_id(rule_id.as_str()).await {
         Ok(Some(_)) => {
-            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            let client = get_orm_client_rw().await;
             match Entity::delete_many()
                 .filter(Column::RuleId.eq(rule_id))
                 .exec(client)
@@ -526,7 +526,7 @@ pub async fn list(
     api: Option<&str>,
     user_id: Option<&str>,
 ) -> Result<Vec<RatelimitRule>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut query = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -601,7 +601,6 @@ mod tests {
             .append_query_results(vec![vec![create_test_model()]])
             .into_connection();
 
-        // Override the ORM_CLIENT for testing
         let rules = Entity::find()
             .select_only()
             .column(Column::Org)
@@ -755,10 +754,10 @@ mod tests {
 
     async fn setup_test_db(mock_db: sea_orm::DatabaseConnection) {
         INIT.call_once(|| {
-            // Initialize ORM_CLIENT only once
-            ORM_CLIENT
-                .set(mock_db)
-                .expect("Failed to set mock database");
+            // Another test in the shared process may already have initialized
+            // the write client; the validation paths under test never reach a
+            // query, so losing the race is fine.
+            let _ = crate::db::ORM_CLIENT_RW.set(mock_db);
         });
     }
 

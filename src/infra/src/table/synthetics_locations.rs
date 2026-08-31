@@ -28,12 +28,9 @@ use std::{
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set, sea_query::Expr};
 use tokio::sync::RwLock;
 
-use super::{
-    entity::synthetics_locations::{ActiveModel, Column, Entity, Model},
-    get_lock,
-};
+use super::entity::synthetics_locations::{ActiveModel, Column, Entity, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -96,7 +93,7 @@ async fn ensure_fresh() -> Result<(), errors::Error> {
         return Ok(());
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let rows: Vec<SyntheticsLocationRecord> = Entity::find()
         .order_by_asc(Column::Kind)
         .order_by_asc(Column::Label)
@@ -159,8 +156,7 @@ impl From<Model> for SyntheticsLocationRecord {
 
 /// Insert a new location row.
 pub async fn add(record: &SyntheticsLocationRecord) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = ActiveModel {
         id: Set(record.id.clone()),
         org_id: Set(record.org_id.clone()),
@@ -179,11 +175,6 @@ pub async fn add(record: &SyntheticsLocationRecord) -> Result<(), errors::Error>
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish().await;
     Ok(())
 }
@@ -208,7 +199,7 @@ pub async fn list_visible(org_id: &str) -> Result<Vec<SyntheticsLocationRecord>,
 
 /// All private rows across orgs — used by the staleness watcher.
 pub async fn list_private() -> Result<Vec<SyntheticsLocationRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let rows = Entity::find()
         .filter(Column::Kind.eq(KIND_PRIVATE))
         .all(client)
@@ -247,35 +238,23 @@ fn update_stmt(id: &str, label: &str, enabled: bool, now: i64) -> sea_orm::Updat
 
 /// Update label/enabled on a location.
 pub async fn update(id: &str, label: &str, enabled: bool) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
     update_stmt(id, label, enabled, now)
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish().await;
     Ok(())
 }
 
 /// Delete a location row.
 pub async fn remove(id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_by_id(id)
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-    // Release the SQLite write mutex BEFORE emitting. On a sqlite meta_store
-    // the coordinator's put() takes the *same* CLIENT_RW lock `get_lock()`
-    // returns, so emitting while holding it deadlocks the process — and the
-    // mutex is then held forever, hanging every later synthetics query.
-    drop(_lock);
     invalidate_and_publish().await;
     Ok(())
 }
@@ -296,8 +275,7 @@ pub async fn remove(id: &str) -> Result<(), errors::Error> {
 /// Deliberately NOT cached — `LOCATIONS_CACHE` serves definition reads, and a
 /// stale `down_notified_at` would reintroduce exactly the duplicate this fixes.
 pub async fn try_claim_down_notification(id: &str, now_us: i64) -> Result<bool, errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let res = Entity::update_many()
         .col_expr(Column::DownNotifiedAt, Expr::value(now_us))
         .filter(Column::Id.eq(id))
@@ -314,8 +292,7 @@ pub async fn try_claim_down_notification(id: &str, now_us: i64) -> Result<bool, 
 /// the result is the same. Guarding it would leave the flag set if the one node
 /// that "won" the clear died before the next tick, silencing the next outage.
 pub async fn clear_down_notification(id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::update_many()
         .col_expr(Column::DownNotifiedAt, Expr::value(0i64))
         .filter(Column::Id.eq(id))

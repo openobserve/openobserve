@@ -1,3 +1,5 @@
+use infra::db::get_orm_client_ro;
+
 use super::*;
 
 // ── Runs API ──────────────────────────────────────────────────────────────────
@@ -72,7 +74,7 @@ pub async fn list_runs(
     page: i64,
     page_size: i64,
 ) -> anyhow::Result<ListRunsResponse> {
-    let conn = db()?;
+    let conn = get_orm_client_ro().await;
     let (rows, total) = synthetics_runs::list_runs(
         conn,
         synthetics_runs::ListRunsParams {
@@ -98,7 +100,7 @@ pub async fn get_run_detail(
     synthetics_id: &str,
     run_id: &str,
 ) -> anyhow::Result<Option<RunSummary>> {
-    let conn = db()?;
+    let conn = get_orm_client_ro().await;
     let row = synthetics_runs::get_run(conn, run_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;

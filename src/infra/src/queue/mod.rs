@@ -105,7 +105,11 @@ pub async fn get_super_cluster() -> &'static Box<dyn Queue> {
 }
 
 pub async fn init() -> Result<()> {
-    nats::init().await
+    match QueueStore::try_from(config::get_config().common.queue_store.as_str()) {
+        Ok(QueueStore::Nats) => nats::init().await,
+        Ok(QueueStore::Memory) => memory::init().await,
+        Err(e) => Err(Error::Message(e)),
+    }
 }
 
 async fn default() -> Box<dyn Queue> {
@@ -137,6 +141,13 @@ pub trait Queue: Sync + Send + 'static {
     async fn create(&self, topic: &str) -> Result<()>;
     async fn create_with_config(&self, topic: &str, config: QueueConfig) -> Result<()>;
     async fn publish(&self, topic: &str, value: Bytes) -> Result<()>;
+    /// Publish a logical task with a stable identity. Durable backends use the
+    /// identity for broker-side duplicate suppression; other backends retain
+    /// at-least-once delivery and rely on consumer idempotency.
+    async fn publish_with_id(&self, topic: &str, value: Bytes, message_id: &str) -> Result<()> {
+        let _ = message_id;
+        self.publish(topic, value).await
+    }
     async fn consume(
         &self,
         topic: &str,

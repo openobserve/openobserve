@@ -27,6 +27,48 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+def read_sse_frames(response: requests.Response) -> list[tuple[str, dict[str, Any]]]:
+    """Parse an SSE-streamed response into its raw frames, in wire order.
+
+    Returns one `(event_name, data)` pair per `event:` / `data:` line pair,
+    with NO merging and NO interpretation — e.g.::
+
+        [("search_response_metadata", {"results": {...}, "streaming_aggs": True}),
+         ("search_response_hits",     {"hits": [...]}),
+         ("search_response_metadata", {...}),
+         ...]
+
+    Use this (instead of `read_sse_response()`) whenever the PER-FRAME
+    semantics are the thing under test. `read_sse_response()` deliberately
+    collapses the frames — it keeps `max(totals)` and concatenates every hits
+    frame — so it cannot tell a disjoint page from a cumulative aggregation
+    state, and concatenating hits across cumulative frames duplicates rows.
+
+    Frames whose `data:` payload is not valid JSON are skipped (logged at
+    debug), matching `read_sse_response()`'s tolerance.
+    """
+    content = response.content.decode("utf-8")
+    lines = content.split("\n")
+    frames: list[tuple[str, dict[str, Any]]] = []
+
+    for i, line in enumerate(lines):
+        text = line.strip()
+        if not text.startswith("event: "):
+            continue
+        event = text[len("event: "):].strip()
+        if i + 1 >= len(lines):
+            continue
+        data_line = lines[i + 1].strip()
+        if not data_line.startswith("data: "):
+            continue
+        try:
+            frames.append((event, json.loads(data_line[6:])))
+        except json.JSONDecodeError as e:
+            logger.debug("SSE %s frame parse error: %s", event, e)
+
+    return frames
+
+
 def read_sse_response(response: requests.Response) -> dict[str, Any]:
     """Parse an SSE-streamed response into one merged `{results: {total, hits}}` dict.
 

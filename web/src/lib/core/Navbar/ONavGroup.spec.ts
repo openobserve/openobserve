@@ -42,7 +42,7 @@ const store = createStore({
 const i18n = createI18n({
   locale: "en",
   legacy: false,
-  messages: { en: {} },
+  messages: { en: { menu: { alerts: "Alerts" } } },
   missingWarn: false,
   fallbackWarn: false,
 });
@@ -114,6 +114,88 @@ describe("ONavGroup", () => {
     expect(flyout().exists()).toBe(true);
   });
 
+  // The Infra tile holds ONE child (Database Monitoring) behind the
+  // `databaseMonitoring` runtime gate. Rendering the tile regardless of its
+  // children would leave a dead "Infra" entry on every build with the feature
+  // off — it would open nothing, and clicking it would land on a page the route
+  // guard bounces straight back. The tile must not exist at all.
+  describe("a group whose children are all filtered out", () => {
+    // A store whose zoConfig can be set per test, unlike the shared one above.
+    function makeGatedStore(databaseMonitoringEnabled: boolean) {
+      return createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: { database_monitoring_enabled: databaseMonitoringEnabled },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+    }
+
+    // Infra's real shape: one gated child, routes registered (they always are —
+    // the guard, not the router, is what turns the feature off).
+    function mountInfra(databaseMonitoringEnabled: boolean) {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          {
+            path: "/traces/databases",
+            name: "dbmDatabases",
+            component: { template: "<div />" },
+          },
+        ],
+      });
+      return mount(ONavGroup, {
+        props: {
+          groupKey: "infra",
+          title: "Infra",
+          icon: "dns",
+          children: [
+            {
+              titleKey: "menu.databases",
+              icon: "database",
+              name: "dbmDatabases",
+              gate: "databaseMonitoring",
+            },
+          ] as SubnavChild[],
+          parentItem: {
+            link: "/traces/databases",
+            title: "Infra",
+            icon: "dns",
+            name: "infra",
+          },
+        },
+        global: {
+          plugins: [router, makeGatedStore(databaseMonitoringEnabled), i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+    }
+
+    it("renders the Infra tile when the databaseMonitoring gate passes", () => {
+      wrapper = mountInfra(true);
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="tile"]').exists()).toBe(true);
+    });
+
+    it("renders NO Infra tile when the databaseMonitoring gate fails", () => {
+      wrapper = mountInfra(false);
+      // The whole wrapper element is gone — not merely an empty flyout.
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="tile"]').exists()).toBe(false);
+    });
+
+    it("renders no tile when every child's route is missing from the build", async () => {
+      // The other half of the filter: `router.hasRoute` rather than `gate`.
+      wrapper = mountGroup();
+      await wrapper.setProps({
+        children: [{ titleKey: "menu.ghost", icon: "x", name: "notARoute" }] as SubnavChild[],
+      });
+      expect(wrapper.find('[data-test="nav-group-data"]').exists()).toBe(false);
+    });
+  });
+
   it("renders only children whose routes are registered", async () => {
     wrapper = mountGroup();
     await wrapper.setProps({
@@ -124,6 +206,139 @@ describe("ONavGroup", () => {
     expect(flyout().find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
     expect(flyout().find('[data-test="nav-group-item-pipelines"]').exists()).toBe(true);
     expect(flyout().find('[data-test="nav-group-item-notARoute"]').exists()).toBe(false);
+  });
+
+  it("heads a run of children sharing a categoryKey, and TRANSLATES the header", async () => {
+    // The header was the one string in the rail rendered from a raw literal, so
+    // it would have stayed English in all 15 locales. It takes an i18n key like
+    // every other label here.
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        {
+          titleKey: "menu.pipeline",
+          icon: "graph-2",
+          name: "pipelines",
+          categoryKey: "menu.alerts",
+        },
+      ],
+    });
+    await hoverOpen();
+
+    const header = flyout().find('[data-test^="nav-group-section-label-"]');
+    expect(header.exists()).toBe(true);
+    expect(header.text()).toBe("Alerts");
+
+    // The run is a real group to assistive tech, named by that heading. A bare
+    // heading div is not a valid child of role="menu" — AT drops it, and the
+    // grouping this exists to convey is silent.
+    const group = flyout().find('[role="group"]');
+    expect(group.exists()).toBe(true);
+    expect(group.attributes("aria-labelledby")).toBe(header.attributes("id"));
+    expect(header.attributes("role")).toBe("presentation");
+    expect(group.findAll('[role="menuitem"]')).toHaveLength(2);
+  });
+
+  it("sizes the three levels by depth, not against it", async () => {
+    // It ran 11px → 11px → 14px: the group title and its section headers were
+    // the same size, and the ITEMS — the deepest level — were the largest text
+    // in the flyout. Group (base) > section (sm, secondary) > item (sm, plain).
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+      ],
+    });
+    await hoverOpen();
+
+    const classesOf = (sel: string) => flyout().find(sel).classes().join(" ");
+    const groupTitle = flyout().element.firstElementChild?.className ?? "";
+    // Group and items share body size; the group outranks them by weight. It is
+    // NOT a step above — 16px read as a page title inside a 217px menu.
+    expect(groupTitle).toContain("text-sm");
+    expect(groupTitle).toContain("font-semibold");
+    expect(classesOf('[data-test="nav-group-item-logstreams"]')).toContain("text-sm");
+    expect(classesOf('[data-test="nav-group-item-logstreams"]')).not.toContain("font-semibold");
+    // The section header is the one label that steps DOWN, in the secondary
+    // colour — it names a run, it is not a thing you click.
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("text-xs");
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("font-semibold");
+    expect(classesOf('[data-test^="nav-group-section-label-"]')).toContain("text-text-secondary");
+  });
+
+  it("heads the run once, not once per child", async () => {
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        {
+          titleKey: "menu.pipeline",
+          icon: "graph-2",
+          name: "pipelines",
+          categoryKey: "menu.alerts",
+        },
+      ],
+    });
+    await hoverOpen();
+
+    expect(flyout().findAll('[data-test^="nav-group-section-label-"]')).toHaveLength(1);
+  });
+
+  it("leaves uncategorised children unheaded, so they are not filed under it", async () => {
+    // Reliability's SLOs/Incidents sit outside the Alerts header exactly this
+    // way: a trailing child with no key must not inherit the previous header.
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        { titleKey: "menu.pipeline", icon: "graph-2", name: "pipelines" },
+      ],
+    });
+    await hoverOpen();
+
+    const rows = flyout().findAll(
+      '[data-test^="nav-group-section-label-"], [data-test^="nav-group-item-"]',
+    );
+    expect(rows.map((r) => r.attributes("data-test"))).toEqual([
+      "nav-group-section-label-h-menu.alerts-0",
+      "nav-group-item-logstreams",
+      "nav-group-item-pipelines",
+    ]);
+    // Outside the group element, not merely after the heading.
+    expect(
+      flyout().find('[role="group"]').find('[data-test="nav-group-item-pipelines"]').exists(),
+    ).toBe(false);
+    // And it is visibly outside: a header owns everything below it until
+    // something says otherwise, and at the same indent nothing else does.
+    expect(flyout().find('[data-test="nav-group-item-pipelines"]').classes()).toContain("mt-3");
+  });
+
+  it("does not break the run it is still inside", async () => {
+    // The gap marks LEAVING a headed run. Putting it on a member would split
+    // the run into two groups under one header.
+    wrapper = mountGroup();
+    await wrapper.setProps({
+      children: [
+        { titleKey: "menu.streams", icon: "table", name: "logstreams", categoryKey: "menu.alerts" },
+        {
+          titleKey: "menu.pipeline",
+          icon: "graph-2",
+          name: "pipelines",
+          categoryKey: "menu.alerts",
+        },
+      ],
+    });
+    await hoverOpen();
+
+    expect(flyout().find('[data-test="nav-group-item-pipelines"]').classes()).not.toContain("mt-3");
+  });
+
+  it("adds no gap when nothing is categorised at all", async () => {
+    // The Data group has no headers; it must stay one flat list.
+    wrapper = mountGroup();
+    await hoverOpen();
+    expect(flyout().find('[data-test="nav-group-item-pipelines"]').classes()).not.toContain("mt-3");
   });
 
   // Regression: clicking the tile used to close() the flyout while the pointer
@@ -425,6 +640,65 @@ describe("ONavGroup", () => {
       expect(query.get("stream")).toBe("default");
       expect(query.get("period")).toBe("15m");
       expect(query.get("query")).toBe("c2VydmljZQ==");
+    });
+  });
+  // A child with no top-level rail entry of its own (Alert Library, Destinations,
+  // Enrichment Tables…) is unreachable by MainLayout's linksList filter, and
+  // `requires` only tracks its PARENT. Matching custom_hide_menus against the
+  // child's own route name is what makes those hideable at all.
+  describe("custom_hide_menus names a child directly", () => {
+    function mountWithHidden(hidden: string) {
+      const hiddenStore = createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: { custom_hide_menus: hidden },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+      return mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children,
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [makeRouter(), hiddenStore, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+    }
+
+    async function openFlyout() {
+      await wrapper.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+      return wrapper.find('[data-test="nav-group-flyout-data"]');
+    }
+
+    it("drops the named child and keeps its siblings", async () => {
+      wrapper = mountWithHidden("openapi,reports,pipelines");
+      const panel = await openFlyout();
+      expect(panel.find('[data-test="nav-group-item-pipelines"]').exists()).toBe(false);
+      expect(panel.find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
+    });
+
+    it("keeps every child when the flag names none of them", async () => {
+      wrapper = mountWithHidden("openapi,reports");
+      const panel = await openFlyout();
+      expect(panel.find('[data-test="nav-group-item-pipelines"]').exists()).toBe(true);
+      expect(panel.find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
+    });
+
+    it("ignores an empty flag rather than hiding an unnamed child", async () => {
+      // "".split(",") is [""], so a child whose name is "" would match — none is,
+      // but the empty entry must not be treated as a wildcard either.
+      wrapper = mountWithHidden("");
+      const panel = await openFlyout();
+      expect(panel.find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
+      expect(panel.find('[data-test="nav-group-item-pipelines"]').exists()).toBe(true);
     });
   });
 });

@@ -46,9 +46,17 @@ const organizationObj = {
   rumToken: {
     rum_token: "",
   },
+  // Which traces stream contains a given (canonical 32-char) trace id, learned
+  // by probing — see useCorrelatedTracesStream. knownStreams is the org-level
+  // fact ("streams that have ever contained a correlated trace") that keeps
+  // steady-state resolution at one point lookup regardless of stream count.
+  // Lives here so resetOrganizationData wipes it on org switch.
+  correlatedTracesStreams: {
+    byTraceId: {} as Record<string, string>,
+    knownStreams: [] as string[],
+  },
   quotaThresholdMsg: "",
   functions: [],
-  actions: [],
   streams: {},
   folders: [],
   foldersByType: [],
@@ -124,6 +132,18 @@ export default createStore({
       cacheExpiry: 10 * 60 * 1000, // 10 minutes in milliseconds
       dashboardJsonCache: {} as Record<string, unknown>, // Cache for individual dashboard JSON content: { folderPath/fileName: jsonContent }
     },
+    // Alert library cache (source: S3, see composables/useAlertLibrary.ts).
+    // This is the READ cache, not a write-through mirror: the composable reads
+    // it back, so a second component mounting after navigation is served from
+    // here rather than refetching 47 KB.
+    alertLibrary: {
+      manifest: null as unknown,
+      lastFetched: null as number | null,
+      cacheExpiry: 10 * 60 * 1000, // 10 minutes, matching the gallery above
+      // Whole alert files, keyed by the manifest's stable `<pack>/<name>` id —
+      // never by bare name, which is only unique within a pack.
+      fileCache: {} as Record<string, unknown>,
+    },
     // Temporary theme colors for live preview in General Settings
     // These colors are stored here (instead of component state) so they persist
     // across navigation and are accessible to all components for preview
@@ -190,6 +210,15 @@ export default createStore({
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
     },
+    setCorrelatedTracesStream(state, payload: { traceId: string; stream: string }) {
+      const cache = state.organizationData.correlatedTracesStreams;
+      // Bounded: past the cap, clear and restart. knownStreams survives, so a
+      // re-resolution of any dropped id is a single point lookup — LRU would
+      // be bookkeeping for ~100KB of strings.
+      if (Object.keys(cache.byTraceId).length >= 1000) cache.byTraceId = {};
+      cache.byTraceId[payload.traceId] = payload.stream;
+      if (!cache.knownStreams.includes(payload.stream)) cache.knownStreams.push(payload.stream);
+    },
     setOrgTokens(state, payload) {
       state.organizationData.orgTokens = payload;
     },
@@ -222,9 +251,6 @@ export default createStore({
     },
     setFunctions(state, payload) {
       state.organizationData.functions = payload;
-    },
-    setActions(state, payload) {
-      state.organizationData.actions = payload;
     },
     setStreams(state, payload) {
       state.organizationData.streams[payload.name] = payload;
@@ -351,6 +377,38 @@ export default createStore({
       state.alertListFilters = { ...state.alertListFilters, ...payload };
     },
     /**
+     * Cache the alert library manifest, stamping the time the TTL is measured
+     * from. Leaving lastFetched unset would make a warm cache look permanently
+     * stale and refetch on every render.
+     */
+    setAlertLibraryManifest(state, payload) {
+      state.alertLibrary.manifest = payload;
+      state.alertLibrary.lastFetched = Date.now();
+    },
+    /**
+     * Cache one alert file. Accumulates — opening a second drawer must not
+     * evict the first alert, since the gallery reopens drawers constantly
+     * while comparing alerts.
+     * @param payload - { id: '<pack>/<name>', file: alertJson }
+     */
+    setAlertLibraryFile(state, payload) {
+      state.alertLibrary.fileCache[payload.id] = payload.file;
+    },
+    /**
+     * Drop cached library data. Mutates IN PLACE and deliberately leaves
+     * `cacheExpiry` alone: that is configuration, not cached data, and
+     * reassigning the whole object would silently reset it.
+     *
+     * Not needed for org switching — the library is a global public catalog,
+     * identical for every org, and the org-specific half of a "Ready" verdict
+     * (the stream list) lives in useStreams and is recomputed at render.
+     */
+    clearAlertLibrary(state) {
+      state.alertLibrary.manifest = null;
+      state.alertLibrary.lastFetched = null;
+      state.alertLibrary.fileCache = {};
+    },
+    /**
      * Set GitHub dashboard gallery cache
      */
     setGithubDashboardGallery(state, payload) {
@@ -451,9 +509,6 @@ export default createStore({
     },
     setFunctions(context, payload) {
       context.commit("setFunctions", payload);
-    },
-    setActions(context, payload) {
-      context.commit("setActions", payload);
     },
     setStreams(context, payload) {
       context.commit("setStreams", payload);

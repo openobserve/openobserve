@@ -292,15 +292,25 @@ mod tests {
 
     use arrow::array::{Float64Array, Int64Array, RecordBatch, UInt64Array};
     use arrow_schema::{DataType, Field, Schema};
-    use config::meta::promql::HASH_LABEL;
+    use config::{FileFormat, meta::promql::HASH_LABEL};
     use datafusion::{
         datasource::{
-            file_format::parquet::ParquetFormat,
+            file_format::{FileFormat as DataFusionFileFormat, parquet::ParquetFormat},
             listing::{ListingOptions, ListingTableUrl},
         },
         physical_plan::{collect, displayable},
     };
     use parquet::arrow::ArrowWriter;
+    use vortex::{
+        VortexSessionDefault,
+        array::ArrayRef,
+        arrow::{FromArrowArray, FromArrowType},
+        dtype::DType,
+        file::VortexWriteOptions,
+        io::session::RuntimeSessionExt,
+        session::VortexSession,
+    };
+    use vortex_datafusion::VortexFormat;
 
     use super::*;
     use crate::datafusion::exec::DataFusionContextBuilder;
@@ -313,8 +323,13 @@ mod tests {
         ]))
     }
 
-    /// Write one Parquet file whose rows are ordered by (__hash__, _timestamp).
-    fn write_hash_sorted_file(dir: &std::path::Path, name: &str, rows: &[(u64, i64)]) {
+    /// Write one file whose rows are ordered by (__hash__, _timestamp).
+    async fn write_hash_sorted_file(
+        dir: &std::path::Path,
+        name: &str,
+        rows: &[(u64, i64)],
+        file_format: FileFormat,
+    ) {
         let schema = hash_sorted_schema();
         let batch = RecordBatch::try_new(
             schema.clone(),
@@ -327,10 +342,24 @@ mod tests {
             ],
         )
         .unwrap();
-        let file = std::fs::File::create(dir.join(name)).unwrap();
-        let mut writer = ArrowWriter::try_new(file, schema, None).unwrap();
-        writer.write(&batch).unwrap();
-        writer.close().unwrap();
+        match file_format {
+            FileFormat::Parquet => {
+                let file = std::fs::File::create(dir.join(name)).unwrap();
+                let mut writer = ArrowWriter::try_new(file, schema, None).unwrap();
+                writer.write(&batch).unwrap();
+                writer.close().unwrap();
+            }
+            FileFormat::Vortex => {
+                let session = VortexSession::default().with_tokio();
+                let mut buf = Vec::new();
+                let mut writer = VortexWriteOptions::new(session)
+                    .writer(&mut buf, DType::from_arrow(schema.as_ref()));
+                let array: ArrayRef = ArrayRef::from_arrow(batch, false).unwrap();
+                writer.push(array).await.unwrap();
+                writer.finish().await.unwrap();
+                std::fs::write(dir.join(name), buf).unwrap();
+            }
+        }
     }
 
     /// Hash-sorted files with overlapping hash ranges (every ingester file
@@ -338,14 +367,34 @@ mod tests {
     /// per partition, merged by SortPreservingMergeExec without a SortExec.
     #[tokio::test]
     async fn test_hash_sorted_files_merge_without_sort_exec() {
+        for file_format in [FileFormat::Parquet, FileFormat::Vortex] {
+            assert_hash_sorted_files_merge_without_sort_exec(file_format).await;
+        }
+    }
+
+    async fn assert_hash_sorted_files_merge_without_sort_exec(file_format: FileFormat) {
         let dir = tempfile::tempdir().unwrap();
         write_hash_sorted_file(
             dir.path(),
-            "a.parquet",
+            &format!("a{}", file_format.extension()),
             &[(1, 10), (1, 30), (5, 10), (9, 20)],
-        );
-        write_hash_sorted_file(dir.path(), "b.parquet", &[(1, 20), (2, 10), (9, 10)]);
-        write_hash_sorted_file(dir.path(), "c.parquet", &[(3, 10), (5, 5), (5, 20)]);
+            file_format,
+        )
+        .await;
+        write_hash_sorted_file(
+            dir.path(),
+            &format!("b{}", file_format.extension()),
+            &[(1, 20), (2, 10), (9, 10)],
+            file_format,
+        )
+        .await;
+        write_hash_sorted_file(
+            dir.path(),
+            &format!("c{}", file_format.extension()),
+            &[(3, 10), (5, 5), (5, 20)],
+            file_format,
+        )
+        .await;
 
         let sort_order = FileSortOrder::HashTimestampAsc;
         let ctx = DataFusionContextBuilder::new()
@@ -355,7 +404,13 @@ mod tests {
             .await
             .unwrap();
 
-        let listing_options = ListingOptions::new(Arc::new(ParquetFormat::default()))
+        let datafusion_file_format: Arc<dyn DataFusionFileFormat> = match file_format {
+            FileFormat::Parquet => Arc::new(ParquetFormat::default()),
+            FileFormat::Vortex => {
+                Arc::new(VortexFormat::new(VortexSession::default().with_tokio()))
+            }
+        };
+        let listing_options = ListingOptions::new(datafusion_file_format)
             .with_target_partitions(2)
             .with_collect_stat(true)
             .with_file_sort_order(vec![sort_order.logical_sort_exprs()]);
@@ -386,11 +441,11 @@ mod tests {
         let display = displayable(physical_plan.as_ref()).indent(true).to_string();
         assert!(
             display.contains("SortPreservingMergeExec"),
-            "expected a merge of pre-sorted partitions, got:\n{display}"
+            "expected a merge of pre-sorted {file_format} partitions, got:\n{display}"
         );
         assert!(
             !display.contains("SortExec"),
-            "hash-sorted inputs must not be re-sorted, got:\n{display}"
+            "hash-sorted {file_format} inputs must not be re-sorted, got:\n{display}"
         );
 
         let batches = collect(physical_plan, ctx.task_ctx()).await.unwrap();
@@ -424,5 +479,99 @@ mod tests {
         ];
         expected.sort();
         assert_eq!(rows, expected);
+    }
+
+    // Utf8-typed vortex min with max dropped used to panic FilterExec interval analysis on a
+    // Utf8View schema
+    #[tokio::test]
+    async fn test_vortex_utf8view_stats_plan_and_scan() {
+        use arrow::array::StringArray;
+
+        let dir = tempfile::tempdir().unwrap();
+        let file_schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("name", DataType::Utf8, true),
+        ]));
+        let batch1 = RecordBatch::try_new(
+            file_schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![1i64, 2, 3])),
+                Arc::new(StringArray::from(vec![Some("a"), Some("b"), Some("c")])),
+            ],
+        )
+        .unwrap();
+        // chunk with the string column entirely null: file-level Max is skipped
+        let batch2 = RecordBatch::try_new(
+            file_schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![4i64, 5, 6])),
+                Arc::new(StringArray::from(vec![None::<&str>, None, None])),
+            ],
+        )
+        .unwrap();
+
+        let session = VortexSession::default().with_tokio();
+        let mut buf = Vec::new();
+        let mut writer = VortexWriteOptions::new(session.clone())
+            .writer(&mut buf, DType::from_arrow(file_schema.as_ref()));
+        writer
+            .push(ArrayRef::from_arrow(batch1, false).unwrap())
+            .await
+            .unwrap();
+        writer
+            .push(ArrayRef::from_arrow(batch2, false).unwrap())
+            .await
+            .unwrap();
+        writer.finish().await.unwrap();
+        std::fs::write(dir.path().join("a.vortex"), buf).unwrap();
+
+        // table schema the way finalize_schemas produces it: Utf8 -> Utf8View
+        let table_schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("name", DataType::Utf8View, true),
+        ]));
+
+        let ctx = DataFusionContextBuilder::new()
+            .trace_id("test_vortex_utf8view_stats")
+            .build(2)
+            .await
+            .unwrap();
+        let format: Arc<dyn DataFusionFileFormat> =
+            Arc::new(VortexFormat::new(VortexSession::default().with_tokio()));
+        let listing_options = ListingOptions::new(format)
+            .with_target_partitions(2)
+            .with_collect_stat(true);
+        let url = ListingTableUrl::parse(format!("file://{}/", dir.path().display())).unwrap();
+        let config = ListingTableConfig::new(url)
+            .with_listing_options(listing_options)
+            .with_schema(table_schema);
+        let table = ListingTableAdapter::try_new(
+            config,
+            "test_vortex_utf8view_stats".to_string(),
+            FileSortOrder::None,
+            None,
+            vec![],
+            None,
+        )
+        .unwrap();
+        ctx.register_table("t", Arc::new(table)).unwrap();
+
+        let plan = ctx
+            .state()
+            .create_logical_plan(
+                "SELECT count(name) FROM t WHERE _timestamp >= 1 AND _timestamp < 100",
+            )
+            .await
+            .unwrap();
+        let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+        let batches = collect(physical_plan, ctx.task_ctx()).await.unwrap();
+        let counts = batches
+            .iter()
+            .flat_map(|b| {
+                let col = b.column(0).as_any().downcast_ref::<Int64Array>().unwrap();
+                (0..b.num_rows()).map(|i| col.value(i)).collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(counts, vec![3]);
     }
 }
