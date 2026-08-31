@@ -281,9 +281,13 @@ export type ExperimentComparisonAssignment =
   | "candidate_only"
   | "unavailable";
 
+export type ExperimentComparisonScoreDataType = "numeric" | "categorical" | "boolean";
+
 export interface ExperimentComparisonDimension {
   name: string;
   kind: "score" | "cost" | "latency";
+  /** Score value type; null for the cost and latency dimensions. */
+  dataType: ExperimentComparisonScoreDataType | null;
   scoreConfigId: string | null;
   scoreConfigName: string | null;
   scoreConfigVersion: string | null;
@@ -298,6 +302,14 @@ export interface ExperimentComparisonDimension {
   normalized: boolean;
   baselineSampleCount: number;
   candidateSampleCount: number;
+  /** The side's own category name, when it has one unambiguous label. */
+  baselineLabel: string | null;
+  candidateLabel: string | null;
+  /** Normalized trial spread per side; only where a side ran more than one trial. */
+  baselineDispersion: number | null;
+  candidateDispersion: number | null;
+  /** The delta is smaller than the trial noise on both sides. */
+  withinNoise: boolean;
   assignment: ExperimentComparisonAssignment;
 }
 
@@ -621,6 +633,7 @@ function normalizeComparisonDimension(input: any): ExperimentComparisonDimension
   return {
     name: String(input?.name ?? ""),
     kind: input?.kind,
+    dataType: value(input, "dataType", "data_type", null),
     scoreConfigId: scoreConfigId === null ? null : String(scoreConfigId),
     scoreConfigName: scoreConfigName === null ? null : String(scoreConfigName),
     scoreConfigVersion: scoreConfigVersion === null ? null : String(scoreConfigVersion),
@@ -632,6 +645,11 @@ function normalizeComparisonDimension(input: any): ExperimentComparisonDimension
     normalized: Boolean(value(input, "normalized", "normalized", false)),
     baselineSampleCount: Number(value(input, "baselineSampleCount", "baseline_sample_count", 0)),
     candidateSampleCount: Number(value(input, "candidateSampleCount", "candidate_sample_count", 0)),
+    baselineLabel: value(input, "baselineLabel", "baseline_label", null),
+    candidateLabel: value(input, "candidateLabel", "candidate_label", null),
+    baselineDispersion: value(input, "baselineDispersion", "baseline_dispersion", null),
+    candidateDispersion: value(input, "candidateDispersion", "candidate_dispersion", null),
+    withinNoise: Boolean(value(input, "withinNoise", "within_noise", false)),
     assignment: input?.assignment,
   };
 }
