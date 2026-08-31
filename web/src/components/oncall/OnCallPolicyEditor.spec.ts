@@ -62,15 +62,14 @@ const stubs = {
     props: ["modelValue", "label"],
     template: `<label><input type="checkbox" :checked="modelValue" />{{ label }}</label>`,
   },
-  /// The "everything else" cards fold their bodies away behind a summary. That
-  /// fold is OnCallPolicySection's own behaviour and is tested there; here it
-  /// would only hide the controls these tests are about.
-  OnCallPolicySection: {
-    name: "OnCallPolicySection",
-    props: ["summary"],
-    template: `<div><slot name="badge" /><slot name="problems" />{{ summary }}<slot /></div>`,
-    methods: { expand() {} },
-  },
+  /// Delivery and AI triage are tabs now. These stubs render every tab's
+  /// label and every panel's body regardless of which is "active" — that
+  /// switching behaviour is OTabs/OTabPanels' own and is tested there; here
+  /// it would only hide the controls these tests are about.
+  OTabs: { name: "OTabs", template: `<div><slot /></div>` },
+  OTab: { name: "OTab", template: `<div><slot /></div>` },
+  OTabPanels: { name: "OTabPanels", template: `<div><slot /></div>` },
+  OTabPanel: { name: "OTabPanel", template: `<div><slot /></div>` },
 };
 
 /// **The shape the server actually sends** — D-33 in the defect register. This
@@ -1033,8 +1032,9 @@ describe("the first step's delay", () => {
 });
 
 /// **A channel that is on and delivers nowhere looks identical to working.**
-/// The delivery card folds away, so what it reports has to survive the fold —
-/// a card that hides its own breakage reads as fine.
+/// Delivery and AI triage are tabs, so the problem count belongs on the tab
+/// itself — a tab that hides its own breakage behind the other one reads as
+/// fine.
 describe("the delivery card", () => {
   beforeEach(() => {
     __resetOnCallRoutingConfig();
@@ -1084,14 +1084,15 @@ describe("the delivery card", () => {
     expect(wrapper.find('[data-test="oncall-policy-delivery-problems"]').exists()).toBe(false);
   });
 
-  /// Folded away, the card has to say what it currently holds — otherwise the
-  /// only way to read the delivery setup is to open it.
-  it("summarises the channels and the room while it is folded away", async () => {
+  /// There is no folded summary to keep in sync any more — the Delivery tab
+  /// shows the channels and the room through its own live controls.
+  it("shows the channels and the room directly on the tab", async () => {
     const wrapper = renderWith();
     await flushPromises();
 
-    const text = wrapper.text();
-    expect(text).toContain("Chat / webhook");
-    expect(text).toContain("seed_dest");
+    expect(wrapper.text()).toContain("Chat / webhook");
+    expect(
+      wrapper.findComponent('[data-test="oncall-team-channel-select"]').props("modelValue"),
+    ).toEqual(["seed_dest"]);
   });
 });

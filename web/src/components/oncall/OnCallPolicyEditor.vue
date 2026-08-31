@@ -334,192 +334,207 @@
       </div>
 
       <!-- Everything that is not the ladder: how the pages get out, and what
-           the agent does before they do. Both are set once and then read at a
-           glance, so both are folded behind a summary of what they say now. -->
+           the agent does before they do. Tabs, not a fold — a "Fix" button
+           now switches tabs instead of expanding a card, and the delivery
+           destinations warning sits above both panels so it survives
+           whichever tab happens to be showing. -->
       <div class="flex flex-col gap-2">
-        <OnCallPolicySection
-          ref="deliverySection"
-          icon="activity"
-          :title="t('oncall.policyDeliveryTitle')"
-          :description="t('oncall.policyDeliveryHint')"
-          :summary="deliverySummary"
-          data-test="oncall-policy-delivery"
+        <!-- The webhook channel being on with nowhere to post looks identical
+             to working, so this has to say so regardless of which tab is
+             open. -->
+        <OBanner
+          v-if="webhookEnabled && !destinations.length"
+          variant="error-soft"
+          icon="warning"
+          dense
+          inline-actions
+          data-test="oncall-policy-destinations-warning"
         >
-          <template #badge>
-            <OTag
-              v-if="deliveryProblems"
-              variant="error-soft"
-              size="xs"
-              data-test="oncall-policy-delivery-problems"
-            >
-              {{ t("oncall.policyProblemCount", { count: deliveryProblems }, deliveryProblems) }}
-            </OTag>
-          </template>
-
-          <!-- Outside the fold: the webhook channel being on with nowhere to
-               post looks identical to working, so the card must say so even
-               while it is closed. -->
-          <template #problems>
-            <OBanner
-              v-if="webhookEnabled && !destinations.length"
-              variant="error-soft"
-              icon="warning"
-              dense
-              inline-actions
-              data-test="oncall-policy-destinations-warning"
-            >
-              {{ t("oncall.policyNoDestinationWarning") }}
-              <template #actions>
-                <OButton
-                  variant="outline"
-                  size="xs"
-                  data-test="oncall-policy-destinations-fix"
-                  @click="deliverySection?.expand()"
-                >
-                  {{ t("oncall.policyFix") }}
-                </OButton>
-              </template>
-            </OBanner>
-          </template>
-
-          <!-- Channels apply to everyone paged at this priority; the primary
-               and the secondary are not treated differently. -->
-          <div v-if="current" class="flex flex-wrap items-center gap-2">
-            <OText variant="label" class="w-32 shrink-0">{{ t("oncall.channels") }}</OText>
-            <OCheckbox
-              v-for="channel in CHANNELS"
-              :key="channel"
-              :model-value="current.channels.includes(channel)"
-              :label="t(`oncall.channel_${channel}`)"
-              :data-test="`oncall-policy-channel-${current.priority}-${channel}`"
-              @update:model-value="
-                (on: CheckboxModelValue) => toggleChannel(current!, channel, on === true)
-              "
-            />
-            <OText variant="meta">
-              {{
-                t("oncall.policyChannelsHint", { priority: raw(priorityLabel(current.priority)) })
-              }}
-            </OText>
-          </div>
-
-          <!-- Ticking `webhook` above says HOW to page; this says WHERE. Without
-               it the channel is on and delivers nowhere, which looks identical
-               to working. -->
-          <div v-if="webhookEnabled" class="flex flex-wrap items-center gap-2">
-            <OText variant="label" class="w-32 shrink-0">
-              {{ t("oncall.policyDestinations") }}
-            </OText>
-            <span class="w-72">
-              <OSelect
-                v-model="destinations"
-                :options="destinationOptions"
-                multiple
-                size="sm"
-                :placeholder="t('oncall.policyDestinationsPlaceholder')"
-                data-test="oncall-policy-destinations"
-              />
-            </span>
-            <OTag
-              v-if="!destinations.length"
-              variant="error-soft"
-              size="xs"
-              data-test="oncall-policy-destinations-empty"
-            >
-              {{ t("oncall.policyReachesNobody") }}
-            </OTag>
-            <OText v-else variant="meta">{{ t("oncall.policyDestinationsHint") }}</OText>
-          </div>
-
-          <!-- C15/C16: WHERE the team is talked to, beside the policy list it
-               can override. `source` makes precedence visible — "I set the team
-               channel and pages still go to the old room" has to be answerable
-               here, not by paging somebody to find out. -->
-          <div class="flex flex-wrap items-center gap-2" data-test="oncall-team-channel">
-            <OText variant="label" class="w-32 shrink-0">
-              {{ t("oncall.teamChannelTitle") }}
-            </OText>
-            <span class="w-72">
-              <OSelect
-                v-model="teamChannelDraft"
-                :options="destinationOptions"
-                multiple
-                size="sm"
-                :placeholder="t('oncall.teamChannelPlaceholder')"
-                data-test="oncall-team-channel-select"
-              />
-            </span>
-            <OTag
-              v-if="teamChannel"
-              :variant="teamChannel.source === 'team' ? 'primary-soft' : 'default-soft'"
-              size="xs"
-              data-test="oncall-team-channel-source"
-            >
-              {{
-                teamChannel.source === "team"
-                  ? t("oncall.teamChannelFromTeam")
-                  : t("oncall.teamChannelFromPolicy")
-              }}
-            </OTag>
+          {{ t("oncall.policyNoDestinationWarning") }}
+          <template #actions>
             <OButton
               variant="outline"
-              size="sm-action"
-              :loading="savingChannel"
-              :disabled="!teamChannelDirty"
-              data-test="oncall-team-channel-save"
-              @click="saveTeamChannel(teamChannelDraft)"
+              size="xs"
+              data-test="oncall-policy-destinations-fix"
+              @click="policyTab = 'delivery'"
             >
-              {{ t("oncall.teamChannelSave") }}
+              {{ t("oncall.policyFix") }}
             </OButton>
-            <!-- Clearing is its own verb because null and [] are different
-                 facts on the wire: back-to-policy versus silence-on-purpose. -->
-            <OButton
-              v-if="teamChannel?.source === 'team'"
-              variant="ghost"
-              size="sm-action"
-              :loading="savingChannel"
-              data-test="oncall-team-channel-clear"
-              @click="saveTeamChannel(null)"
-            >
-              {{ t("oncall.teamChannelUsePolicy") }}
-            </OButton>
-            <!-- One post per firing, not a live room: the only transport is an
-                 HTTP destination, which cannot edit what it already sent. Said
-                 here so nobody designs an expectation the engine cannot meet. -->
-            <OText variant="meta">{{ t("oncall.teamChannelHint") }}</OText>
-            <span
-              v-if="teamChannel && !teamChannel.destinations.length"
-              class="text-status-warning-text text-xs"
-              data-test="oncall-team-channel-silent"
-            >
-              {{ t("oncall.teamChannelSilent") }}
-            </span>
-          </div>
-        </OnCallPolicySection>
-
-        <!-- C11: the l0_json block. Wire rule: `l0` absent on the PUT means
-             unchanged, so it is only included once the panel is touched —
-             editing steps must never silently rewrite the gate. -->
-        <OnCallPolicySection
-          icon="notifications"
-          :title="t('oncall.policyTriageTitle')"
-          :description="t('oncall.l0Hint')"
-          :summary="triageSummary"
-          advanced
-          data-test="oncall-policy-triage"
-        >
-          <template #badge>
-            <OTag variant="success-soft" size="xs" data-test="oncall-policy-triage-state">
-              {{ t("oncall.policyTriageOn") }}
-            </OTag>
           </template>
+        </OBanner>
 
-          <OnCallL0Editor
-            :l0="props.policy?.l0 ?? null"
-            @update:l0="onL0Update"
-            @update:valid="(v: boolean) => (l0Valid = v)"
-          />
-        </OnCallPolicySection>
+        <div
+          class="card-container rounded-surface bg-surface-base border-border-default flex flex-col border"
+        >
+          <OTabs
+            v-model="policyTab"
+            class="border-border-default border-b px-2"
+            data-test="oncall-policy-tabs"
+          >
+            <OTab name="delivery" data-test="oncall-policy-tab-delivery">
+              {{ t("oncall.policyDeliveryTitle") }}
+              <OTag
+                v-if="deliveryProblems"
+                variant="error-soft"
+                size="xs"
+                data-test="oncall-policy-delivery-problems"
+              >
+                {{ t("oncall.policyProblemCount", { count: deliveryProblems }, deliveryProblems) }}
+              </OTag>
+            </OTab>
+
+            <!-- C11: the l0_json block. -->
+            <OTab name="triage" data-test="oncall-policy-tab-triage">
+              {{ t("oncall.policyTriageTitle") }}
+              <OTag variant="default-soft" size="xs">{{ t("oncall.policySectionAdvanced") }}</OTag>
+              <OTag variant="success-soft" size="xs" data-test="oncall-policy-triage-state">
+                {{ t("oncall.policyTriageOn") }}
+              </OTag>
+            </OTab>
+          </OTabs>
+
+          <!-- `keep-alive` because a rotation typed into the destinations
+               picker or a step taken through the L0 editor must not be
+               dropped just because the reader glanced at the other tab. -->
+          <OTabPanels v-model="policyTab" keep-alive>
+            <OTabPanel name="delivery" data-test="oncall-policy-delivery">
+              <div class="flex flex-col gap-3 px-4 pt-3 pb-4">
+                <OText variant="meta">{{ t("oncall.policyDeliveryHint") }}</OText>
+
+                <!-- Channels apply to everyone paged at this priority; the primary
+                     and the secondary are not treated differently. -->
+                <div v-if="current" class="flex flex-wrap items-center gap-2">
+                  <OText variant="label" class="w-32 shrink-0">{{ t("oncall.channels") }}</OText>
+                  <OCheckbox
+                    v-for="channel in CHANNELS"
+                    :key="channel"
+                    :model-value="current.channels.includes(channel)"
+                    :label="t(`oncall.channel_${channel}`)"
+                    :data-test="`oncall-policy-channel-${current.priority}-${channel}`"
+                    @update:model-value="
+                      (on: CheckboxModelValue) => toggleChannel(current!, channel, on === true)
+                    "
+                  />
+                  <OText variant="meta">
+                    {{
+                      t("oncall.policyChannelsHint", {
+                        priority: raw(priorityLabel(current.priority)),
+                      })
+                    }}
+                  </OText>
+                </div>
+
+                <!-- Ticking `webhook` above says HOW to page; this says WHERE. Without
+                     it the channel is on and delivers nowhere, which looks identical
+                     to working. -->
+                <div v-if="webhookEnabled" class="flex flex-wrap items-center gap-2">
+                  <OText variant="label" class="w-32 shrink-0">
+                    {{ t("oncall.policyDestinations") }}
+                  </OText>
+                  <span class="w-72">
+                    <OSelect
+                      v-model="destinations"
+                      :options="destinationOptions"
+                      multiple
+                      size="sm"
+                      :placeholder="t('oncall.policyDestinationsPlaceholder')"
+                      data-test="oncall-policy-destinations"
+                    />
+                  </span>
+                  <OTag
+                    v-if="!destinations.length"
+                    variant="error-soft"
+                    size="xs"
+                    data-test="oncall-policy-destinations-empty"
+                  >
+                    {{ t("oncall.policyReachesNobody") }}
+                  </OTag>
+                  <OText v-else variant="meta">{{ t("oncall.policyDestinationsHint") }}</OText>
+                </div>
+
+                <!-- C15/C16: WHERE the team is talked to, beside the policy list it
+                     can override. `source` makes precedence visible — "I set the team
+                     channel and pages still go to the old room" has to be answerable
+                     here, not by paging somebody to find out. -->
+                <div class="flex flex-wrap items-center gap-2" data-test="oncall-team-channel">
+                  <OText variant="label" class="w-32 shrink-0">
+                    {{ t("oncall.teamChannelTitle") }}
+                  </OText>
+                  <span class="w-72">
+                    <OSelect
+                      v-model="teamChannelDraft"
+                      :options="destinationOptions"
+                      multiple
+                      size="sm"
+                      :placeholder="t('oncall.teamChannelPlaceholder')"
+                      data-test="oncall-team-channel-select"
+                    />
+                  </span>
+                  <OTag
+                    v-if="teamChannel"
+                    :variant="teamChannel.source === 'team' ? 'primary-soft' : 'default-soft'"
+                    size="xs"
+                    data-test="oncall-team-channel-source"
+                  >
+                    {{
+                      teamChannel.source === "team"
+                        ? t("oncall.teamChannelFromTeam")
+                        : t("oncall.teamChannelFromPolicy")
+                    }}
+                  </OTag>
+                  <OButton
+                    variant="outline"
+                    size="sm-action"
+                    :loading="savingChannel"
+                    :disabled="!teamChannelDirty"
+                    data-test="oncall-team-channel-save"
+                    @click="saveTeamChannel(teamChannelDraft)"
+                  >
+                    {{ t("oncall.teamChannelSave") }}
+                  </OButton>
+                  <!-- Clearing is its own verb because null and [] are different
+                       facts on the wire: back-to-policy versus silence-on-purpose. -->
+                  <OButton
+                    v-if="teamChannel?.source === 'team'"
+                    variant="ghost"
+                    size="sm-action"
+                    :loading="savingChannel"
+                    data-test="oncall-team-channel-clear"
+                    @click="saveTeamChannel(null)"
+                  >
+                    {{ t("oncall.teamChannelUsePolicy") }}
+                  </OButton>
+                  <!-- One post per firing, not a live room: the only transport is an
+                       HTTP destination, which cannot edit what it already sent. Said
+                       here so nobody designs an expectation the engine cannot meet. -->
+                  <OText variant="meta">{{ t("oncall.teamChannelHint") }}</OText>
+                  <span
+                    v-if="teamChannel && !teamChannel.destinations.length"
+                    class="text-status-warning-text text-xs"
+                    data-test="oncall-team-channel-silent"
+                  >
+                    {{ t("oncall.teamChannelSilent") }}
+                  </span>
+                </div>
+              </div>
+            </OTabPanel>
+
+            <!-- C11: the l0_json block. Wire rule: `l0` absent on the PUT means
+                 unchanged, so it is only included once the panel is touched —
+                 editing steps must never silently rewrite the gate. -->
+            <OTabPanel name="triage" data-test="oncall-policy-triage">
+              <div class="flex flex-col gap-3 px-4 pt-3 pb-4">
+                <OText variant="meta">{{ t("oncall.l0Hint") }}</OText>
+
+                <OnCallL0Editor
+                  :l0="props.policy?.l0 ?? null"
+                  @update:l0="onL0Update"
+                  @update:valid="(v: boolean) => (l0Valid = v)"
+                />
+              </div>
+            </OTabPanel>
+          </OTabPanels>
+        </div>
       </div>
     </div>
 
@@ -555,13 +570,16 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 
 import OnCallL0Editor from "@/components/oncall/OnCallL0Editor.vue";
-import OnCallPolicySection from "@/components/oncall/OnCallPolicySection.vue";
 import OAvatar from "@/lib/core/Avatar/OAvatar.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -589,7 +607,6 @@ import { formatMicrosDuration } from "@/utils/formatters";
 import {
   DELIVERABLE_CHANNELS,
   describeTarget,
-  l0Defaults,
   priorityLabel,
   resolveLadder,
 } from "@/utils/oncall";
@@ -659,9 +676,9 @@ const finalAction = ref<PolicyFinalAction>("stop");
 const availableDestinations = ref<string[]>([]);
 const saving = ref(false);
 
-/// The parent opens the delivery card when somebody presses Fix on a problem
-/// it is reporting from outside the fold.
-const deliverySection = ref<{ expand: () => void } | null>(null);
+/// Which of the two "everything else" tabs is showing. The delivery
+/// destinations warning's Fix button jumps here instead of expanding a card.
+const policyTab = ref<"delivery" | "triage">("delivery");
 
 /// Held OUTSIDE the PUT body until touched: the server reads an absent `l0`
 /// as "unchanged", which is the only reason a step edit cannot wipe the gate.
@@ -817,39 +834,8 @@ function setLadderEnd(value: string) {
   finalAction.value = action as PolicyFinalAction;
 }
 
-/// What the delivery card says while it is folded away: the channels this
-/// priority pages on, and the room the firing is announced in.
-const deliverySummary = computed<I18nText>(() => {
-  const channels = (current.value?.channels ?? []).map((c) => t(`oncall.channel_${c}`)).join(" + ");
-  if (!channels) return t("oncall.policyDeliverySummaryNoChannel");
-  const room = teamChannel.value?.destinations ?? [];
-  return room.length
-    ? t("oncall.policyDeliverySummary", { channels: raw(channels), room: raw(room.join(", ")) })
-    : t("oncall.policyDeliverySummaryNoRoom", { channels: raw(channels) });
-});
-
 const deliveryProblems = computed(() =>
   webhookEnabled.value && !destinations.value.length ? 1 : 0,
-);
-
-/// The gate as it stands right now — the draft once touched, else what is
-/// stored, else the block auto-creation would have written. Reading an absent
-/// block as "off" would describe a team that is in fact gating its P2s.
-const l0Current = computed<L0Policy>(() => l0Draft.value ?? props.policy?.l0 ?? l0Defaults());
-
-function l0ModeShort(mode: L0Policy["mode"]["P2"]): I18nText {
-  if (mode === "gate")
-    return t("oncall.l0ModeShortGate", { seconds: l0Current.value.triage_budget_seconds });
-  if (mode === "parallel") return t("oncall.l0ModeShortParallel");
-  return t("oncall.l0ModeShortOnly");
-}
-
-/// What the triage card says while it is folded away.
-const triageSummary = computed<I18nText>(() =>
-  t("oncall.policyTriageSummary", {
-    p2: l0ModeShort(l0Current.value.mode.P2),
-    p3: l0ModeShort(l0Current.value.mode.P3),
-  }),
 );
 
 /// **Three options: a rotation, some people, or the whole team.** It was eight,
@@ -1040,6 +1026,9 @@ watch(
   (open) => {
     if (!open) return;
     reset();
+    // Every visit starts on Delivery — a re-open landing on whichever tab was
+    // last showing would carry a stale AI triage view into an unrelated edit.
+    policyTab.value = "delivery";
     // A policy need not carry a rung for every priority, so an unrepresented
     // one falls back to a chip that exists rather than an empty body.
     const wanted = props.priority ?? selected.value;
