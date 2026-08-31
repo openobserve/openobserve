@@ -58,6 +58,7 @@ import {
   type JsonValidationContext,
 } from "@/utils/alerts/alertValidation";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 import {
   getAlertPayload as getAlertPayloadUtil,
   prepareAndSaveAlert as prepareAndSaveAlertUtil,
@@ -767,6 +768,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const debouncedSyncStreamFromSql = debounce(async (sql: string) => {
     if (!sql || !parser || isSyncingStreamFromSql.value) return;
+    // parse() is exponential in paren nesting depth — skip a pathologically
+    // nested query rather than freeze the tab. Losing this convenience sync
+    // is fine; the user can still pick the stream from the dropdown.
+    if (maxParenDepth(sql) > SQL_PARSE_MAX_DEPTH) return;
     try {
       const parsed = parser.parse(sql);
       const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;
