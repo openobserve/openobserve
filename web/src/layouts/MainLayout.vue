@@ -348,13 +348,6 @@ export default defineComponent({
       : undefined;
     const selectedOrg = ref(store.state.selectedOrganization);
     const userClickedOrg = ref(store.state.selectedOrganization);
-    const isActionsEnabled = computed(() => {
-      return (
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        store.state.zoConfig.actions_enabled
-      );
-    });
-
     const isIncidentsEnabled = computed(() => {
       return (
         (config.isEnterprise == "true" || config.isCloud == "true") &&
@@ -613,12 +606,17 @@ export default defineComponent({
       !Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") ||
       store.state.zoConfig.version == "";
 
+    // Which org the full config was fetched for — the response carries
+    // org-scoped fields (e.g. per-user permission flags), so an org switch
+    // must refetch even when a config is already loaded.
+    let fullConfigOrg = "";
+
     // The full config endpoint is authenticated and org-scoped; on a fresh
     // session the org can resolve after this component mounts.
     watch(
       () => store.state.selectedOrganization?.identifier,
       (identifier) => {
-        if (identifier && needsFullConfig()) {
+        if (identifier && (needsFullConfig() || identifier !== fullConfigOrg)) {
           getConfig();
         }
       },
@@ -661,33 +659,14 @@ export default defineComponent({
       }
     };
 
-    const updateActionsMenu = () => {
-      if (isActionsEnabled.value) {
-        const incidentIndex = linksList.value.findIndex((link) => link.name === "incidentList");
-
-        const actionExists = linksList.value.some((link) => link.name === "actionScripts");
-
-        if (incidentIndex !== -1 && !actionExists) {
-          linksList.value.splice(incidentIndex + 1, 0, {
-            title: t("menu.actions"),
-            icon: "code",
-            link: "/actions",
-            name: "actionScripts",
-          });
-        }
-      }
-    };
-
-    // Insert the Workflows entry after Actions (fallback: Alerts). Idempotent.
+    // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
       const existingIndex = linksList.value.findIndex((link) => link.name === "workflows");
 
       if (isWorkflowsEnabled.value) {
         if (existingIndex !== -1) return;
 
-        const actionIndex = linksList.value.findIndex((link) => link.name === "actionScripts");
-        const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
-        const anchor = actionIndex !== -1 ? actionIndex : alertIndex;
+        const anchor = linksList.value.findIndex((link) => link.name === "alertList");
         if (anchor === -1) return;
 
         linksList.value.splice(anchor + 1, 0, {
@@ -770,7 +749,6 @@ export default defineComponent({
 
     const filterMenus = () => {
       updateIncidentsMenu();
-      updateActionsMenu();
       updateWorkflowsMenu();
       updateSyntheticMenu();
       updateAIObservabilityMenu();
@@ -1197,6 +1175,7 @@ export default defineComponent({
           }
 
           store.dispatch("setConfig", res.data);
+          fullConfigOrg = orgIdentifier;
           await nextTick();
 
           filterMenus();
@@ -1435,7 +1414,6 @@ export default defineComponent({
       userClickedOrg,
       verifyStreamExist,
       filterMenus,
-      updateActionsMenu,
       getConfig,
       setRumUser,
       openPredefinedThemes,

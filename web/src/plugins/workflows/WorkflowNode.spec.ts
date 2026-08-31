@@ -101,6 +101,14 @@ const mountNode = (id: string, data: any) =>
 
 const card = (wrapper: any) => wrapper.findComponent({ name: "FlowNodeCard" });
 
+// A badge click opens the node's NDV — the same panel a node click opens, now
+// carrying this run's Input/Output. There is no separate results dock any more,
+// so "inspect a step" and "edit a step" are one surface.
+const expectNdvOpenedOn = (id: string) => {
+  expect(workflowObj.dialog.show).toBe(true);
+  expect(workflowObj.currentSelectedNodeID).toBe(id);
+};
+
 describe("WorkflowNode", () => {
   let wrapper: any = null;
 
@@ -484,37 +492,10 @@ describe("WorkflowNode", () => {
   // The hover-`+` under the card is gone: clicking the node's SOURCE HANDLE
   // opens the step picker. Terminal (output) nodes render no source handle, so
   // there is nothing to click on them.
-  describe("source handle -> step picker", () => {
-    const outputClick = (w: any, x = 120, y = 240) =>
-      w.findComponent({ name: "FlowNodeCard" }).vm.$emit("outputClick", {
-        clientX: x,
-        clientY: y,
-      } as MouseEvent);
-
-    it("opens the step picker anchored at the click for a logic node", async () => {
-      wrapper = mountNode("c1", CONDITION.data);
-      outputClick(wrapper, 120, 240);
-      await nextTick();
-      expect(workflowObj.stepPicker).toEqual({
-        show: true,
-        source: "c1",
-        handle: "out",
-        mode: "next",
-        // edgeId is only set in insert-on-edge mode (T7); empty here.
-        edgeId: "",
-        position: null,
-        anchor: { x: 120, y: 240 },
-      });
-    });
-
-    it("opens the step picker for the trigger too", async () => {
-      wrapper = mountNode("t1", TRIGGER.data);
-      outputClick(wrapper);
-      await nextTick();
-      expect(workflowObj.stepPicker.show).toBe(true);
-      expect(workflowObj.stepPicker.source).toBe("t1");
-    });
-
+  // The source dot is a connection point only now (adding a next step / fan-out
+  // branch moved to the canvas-level append `+`); it renders where a next step is
+  // legal and is absent on terminal nodes.
+  describe("source handle (connection point)", () => {
     it("renders a source handle on a logic node", () => {
       wrapper = mountNode("c1", CONDITION.data);
       expect(wrapper.findComponent({ name: "FlowNodeCard" }).props("hasOutput")).toBe(true);
@@ -523,15 +504,6 @@ describe("WorkflowNode", () => {
     it("renders NO source handle on a terminal (output) destination node", () => {
       wrapper = mountNode("d1", DESTINATION.data);
       expect(wrapper.findComponent({ name: "FlowNodeCard" }).props("hasOutput")).toBe(false);
-    });
-
-    it("does nothing on the read-only Runs canvas", async () => {
-      workflowObj.readOnly = true;
-      wrapper = mountNode("c1", CONDITION.data);
-      outputClick(wrapper);
-      await nextTick();
-      expect(workflowObj.stepPicker.show).toBe(false);
-      workflowObj.readOnly = false;
     });
   });
 
@@ -666,7 +638,7 @@ describe("WorkflowNode", () => {
       expect(wrapper.find(".wf-test-count").exists()).toBe(false);
     });
 
-    it("opens the per-node result drawer when the error badge is clicked", async () => {
+    it("opens the NDV when the error badge is clicked", async () => {
       setResult({
         errors: { c1: { error_count: 1, errors: [["boom"]] } },
         ranNodeIds: ["c1"],
@@ -674,13 +646,10 @@ describe("WorkflowNode", () => {
       });
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.find('[data-test="workflow-node-condition-test-error"]').trigger("click");
-      expect(workflowObj.testRun.resultDrawer).toEqual({
-        show: true,
-        nodeId: "c1",
-      });
+      expectNdvOpenedOn("c1");
     });
 
-    it("opens the drawer when the ok badge is clicked (every ran node is inspectable)", async () => {
+    it("opens the NDV when the ok badge is clicked (every ran node is inspectable)", async () => {
       setResult({
         errors: {},
         inputs: { c1: [{ meta: {}, data: [{ x: 1 }] }] },
@@ -689,14 +658,14 @@ describe("WorkflowNode", () => {
       });
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.find('[data-test="workflow-node-condition-test-ok"]').trigger("click");
-      expect(workflowObj.testRun.resultDrawer).toEqual({ show: true, nodeId: "c1" });
+      expectNdvOpenedOn("c1");
     });
 
-    it("opens the drawer when the grey (skipped) badge is clicked", async () => {
+    it("opens the NDV when the grey (skipped) badge is clicked", async () => {
       setResult({ errors: {}, inputs: {}, ranNodeIds: ["c1"], blockedNodeIds: [] });
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.find('[data-test="workflow-node-condition-test-skipped"]').trigger("click");
-      expect(workflowObj.testRun.resultDrawer).toEqual({ show: true, nodeId: "c1" });
+      expectNdvOpenedOn("c1");
     });
 
     it("reacts to a test result arriving after mount", async () => {
@@ -747,10 +716,7 @@ describe("WorkflowNode", () => {
       const badge = wrapper.find('[data-test="workflow-node-undefined-test-error"]');
       expect(badge.exists()).toBe(true);
       await badge.trigger("click");
-      expect(workflowObj.testRun.resultDrawer).toEqual({
-        show: true,
-        nodeId: "c1",
-      });
+      expectNdvOpenedOn("c1");
     });
 
     it("renders the delete button and the actions bar with an undefined type", async () => {

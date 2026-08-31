@@ -5,6 +5,7 @@ import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
 import AppPerformance from "./AppPerformance.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
 
 // Mock the composables
 const mockPerformanceState = {
@@ -23,11 +24,14 @@ vi.mock("@/composables/rum/usePerformance", () => ({
   }),
 }));
 
-vi.mock("@/composables/rum/useRum", () => ({
-  default: () => ({
-    rumState: mockRumState,
-  }),
-}));
+// Only rumState is faked — the rest of useRum (shareUrl) stays real so the share
+// link is exercised rather than mocked.
+vi.mock("@/composables/rum/useRum", async (importOriginal) => {
+  const actual = await importOriginal<{ default: () => Record<string, unknown> }>();
+  return {
+    default: () => ({ ...actual.default(), rumState: mockRumState }),
+  };
+});
 
 // Mock utility functions
 vi.mock("@/utils/commons.ts", () => ({
@@ -214,6 +218,15 @@ describe("AppPerformance.vue", () => {
     it("should render refresh button", () => {
       const refreshBtn = wrapper.find('[data-test="rum-performance-refresh"]');
       expect(refreshBtn.exists()).toBe(true);
+    });
+
+    it("shares a URL carrying the active tab and its time range", () => {
+      const shareButton = wrapper.findComponent(ShareButton);
+
+      expect(shareButton.exists()).toBe(true);
+      expect(shareButton.props("url")).toBe(
+        `${window.location.origin}/rum/performance?org_identifier=test-org-123&period=15m`,
+      );
     });
 
     it("should have correct key attribute based on organization", () => {

@@ -277,7 +277,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     titleKey: "menu.data",
     icon: "database",
     parentLink: "/streams",
-    absorbs: ["streams", "pipeline", "ingestion"],
+    absorbs: ["streams", "pipeline", "ingestion", "workflows"],
     // Data follows the Reliability tile — after Infra, which names the same
     // anchor and is declared ahead of it. This is load-bearing: without it Data
     // lands at its own first absorbed item (pipeline/streams), near the TOP of
@@ -293,6 +293,11 @@ export const NAV_GROUPS: NavGroupDef[] = [
         requires: "pipeline",
         gate: "streamPipelines",
       },
+      // Sits with Pipelines — the two are the same kind of thing (a flow canvas)
+      // and share the canvas code. `requires` keys off the top-level entry
+      // MainLayout adds/removes from `workflows_enabled`, so the flag still owns
+      // visibility and no gate is duplicated here.
+      { titleKey: "menu.workflows", icon: "schema", name: "workflows", requires: "workflows" },
       { titleKey: "function.header", icon: "function", name: "functionList", requires: "pipeline" },
       {
         titleKey: "function.enrichmentTables",

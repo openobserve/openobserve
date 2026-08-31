@@ -58,7 +58,6 @@ const organizationObj = {
   },
   quotaThresholdMsg: "",
   functions: [],
-  actions: [],
   streams: {},
   folders: [],
   foldersByType: [],
@@ -253,9 +252,6 @@ export default createStore({
     },
     setFunctions(state, payload) {
       state.organizationData.functions = payload;
-    },
-    setActions(state, payload) {
-      state.organizationData.actions = payload;
     },
     setStreams(state, payload) {
       state.organizationData.streams[payload.name] = payload;
@@ -514,9 +510,6 @@ export default createStore({
     },
     setFunctions(context, payload) {
       context.commit("setFunctions", payload);
-    },
-    setActions(context, payload) {
-      context.commit("setActions", payload);
     },
     setStreams(context, payload) {
       context.commit("setStreams", payload);

@@ -98,9 +98,12 @@ describe("WorkflowTrigger", () => {
       expect(editor(w).props("readOnly")).toBe(true);
     });
 
+    // Monaco collapses without a definite height. The box now gets one by filling
+    // its flex parent (min-h-0 + flex-1) rather than carrying a fixed h-* class.
     it("gives the editor a definite height (Monaco collapses without one)", () => {
       const box = createWrapper().find('[data-test="workflow-trigger-structure"]');
-      expect(box.classes().some((c: string) => /^h-\d/.test(c))).toBe(true);
+      expect(box.classes()).toContain("flex-1");
+      expect(box.classes()).toContain("min-h-0");
     });
   });
 

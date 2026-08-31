@@ -119,7 +119,6 @@ vi.mock("@/composables/useLogs", () => {
       selectedTraceStream: "",
       showSearchScheduler: false,
       toggleFunction: false, // DEPRECATED use showTransformEditor instead
-      isActionsEnabled: false,
       resetPlotChart: false,
     },
     data: {
@@ -209,7 +208,6 @@ vi.mock("@/composables/useLogs", () => {
       searchWebSocketTraceIds: <string[]>[],
       isOperationCancelled: false,
       searchRetriesCount: <{ [key: string]: number }>{},
-      actionId: null,
     },
     organizationIdentifier: "",
     runQuery: false,

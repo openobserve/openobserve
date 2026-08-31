@@ -23,6 +23,12 @@ export interface TextareaProps {
   rows?: number;
   /** Auto-resize to fit content */
   autogrow?: boolean;
+  /**
+   * Upper bound for `autogrow`, in lines. Past it the field stops growing and
+   * scrolls instead, so one long message cannot push everything below it off
+   * the screen. Ignored without `autogrow`.
+   */
+  maxRows?: number;
   /** Prevents value editing */
   readonly?: boolean;
   /** Prevents interaction */

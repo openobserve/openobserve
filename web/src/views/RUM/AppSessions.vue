@@ -98,6 +98,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   shortcut-id="rumSessionsRefresh"
                 />
               </OButton>
+              <ShareButton
+                ref="shareButtonRef"
+                data-test="rum-app-sessions-share-link-btn"
+                :url="shareUrl"
+                variant="outline"
+                size="icon-toolbar"
+                shortcut-id="rumSessionsCopyUrl"
+                class="shrink-0"
+              />
             </div>
             <!-- end controls -->
           </div>
@@ -463,6 +472,8 @@ import useStreams from "@/composables/useStreams";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
+import useRum from "@/composables/rum/useRum";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -1580,6 +1591,9 @@ const getSessionStatusColor = (row: any) => {
 
 const router = useRouter();
 
+const { shareUrl } = useRum();
+const shareButtonRef = ref<InstanceType<typeof ShareButton> | null>(null);
+
 const handleRowClick = (row: any) => {
   if (!row.session_id) return;
   handleCellClick({ columnName: "action_play", row });
@@ -1700,6 +1714,10 @@ useShortcuts([
     handler: () => {
       if (!isInputFocused()) runQuery();
     },
+  },
+  {
+    id: "rumSessionsCopyUrl",
+    handler: () => shareButtonRef.value?.handleShareClick(),
   },
 ]);
 </script>

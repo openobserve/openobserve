@@ -266,4 +266,7 @@ describe("OButton", () => {
 ## 11. After building
 
 1. **Add the component to this skill's catalog** — the sibling reference files in this folder are grouped by domain: `core-controls-table.md`, `core-display.md`, `forms-inputs.md`, `forms-specialized.md`, `forms-validation.md`, `feedback-data.md`, `overlay-navigation.md`, `keyboard-shortcuts.md`. Document the new component (props, variants, usage) in the matching file so consumers can find it.
-2. **Lint + type-check** (from `web/`): `npm run lint` then `npm run type-check`. Fix everything before declaring done. Do **not** run `npm run build`.
+2. **Lint + type-check** (from `web/`): `npm run lint` then **`npm run type-check:app`**. Fix everything before declaring done. Do **not** run `npm run build`.
+   Use `type-check:app`, not `type-check`: the plain script targets
+   `tsconfig.vitest.json`, which includes only `src/**/*.spec.{ts,js}` and so
+   never type-checks a `.vue` file.

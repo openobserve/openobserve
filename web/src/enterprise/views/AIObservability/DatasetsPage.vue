@@ -16,11 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   Datasets — the first slice of the AI Observability "Annotate" section. Golden
-  (MVCC) datasets that the annotation workflow feeds into. Frontend-first: this
-  page reads llm-datasets.service.ts, which serves mock fixtures until the
-  backend API lands (see VITE_LLM_ANNOTATION_MOCK). No page-level date range —
-  datasets are configuration objects, not time-series — so it uses OPageLayout
-  directly rather than AiPageShell.
+  (MVCC) datasets that the annotation workflow feeds into, read live from
+  llm-datasets.service.ts. No page-level date range — datasets are
+  configuration objects, not time-series — so it uses OPageLayout directly
+  rather than AiPageShell.
 -->
 <template>
   <OPageLayout
@@ -142,15 +141,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon-sm"
-              icon-left="function"
-              :data-test="`ai-datasets-experiments-${row.id}`"
-              @click.stop="openExperiments(row)"
-            >
-              <OTooltip side="bottom" :content="t('aiObservability.experiments.viewAll')" />
-            </OButton>
-            <OButton
-              variant="ghost"
-              size="icon-sm"
               icon-left="edit"
               :data-test="`ai-datasets-edit-${row.id}`"
               @click.stop="openEdit(row)"
@@ -264,7 +254,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
-import { aiExperimentsRoute } from "./experimentRoutes";
 
 defineOptions({ name: "AIDatasetsPage" });
 
@@ -383,13 +372,9 @@ const columns = computed<OTableColumnDef[]>(() => [
     sortable: false,
     size: 128,
     pinned: "right" as const,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
   },
 ]);
-
-function openExperiments(row: LlmDataset) {
-  router.push(aiExperimentsRoute(orgId.value, { datasetId: row.id }));
-}
 
 // Named handler: binding refresh straight to @click puts the MouseEvent in
 // `force`.

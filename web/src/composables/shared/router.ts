@@ -206,6 +206,14 @@ const useRoutes = () => {
         titleKey: "routeTitles.loginCallback",
       },
     },
+    {
+      path: "/slack/oauth/callback",
+      name: "slackOAuthCallback",
+      component: () => import("@/views/SlackOAuthCallback.vue"),
+      meta: {
+        titleKey: "routeTitles.slackOAuthCallback",
+      },
+    },
   ];
 
   const homeChildRoutes = [

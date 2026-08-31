@@ -122,7 +122,7 @@ const useStreams = (t: TranslateFn) => {
             } else {
               queryClient.fetchQuery(streamNameListQuery(store.state.selectedOrganization.identifier, _streamName))
                 .then((list: any) => {
-                  setStreams(streamName, list);
+                  setStreams(streamName, list, force);
                   const streamData = {
                     name: streamName,
                     list,

@@ -11,7 +11,7 @@ recurring class of bug or drift in this codebase.
 ### 1. Every page/module header is `OPageHeader`
 
 **What.** The top of any routed view or module screen (title + icon + actions,
-optionally tabs/breadcrumb/back) is rendered by `OPageHeader`, never a
+optionally peer tabs and a back button) is rendered by `OPageHeader`, never a
 hand-rolled `<div class="header">…<h1>…` or a bespoke `q-toolbar`.
 
 ```vue
@@ -41,8 +41,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 ```
 
 **Why.** `OPageHeader` encodes a single header contract used app-wide: row 1 is
-a fixed-height band (icon tile + `<h1>` + right-aligned actions); row 2 shows
-**exactly one** of peer tabs, an ancestor breadcrumb, or a plain tagline. Every
+a fixed-height band (icon tile + `<h1>` + right-aligned actions, with the
+`subtitle` tagline under the title); row 2 is the full-width peer-tab strip.
+Tabs and a tagline coexist — most module index pages carry both. Every
 hand-built header silently re-litigates title font size, icon tile geometry,
 back-button placement, and the tab underline — and drifts. Reusing the component
 keeps the title's X/Y position identical as a user navigates list → detail →
@@ -55,11 +56,25 @@ edit, which is the whole point.
   the one-row-content contract — is documented in this rule (below), so you can
   use it correctly without opening the file.
 - Props: `title`, `subtitle`, `icon` (an `IconName` from
-  `@/lib/core/Icon/OIcon.icons`), `breadcrumb` (`BreadcrumbItem[]`),
-  `breadcrumbMaxInline`, `back` (`{ label, to | onClick, dataTest }`),
-  `tabsBelow`.
+  `@/lib/core/Icon/OIcon.icons`), `back` (`{ label, to | onClick, dataTest }`),
+  `tabsBelow`, `titleDataTest` (a `data-test` on the `<h1>`, so a page needn't
+  take over the `#title` slot just to attach a test hook), and `titleOverflow`
+  (`"truncate"` default | `"visible"` — pass `"visible"` when `#title` hosts an
+  interactive control, or the `<h1>`'s `overflow:hidden` swallows its focus ring).
+  There is **no breadcrumb prop** — `OPageHeader` has no breadcrumb affordance
+  and no `BreadcrumbItem` type exists; a sub-page uses `back` instead.
 - Slots: `title-prefix`, `title`, `subtitle`, `title-trail`, `actions`, `tabs`,
   `back`.
+- **Peer tabs need `tabs-below` — the slot alone is not enough.** `#tabs`
+  (`#header-tabs` on `OPageLayout`) defaults to rendering the strip *inline
+  beside the title*, which is the wrong place for Level-2 section nav: the title
+  block is `shrink-0`, so the strip's x-position moves with the title's width
+  and shifts under the cursor as you navigate between siblings. Pass
+  `tabs-below` to get the full-width row-2 strip every module uses. The four
+  alerting pages shipped inline for exactly this reason — nothing failed, they
+  just didn't look like the rest of the app.
+- **The header `icon` must be the SAME `IconName` the page's nav entry
+  declares** — see [navigation-menus](navigation-menus.md#icon-parity).
 - Put page actions in `#actions` using O2 components. Do not add your own
   `border-b`, height, or padding around it — the header owns its own chrome.
 - **Do not** style `OPageHeader` from the outside with utility classes or a

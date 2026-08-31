@@ -39,7 +39,18 @@ const pickerSubmit = vi.fn();
 vi.mock("@/components/flow/forms/FunctionPicker.vue", () => ({
   default: {
     name: "FunctionPicker",
-    props: ["initialName", "initialAfterFlatten", "sampleEvents", "language", "defaultCode"],
+    // Object form (not an array): boolean props must be typed Boolean so a shorthand
+    // attribute coerces to `true` instead of surfacing as `""`.
+    props: {
+      initialName: {},
+      initialRawFn: {},
+      initialAfterFlatten: {},
+      sampleEvents: {},
+      language: {},
+      defaultCode: {},
+      optional: { type: Boolean, default: false },
+      createButton: { type: Boolean, default: false },
+    },
     emits: ["expand"],
     methods: {
       submit: (...args: any[]) => pickerSubmit(...args),
@@ -87,6 +98,16 @@ describe("WorkflowFunction", () => {
       expect(picker(wrapper).exists()).toBe(true);
     });
 
+    it("renders the picker as optional (empty selection = dummy node)", () => {
+      const wrapper = createWrapper();
+      expect(picker(wrapper).props("optional")).toBe(true);
+    });
+
+    it("uses single-screen mode (create-button, no mode switch)", () => {
+      const wrapper = createWrapper();
+      expect(picker(wrapper).props("createButton")).toBe(true);
+    });
+
     it("passes an empty initial-name and after-flatten=false by default", () => {
       const wrapper = createWrapper();
       expect(picker(wrapper).props("initialName")).toBe("");
@@ -102,6 +123,16 @@ describe("WorkflowFunction", () => {
       const wrapper = createWrapper();
       expect(picker(wrapper).props("initialName")).toBe("redact");
       expect(picker(wrapper).props("initialAfterFlatten")).toBe(false);
+    });
+
+    it("seeds initial-raw-fn from a saved inline (nameless) node", () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "n1",
+        data: { node_type: "function", name: "", raw_fn: "() => 1", after_flatten: true },
+      } as any;
+      const wrapper = createWrapper();
+      expect(picker(wrapper).props("initialName")).toBe("");
+      expect(picker(wrapper).props("initialRawFn")).toBe("() => 1");
     });
 
     it("defaults after-flatten to false when only a name is saved", () => {
@@ -198,64 +229,45 @@ describe("WorkflowFunction", () => {
       const wrapper = createWrapper();
       await expect((wrapper.vm as any).submit()).resolves.toBeNull();
     });
+
+    it("proxies an inline raw_fn payload and flags incomplete (empty name)", async () => {
+      workflowObj.currentSelectedNodeData = { id: "f1", data: { node_type: "function" } } as any;
+      pickerSubmit.mockResolvedValue({ name: "", raw_fn: "() => 2", after_flatten: true });
+      const wrapper = createWrapper();
+      await expect((wrapper.vm as any).submit()).resolves.toEqual({
+        name: "",
+        raw_fn: "() => 2",
+        after_flatten: true,
+      });
+      // raw_fn has an empty name → treated the same as a dummy (blocks Publish).
+      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBe("true");
+    });
   });
 
-  describe("'Set up later' toggle — placeholder", () => {
-    // The toggle is a real OSwitch; drive it through its v-model emit.
-    const toggle = (wrapper: any, on: boolean) =>
-      wrapper.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", on);
-
-    it("renders the 'Set up later' toggle", () => {
+  // Dummy-node model (C1): no "Set up later" toggle. An empty picker result saves
+  // the node as a placeholder (empty name + meta.incomplete); a real selection
+  // clears it. submit() always defers to the (optional) picker.
+  describe("dummy-node placeholder (no toggle)", () => {
+    it("does not render a 'Set up later' toggle", () => {
       const wrapper = createWrapper();
-      expect(wrapper.find('[data-test="workflow-function-set-up-later"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-function-set-up-later"]').exists()).toBe(false);
     });
 
-    it("Save (submit) returns an empty function name and flags meta.incomplete", async () => {
+    it("flags meta.incomplete when the picker returns an empty function name", async () => {
       workflowObj.currentSelectedNodeData = {
         id: "f1",
         data: { node_type: "function" },
       } as any;
+      pickerSubmit.mockResolvedValue({ name: "", after_flatten: false });
       const wrapper = createWrapper();
-      toggle(wrapper, true);
-      await wrapper.vm.$nextTick();
-      // the picker is NOT consulted while set-up-later is on
       await expect((wrapper.vm as any).submit()).resolves.toEqual({
         name: "",
         after_flatten: false,
       });
-      expect(pickerSubmit).not.toHaveBeenCalled();
       expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBe("true");
     });
 
-    it("preserves a saved after_flatten in the placeholder payload", async () => {
-      workflowObj.currentSelectedNodeData = {
-        id: "f1",
-        data: { node_type: "function", after_flatten: true },
-      } as any;
-      const wrapper = createWrapper();
-      toggle(wrapper, true);
-      await wrapper.vm.$nextTick();
-      await expect((wrapper.vm as any).submit()).resolves.toEqual({
-        name: "",
-        after_flatten: true,
-      });
-    });
-
-    it("defaults ON when reopening a placeholder node", async () => {
-      workflowObj.currentSelectedNodeData = {
-        id: "f1",
-        data: { node_type: "function" },
-        meta: { incomplete: "true" },
-      } as any;
-      const wrapper = createWrapper();
-      await expect((wrapper.vm as any).submit()).resolves.toEqual({
-        name: "",
-        after_flatten: false,
-      });
-      expect(pickerSubmit).not.toHaveBeenCalled();
-    });
-
-    it("clears meta.incomplete when toggled off and a real function is chosen", async () => {
+    it("clears meta.incomplete when a real function is chosen", async () => {
       workflowObj.currentSelectedNodeData = {
         id: "f1",
         data: { node_type: "function" },
@@ -263,9 +275,6 @@ describe("WorkflowFunction", () => {
       } as any;
       pickerSubmit.mockResolvedValue({ name: "redact", after_flatten: false });
       const wrapper = createWrapper();
-      // reopening a placeholder defaults the toggle ON — turn it OFF to pick a real one
-      toggle(wrapper, false);
-      await wrapper.vm.$nextTick();
       await expect((wrapper.vm as any).submit()).resolves.toEqual({
         name: "redact",
         after_flatten: false,

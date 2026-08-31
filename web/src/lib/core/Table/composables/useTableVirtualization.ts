@@ -32,6 +32,13 @@ export interface VirtualizationOptions {
    * deltas to that shared element makes it jump during result refreshes.
    */
   preserveScrollOffsetOnRowResize?: MaybeRefOrGetter<boolean>;
+  /**
+   * Virtualize this many rows instead of `rows.length`. Lets the caller feed a
+   * windowed row model (only the visible slice materialized) while the
+   * scrollbar and spacers still span the full dataset. Return undefined to
+   * fall back to `rows.length`.
+   */
+  totalCount?: MaybeRefOrGetter<number | undefined>;
 }
 
 /**
@@ -50,6 +57,7 @@ export function useTableVirtualization(options: VirtualizationOptions) {
     overscan = 100,
     dynamicRowHeight,
     preserveScrollOffsetOnRowResize,
+    totalCount,
   } = options;
 
   const isFirefox = computed(() => {
@@ -67,7 +75,7 @@ export function useTableVirtualization(options: VirtualizationOptions) {
     // from null to real after mount, the virtualizer rebinds its scroll listener.
     const resolvedScrollEl = (toValue(scrollEl) as HTMLElement | null) ?? parentRef.value;
     return {
-      count: rows.value.length,
+      count: toValue(totalCount) ?? rows.value.length,
       getScrollElement: () => resolvedScrollEl,
       scrollMargin,
       estimateSize: (index: number) => {

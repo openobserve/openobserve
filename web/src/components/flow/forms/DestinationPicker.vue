@@ -30,8 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div data-test="destination-picker" class="flex w-full flex-col gap-4">
-    <!-- Mode toggle — a bare control OUTSIDE the form: it swaps the
-         select-existing form for the CreateDestinationForm create child. -->
+    <!-- Mode toggle — a bare control OUTSIDE the form: it swaps the select-existing
+         form for the CreateDestinationForm create child. Always visible, so the user
+         can toggle back to picking an existing destination without hunting for Cancel. -->
     <OSwitch
       v-model="createNewDestination"
       :label="t('flow.destination.createNew')"
@@ -75,6 +76,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { isCustomDestination } from "@/utils/destinationType";
 import CreateDestinationForm from "@/components/pipeline/NodeForm/CreateDestinationForm.vue";
 import {
   makeExternalDestinationSchema,
@@ -143,15 +145,37 @@ watch(createNewDestination, async (v) => {
   }
 });
 
-// Show the destination URL as a sub-label.
-const destinationOptions = computed(() =>
-  destinations.value.map((d: any) => ({
-    label: d.name,
-    value: d.name,
-    subLabel: d.url && d.url.length > 70 ? d.url.slice(0, 70) + "..." : d.url,
-    subLabelInline: true,
-  })),
-);
+const toOption = (d: any) => ({
+  label: d.name,
+  value: d.name,
+  subLabel: d.url && d.url.length > 70 ? d.url.slice(0, 70) + "..." : d.url,
+  subLabelInline: true,
+});
+
+// Show the destination URL as a sub-label. When the host locks the type to custom
+// (Workflows), prebuilt provider destinations are filtered out — they are listed by
+// the shared pipeline endpoint but cannot be executed by a workflow node.
+const destinationOptions = computed(() => {
+  const all = destinations.value;
+  if (props.forcedType !== "custom") return all.map(toOption);
+
+  const custom = all.filter(isCustomDestination);
+  const options = custom.map(toOption);
+
+  // A node saved before this filter existed may point at a prebuilt destination.
+  // Keep it listed (flagged) rather than letting it vanish — an empty picker would
+  // silently downgrade the node to a placeholder on the next Save.
+  const saved = props.initialName
+    ? all.find((d: any) => d.name === props.initialName && !isCustomDestination(d))
+    : undefined;
+  if (saved) {
+    options.unshift({
+      ...toOption(saved),
+      subLabel: t("flow.destination.unsupportedType"),
+    });
+  }
+  return options;
+});
 
 // Pipeline-module external destinations.
 const getDestinations = async () => {

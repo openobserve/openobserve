@@ -27,6 +27,8 @@ const { mockRouter, mockToast, mockHydrate, mockLoadRun, mockReset, workflowObj,
       readOnly: false,
       currentSelectedWorkflow: { id: "", name: "", nodes: [], edges: [] },
       testRun: { resultDrawer: { show: false, nodeId: "" }, result: null },
+      // The NDV now renders inside this view, so the template reads dialog.show.
+      dialog: { show: false, name: "", expand: false },
     };
     return {
       mockRouter: {
@@ -201,6 +203,51 @@ describe("WorkflowRuns", () => {
   it("Edit Workflow navigates to the editor (build stays separate from inspect)", async () => {
     const wrapper = await mountRuns();
     await wrapper.find('[data-test="workflow-runs-edit"]').trigger("click");
+    expect(mockRouter.push).toHaveBeenCalledWith({
+      name: "workflowEditor",
+      query: { id: "wf-1", name: "my flow", org_identifier: "default" },
+    });
+  });
+
+  // ── Debug In Editor ────────────────────────────────────────────────────────
+  // The pair to Edit Workflow: same destination, but the selected run travels
+  // with it so the editor repaints the whole run and stays editable. Whole-graph
+  // counterpart to the NDV's per-step "Fix This Step".
+
+  it("hides Debug In Editor until a run is selected", async () => {
+    const wrapper = await mountRuns();
+    expect(wrapper.find('[data-test="workflow-runs-debug"]').exists()).toBe(false);
+  });
+
+  it("offers Debug In Editor once a run is selected", async () => {
+    const wrapper = await mountRuns();
+    panel(wrapper).vm.$emit("select-run", "run-5");
+    await flushPromises();
+    expect(wrapper.find('[data-test="workflow-runs-debug"]').exists()).toBe(true);
+  });
+
+  it("Debug In Editor carries the selected run to the editor", async () => {
+    const wrapper = await mountRuns();
+    panel(wrapper).vm.$emit("select-run", "run-5");
+    await flushPromises();
+
+    await wrapper.find('[data-test="workflow-runs-debug"]').trigger("click");
+
+    expect(mockRouter.push).toHaveBeenCalledWith({
+      name: "workflowEditor",
+      query: { id: "wf-1", name: "my flow", org_identifier: "default", run_id: "run-5" },
+    });
+  });
+
+  // The two verbs must stay distinct: "go build" must not silently arrive with a
+  // past run's badges painted on the canvas.
+  it("Edit Workflow still leaves the run behind even when one is selected", async () => {
+    const wrapper = await mountRuns();
+    panel(wrapper).vm.$emit("select-run", "run-5");
+    await flushPromises();
+
+    await wrapper.find('[data-test="workflow-runs-edit"]').trigger("click");
+
     expect(mockRouter.push).toHaveBeenCalledWith({
       name: "workflowEditor",
       query: { id: "wf-1", name: "my flow", org_identifier: "default" },

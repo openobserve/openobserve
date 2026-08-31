@@ -31,7 +31,11 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 
 - `variant` (default `"default"`) — one of: `default`, `primary`, `success`, `warning`, `error`, `default-outline`, `primary-outline`, `success-outline`, `warning-outline`, `error-outline`, `info-outline`, `purple-outline`, `default-soft`, `primary-soft`, `success-soft`, `warning-soft`, `error-soft`, `teal`, `teal-outline`, `teal-soft`, `orange`, `orange-outline`, `orange-soft`, `lime`, `lime-outline`, `lime-soft`, `amber`, `amber-outline`, `amber-soft`, `cyan`, `cyan-outline`, `cyan-soft`, `blue`, `blue-outline`, `blue-soft`, `purple`, `purple-soft`, `indigo`, `indigo-outline`, `indigo-soft`
 - `size` (`xs` | `sm` | `md` — default `md`)
-- `shape` (`pill` | `rounded` | `square` — default `pill`)
+- `shape` (`pill` | `rounded` | `square` — default `pill`).
+  **Strict: badges are `pill` by default and STAY pill.** Do not pass `rounded`
+  or `square` — never pick a badge shape by eye. Only set another shape when a
+  design explicitly calls for it, and for a typed `OTag` that shape lives in the
+  badge-registry group (`badgeGroups.ts`), never as a call-site prop.
 - `icon` (string — Material icon or OIcon registry name; overridden by `#icon` slot)
 - `count` (number — trailing segment; `0` still renders unless `hideZeroCount`)
 - `hideZeroCount` (boolean — suppress trailing segment when count is 0)
@@ -56,12 +60,30 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 **Import:** `@/lib/core/Badge/OTag.vue`
 **Use when:** This is THE badge for application code. Use it for any status pill, type chip, or label — either semantic (pass `type` + `value` to resolve colour/icon/dot/label from the badge registry) or manual (pass `variant`/slots like OBadge).
 **Don't use for:** Two-segment `key=value` dimension chips — use `ODimensionChip`. Don't reach past it to `OBadge`.
+
+> **Rule (strict) — styling lives in the registry, never at the call site.**
+> A semantic `<OTag>` in application code carries **only `type` + `value`** (plus
+> `label`/`count`/`#default` for genuinely dynamic *content* the registry cannot
+> enumerate — a version string, an instance name, a live count). Every VISUAL
+> decision — `variant`, `size`, `shape`, `icon`, `dot` — belongs in the group's
+> entry in `badgeGroups.ts`, **not** as a per-call prop, so one edit restyles
+> every use and the look cannot drift between call sites. The style-override props
+> listed below exist for the low-level library and one-off *manual* passthrough
+> badges (no `type`) only — do not use them to re-style a typed badge.
+>
+> A badge that must look different **in a different context** gets its own
+> registry **group** (e.g. a distinct `type`), not a call-site override. If you
+> find yourself writing `<OTag type="x" value="y" size="md" shape="pill">`, the
+> size/shape belong in group `x` (or a new group), not on the tag.
 **Key props:**
 
 - `type` (`BadgeGroupName | string` — registry group e.g. `"alertType"`; omit for a manual badge)
 - `value` (unknown — raw value resolved against the group)
 - `size` (`xs` | `sm` | `md` — precedence: prop → registry → `sm`)
-- `shape` (`pill` | `rounded` | `square` — precedence: prop → registry → `pill`)
+- `shape` (`pill` | `rounded` | `square` — precedence: prop → registry → `pill`).
+  Default is `pill` and stays pill; a group sets `rounded`/`square` in
+  `badgeGroups.ts` only when a design explicitly calls for it — never a call-site
+  shape override.
 - `label` (string — override resolved label)
 - `variant` (`BadgeVariant` — override resolved colour; same enum as OBadge)
 - `icon` (string — override resolved OIcon name; `""` suppresses)
@@ -274,6 +296,17 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 **Import:** `@/lib/core/EmptyState/OEmptyState.vue`
 **Use when:** The app-wide empty-state primitive for "no data / no results" contexts. Driven by a named `preset` (fills illustration + copy + actions) or by props/slots. Three sizes for the three contexts: full page/section (`hero`), inside a card/panel (`block`), inside a table/dropdown (`inline`).
 **Don't use for:** Loading/skeleton states, or inline validation errors.
+
+> **Rule (strict) — every empty state IS `OEmptyState`.** Never hand-roll a
+> "no data / no results / nothing here yet" state from a bare `<div>` with
+> centered text and a button. ANY empty/zero state — a table with no rows, a
+> panel or tab with nothing yet, a filtered list with no matches — renders
+> through `OEmptyState` (illustration + title + description). **Actions use the
+> ONE standard layout:** a rich action **card** — `EmptyStateActionCard` via the
+> `actions` prop or the `#actions` slot — for a primary next-step CTA (icon chip
+> + label + sublabel + chevron, the same card the empty dashboard uses), or
+> `actionLabel` + `@action` for a simple button. Never a hand-placed button row
+> or a custom card. So every empty state across the app reads as one system.
 **Key props:**
 
 - `preset` (`EmptyStatePresetName` — named scenario from the catalog; see `EmptyState/presets.ts`)
@@ -311,6 +344,24 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 **Key props:**
 
 - `name` (`IconName | string`, required — registry name or `img:<path>`). There are several hundred registry names; discover them in `@/lib/core/Icon/OIcon.icons.ts` (the exported `iconRegistry` / `IconName` type). Do not guess — check the registry.
+  - **A wrong name fails SILENTLY — nothing renders, no error, no warning.** The
+    `| string` in the prop type (needed for `img:<path>`) collapses the union, so
+    a typo type-checks. Registry keys are **kebab-case**; Material Symbols'
+    snake_case names are NOT valid. The SLO module shipped `format_list_bulleted`,
+    `gpp_maybe`, `timelapse`, `hourglass_empty`, `restart_alt` and `data_usage` —
+    six blank icons across four files, one of which left a filter row where only
+    one of four options had a glyph.
+  - **So type the literal, don't rely on the prop.** When icon names live in a
+    data array, annotate it so the strings are checked against the union:
+    ```ts
+    import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+    const options = computed<{ value: string; label: I18nText; icon: IconName }[]>(() => [
+      { value: "all", label: t("x.all"), icon: "format-list-bulleted" },
+    ]);
+    ```
+    Without the annotation TS infers `icon: string` and the typo survives to
+    production. To audit an existing file, grep its icon literals against
+    `iconRegistry`'s keys.
 - `size` (`xs` | `sm` | `md` | `lg` | `xl` — default `md`; xs=12px, sm=16px, md=24px, lg=32px, xl=40px)
 - `label` (string — accessible label; sets `role="img"`, otherwise the icon is `aria-hidden`)
 

@@ -29,6 +29,10 @@ vi.mock("@/services/jstransform", async (importOriginal) => {
   });
 });
 
+// The live editor code AddFunction.getCode() returns — tests set it to simulate the
+// user typing / editing (the real editor is imperative; the picker reads it on demand).
+let mockEditorCode = "";
+
 // Minimal, controllable stubs for the lib inputs so we can drive v-model.
 const OSelectStub = {
   name: "OSelect",
@@ -52,6 +56,12 @@ function createWrapper(props: Record<string, any> = {}) {
       stubs: {
         OSelect: OSelectStub,
         OSwitch: OSwitchStub,
+        OButton: {
+          name: "OButton",
+          props: ["iconLeft", "variant", "size"],
+          emits: ["click"],
+          template: '<button class="o-btn" @click="$emit(\'click\')"><slot /></button>',
+        },
         OSpinner: true,
         OCard: { template: "<div><slot /></div>" },
         OCardSection: { template: "<div><slot /></div>" },
@@ -59,9 +69,15 @@ function createWrapper(props: Record<string, any> = {}) {
         OIcon: true,
         AddFunction: {
           name: "AddFunction",
-          template: '<div class="add-function-stub"></div>',
-          props: ["isUpdated", "heightOffset"],
+          template: '<div class="add-function-stub">{{ defaultCode }}</div>',
+          props: ["isUpdated", "heightOffset", "defaultCode", "forcedLanguage", "sampleEvents"],
           emits: ["update:list", "cancel:hideform"],
+          // Mirrors the real AddFunction's only exposed method; returns the mock code
+          // unless a test left it empty, in which case it echoes the seed (matches the
+          // real editor, which starts at default-code).
+          setup(props: any, { expose }: any) {
+            expose({ getCode: () => (mockEditorCode !== "" ? mockEditorCode : props.defaultCode) });
+          },
         },
       },
     },
@@ -85,6 +101,7 @@ const listResponse = {
 describe("FunctionPicker", () => {
   beforeEach(() => {
     mockList.mockResolvedValue(listResponse);
+    mockEditorCode = "";
   });
   afterEach(() => vi.clearAllMocks());
 
@@ -133,6 +150,30 @@ describe("FunctionPicker", () => {
     const wrapper = createWrapper();
     await flushPromises();
     await expect((wrapper.vm as any).submit()).resolves.toBeNull();
+  });
+
+  // Optional mode (Workflows dummy node): an empty selection is allowed — submit
+  // resolves an empty name (placeholder) instead of null, and no required error.
+  it("optional: submit resolves an empty name when nothing is selected", async () => {
+    const wrapper = createWrapper({ optional: true });
+    await flushPromises();
+    await expect((wrapper.vm as any).submit()).resolves.toEqual({
+      name: "",
+      after_flatten: true,
+    });
+  });
+
+  it("optional: still resolves the chosen function when one is selected", async () => {
+    const wrapper = createWrapper({
+      optional: true,
+      initialName: "alpha",
+      initialAfterFlatten: false,
+    });
+    await flushPromises();
+    await expect((wrapper.vm as any).submit()).resolves.toEqual({
+      name: "alpha",
+      after_flatten: false,
+    });
   });
 
   it("submit resolves { name, after_flatten } with the flatten value", async () => {
@@ -185,5 +226,123 @@ describe("FunctionPicker", () => {
     expect(wrapper.find('[data-test="associate-function-after-flattening-toggle"]').exists()).toBe(
       false,
     );
+  });
+
+  // Single-screen mode (workflows): the select AND the create editor are BOTH on one
+  // page — no mode switch, no view swap. Pipelines keep the switch.
+  it("createButton: shows the select and the create editor together (no mode switch)", async () => {
+    const wrapper = createWrapper({ createButton: true });
+    await flushPromises();
+    expect(wrapper.find(".o-select").exists()).toBe(true); // pick existing
+    expect(wrapper.find(".add-function-stub").exists()).toBe(true); // create new — same page
+    expect(wrapper.find('[data-test="create-function-toggle"]').exists()).toBe(false);
+  });
+
+  it("createButton: does not emit expand (inline on one page, no drawer widen swap)", async () => {
+    const wrapper = createWrapper({ createButton: true });
+    await flushPromises();
+    expect(wrapper.emitted("expand")).toBeFalsy();
+  });
+
+  it("createButton: selecting a function fills its definition into the editor", async () => {
+    // 'alpha' is a VRL function in the fixture — preselect it, then the editor's
+    // default-code should be that function's definition.
+    const wrapper = createWrapper({ createButton: true, language: "vrl", initialName: "alpha" });
+    await flushPromises();
+    const addFn = wrapper.findComponent({ name: "AddFunction" });
+    expect(addFn.props("defaultCode")).toBe("def alpha(r): r");
+  });
+
+  it("keeps the mode switch by default (pipelines)", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(wrapper.find('[data-test="create-function-toggle"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="create-function-open"]').exists()).toBe(false);
+  });
+
+  // ── Workflow inline JS (raw_fn) + dirty tracking ─────────────────────────────
+  // Single-screen workflow: the editor can hold inline/edited code that isn't backed
+  // by a saved function. submit() then sends `raw_fn` (empty name) instead of a name;
+  // a clean saved-fn selection sends `{ name, raw_fn: undefined }` so any stale raw_fn
+  // is cleared. isDirty() drives the NDV's save/discard exit prompt.
+  const wf = (props: Record<string, any> = {}) =>
+    createWrapper({ createButton: true, optional: true, language: "javascript", ...props });
+
+  it("clean selection (no edits) → submit sends the name and clears raw_fn", async () => {
+    const wrapper = wf({ initialName: "js_fn", initialAfterFlatten: false });
+    await flushPromises();
+    // editor equals the saved code → not dirty
+    mockEditorCode = "() => {}";
+    expect((wrapper.vm as any).isDirty()).toBe(false);
+    await expect((wrapper.vm as any).submit()).resolves.toEqual({
+      name: "js_fn",
+      raw_fn: undefined,
+      after_flatten: false,
+    });
+  });
+
+  it("edited saved fn (unsaved) → submit sends raw_fn with an empty name", async () => {
+    const wrapper = wf({ initialName: "js_fn", initialAfterFlatten: true });
+    await flushPromises();
+    mockEditorCode = "() => { return 1 }"; // diverges from saved "() => {}"
+    expect((wrapper.vm as any).isDirty()).toBe(true);
+    await expect((wrapper.vm as any).submit()).resolves.toEqual({
+      name: "",
+      raw_fn: "() => { return 1 }",
+      after_flatten: true,
+    });
+  });
+
+  it("pure inline code (no fn selected) → submit sends raw_fn", async () => {
+    const wrapper = wf({ initialAfterFlatten: false, defaultCode: "// seed" });
+    await flushPromises();
+    mockEditorCode = "() => 42"; // real code, none selected, differs from the seed
+    expect((wrapper.vm as any).isDirty()).toBe(true);
+    await expect((wrapper.vm as any).submit()).resolves.toEqual({
+      name: "",
+      raw_fn: "() => 42",
+      after_flatten: false,
+    });
+  });
+
+  it("untouched seed (no fn, only default code) → not dirty, empty-name dummy", async () => {
+    const wrapper = wf({ defaultCode: "// seed" });
+    await flushPromises();
+    mockEditorCode = "// seed"; // still the seed → nothing to save
+    expect((wrapper.vm as any).isDirty()).toBe(false);
+    await expect((wrapper.vm as any).submit()).resolves.toEqual({
+      name: "",
+      raw_fn: undefined,
+      after_flatten: true,
+    });
+  });
+
+  it("initialRawFn seeds the editor when reopening an inline (nameless) node", async () => {
+    const wrapper = wf({ initialRawFn: "() => 'persisted'" });
+    await flushPromises();
+    const addFn = wrapper.findComponent({ name: "AddFunction" });
+    expect(addFn.props("defaultCode")).toBe("() => 'persisted'");
+  });
+
+  it("reopened, untouched inline raw_fn node is NOT dirty (seed = initialRawFn)", async () => {
+    // Reopen a saved inline node: editor seeds from initialRawFn, defaultCode is the
+    // fresh-node placeholder. Nothing typed → must be clean (no spurious exit prompt).
+    const wrapper = wf({ initialRawFn: "() => 'persisted'", defaultCode: "// seed" });
+    await flushPromises();
+    expect((wrapper.vm as any).isDirty()).toBe(false);
+  });
+
+  it("editing a reopened inline raw_fn node past its persisted code → dirty", async () => {
+    const wrapper = wf({ initialRawFn: "() => 'persisted'", defaultCode: "// seed" });
+    await flushPromises();
+    mockEditorCode = "() => 'edited'"; // diverges from the persisted raw_fn
+    expect((wrapper.vm as any).isDirty()).toBe(true);
+  });
+
+  it("isDirty() is false outside single-screen mode (raw_fn is workflow-only)", async () => {
+    const wrapper = createWrapper({ language: "javascript", initialName: "js_fn" });
+    await flushPromises();
+    mockEditorCode = "() => { changed }";
+    expect((wrapper.vm as any).isDirty()).toBe(false);
   });
 });

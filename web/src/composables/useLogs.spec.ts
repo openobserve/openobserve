@@ -1980,8 +1980,6 @@ describe("Use Logs Composable", () => {
       });
     });
 
-    // getActions is not exported, removing these tests
-
     describe("updatedLocalLogFilterField", () => {
       it("should update local log filter field", () => {
         wrapper.vm.searchObj.data.stream.selectedStream = ["test-stream"];
@@ -2583,20 +2581,6 @@ describe("Use Logs Composable", () => {
         const { getFilterExpressionByFieldType } = wrapper.vm;
         expect(typeof getFilterExpressionByFieldType).toBe("function");
         expect(true).toBe(true);
-      });
-    });
-
-    describe("isActionsEnabled", () => {
-      it.skip("should check if actions are enabled", () => {
-        const { isActionsEnabled } = wrapper.vm;
-        expect(typeof isActionsEnabled).toBe("boolean");
-        expect(isActionsEnabled).toBeDefined();
-      });
-
-      it.skip("should handle different action states", () => {
-        const { isActionsEnabled } = wrapper.vm;
-        expect(typeof isActionsEnabled).toBe("boolean");
-        expect(isActionsEnabled).toBeDefined();
       });
     });
 

@@ -19,7 +19,7 @@
 // children (OTable, DateTime, timeline) are stubbed; the run-click wiring and the
 // highlight function are what matter.
 
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
 const { mockList, mockToast } = vi.hoisted(() => ({
   mockList: vi.fn().mockResolvedValue({ data: [] }),
@@ -87,10 +87,11 @@ const DateTimeStub = {
   },
 };
 
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, enableAutoUnmount } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import WorkflowRunsPanel from "./WorkflowRunsPanel.vue";
+import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 
 const globalCfg = {
   plugins: [i18n, store],
@@ -118,9 +119,20 @@ const mountPanel = (props: Record<string, any> = {}) =>
   });
 
 describe("WorkflowRunsPanel", () => {
+  // The runs list is SHARED state now, so a leaked wrapper from a prior test would
+  // keep reacting to it and skew fetch counts — auto-unmount after each test.
+  enableAutoUnmount(afterEach);
   beforeEach(() => {
     mockList.mockClear();
     mockToast.mockClear();
+    // Reset the shared list so a prior test's fetch doesn't leak into the next
+    // (each mount re-fetches and repopulates it).
+    workflowObj.runsHistory = {
+      list: [],
+      fetchedAt: 0,
+      params: { start: 0, end: 0 },
+      loading: false,
+    };
   });
 
   it("renders the runs table", async () => {

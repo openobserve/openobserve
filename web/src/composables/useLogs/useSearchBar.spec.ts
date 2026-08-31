@@ -81,13 +81,6 @@ vi.mock("@/composables/useFunctions", () => ({
   default: () => ({ getAllFunctions: mockGetAllFunctions }),
 }));
 
-const { mockGetAllActions } = vi.hoisted(() => ({
-  mockGetAllActions: vi.fn(),
-}));
-vi.mock("@/composables/useActions", () => ({
-  default: () => ({ getAllActions: mockGetAllActions }),
-}));
-
 const { mockShowErrorNotification } = vi.hoisted(() => ({
   mockShowErrorNotification: vi.fn(),
 }));
@@ -168,10 +161,6 @@ describe("useSearchBar Composable", () => {
 
     it("should expose getFunctions", () => {
       expect(typeof wrapper.vm.getFunctions).toBe("function");
-    });
-
-    it("should expose getActions", () => {
-      expect(typeof wrapper.vm.getActions).toBe("function");
     });
 
     it("should expose getSavedViews", () => {
@@ -358,34 +347,6 @@ describe("useSearchBar Composable", () => {
 
       await wrapper.vm.getFunctions();
       expect(mockShowErrorNotification).toHaveBeenCalledWith("Error while fetching functions");
-    });
-  });
-
-  describe("getActions", () => {
-    it("should call getAllActions when actions list is empty", async () => {
-      store.state.organizationData.actions = [];
-      mockGetAllActions.mockResolvedValue(undefined);
-
-      await wrapper.vm.getActions();
-      expect(mockGetAllActions).toHaveBeenCalled();
-    });
-
-    it("should not call getAllActions when already loaded", async () => {
-      store.state.organizationData.actions = [
-        { name: "existing", id: "act-1", execution_details_type: "service" },
-      ];
-      mockGetAllActions.mockResolvedValue(undefined);
-
-      await wrapper.vm.getActions();
-      expect(mockGetAllActions).not.toHaveBeenCalled();
-    });
-
-    it("should show error notification on failure", async () => {
-      store.state.organizationData.actions = [];
-      mockGetAllActions.mockRejectedValue(new Error("Network error"));
-
-      await wrapper.vm.getActions();
-      expect(mockShowErrorNotification).toHaveBeenCalledWith("Error while fetching actions");
     });
   });
 

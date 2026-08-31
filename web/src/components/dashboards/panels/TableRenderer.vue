@@ -38,13 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :horizontal-scroll="true"
       :row-height="22"
       :virtual-scroll="virtualizeRows"
+      :window-row-model="virtualizeRows"
       :default-columns="false"
       :show-global-filter="false"
       :enable-column-filter="enableFiltering"
       :enable-column-format="enableColumnFormat"
       @format-column="onFormatColumn"
       :enable-column-reorder="false"
-      :enable-cell-copy="true"
+      :enable-cell-copy="false"
       :class="{ 'wrap-enabled': wrapCells }"
       data-test="dashboard-panel-table"
       @row-click="
@@ -82,20 +83,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-else>{{ formatCellValue(value, column, row) }}</span>
       </template>
 
-      <!-- Explore-in-Logs hover action, drillable columns only -->
-      <template
-        v-if="drilldownColumns.length || drilldownAllColumns"
-        #copy-actions="{ columnId, row, value }"
-      >
+      <template #cell-hover-actions="{ row, column, value }">
         <OButton
-          v-if="isCellDrillable(columnId)"
+          v-if="isCopyableCellValue(value)"
           variant="ghost"
-          size="icon-xs-sq"
-          :data-test="`dashboard-table-cell-drilldown-${columnId}`"
-          class="ml-1 h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100"
-          @click.stop="onCellDrilldown({ columnId, row, value })"
+          size="icon-xs-circle"
+          :data-test="`dashboard-table-cell-copy-${column.id}`"
+          :data-copied="copiedCellKey === cellKey(column, row) ? 'true' : undefined"
+          @click.stop="copyCellValue(value, column, row)"
         >
-          <OIcon name="search" size="sm" />
+          <OIcon
+            :name="copiedCellKey === cellKey(column, row) ? 'check' : 'content-copy'"
+            size="xs"
+          />
+          <OTooltip :content="t('common.copy')" />
+        </OButton>
+        <OButton
+          v-if="isCellDrillable(column.id)"
+          variant="ghost"
+          size="icon-xs-circle"
+          :data-test="`dashboard-table-cell-drilldown-${column.id}`"
+          @click.stop="onCellDrilldown({ columnId: column.id, row, value })"
+        >
+          <OIcon name="search" size="xs" />
           <OTooltip :content="t('dashboard.tableCellDrilldownTooltip')" />
         </OButton>
       </template>
@@ -159,6 +169,7 @@ import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import { isColorDark } from "@/utils/dashboard/chartColorUtils";
 import { buildValueMappingCache, lookupValueMappingFull } from "@/utils/dashboard/tableConfigUtils";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
 
 export default defineComponent({
@@ -388,6 +399,24 @@ export default defineComponent({
       emit("explore-cell", params, sortedRows.value.indexOf(params.row));
     };
 
+    const isCopyableCellValue = (value: any) =>
+      value !== null && value !== undefined && String(value).trim() !== "";
+
+    const copiedCellKey = ref<string | null>(null);
+    let copiedTimer: ReturnType<typeof setTimeout> | null = null;
+    const cellKey = (column: any, row: any) => `${column?.id}#${sortedRows.value.indexOf(row)}`;
+
+    const copyCellValue = async (value: any, column: any, row: any) => {
+      const text = String(formatCellValue(value, column, row) ?? "");
+      const ok = await copyToClipboard(text, t, { silent: true });
+      if (!ok) return;
+      copiedCellKey.value = cellKey(column, row);
+      if (copiedTimer) clearTimeout(copiedTimer);
+      copiedTimer = setTimeout(() => {
+        copiedCellKey.value = null;
+      }, 2000);
+    };
+
     const cellStyleFn = computed(
       () =>
         (params: { columnId: string; row: any; value: any }): Record<string, any> => {
@@ -587,6 +616,10 @@ export default defineComponent({
       onFormatColumn,
       onCellDrilldown,
       isCellDrillable,
+      isCopyableCellValue,
+      copyCellValue,
+      copiedCellKey,
+      cellKey,
       getTableCsvString,
       downloadTableAsCSV,
       downloadTableAsJSON,

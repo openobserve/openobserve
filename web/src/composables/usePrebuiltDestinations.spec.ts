@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -95,7 +95,11 @@ vi.mock("@/utils/prebuilt-templates", async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
     ...actual,
-    generateDestinationUrl: vi.fn(() => "https://hooks.slack.com/test"),
+    generateDestinationUrl: vi.fn((type: string, credentials: Record<string, unknown>) =>
+      type === "servicenow"
+        ? String(credentials.instanceUrl ?? "")
+        : String(credentials.webhookUrl ?? "https://generated.example.com"),
+    ),
     generateDestinationHeaders: vi.fn(() => ({
       "Content-Type": "application/json",
     })),
@@ -103,7 +107,7 @@ vi.mock("@/utils/prebuilt-templates", async (importOriginal) => {
 });
 
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { usePrebuiltDestinations } from "./usePrebuiltDestinations";
+import { usePrebuiltDestinations, type SlackSetupMetadata } from "./usePrebuiltDestinations";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -123,6 +127,10 @@ describe("usePrebuiltDestinations", () => {
     mockGetSystemTemplates.mockResolvedValue({ data: [] });
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   // -------------------------------------------------------------------------
   // Return value structure
   // -------------------------------------------------------------------------
@@ -133,6 +141,7 @@ describe("usePrebuiltDestinations", () => {
       expect(inst).toHaveProperty("isLoading");
       expect(inst).toHaveProperty("isTestInProgress");
       expect(inst).toHaveProperty("lastTestResult");
+      expect(inst).toHaveProperty("clearTestResult");
       expect(inst).toHaveProperty("availableTypes");
       expect(inst).toHaveProperty("popularTypes");
       expect(inst).toHaveProperty("typesByCategory");
@@ -331,6 +340,38 @@ describe("usePrebuiltDestinations", () => {
       expect(callArg.data.type).toBe("email");
       expect(Array.isArray(callArg.data.recipients)).toBe(true);
     });
+
+    it("clears a stale test result on demand", async () => {
+      mockDestTest.mockResolvedValue({ data: { success: true, statusCode: 200 } });
+      const { testDestination, clearTestResult, lastTestResult } = usePrebuiltDestinations();
+
+      await testDestination("slack", makeSlackCredentials());
+      expect(lastTestResult.value).not.toBeNull();
+
+      clearTestResult();
+      expect(lastTestResult.value).toBeNull();
+    });
+
+    it("does not republish an in-flight result after it is cleared", async () => {
+      let resolveRequest:
+        ((value: { data: { success: boolean; statusCode: number } }) => void) | null = null;
+      mockDestTest.mockReturnValue(
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+      );
+      const { testDestination, clearTestResult, lastTestResult, isTestInProgress } =
+        usePrebuiltDestinations();
+
+      const pending = testDestination("slack", makeSlackCredentials());
+      await vi.waitFor(() => expect(mockDestTest).toHaveBeenCalledTimes(1));
+      clearTestResult();
+      resolveRequest?.({ data: { success: true, statusCode: 200 } });
+      await pending;
+
+      expect(lastTestResult.value).toBeNull();
+      expect(isTestInProgress.value).toBe(false);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -445,6 +486,189 @@ describe("usePrebuiltDestinations", () => {
       const callArg = mockDestCreate.mock.calls[0][0];
       expect(callArg.data.headers?.Authorization).toMatch(/^Basic /);
     });
+
+    it("stores typed OAuth setup metadata without duplicating the webhook", async () => {
+      mockDestCreate.mockResolvedValue({ data: {} });
+      const secret = "https://hooks.slack.com/services/T000/B000/secret";
+
+      const { createDestination } = usePrebuiltDestinations();
+      const untrustedSetupMetadata = {
+        setup_method: "oauth" as const,
+        slack_team_id: "T000",
+        slack_team_name: "Acme",
+        slack_channel_id: "B000",
+        prebuilt_type: "attacker-controlled",
+        credential_webhookUrl: secret,
+        arbitrary: "must-not-persist",
+      };
+      await createDestination(
+        "slack",
+        "slack-dest",
+        { webhookUrl: secret, channel: "" },
+        {},
+        false,
+        undefined,
+        untrustedSetupMetadata,
+      );
+
+      const data = mockDestCreate.mock.calls[0][0].data;
+      expect(data.url).toBe(secret);
+      expect(data.metadata).toEqual({
+        prebuilt_type: "slack",
+        setup_method: "oauth",
+        slack_team_id: "T000",
+        slack_team_name: "Acme",
+        slack_channel_id: "B000",
+      });
+      expect(JSON.stringify(data.metadata)).not.toContain(secret);
+      expect(data.metadata).not.toHaveProperty("credential_webhookUrl");
+      expect(data.metadata).not.toHaveProperty("credential_channel");
+      expect(data.metadata).not.toHaveProperty("arbitrary");
+      expect(JSON.stringify(data).split(secret)).toHaveLength(2);
+    });
+
+    it("stores allowlisted manifest metadata without duplicating the webhook", async () => {
+      mockDestCreate.mockResolvedValue({ data: {} });
+      const secret = "https://hooks.slack.com/services/T000/B000/secret";
+
+      const { createDestination } = usePrebuiltDestinations();
+      await createDestination(
+        "slack",
+        "slack-dest",
+        { webhookUrl: secret, channel: "#operations" },
+        {},
+        false,
+        undefined,
+        {
+          setup_method: "manifest",
+          slack_app_name: "  Operations Alerts  ",
+          arbitrary: "must-not-persist",
+        } as SlackSetupMetadata & { arbitrary: string },
+      );
+
+      const data = mockDestCreate.mock.calls[0][0].data;
+      expect(data.metadata).toEqual({
+        prebuilt_type: "slack",
+        credential_channel: "#operations",
+        setup_method: "manifest",
+        slack_app_name: "Operations Alerts",
+      });
+      expect(JSON.stringify(data.metadata)).not.toContain(secret);
+      expect(data.metadata).not.toHaveProperty("arbitrary");
+      expect(JSON.stringify(data).split(secret)).toHaveLength(2);
+    });
+
+    it("persists an explicitly entered Slack channel", async () => {
+      mockDestCreate.mockResolvedValue({ data: {} });
+
+      const { createDestination } = usePrebuiltDestinations();
+      await createDestination(
+        "slack",
+        "slack-dest",
+        { ...makeSlackCredentials(), channel: "#operations" },
+        {},
+        false,
+        undefined,
+        { setup_method: "webhook" },
+      );
+
+      const metadata = mockDestCreate.mock.calls[0][0].data.metadata;
+      expect(metadata.credential_channel).toBe("#operations");
+      expect(metadata).not.toHaveProperty("credential_webhookUrl");
+      expect(metadata).not.toHaveProperty("slack_team_id");
+    });
+
+    it("does not flatten Discord or Teams webhook credentials", async () => {
+      mockDestCreate.mockResolvedValue({ data: {} });
+      const { createDestination } = usePrebuiltDestinations();
+
+      await createDestination("discord", "discord-dest", {
+        webhookUrl: "https://discord.com/api/webhooks/123/secret",
+        username: "OpenObserve",
+      });
+      await createDestination("msteams", "teams-dest", {
+        webhookUrl: "https://outlook.office.com/webhook/test",
+      });
+
+      const discordMetadata = mockDestCreate.mock.calls[0][0].data.metadata;
+      const teamsMetadata = mockDestCreate.mock.calls[1][0].data.metadata;
+      expect(discordMetadata.credential_username).toBe("OpenObserve");
+      expect(discordMetadata).not.toHaveProperty("credential_webhookUrl");
+      expect(teamsMetadata).not.toHaveProperty("credential_webhookUrl");
+    });
+
+    it("persists meaningful false toggles and omits empty allowlisted text", async () => {
+      mockDestCreate.mockResolvedValue({ data: {} });
+      const { createDestination } = usePrebuiltDestinations();
+
+      await createDestination("opsgenie", "opsgenie-dest", {
+        apiKey: "x".repeat(40),
+        euRegion: false,
+        priority: "",
+      });
+
+      const metadata = mockDestCreate.mock.calls[0][0].data.metadata;
+      expect(metadata.credential_euRegion).toBe("false");
+      expect(metadata).not.toHaveProperty("credential_priority");
+      expect(metadata).not.toHaveProperty("credential_apiKey");
+    });
+
+    it("does not duplicate ServiceNow username outside the Authorization header", async () => {
+      mockDestCreate.mockResolvedValue({ data: {} });
+      const { createDestination } = usePrebuiltDestinations();
+
+      await createDestination("servicenow", "snow-dest", {
+        instanceUrl: "https://myinstance.service-now.com/api/now/table/incident",
+        username: "admin",
+        password: "secret",
+        assignmentGroup: "Platform",
+      });
+
+      const metadata = mockDestCreate.mock.calls[0][0].data.metadata;
+      expect(metadata.credential_assignmentGroup).toBe("Platform");
+      expect(metadata).not.toHaveProperty("credential_username");
+      expect(metadata).not.toHaveProperty("credential_password");
+      expect(metadata).not.toHaveProperty("credential_instanceUrl");
+    });
+
+    it("keeps PagerDuty substitutions separate from generic credential metadata", async () => {
+      mockDestCreate.mockResolvedValue({ data: {} });
+      const { createDestination } = usePrebuiltDestinations();
+
+      await createDestination("pagerduty", "pagerduty-dest", {
+        integrationKey: "x".repeat(32),
+        severity: "critical",
+      });
+
+      const metadata = mockDestCreate.mock.calls[0][0].data.metadata;
+      expect(metadata.routing_key).toBe("x".repeat(32));
+      expect(metadata.severity).toBe("critical");
+      expect(metadata).not.toHaveProperty("credential_integrationKey");
+      expect(metadata).not.toHaveProperty("credential_severity");
+    });
+
+    it("does not log an Axios error object containing the webhook on failure", async () => {
+      const secret = "https://hooks.slack.com/services/T000/B000/private";
+      const error = Object.assign(new Error("create failed"), {
+        config: { data: JSON.stringify({ url: secret }) },
+        response: { data: { message: "create failed" } },
+      });
+      mockDestCreate.mockRejectedValue(error);
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+      const { createDestination } = usePrebuiltDestinations();
+      await expect(
+        createDestination("slack", "slack-dest", { webhookUrl: secret }),
+      ).rejects.toThrow("create failed");
+
+      const logged = consoleError.mock.calls
+        .flat()
+        .map((value) => (typeof value === "string" ? value : JSON.stringify(value)))
+        .join(" ");
+      expect(consoleError.mock.calls.flat()).not.toContain(error);
+      expect(logged).not.toContain(secret);
+      consoleError.mockRestore();
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -487,6 +711,95 @@ describe("usePrebuiltDestinations", () => {
       const { updateDestination, isLoading } = usePrebuiltDestinations();
       await updateDestination("slack", "orig", "new", makeSlackCredentials());
       expect(isLoading.value).toBe(false);
+    });
+
+    it("preserves OAuth setup metadata without flattening the webhook", async () => {
+      mockDestUpdate.mockResolvedValue({ data: {} });
+      const secret = "https://hooks.slack.com/services/T000/B000/secret";
+
+      const { updateDestination } = usePrebuiltDestinations();
+      const untrustedSetupMetadata = {
+        setup_method: "oauth" as const,
+        slack_team_id: "T000",
+        slack_team_name: "Acme",
+        slack_channel_id: "B000",
+        prebuilt_type: "attacker-controlled",
+        credential_webhookUrl: secret,
+        arbitrary: "must-not-persist",
+      };
+      await updateDestination(
+        "slack",
+        "original",
+        "renamed",
+        { webhookUrl: secret, channel: "#alerts" },
+        {},
+        false,
+        undefined,
+        untrustedSetupMetadata,
+      );
+
+      const data = mockDestUpdate.mock.calls[0][0].data;
+      expect(data.metadata).toEqual({
+        prebuilt_type: "slack",
+        credential_channel: "#alerts",
+        setup_method: "oauth",
+        slack_team_id: "T000",
+        slack_team_name: "Acme",
+        slack_channel_id: "B000",
+      });
+      expect(JSON.stringify(data.metadata)).not.toContain(secret);
+      expect(data.metadata).not.toHaveProperty("credential_webhookUrl");
+      expect(data.metadata).not.toHaveProperty("arbitrary");
+      expect(JSON.stringify(data).split(secret)).toHaveLength(2);
+    });
+
+    it("preserves allowlisted manifest metadata without flattening the webhook", async () => {
+      mockDestUpdate.mockResolvedValue({ data: {} });
+      const secret = "https://hooks.slack.com/services/T000/B000/secret";
+
+      const { updateDestination } = usePrebuiltDestinations();
+      await updateDestination(
+        "slack",
+        "original",
+        "renamed",
+        { webhookUrl: secret, channel: "#alerts" },
+        {},
+        false,
+        undefined,
+        {
+          setup_method: "manifest",
+          slack_app_name: "  Operations Alerts  ",
+          arbitrary: "must-not-persist",
+        } as SlackSetupMetadata & { arbitrary: string },
+      );
+
+      const data = mockDestUpdate.mock.calls[0][0].data;
+      expect(data.metadata).toEqual({
+        prebuilt_type: "slack",
+        credential_channel: "#alerts",
+        setup_method: "manifest",
+        slack_app_name: "Operations Alerts",
+      });
+      expect(JSON.stringify(data.metadata)).not.toContain(secret);
+      expect(data.metadata).not.toHaveProperty("arbitrary");
+      expect(JSON.stringify(data).split(secret)).toHaveLength(2);
+    });
+
+    it("uses the same credential allowlist when updating non-Slack destinations", async () => {
+      mockDestUpdate.mockResolvedValue({ data: {} });
+      const { updateDestination } = usePrebuiltDestinations();
+      const secret = "https://discord.com/api/webhooks/123/private";
+
+      await updateDestination("discord", "original", "renamed", {
+        webhookUrl: secret,
+        username: "OpenObserve",
+      });
+
+      const data = mockDestUpdate.mock.calls[0][0].data;
+      expect(data.url).toBe(secret);
+      expect(data.metadata.credential_username).toBe("OpenObserve");
+      expect(data.metadata).not.toHaveProperty("credential_webhookUrl");
+      expect(JSON.stringify(data.metadata)).not.toContain(secret);
     });
   });
 

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   Dataset Detail — the goldens inside one dataset. Reached by clicking a row on
-  the Datasets list. Header carries the dataset meta + Edit / Delete / Add Item;
+  the Datasets list. Header carries the dataset meta + item creation/import;
   the body is the Items table, paged server-side off
   GET /datasets/{id}/items. Golden items are MVCC — editing one APPENDS a row
   under the same logical id, which is why every write addresses the logical id.
@@ -42,16 +42,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("aiObservability.experiments.newButton") }}
       </OButton>
-      <OButton
-        v-else
-        variant="primary"
-        size="sm"
-        :disabled="!dataset"
-        data-test="ai-dataset-detail-add-item"
-        @click="openAddItem"
-      >
-        {{ t("aiObservability.datasets.detail.addItem.button") }}
-      </OButton>
+      <div v-else class="flex items-center gap-2">
+        <OButton
+          variant="outline"
+          size="sm"
+          icon-left="cloud-upload"
+          :disabled="!dataset"
+          data-test="ai-dataset-detail-upload-csv"
+          @click="openCsvImport"
+        >
+          {{ t("aiObservability.datasets.detail.csvImport.button") }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm"
+          :disabled="!dataset"
+          data-test="ai-dataset-detail-add-item"
+          @click="openAddItem"
+        >
+          {{ t("aiObservability.datasets.detail.addItem.button") }}
+        </OButton>
+      </div>
     </template>
 
     <template #subnav>
@@ -221,6 +232,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @delete="deleteFromDetail"
     />
 
+    <ODrawer
+      v-model:open="importOpen"
+      side="right"
+      size="lg"
+      :title="t('aiObservability.datasets.detail.csvImport.title')"
+      :primary-button-label="t('aiObservability.datasets.detail.csvImport.button')"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-disabled="!importFile"
+      :primary-button-loading="isImporting"
+      data-test="ai-dataset-detail-import-drawer"
+      @click:primary="importCsv"
+      @click:secondary="closeCsvImport"
+    >
+      <div class="flex flex-col gap-4">
+        <p class="text-text-secondary text-sm">
+          {{ t("aiObservability.datasets.detail.csvImport.description") }}
+        </p>
+        <OFile
+          v-model="importFile"
+          :label="t('aiObservability.datasets.detail.csvImport.fileLabel')"
+          :placeholder="t('aiObservability.datasets.detail.csvImport.placeholder')"
+          :help-text="t('aiObservability.datasets.detail.csvImport.help')"
+          :max-file-size="DATASET_IMPORT_MAX_FILE_SIZE"
+          accept=".csv,text/csv"
+          drop-zone
+          required
+          data-test="ai-dataset-detail-import-file"
+          @size-error="showCsvSizeError"
+        />
+      </div>
+    </ODrawer>
+
     <!-- Add / Edit item — a drawer, same shell as the dataset create/edit form -->
     <ODrawer
       v-model:open="itemOpen"
@@ -322,6 +365,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -329,6 +373,7 @@ import DatasetItemDetail from "@/enterprise/components/AIObservability/DatasetIt
 import ExperimentBrowser from "@/enterprise/components/AIObservability/ExperimentBrowser.vue";
 import { makeDatasetItemFormSchema, type DatasetItemForm } from "./DatasetItemForm.schema";
 import llmDatasetsService, {
+  DATASET_IMPORT_MAX_FILE_SIZE,
   DATASET_ITEMS_MAX_PAGE_SIZE,
   type LlmDataset,
   type LlmDatasetItem,
@@ -502,6 +547,60 @@ function onPageSizeChange(size: number) {
   pageSize.value = size;
   currentPage.value = 1;
   refresh();
+}
+
+const importOpen = ref(false);
+const importFile = ref<File | null>(null);
+const isImporting = ref(false);
+
+function openCsvImport() {
+  importFile.value = null;
+  importOpen.value = true;
+}
+
+function closeCsvImport() {
+  if (isImporting.value) return;
+  importOpen.value = false;
+  importFile.value = null;
+}
+
+function showCsvSizeError() {
+  importFile.value = null;
+  toast({
+    variant: "error",
+    message: t("aiObservability.datasets.detail.csvImport.sizeError"),
+  });
+}
+
+async function importCsv() {
+  if (isImporting.value || !orgId.value || !datasetId.value || !importFile.value) return;
+  isImporting.value = true;
+  try {
+    const result = await llmDatasetsService.importItems(
+      orgId.value,
+      datasetId.value,
+      importFile.value,
+    );
+    toast({
+      variant: "success",
+      message: t("aiObservability.datasets.detail.csvImport.success", {
+        filename: result.filename,
+        imported: result.importedCount,
+        skipped: result.skippedCount,
+      }),
+    });
+    importOpen.value = false;
+    importFile.value = null;
+    currentPage.value = 1;
+    await refresh();
+  } catch {
+    toast({
+      variant: "error",
+      message: t("aiObservability.datasets.detail.csvImport.error"),
+    });
+  } finally {
+    isImporting.value = false;
+  }
 }
 
 // ── Item detail ──

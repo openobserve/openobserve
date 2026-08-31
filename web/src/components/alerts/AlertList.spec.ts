@@ -214,14 +214,17 @@ async function mountAlertList() {
           emits: ["update:ok", "update:cancel", "update:modelValue"],
           template: '<div class="confirm-dialog-stub" :data-open="modelValue"></div>',
         },
-        AppTabs: {
-          name: "AppTabs",
-          props: ["tabs", "activeTab"],
-          emits: ["update:active-tab"],
-          template:
-            '<div class="app-tabs-stub">' +
-            '<button v-for="tab in tabs" :key="tab.value" :class="`tab-${tab.value}`" @click="$emit(\'update:active-tab\', tab.value)">{{tab.label}}</button>' +
-            "</div>",
+        // Real reka-ui toggle groups slow every mount, and this file mounts 70 times — enough to push borderline tests past their timeouts.
+        OToggleGroup: {
+          name: "OToggleGroup",
+          props: ["modelValue"],
+          emits: ["update:modelValue"],
+          template: '<div class="toggle-group-stub"><slot /></div>',
+        },
+        OToggleGroupItem: {
+          name: "OToggleGroupItem",
+          props: ["value"],
+          template: '<button type="button"><slot /></button>',
         },
         SelectFolderDropDown: true,
       },
@@ -250,7 +253,7 @@ beforeEach(() => {
   // query.tab) run during mount(), before mountAlertList can blank the query —
   // so a leftover action/tab from an earlier test (e.g. "when action=add"
   // pushes {action:"add"}) would asynchronously re-open the add/import dialog
-  // and hide the list (and its AppTabs), breaking every later assertion.
+  // and hide the list (and its type filter), breaking every later assertion.
   router.currentRoute.value.query = {};
   router.currentRoute.value.params = {};
   router.currentRoute.value.name = "alertList";
@@ -1394,8 +1397,10 @@ describe("AlertList - ODialog/ODrawer migration", () => {
       expect(wrapper.vm.tabs).toEqual(
         expect.arrayContaining([expect.objectContaining({ value: "composite" })]),
       );
-      const tabs = wrapper.findComponent({ name: "AppTabs" });
-      await tabs.vm.$emit("update:active-tab", "composite");
+      const typeFilter = wrapper
+        .findAllComponents({ name: "OToggleGroup" })
+        .find((group: any) => group.attributes("data-test") === "alert-list-tabs");
+      await typeFilter.vm.$emit("update:modelValue", "composite");
       await flushPromises();
 
       expect(AlertService.listByFolderId).toHaveBeenLastCalledWith(

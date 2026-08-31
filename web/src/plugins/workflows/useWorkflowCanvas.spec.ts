@@ -26,7 +26,7 @@ const t = (i18nInstance.global as any).t;
 vi.mock("@/services/workflows", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {
-    default: { getWorkflowRun: vi.fn(), testWorkflow: vi.fn() },
+    default: { getWorkflowRun: vi.fn(), testWorkflow: vi.fn(), getWorkflowHistory: vi.fn() },
   });
 });
 
@@ -41,7 +41,7 @@ vi.mock("@vue-flow/core", () => ({
     onNodesInitialized: vi.fn(),
     updateNode: vi.fn(),
   }),
-  // makeEdge (via commitNode) reads MarkerType.ArrowClosed for the edge marker.
+  // makeEdge (via commitStagedNode) reads MarkerType.ArrowClosed for the edge marker.
   MarkerType: { ArrowClosed: "arrowclosed" },
 }));
 
@@ -55,10 +55,11 @@ import useWorkflowCanvas, {
   workflowObj,
   hydrateWorkflow,
   loadWorkflowRun,
+  loadRunsHistory,
   executeTestRun,
   serializeWorkflow,
   nodeTestInput,
-  nodeTestOutputBranches,
+  nodeTestOutput,
   currentTriggerKind,
   buildStepTree,
   toggleNodeDisabled,
@@ -79,6 +80,41 @@ const triggerNode = () => ({
 
 const mockRun = workflowService.getWorkflowRun as unknown as ReturnType<typeof vi.fn>;
 const mockTest = workflowService.testWorkflow as unknown as ReturnType<typeof vi.fn>;
+const mockHistory = workflowService.getWorkflowHistory as unknown as ReturnType<typeof vi.fn>;
+
+describe("loadRunsHistory — shared runs list for the Runs page + NDV switcher", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    workflowObj.runsHistory = {
+      list: [],
+      fetchedAt: 0,
+      params: { start: 0, end: 0 },
+      loading: false,
+    };
+  });
+
+  it("stores the fetched list, the window, and a fetchedAt stamp", async () => {
+    const runs = [{ run_id: "r1", start_time: 10 }];
+    mockHistory.mockResolvedValue({ data: runs });
+    const r = await loadRunsHistory({ orgId: "o", workflowId: "wf1", start: 100, end: 200 });
+    expect(r.ok).toBe(true);
+    expect(workflowObj.runsHistory.list).toEqual(runs);
+    expect(workflowObj.runsHistory.params).toEqual({ start: 100, end: 200 });
+    expect(workflowObj.runsHistory.fetchedAt).toBeGreaterThan(0);
+    expect(workflowObj.runsHistory.loading).toBe(false);
+    // called with the passed window
+    expect(mockHistory.mock.calls[0][0]).toMatchObject({ start_time: 100, end_time: 200 });
+  });
+
+  it("keeps the previous list on failure (a failed refresh must not blank it)", async () => {
+    workflowObj.runsHistory.list = [{ run_id: "old" }] as any;
+    mockHistory.mockRejectedValue({ response: { status: 500 } });
+    const r = await loadRunsHistory({ orgId: "o", workflowId: "wf1", start: 1, end: 2 });
+    expect(r).toEqual({ ok: false, status: 500 });
+    expect(workflowObj.runsHistory.list).toEqual([{ run_id: "old" }]); // untouched
+    expect(workflowObj.runsHistory.loading).toBe(false);
+  });
+});
 
 describe("loadWorkflowRun — history run response mapping", () => {
   beforeEach(() => {
@@ -291,14 +327,9 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     // the disconnected node never ran → no ✓ badge
     expect(res.ranNodeIds).not.toContain("x");
     expect(res.blockedNodeIds).toEqual([]);
-    // ranSteps snapshots the executed-steps tree (structure + frozen data) so the
-    // dock can persist across later edits.
-    expect(res.ranSteps.map((s: any) => s.id)).toEqual(["t", "f", "d"]);
-    expect(res.ranSteps.find((s: any) => s.id === "t")).toMatchObject({
-      depth: 0,
-      childCount: 1,
-    });
-    expect(res.ranSteps.find((s: any) => s.id === "f").data.node_type).toBe("function");
+    // The frozen `ranSteps` tree went with the results dock — the NDV reads the
+    // live graph plus this result, so there is no snapshot to keep in sync.
+    expect(res.ranSteps).toBeUndefined();
   });
 
   it("sends the whole in-memory graph (test-without-saving), not just an id", async () => {
@@ -320,6 +351,100 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     const res: any = workflowObj.testRun.result;
     expect(res.ranNodeIds.sort()).toEqual(["d", "f"]);
     expect(res.ranNodeIds).not.toContain("t");
+  });
+
+  it("Run Step (singleNode) sends ONLY that node as the workflow and marks only it", async () => {
+    mockTest.mockResolvedValue({ data: { errors: {} } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
+    const arg = mockTest.mock.calls[0][0];
+    // Just the one node, no edges — from_node is that node so it runs in isolation.
+    expect(arg.from_node).toBe("f");
+    expect(arg.workflow.nodes.map((n: any) => n.id)).toEqual(["f"]);
+    expect(arg.workflow.edges).toEqual([]);
+    // Only the run node counts as ran — nothing upstream/downstream executed.
+    const res: any = workflowObj.testRun.result;
+    expect(res.ranNodeIds).toEqual(["f"]);
+  });
+
+  it("Run Step accumulates: a second node's run keeps the first node's result", async () => {
+    // Run Step on "f", then on "d" — d's run must NOT wipe f's input/output.
+    mockTest.mockResolvedValue({ data: { inputs: { f: [{ a: 1 }] }, outputs: { f: [{ o: 1 }] } } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
+    mockTest.mockResolvedValue({ data: { inputs: { d: [{ b: 2 }] }, outputs: { d: [{ o: 2 }] } } });
+    await executeTestRun({ orgId: "o", inputs: [{ b: 2 }], fromNode: "d", singleNode: true });
+
+    const res: any = workflowObj.testRun.result;
+    // both nodes' data is retained, and both are marked ran
+    expect(res.inputs).toEqual({ f: [{ a: 1 }], d: [{ b: 2 }] });
+    expect(res.outputs).toEqual({ f: [{ o: 1 }], d: [{ o: 2 }] });
+    expect(res.ranNodeIds.sort()).toEqual(["d", "f"]);
+  });
+
+  it("Run Step refreshes only its own node (re-running clears that node's stale error)", async () => {
+    mockTest.mockResolvedValue({
+      data: { errors: { f: { error_count: 1, errors: [["boom"]] } }, outputs: {} },
+    });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
+    expect((workflowObj.testRun.result as any).errors.f).toBeTruthy();
+    // re-run f successfully → its error clears, and it stays the only ran node
+    mockTest.mockResolvedValue({ data: { inputs: { f: [{ a: 1 }] }, outputs: { f: [{ o: 9 }] } } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
+    const res: any = workflowObj.testRun.result;
+    expect(res.errors.f).toBeUndefined();
+    expect(res.outputs.f).toEqual([{ o: 9 }]);
+  });
+
+  it("Run Step into a loaded run replaces only that node's output, keeping the rest", async () => {
+    // A history run is loaded (mode set) with data for every node.
+    workflowObj.testRun.result = {
+      mode: "history",
+      runId: "r9",
+      errors: {},
+      inputs: { t: [{ x: 0 }], f: [{ a: 1 }], d: [{ b: 2 }] },
+      outputs: { t: [{ x: 0 }], f: [{ old: 1 }], d: [{ dd: 2 }] },
+      ranNodeIds: ["t", "f", "d"],
+      blockedNodeIds: [],
+    } as any;
+    mockTest.mockResolvedValue({
+      data: { inputs: { f: [{ a: 1 }] }, outputs: { f: [{ fresh: 9 }] } },
+    });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
+    const res: any = workflowObj.testRun.result;
+    expect(res.outputs.f).toEqual([{ fresh: 9 }]); // this node's output REPLACED
+    expect(res.outputs.d).toEqual([{ dd: 2 }]); // other nodes untouched
+    expect(res.outputs.t).toEqual([{ x: 0 }]);
+    expect(res.mode).toBe("history"); // surrounding context preserved
+    expect(res.runId).toBe("r9");
+    expect(res.ranNodeIds.sort()).toEqual(["d", "f", "t"]);
+  });
+
+  it("Run Step with an EMPTY output clears this node's stale output (not falls through)", async () => {
+    workflowObj.testRun.result = {
+      errors: {},
+      inputs: { f: [{ a: 1 }] },
+      outputs: { f: [{ stale: 1 }] }, // a previous output for f
+      ranNodeIds: ["f"],
+      blockedNodeIds: [],
+    } as any;
+    // the run emits nothing for f (e.g. it errored) — response has no `outputs.f`
+    mockTest.mockResolvedValue({
+      data: { errors: { f: { error_count: 1, errors: [["boom"]] } }, inputs: {}, outputs: {} },
+    });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
+    const res: any = workflowObj.testRun.result;
+    expect(res.outputs.f).toBeUndefined(); // stale output CLEARED, not left behind
+    expect(res.errors.f).toBeTruthy();
+  });
+
+  it("a FULL run replaces accumulated single-node results", async () => {
+    mockTest.mockResolvedValue({ data: { inputs: { f: [{ a: 1 }] }, outputs: { f: [{ o: 1 }] } } });
+    await executeTestRun({ orgId: "o", inputs: [{ a: 1 }], fromNode: "f", singleNode: true });
+    // full run (no singleNode) → fresh result, stale single-node data gone
+    mockTest.mockResolvedValue({ data: { inputs: { t: [{ x: 0 }] }, outputs: {} } });
+    await executeTestRun({ orgId: "o", inputs: [{ x: 0 }] });
+    const res: any = workflowObj.testRun.result;
+    expect(res.inputs).toEqual({ t: [{ x: 0 }] }); // f's accumulated input is gone
+    expect(res.ranNodeIds.sort()).toEqual(["d", "f", "t"]); // reachable-from-trigger
   });
 
   it("marks nodes downstream of an errored node as blocked (not passed)", async () => {
@@ -487,10 +612,10 @@ describe("tidyWorkflowLayout — orphan subtree ordering", () => {
   });
 });
 
-// nodeTestInput / nodeTestOutputBranches derive per-node Input and Output from the
-// backend `inputs` map. Output on an edge == the child's input (single-incoming
-// tree), so these two helpers power the whole step-drawer.
-describe("nodeTestInput + nodeTestOutputBranches — per-node I/O derivation", () => {
+// nodeTestInput / nodeTestOutput read per-node Input and Output straight from the
+// backend `inputs` / `outputs` maps (the backend reports each node's output
+// directly). These two helpers power the whole step-drawer.
+describe("nodeTestInput + nodeTestOutput — per-node I/O maps", () => {
   beforeEach(() => {
     // trigger(t) -> function(f) -> destination(d);  t also -> condition(c) (fan-out)
     workflowObj.currentSelectedWorkflow = {
@@ -511,6 +636,7 @@ describe("nodeTestInput + nodeTestOutputBranches — per-node I/O derivation", (
     workflowObj.testRun.result = {
       errors: {},
       inputs: { t: [{ x: 0 }], f: [{ x: 1 }], d: [{ x: 2 }] }, // c got nothing
+      outputs: { t: [{ x: 0 }], f: [{ x: 2 }] }, // f emitted { x: 2 }; c/d emitted nothing
       ranNodeIds: ["t", "f", "c", "d"],
       blockedNodeIds: [],
     } as any;
@@ -527,24 +653,15 @@ describe("nodeTestInput + nodeTestOutputBranches — per-node I/O derivation", (
     expect(nodeTestInput("f")).toBeNull();
   });
 
-  it("nodeTestOutputBranches: a node's output == each child's input", () => {
-    const branches = nodeTestOutputBranches("f");
-    expect(branches).toHaveLength(1);
-    expect(branches[0]).toMatchObject({ targetId: "d", nodeType: "destination" });
-    expect(branches[0].records).toEqual([{ x: 2 }]); // == inputs[d]
+  it("nodeTestOutput returns the records a node emitted, null when absent", () => {
+    expect(nodeTestOutput("f")).toEqual([{ x: 2 }]);
+    expect(nodeTestOutput("c")).toBeNull(); // emitted nothing — not in outputs
+    expect(nodeTestOutput("missing")).toBeNull();
   });
 
-  it("fan-out yields one branch per outgoing edge; a filtered branch has null records", () => {
-    const branches = nodeTestOutputBranches("t");
-    expect(branches.map((b) => b.targetId).sort()).toEqual(["c", "f"]);
-    const toC = branches.find((b) => b.targetId === "c")!;
-    const toF = branches.find((b) => b.targetId === "f")!;
-    expect(toC.records).toBeNull(); // c received nothing
-    expect(toF.records).toEqual([{ x: 1 }]);
-  });
-
-  it("a terminal (destination) has no outgoing edges → no branches", () => {
-    expect(nodeTestOutputBranches("d")).toEqual([]);
+  it("nodeTestOutput is null when there is no run", () => {
+    workflowObj.testRun.result = null as any;
+    expect(nodeTestOutput("f")).toBeNull();
   });
 });
 
@@ -695,6 +812,69 @@ describe("placeholder / incomplete node (Configure Later)", () => {
     expect(wf.nodes[0].meta.incomplete).toBe("true");
     expect(wf.nodes[0].data.destination_id).toBe("");
   });
+
+  // A never-configured (dummy) node carries only { label, node_type }. serializeNode
+  // must fill a valid NodeData for it or the backend fails deserialization.
+  it("dummy DESTINATION node serializes with an empty destination name", () => {
+    workflowObj.currentSelectedWorkflow = {
+      nodes: [
+        {
+          id: "d1",
+          type: "output",
+          position: { x: 0, y: 0 },
+          data: { label: "d1", node_type: "destination" }, // no destination_id
+          meta: { incomplete: "true" },
+        },
+      ],
+      edges: [],
+    } as any;
+    const { data } = serializeWorkflow().nodes[0];
+    expect(data.destination_id).toBe("");
+    expect(data.template_override).toBeNull();
+  });
+
+  it("dummy CONDITION node serializes as a pass-through v2 rule (empty column, empty value)", () => {
+    workflowObj.currentSelectedWorkflow = {
+      nodes: [
+        {
+          id: "c1",
+          type: "default",
+          position: { x: 0, y: 0 },
+          data: { label: "c1", node_type: "condition" }, // no conditions
+          meta: { incomplete: "true" },
+        },
+      ],
+      edges: [],
+    } as any;
+    const { data } = serializeWorkflow().nodes[0];
+    expect(data.version).toBe(2);
+    expect(data.conditions.filterType).toBe("group");
+    expect(data.conditions.conditions).toHaveLength(1);
+    // Empty column → backend short-circuits to always-true; value is irrelevant, so
+    // it's empty (not a misleading "true" literal).
+    expect(data.conditions.conditions[0]).toMatchObject({
+      column: "",
+      operator: "=",
+      value: "",
+    });
+  });
+
+  it("a CONFIGURED condition node keeps its own rule (no pass-through override)", () => {
+    const conditions = { filterType: "group", logicalOperator: "AND", conditions: [] };
+    workflowObj.currentSelectedWorkflow = {
+      nodes: [
+        {
+          id: "c1",
+          type: "default",
+          position: { x: 0, y: 0 },
+          data: { node_type: "condition", version: 2, conditions },
+        },
+      ],
+      edges: [],
+    } as any;
+    const { data } = serializeWorkflow().nodes[0];
+    expect(data.conditions).toEqual(conditions); // untouched
+  });
 });
 
 describe("hydrateWorkflow — draft flag normalization", () => {
@@ -746,21 +926,31 @@ describe("trigger-first guard — palette adds are blocked until a trigger exist
     expect(workflowObj.currentSelectedNodeData).toBeNull();
   });
 
-  it("addNodeToEnd stages a node once a trigger is present", () => {
+  it("addNodeToEnd inserts a node on the canvas once a trigger is present", () => {
     workflowObj.currentSelectedWorkflow.nodes = [triggerNode()];
     addNodeToEnd("condition");
     expect(mockToast).not.toHaveBeenCalled();
-    expect(workflowObj.dialog.show).toBe(true);
-    expect(workflowObj.currentSelectedNodeData?.data.node_type).toBe("condition");
+    // Insert-immediately, panel left SHUT — so the staged selection is cleared and
+    // the node must be inspected on the canvas, where it sits flagged incomplete.
+    expect(workflowObj.dialog.show).toBe(false);
+    const added = workflowObj.currentSelectedWorkflow.nodes.find(
+      (n: any) => n.data.node_type === "condition",
+    );
+    expect(workflowObj.currentSelectedWorkflow.nodes).toHaveLength(2);
+    expect(added?.meta?.incomplete).toBe("true");
   });
 
-  it("onDrop stages a node once a trigger is present", () => {
+  it("onDrop inserts a node on the canvas once a trigger is present", () => {
     workflowObj.currentSelectedWorkflow.nodes = [triggerNode()];
     workflowObj.draggedNodeType = "function";
     onDrop({ clientX: 10, clientY: 10 } as any);
     expect(mockToast).not.toHaveBeenCalled();
-    expect(workflowObj.dialog.show).toBe(true);
-    expect(workflowObj.currentSelectedNodeData?.data.node_type).toBe("function");
+    expect(workflowObj.dialog.show).toBe(false);
+    const dropped = workflowObj.currentSelectedWorkflow.nodes.find(
+      (n: any) => n.data.node_type === "function",
+    );
+    expect(workflowObj.currentSelectedWorkflow.nodes).toHaveLength(2);
+    expect(dropped?.meta?.incomplete).toBe("true");
   });
 });
 
@@ -814,7 +1004,7 @@ describe("addNodeOnEdge — insert-between spacing (T7)", () => {
   };
 
   it("places the spliced node a row below the source and nudges the target down", () => {
-    const { addNodeOnEdge, commitNode } = useWorkflowCanvas(t);
+    const { addNodeOnEdge } = useWorkflowCanvas(t);
     resetStaged();
     workflowObj.currentSelectedWorkflow = {
       nodes: [
@@ -834,27 +1024,26 @@ describe("addNodeOnEdge — insert-between spacing (T7)", () => {
       edges: [{ id: "e1", source: "t", target: "d" }],
     } as any;
 
+    // Insert-immediately: addNodeOnEdge splices the node onto the canvas now (no
+    // separate commit step) and leaves the panel shut.
     addNodeOnEdge("e1", "condition");
-    const staged = workflowObj.currentSelectedNodeData;
-    // staged a row below the source, aligned with the target column
-    expect(staged.position.y).toBe(160);
-    expect(staged.position.x).toBe(100);
-
-    commitNode({});
     const wf = workflowObj.currentSelectedWorkflow;
-    const inserted = wf.nodes.find((n: any) => n.id === staged.id);
+    const inserted = wf.nodes.find((n: any) => n.data.node_type === "condition");
+    // placed a row below the source, aligned with the target column
+    expect(inserted.position.y).toBe(160);
+    expect(inserted.position.x).toBe(100);
     const target = wf.nodes.find((n: any) => n.id === "d");
     // new node stays a row below the source; target pushed down a full row below it
     expect(inserted.position.y).toBe(160);
     expect(target.position.y).toBe(320);
     // rewired A→new→B, old edge dropped
-    expect(wf.edges.some((e: any) => e.source === "t" && e.target === staged.id)).toBe(true);
-    expect(wf.edges.some((e: any) => e.source === staged.id && e.target === "d")).toBe(true);
+    expect(wf.edges.some((e: any) => e.source === "t" && e.target === inserted.id)).toBe(true);
+    expect(wf.edges.some((e: any) => e.source === inserted.id && e.target === "d")).toBe(true);
     expect(wf.edges.some((e: any) => e.id === "e1")).toBe(false);
   });
 
   it("also shifts nodes downstream of the target", () => {
-    const { addNodeOnEdge, commitNode } = useWorkflowCanvas(t);
+    const { addNodeOnEdge } = useWorkflowCanvas(t);
     resetStaged();
     workflowObj.currentSelectedWorkflow = {
       nodes: [
@@ -885,16 +1074,15 @@ describe("addNodeOnEdge — insert-between spacing (T7)", () => {
 
     // insert on the trigger→condition edge; condition AND its downstream destination shift
     addNodeOnEdge("e1", "function");
-    const staged = workflowObj.currentSelectedNodeData;
-    commitNode({});
     const wf = workflowObj.currentSelectedWorkflow;
-    expect(wf.nodes.find((n: any) => n.id === staged.id).position.y).toBe(160);
+    const inserted = wf.nodes.find((n: any) => n.data.node_type === "function");
+    expect(inserted.position.y).toBe(160);
     expect(wf.nodes.find((n: any) => n.id === "c").position.y).toBe(320);
     expect(wf.nodes.find((n: any) => n.id === "d").position.y).toBe(480);
   });
 
   it("does not shift a target that already has enough room", () => {
-    const { addNodeOnEdge, commitNode } = useWorkflowCanvas(t);
+    const { addNodeOnEdge } = useWorkflowCanvas(t);
     resetStaged();
     workflowObj.currentSelectedWorkflow = {
       nodes: [
@@ -910,7 +1098,6 @@ describe("addNodeOnEdge — insert-between spacing (T7)", () => {
     } as any;
 
     addNodeOnEdge("e1", "condition");
-    commitNode({});
     const wf = workflowObj.currentSelectedWorkflow;
     // target already 400 below (> new node at 160 + 160 gap), so it stays put
     expect(wf.nodes.find((n: any) => n.id === "d").position.y).toBe(400);

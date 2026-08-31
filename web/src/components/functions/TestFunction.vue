@@ -1,5 +1,5 @@
 <template>
-  <div data-test="test-function-section" class="flex flex-wrap items-center pb-2">
+  <div v-if="!hideQuery" data-test="test-function-section" class="flex flex-wrap items-center pb-2">
     <div data-test="test-function-query-section" class="test-function-query-container w-full">
       <FullViewContainer
         data-test="test-function-query-title-section"
@@ -159,6 +159,7 @@
         <template #right>
           <!-- o2 ai context add button in the test function -->
           <O2AIContextAddBtn
+            v-if="!hideAiAssist"
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
             imageHeight="24"
             imageWidth="24"
@@ -277,6 +278,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useQuery from "@/composables/useQuery";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
 import { getConsumableRelativeTime } from "@/utils/date";
@@ -304,6 +306,19 @@ const props = defineProps({
   sampleEvents: {
     type: Array,
     default: undefined,
+  },
+  // Hide the SQL "Query" section (stream + query + Run query). Workflows run the
+  // function on the trigger event (seeded into "Events"), not a stream query, so the
+  // Query section is irrelevant there.
+  hideQuery: {
+    type: Boolean,
+    default: false,
+  },
+  // Hide the "send to AI chat" button on the Events header (workflows keep only the
+  // inline editor AI, not the chat-panel context buttons).
+  hideAiAssist: {
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -540,6 +555,10 @@ watch(inputQuery, (value) => {
 // the SQL the user typed.
 const debouncedSyncStreamFromQuery = debounce(async (sql: string) => {
   if (!sql || !parser) return;
+  // parse() is exponential in paren nesting depth — skip a pathologically
+  // nested query rather than freeze the tab. Losing this convenience sync
+  // is fine; the user can still pick the stream from the dropdown.
+  if (maxParenDepth(sql) > SQL_PARSE_MAX_DEPTH) return;
   try {
     const parsed = parser.parse(sql);
     const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;

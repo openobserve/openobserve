@@ -62,7 +62,7 @@ describe("LibraryCard", () => {
   });
 
   it("shows the query language as a quiet neutral chip", () => {
-    expect(mountCard().find('[data-test="alert-library-card-query-type"]').text()).toBe("PROMQL");
+    expect(mountCard().find('[data-test="alert-library-card-query-type"]').text()).toBe("PromQL");
   });
 
   it("carries NO ready label — it would describe almost every card and signal nothing", () => {

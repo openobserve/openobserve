@@ -77,6 +77,7 @@ const CATEGORY_GLYPH = {
   "code-quality": "🧩", "code quality": "🧩", quality: "🧩",
   documentation: "📝", docs: "📝",
   release: "📦",
+  frontend: "🎨", ui: "🎨",
 };
 const MAX_DIFF_TOKENS = 150_000;
 const AGENT_TIMEOUT_MS = 5 * 60 * 1000;
@@ -131,6 +132,17 @@ const AGENTS = {
     opencodeAgent: "ai-review-release",
     fileFocus: f => /Cargo\.toml|package\.json|\.sql$|migration|Migration|\.yml$|Dockerfile|docker/.test(f),
   },
+  // Reviews only the half of the ui-architect skill that no lint rule or script can see
+  // (structure, cross-file consistency, i18n semantics). `requiresFocus` is what makes that
+  // safe: without it, a PR with no web/ files falls back to the FULL diff and this agent
+  // starts opining on Rust.
+  frontend: {
+    name: "Frontend UI Reviewer",
+    promptFile: "agents/frontend.md",
+    opencodeAgent: "ai-review-frontend",
+    fileFocus: isFrontendFile,
+    requiresFocus: true,
+  },
 };
 
 // ─── Risk tiers ────────────────────────────────────────────────────────────
@@ -153,6 +165,13 @@ const RISK_TIERS = {
     coordinatorAgent: COORDINATOR_AGENT,
   },
 };
+
+// Agents added on top of the tier's set when the diff touches their domain, regardless of size.
+// A 6-line UI change is "trivial" by line count but can still hand-roll a header or freeze a
+// product name in the locale catalogue, so tier alone must not decide whether it gets reviewed.
+const CONDITIONAL_AGENTS = [
+  { agent: "frontend", matches: isFrontendFile },
+];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -516,6 +535,15 @@ function isSecuritySensitiveFile(filePath) {
   return /auth|token|secret|crypto|password|oauth|unsafe|acme|cert/i.test(filePath);
 }
 
+// Scoped to web/src on purpose: the ui-architect rules govern app UI, not the build config,
+// the e2e suite or web/scripts. Specs are excluded — they carry deliberate throwaway strings
+// and fixture markup that the house rules do not apply to.
+function isFrontendFile(filePath) {
+  if (!filePath.startsWith("web/src/")) return false;
+  if (/\.(spec|test)\.[jt]sx?$/.test(filePath)) return false;
+  return /\.(vue|ts|js|css)$/.test(filePath);
+}
+
 function filterDiff(diff) {
   const files = parseDiffFiles(diff);
   const filteredFiles = [];
@@ -559,6 +587,15 @@ function assessRiskTier(filteredDiff) {
   if (totalLines <= 10 && fileCount <= 20) return "trivial";
   if (totalLines <= 100 && fileCount <= 20) return "lite";
   return "full";
+}
+
+function selectAgents(tierConfig, filteredDiff) {
+  const agents = [...tierConfig.agents];
+  for (const { agent, matches } of CONDITIONAL_AGENTS) {
+    if (agents.includes(agent)) continue;
+    if (filteredDiff.files.some(f => matches(f.newPath))) agents.push(agent);
+  }
+  return agents;
 }
 
 // ─── LLM calls (via `opencode serve`) ──────────────────────────────────────
@@ -819,6 +856,10 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     });
     if (relevant.length > 0) {
       relevantDiff = relevant.map(s => "diff --git " + s).join("");
+    } else if (agentDef.requiresFocus) {
+      console.log(`[${isoNow()}] ${agentDef.name}: SKIPPED — no files in focus`);
+      TRACE.endSpan(reviewerSpan, { "review.skipped": true, "review.skip_reason": "no_focus_files" });
+      return { agentKey, agentName: agentDef.name, findings: [], rawText: "", error: null, genAIResponseId: "" };
     }
   }
 
@@ -1257,19 +1298,20 @@ async function main() {
     }, rootSpan);
     const tier = process.env.FORCE_FULL === "true" ? "full" : assessRiskTier(filtered);
     const tierConfig = RISK_TIERS[tier] || RISK_TIERS.full;
+    const selectedAgents = selectAgents(tierConfig, filtered);
     TRACE.endSpan(riskSpan, {
       "review.risk_tier": tier,
-      "review.agent_count": tierConfig.agents.length,
-      "review.agents": tierConfig.agents,
+      "review.agent_count": selectedAgents.length,
+      "review.agents": selectedAgents,
     });
     TRACE.setSpanAttributes(rootSpan, {
       "review.risk_tier": tier,
-      "review.agent_count": tierConfig.agents.length,
-      "review.agents": tierConfig.agents,
+      "review.agent_count": selectedAgents.length,
+      "review.agents": selectedAgents,
       "diff.changed_lines": changedLines,
       "diff.filtered_files": filtered.files.length,
     });
-    console.log(`[${isoNow()}] Risk tier: ${tier} → agents: [${tierConfig.agents.join(", ")}]`);
+    console.log(`[${isoNow()}] Risk tier: ${tier} → agents: [${selectedAgents.join(", ")}]`);
 
     // 4. PR context
     let prContext = `PR #${prNumber} in ${process.env.GITHUB_REPOSITORY}`;
@@ -1309,7 +1351,7 @@ async function main() {
     }
 
     // 6. Run reviewers in parallel
-    const agentsToRun = tierConfig.agents;
+    const agentsToRun = selectedAgents;
     console.log(`[${isoNow()}] Launching ${agentsToRun.length} reviewers in parallel...`);
 
     const agentResults = await Promise.allSettled(

@@ -528,6 +528,9 @@ jobs:
         #   --hypothesis-deadline    -> no equivalent; use --request-timeout
         #                               (seconds, not ms) to bound per-request
         #   --data-generation-method -> --mode / -m
+        # The two slack/oauth paths are excluded because CI configures no Slack
+        # credentials, so they correctly answer 503 "not configured" — which the
+        # not_a_server_error check cannot tell apart from a real 5xx panic.
         # `--checks not_a_server_error` keeps focus on 5xx panics (actual
         # backend bugs, not spec-conformance nits). `-n 20` bounds runtime;
         # `--mode positive` keeps inputs realistic (negative inputs are a
@@ -552,6 +555,8 @@ jobs:
             --exclude-path "/api/{org_id}/dashboards/{dashboard_id}/panels/{panel_id}" \
             --exclude-path "/api/{org_id}/pipelines/history" \
             --exclude-path "/api/{org_id}/organizations/assume_service_account" \
+            --exclude-path "/api/{org_id}/alerts/destinations/slack/oauth/start" \
+            --exclude-path "/api/{org_id}/alerts/destinations/slack/oauth/exchange" \
             http://localhost:5080/api-doc/openapi.json
         working-directory: tests/api-testing/
 

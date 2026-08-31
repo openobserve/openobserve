@@ -29,6 +29,7 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { buildContextualSqlMessage, isParserLimitation } from "@/utils/query/sqlDiagnostics";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 import { raw, type TranslateFn } from "@/types/i18n";
 
 // Walk the WHERE clause AST and replace column references whose name matches
@@ -140,11 +141,6 @@ export const useSearchQuery = (t: TranslateFn) => {
     // get function definition
     addTransformToQuery(queryReq);
 
-    // Add action ID if it exists
-    if (searchObj.data.actionId && searchObj.data.transformType === "action") {
-      queryReq.query["action_id"] = searchObj.data.actionId;
-    }
-
     if (searchObj.data.datetime.type === "relative") {
       if (!isPagination) initialQueryPayload.value = cloneDeep(queryReq);
       else {
@@ -174,8 +170,6 @@ export const useSearchQuery = (t: TranslateFn) => {
     delete searchObj.data.histogramQuery.query.from;
     delete searchObj.data.histogramQuery.aggs;
     delete queryReq.aggs;
-    if (searchObj.data.histogramQuery.query.action_id)
-      delete searchObj.data.histogramQuery.query.action_id;
 
     searchObj.data.customDownloadQueryObj = JSON.parse(JSON.stringify(queryReq));
 
@@ -261,8 +255,15 @@ export const useSearchQuery = (t: TranslateFn) => {
         searchObj.data.sqlSyntaxErrorRanges = [];
       }
 
-      // Pre-flight SQL syntax check — runs only in SQL mode, before firing the query
-      if (!readOnly && searchObj.meta.sqlMode && query) {
+      // Pre-flight SQL syntax check — runs only in SQL mode, before firing the query.
+      // Skipped past SQL_PARSE_MAX_DEPTH: astify() is exponential in paren nesting
+      // depth and would freeze the tab for seconds; the server still validates.
+      if (
+        !readOnly &&
+        searchObj.meta.sqlMode &&
+        query &&
+        maxParenDepth(query) <= SQL_PARSE_MAX_DEPTH
+      ) {
         try {
           const _sqlParser = new SqlParser();
           _sqlParser.astify(query);

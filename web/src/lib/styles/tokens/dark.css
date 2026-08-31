@@ -139,6 +139,9 @@
   --color-surface-overlay: var(--d-overlay); /* dropdowns, dialogs, selects, popovers */
   --color-surface-subtle: var(--d-well); /* recessed fills, segmented track */
   --color-surface-subtle-hover: var(--d-panel); /* hover on a recessed fill (one step up) */
+  /* Floating chip on a dark panel — a lighter grey so it lifts off the surface. */
+  --color-surface-chip: var(--color-grey-700);
+  --color-surface-chip-hover: var(--color-grey-600);
   /* Accent-tinted interaction surfaces — dark accent hover/active values. */
   --color-surface-accent-hover: var(--color-primary-900);
   --color-surface-accent-active: var(--color-primary-800);
@@ -178,7 +181,7 @@
 
   /* outline */
   --color-button-outline-text: var(--color-text-heading);
-  --color-button-outline-border: var(--color-border-default);
+  --color-button-outline-border: var(--color-border-control);
   --color-button-outline-hover-bg: var(--color-primary-900);
   --color-button-outline-hover-border: var(--color-border-strong);
   --color-button-outline-active-bg: var(--color-surface-accent-active);
@@ -376,11 +379,10 @@
        a distinct lighter gray; disabled-bg uses --d-well so disabled fields
        still read as a clearly different, inert surface. */
   --color-input-bg: var(--color-surface-base);
-  /* border-control, NOT border-default: this line sits after the
-     --color-border-control definition above and used to override it, so the
-     3:1 fix reached light mode only and dark inputs kept --d-border (#454545
-     on #0d1117 = 1.97:1) — the exact contrast the change existed to fix. */
-  --color-input-border: var(--color-border-control);
+  /* Matched to the outline button's border (--color-border-default) so a text
+     field and a button side by side share one border weight — product decision
+     for visual uniformity, below the WCAG 2.1 SC 1.4.11 3:1 target. */
+  --color-input-border: var(--color-border-default);
   --color-input-disabled-bg: var(--d-well);
   --color-input-disabled-text: var(--color-text-secondary);
   --color-input-placeholder: var(--color-text-placeholder);

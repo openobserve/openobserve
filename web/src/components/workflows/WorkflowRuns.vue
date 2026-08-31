@@ -60,17 +60,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton variant="outline" data-test="workflow-runs-edit" @click="onEditWorkflow">
           {{ t("workflow.runs.edit") }}
         </OButton>
+        <!-- Only meaningful once a run is selected — it is the run that gets
+             carried over. Without one there is nothing to debug, so it stays
+             hidden rather than rendering as a dead control. -->
+        <OButton
+          v-if="selectedRunId"
+          variant="primary"
+          data-test="workflow-runs-debug"
+          @click="onDebugInEditor"
+        >
+          {{ t("workflow.runs.debugInEditor") }}
+        </OButton>
       </template>
     </OPageHeader>
 
     <div class="flex min-h-0 flex-1 gap-2 px-2 pt-3">
-      <!-- Read-only canvas (per-node run status overlay). The SAME results dock as
-           the editor docks the step Input/Output below the canvas once a run is
-           loaded (read-only here) — instead of the old overlay drawer. -->
-      <div class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden">
-        <WorkflowResultsDock>
-          <WorkflowCanvas />
-        </WorkflowResultsDock>
+      <!-- Read-only canvas (per-node run status overlay). Clicking a node's ✓/✗ badge
+           opens its NDV (read-only here) with the step's Input · Config · Output — the
+           SAME panel the editor uses, so results read identically in both places. -->
+      <div
+        class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden dark:bg-transparent"
+      >
+        <WorkflowCanvas />
       </div>
 
       <!-- Persistent runs list (master-detail). -->
@@ -87,9 +98,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <!-- Node NDV (read-only here) — opened by a node's ✓/✗ badge to inspect that
+         step's Input · Config · Output for the loaded run. -->
+    <WorkflowNodeDrawer v-if="workflowObj.dialog.show" />
+
     <!-- Test input popup — a fresh dry-run of the current graph, launched from the
          header. Results paint on the read-only canvas (switching it out of the
-         selected historical run) and open in the results dock above. -->
+         selected historical run) and the node NDV shows each step's I/O. -->
     <WorkflowTestDialog v-if="workflowObj.testRun.show" />
   </div>
 </template>
@@ -106,7 +121,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
-import WorkflowResultsDock from "./WorkflowResultsDock.vue";
+import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
 import WorkflowRunsPanel from "./WorkflowRunsPanel.vue";
 import useWorkflowCanvas, {
@@ -160,6 +175,8 @@ watch(
 );
 
 // Deliberate switch to the editor — the only bridge between inspect and build.
+// Deliberately WITHOUT the run: this is "go build", and arriving with a past
+// run's badges still painted would be surprising.
 const onEditWorkflow = () => {
   router.push({
     name: "workflowEditor",
@@ -167,6 +184,22 @@ const onEditWorkflow = () => {
       id: workflowId.value,
       name: workflowName.value,
       org_identifier: orgId.value,
+    },
+  });
+};
+
+// The other half of that pair: "go fix THIS run". Same destination, but the run
+// travels along, so the editor reloads it onto the canvas — identical badges and
+// per-node data, now editable. The run itself is only ever read; fixing edits the
+// definition, and re-testing produces a new test run.
+const onDebugInEditor = () => {
+  router.push({
+    name: "workflowEditor",
+    query: {
+      id: workflowId.value,
+      name: workflowName.value,
+      org_identifier: orgId.value,
+      run_id: selectedRunId.value,
     },
   });
 };

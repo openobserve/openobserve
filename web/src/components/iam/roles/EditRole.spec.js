@@ -229,12 +229,6 @@ vi.mock("@/services/alert_templates", async (importOriginal) => {
     default: { list: vi.fn(async () => ({ data: [{ name: "t1" }] })) },
   });
 });
-vi.mock("@/services/action_scripts", async (importOriginal) => {
-  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
-  return overlayServiceMock(await importOriginal(), {
-    default: { list: vi.fn(async () => ({ data: [{ id: "ac1", name: "AC1" }] })) },
-  });
-});
 vi.mock("@/services/alert_destination", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock(await importOriginal(), {

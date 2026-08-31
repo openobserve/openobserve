@@ -45,7 +45,8 @@ const tidy = (value: string): string => value.replace(/\s+/g, " ").trim();
  */
 interface PanelFieldArg {
   type?: string;
-  value?: { field?: string } | null;
+  /** A `function` arg nests another field expression — e.g. a cast. */
+  value?: { field?: string; args?: PanelFieldArg[] } | null;
 }
 
 interface PanelField {
@@ -102,10 +103,24 @@ export interface PanelAutoNameOptions {
 const aggregationOf = (field: PanelField | null | undefined): string | null =>
   field?.functionName ?? field?.aggregationFunction ?? null;
 
+/**
+ * First field named anywhere in an argument list, descending through nested
+ * function args so a wrapped column (sum of a cast) still names the panel.
+ */
+const columnInArgs = (args: PanelFieldArg[] | undefined): string => {
+  for (const arg of args ?? []) {
+    if (arg?.type === "field" && arg?.value?.field) return arg.value.field;
+    if (arg?.type === "function") {
+      const nested = columnInArgs(arg?.value?.args);
+      if (nested) return nested;
+    }
+  }
+  return "";
+};
+
 /** The underlying column, from whichever of the two shapes this field uses. */
 const columnOf = (field: PanelField | null | undefined): string => {
-  const fromArgs = field?.args?.find((arg) => arg?.type === "field")?.value?.field;
-  return (fromArgs || field?.column || field?.alias || "").trim();
+  return (columnInArgs(field?.args) || field?.column || field?.alias || "").trim();
 };
 
 /**

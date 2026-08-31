@@ -550,7 +550,6 @@ export default defineComponent({
       padding: 0.5rem 0.75rem;
       color: var(--rca-text-primary);
       font-weight: 700;
-      text-transform: uppercase;
       font-size: var(--text-3xs);
       letter-spacing: 0.08em;
       text-align: left;

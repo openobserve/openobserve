@@ -370,6 +370,20 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("parentRoutes — Slack OAuth callback", () => {
+    it("exposes the public Slack callback view with localized metadata", () => {
+      const { parentRoutes } = useRoutes();
+      const callbackRoute = parentRoutes.find(
+        (route: any) => route.path === "/slack/oauth/callback",
+      );
+
+      expect(callbackRoute).toBeDefined();
+      expect(callbackRoute.name).toBe("slackOAuthCallback");
+      expect(callbackRoute.component).toBeDefined();
+      expect(enTitle(callbackRoute.meta.titleKey)).toBe("Connecting Slack");
+    });
+  });
+
   // =========================================================================
   // 5. homeChildRoutes — home route
   // =========================================================================
@@ -1926,9 +1940,9 @@ describe("useRoutes (router.ts)", () => {
   // 23. Edge cases
   // =========================================================================
   describe("Edge Cases", () => {
-    it("should have exactly 3 parentRoutes", () => {
+    it("should have exactly 4 parentRoutes", () => {
       const { parentRoutes } = useRoutes();
-      expect(parentRoutes).toHaveLength(3);
+      expect(parentRoutes).toHaveLength(4);
     });
 
     it("should have unique paths in parentRoutes", () => {
