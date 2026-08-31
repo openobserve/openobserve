@@ -146,6 +146,7 @@ export class MetricsExplorerPage {
 
     async switchToVisualize() {
         await this.page.locator(this.modeVisualize).click();
+        await this.expectModeActive('visualize');
     }
 
     async switchToWorkspace() {

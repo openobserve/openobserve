@@ -2,7 +2,6 @@
 
 pub mod prelude;
 
-pub mod action_scripts;
 pub mod alert_composite_children;
 pub mod alert_composites;
 pub mod alert_dedup_state;
@@ -36,6 +35,7 @@ pub mod llm_dataset_items;
 pub mod llm_datasets;
 pub mod llm_experiments;
 pub mod llm_idempotency_records;
+pub mod llm_playground_snapshots;
 pub mod llm_remote_tasks;
 pub mod llm_secrets;
 pub mod model_pricing;

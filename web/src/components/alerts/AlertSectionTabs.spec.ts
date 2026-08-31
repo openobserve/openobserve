@@ -36,6 +36,7 @@ const mountTabs = () =>
 describe("AlertSectionTabs", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
+    store.state.zoConfig.custom_hide_menus = "";
     await router.push({ name: "alertList" });
     await router.isReady();
   });
@@ -79,5 +80,21 @@ describe("AlertSectionTabs", () => {
     await flushPromises();
     const wrapper = mountTabs();
     expect(wrapper.findAll('[aria-selected="true"]')).toHaveLength(0);
+  });
+
+  it("drops the Library tab when custom_hide_menus lists 'alertLibrary'", () => {
+    store.state.zoConfig.custom_hide_menus = "openapi,reports,alertLibrary";
+    const wrapper = mountTabs();
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([
+      "All Alerts",
+      "Destinations",
+      "Destination Templates",
+    ]);
+  });
+
+  it("keeps the Library tab when the flag lists other menus", () => {
+    store.state.zoConfig.custom_hide_menus = "openapi,reports";
+    const wrapper = mountTabs();
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain("Library");
   });
 });

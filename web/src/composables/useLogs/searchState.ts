@@ -44,18 +44,12 @@ export interface Transform {
   [key: string]: unknown;
 }
 
-// The currently applied transform/action; spread from a source item at runtime.
+// The currently applied transform; spread from a source item at runtime.
 export interface SelectedTransform {
   id?: string;
   name?: string;
   type?: string;
   [key: string]: unknown;
-}
-
-// An action entry shown in the action selector.
-export interface ActionItem {
-  name: string;
-  id: string;
 }
 
 export interface RefreshTimeItem {
@@ -186,8 +180,6 @@ export interface SearchObjectData {
   transformType: string;
   selectedTransform: SelectedTransform | null;
   selectedFunction?: { name?: string; function?: string } | null;
-  actions: ActionItem[];
-  actionId: string | null;
   // Polymorphic: used both flat (startTime/endTime) and nested
   // (relative.period.label) with unguarded deep access, so kept as any.
   datetime: any;

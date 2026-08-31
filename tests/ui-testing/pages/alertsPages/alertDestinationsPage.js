@@ -1266,6 +1266,19 @@ export class AlertDestinationsPage {
             }
             await expect.poll(cardSelected, { timeout: 8000, intervals: [400, 800, 1200] }).toBe(true).catch(() => {});
 
+            // Slack opens on the guided flow — OAuth on Cloud, the manifest stepper on
+            // enterprise — neither of which renders a webhook field. These specs cover the
+            // webhook path, so pick that method explicitly rather than depending on which
+            // deployment's default happens to be showing.
+            if (type === 'slack') {
+                const webhookMethod = this.page.locator('[data-test="slack-setup-method-webhook"]').first();
+                if (await webhookMethod.isVisible({ timeout: 5000 }).catch(() => false)) {
+                    await webhookMethod.click({ timeout: 10000 }).catch((e) => {
+                        testLogger.debug('slack webhook method click failed', { openAttempt, error: e.message });
+                    });
+                }
+            }
+
             // Let the prebuilt TEMPLATE auto-load settle BEFORE judging field stability. Picking a
             // type fires a template fetch whose completion re-renders the form and (on a reused
             // form) unmounts the fields. That fetch can land AFTER a short stability window — so

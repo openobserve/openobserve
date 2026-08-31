@@ -34,20 +34,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   health's bare full-width search input has none to give.
 
   So the AFFORDANCE is adopted and the geometry is kept: same OButton, with the
-  staleness dot beside it and the relative time on hover rather than always-on.
-  The reading itself is `ORefreshButton`'s, shared through
-  `useDbmLastRefreshed` — same thresholds, same copy keys — so the two controls
-  cannot drift into disagreeing about what "stale" means.
+  staleness dot and the relative age beside it. The reading is `ORefreshButton`'s,
+  shared through `useDbmLastRefreshed`, so the two controls cannot drift on what
+  "stale" means.
 -->
 <template>
   <div class="inline-flex items-center gap-1.5" :class="shrink ? 'shrink-0' : undefined">
-    <!-- The dot is the always-visible half: it costs almost no width, and it
-         is the part that answers "should I trust this number?" at a glance.
-         Rendered only once a load has succeeded — before that there is no
-         staleness to report, and a grey dot on first paint would read as a
-         verdict rather than as the absence of one. -->
+    <!-- Rendered only after a successful load: a grey dot on first paint would read
+         as a verdict rather than the absence of one. -->
     <span
-      v-if="hasRun"
+      v-if="hasRun && mode !== 'button'"
       class="size-2 shrink-0 rounded-full transition-colors duration-700"
       :class="dotClass"
       :data-test="`${dataTest}-dot`"
@@ -57,7 +53,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTooltip side="bottom" :content="dotStatus" />
     </span>
 
+    <span
+      v-if="hasRun && mode !== 'button'"
+      class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none"
+      :data-test="`${dataTest}-age`"
+    >
+      {{ relative }}
+    </span>
+
     <OButton
+      v-if="mode !== 'status'"
       variant="outline"
       size="icon-sm"
       icon-left="refresh"
@@ -66,11 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="dataTest"
       @click="emit('refresh')"
     >
-      <!-- One tooltip, two sentences: what the button does, and when the data
-           under it was last replaced. Before the first load only the action is
-           claimed — "not yet refreshed" beside a table mid-fetch would be a
-           staleness verdict on data that has not arrived. -->
-      <OTooltip side="bottom" :content="tooltip" />
+      <OTooltip side="bottom" :content="t('dbm.common.reload')" />
     </OButton>
   </div>
 </template>
@@ -100,8 +101,10 @@ const props = withDefaults(
      * adopting the timestamp is per-page rather than a flag day.
      */
     lastRunAt?: number | null;
+    /** Which halves to render: `full` (dot + age + button), `status` (dot + age), or `button` (just the reload). */
+    mode?: "full" | "status" | "button";
   }>(),
-  { loading: false, shrink: true, lastRunAt: null },
+  { loading: false, shrink: true, lastRunAt: null, mode: "full" },
 );
 
 const emit = defineEmits<{ refresh: [] }>();
@@ -115,14 +118,4 @@ const { relative, dotClass, dotLabel, exact, hasRun } = useDbmLastRefreshed({
 
 /** The dot's own hover text — the staleness verdict plus the exact clock time. */
 const dotStatus = computed<I18nText>(() => raw(`${dotLabel.value} — ${exact.value}`));
-
-/**
- * The button's hover text. The action always; the age only once there IS one,
- * so this never asserts staleness about a table that has not loaded.
- */
-const tooltip = computed<I18nText>(() =>
-  hasRun.value
-    ? raw(`${t("dbm.common.reload")} — ${t("dbm.common.lastRefreshed", { age: relative.value })}`)
-    : t("dbm.common.reload"),
-);
 </script>

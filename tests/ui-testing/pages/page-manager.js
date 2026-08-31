@@ -113,7 +113,6 @@ import { StreamsFormValidationPage } from "./streamsPages/streamsFormValidationP
 
 // ===== FUNCTIONS PAGE OBJECTS =====
 const FunctionsPage = require("./functionsPages/functionsPage.js");
-const { ActionScriptsFormValidationPage } = require("./functionsPages/actionScriptsFormValidationPage.js");
 const FunctionsFormValidationPage = require("./functionsPages/functionsFormValidationPage.js");
 
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
@@ -240,7 +239,6 @@ class PageManager {
 
     // ===== FUNCTIONS PAGE OBJECTS =====
     this.functionsPage = new FunctionsPage(page);
-    this.actionScriptsFormValidation = new ActionScriptsFormValidationPage(page);
     this.functionsFormValidation = new FunctionsFormValidationPage(page);
 
     // ===== CIPHER KEYS PAGE OBJECTS =====

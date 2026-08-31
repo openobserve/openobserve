@@ -958,6 +958,12 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     scope: "rum-errors",
     shortcuts: [
       { id: "rumErrorsRefresh", key: "r", descriptionKey: "shortcuts.actions.rumErrorsRefresh" },
+      {
+        id: "rumErrorsCopyUrl",
+        keyForWindows: "ctrl+shift+c",
+        keyForMac: "meta+shift+c",
+        descriptionKey: "shortcuts.actions.rumErrorsCopyUrl",
+      },
     ],
   },
 
@@ -970,6 +976,12 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "rumSessionsRefresh",
         key: "r",
         descriptionKey: "shortcuts.actions.rumSessionsRefresh",
+      },
+      {
+        id: "rumSessionsCopyUrl",
+        keyForWindows: "ctrl+shift+c",
+        keyForMac: "meta+shift+c",
+        descriptionKey: "shortcuts.actions.rumSessionsCopyUrl",
       },
     ],
   },

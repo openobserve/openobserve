@@ -111,11 +111,17 @@ const gateContext = computed<NavGateContext>(() => {
   };
 });
 
-// A child shows only when (a) its route is registered in this build AND (b) its
-// visibility gate (if any) passes — exactly as the target page would decide.
+// A child shows only when (a) its route is registered in this build, (b)
+// custom_hide_menus does not name it, AND (c) its visibility gate (if any)
+// passes — exactly as the target page would decide.
+//
+// The custom_hide_menus check is by route NAME so a child with no top-level
+// rail entry of its own is hideable at all: `requires` only tracks the parent,
+// and MainLayout's filter only ever sees top-level links.
 const visibleChildren = computed(() =>
   props.children.filter((c) => {
     if (!router.hasRoute(c.name)) return false;
+    if (gateContext.value.hiddenMenus.has(c.name)) return false;
     if (c.gate) {
       const predicate = GATE_PREDICATES[c.gate];
       if (predicate && !predicate(gateContext.value)) return false;

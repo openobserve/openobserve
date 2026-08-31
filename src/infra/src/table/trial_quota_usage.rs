@@ -77,12 +77,18 @@ pub async fn load_all() -> Result<Vec<trial_quota_usage::Model>, sea_orm::DbErr>
     trial_quota_usage::Entity::find().all(db).await
 }
 
-/// Get total usage across all features for an org (sum of usage_count).
+/// Total usage for an org across the given pool's feature rows. `features`
+/// scopes the sum to ONE pool, or synthetics steps report as AI credits used.
+///
 /// Note: PostgreSQL SUM(bigint) returns NUMERIC, so we cast to BIGINT for Rust i64 compat.
-pub async fn get_total_usage_for_org(org_id: &str) -> Result<i64, sea_orm::DbErr> {
+pub async fn get_total_usage_for_org(
+    org_id: &str,
+    features: &[&str],
+) -> Result<i64, sea_orm::DbErr> {
     let db = get_orm_client_ro().await;
     let result: Option<Option<i64>> = trial_quota_usage::Entity::find()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
         .select_only()
         .column_as(
             Expr::expr(Func::cast_as(
@@ -111,32 +117,41 @@ pub async fn get_usage_limit_for_org(org_id: &str) -> Result<Option<i64>, sea_or
     Ok(result.flatten())
 }
 
-pub async fn load_all_usage_limits() -> Result<Vec<(String, i64)>, sea_orm::DbErr> {
+/// Every explicit `(org_id, feature, usage_limit)` triple — per FEATURE, not a
+/// per-org maximum: `MAX(usage_limit) GROUP BY org_id` would let a raised AI
+/// credit limit silently raise the one-time synthetics grant.
+pub async fn load_all_usage_limits() -> Result<Vec<(String, String, i64)>, sea_orm::DbErr> {
     let db = get_orm_client_ro().await;
-    let results: Vec<(String, Option<i64>)> = trial_quota_usage::Entity::find()
+    let results: Vec<(String, String, Option<i64>)> = trial_quota_usage::Entity::find()
         .select_only()
         .column(trial_quota_usage::Column::OrgId)
-        .column_as(trial_quota_usage::Column::UsageLimit.max(), "usage_limit")
+        .column(trial_quota_usage::Column::Feature)
+        .column(trial_quota_usage::Column::UsageLimit)
         .filter(trial_quota_usage::Column::UsageLimit.is_not_null())
-        .group_by(trial_quota_usage::Column::OrgId)
         .into_tuple()
         .all(db)
         .await?;
     Ok(results
         .into_iter()
-        .filter_map(|(org_id, limit)| limit.map(|limit| (org_id, limit)))
+        .filter_map(|(org_id, feature, limit)| limit.map(|limit| (org_id, feature, limit)))
         .collect())
 }
 
-/// Set one shared limit on every feature row for an organization. The AI chat
-/// row is upserted first so organizations without prior usage can be configured.
-pub async fn set_usage_limit_for_org(org_id: &str, usage_limit: i64) -> Result<(), sea_orm::DbErr> {
+/// Set one limit on every feature row of ONE POOL for an organization.
+/// `seed_feature` is upserted first so orgs with no prior usage can be
+/// configured; `features` bounds the `UPDATE` so the two pools stay independent.
+pub async fn set_usage_limit_for_org(
+    org_id: &str,
+    seed_feature: &str,
+    features: &[&str],
+    usage_limit: i64,
+) -> Result<(), sea_orm::DbErr> {
     let db = get_orm_client_rw().await;
     let txn = db.begin().await?;
     let now = config::utils::time::now_micros();
     let active_model = trial_quota_usage::ActiveModel {
         org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
-        feature: sea_orm::ActiveValue::Set("ai_chat".to_string()),
+        feature: sea_orm::ActiveValue::Set(seed_feature.to_string()),
         usage_count: sea_orm::ActiveValue::Set(0),
         usage_limit: sea_orm::ActiveValue::Set(Some(usage_limit)),
         updated_at: sea_orm::ActiveValue::Set(now),
@@ -161,6 +176,7 @@ pub async fn set_usage_limit_for_org(org_id: &str, usage_limit: i64) -> Result<(
 
     trial_quota_usage::Entity::update_many()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
         .col_expr(
             trial_quota_usage::Column::UsageLimit,
             Expr::value(usage_limit),

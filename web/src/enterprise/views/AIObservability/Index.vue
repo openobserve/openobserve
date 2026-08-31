@@ -79,7 +79,9 @@ const activeSection = computed<string>(() => {
   if (route.name === "aiDatasets") return "datasets";
   // The create form is a route of its own, so the rail must stay lit while it
   // is open — same shape as the queue sub-routes above.
+  if (route.name === "aiPlayground") return "playground";
   if (route.name === "aiExperiments" || route.name === "aiExperimentCreate") return "experiments";
+  if (typeof route.name === "string" && route.name.startsWith("aiRemoteTask")) return "remoteTasks";
   if (route.name === "aiEvaluations") {
     const tab = (route.query.tab as string) || "quality";
     return tab;
@@ -147,11 +149,27 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => [
     group: "Annotate",
   },
   {
+    key: "playground",
+    label: t("aiObservability.nav.playground"),
+    icon: "play-circle",
+    to: { name: "aiPlayground", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-playground",
+    group: "Experiment",
+  },
+  {
     key: "experiments",
     label: t("aiObservability.nav.experiments"),
     icon: "science",
     to: { name: "aiExperiments", query: orgQuery.value },
     dataTest: "ai-secondary-nav-experiments",
+    group: "Experiment",
+  },
+  {
+    key: "remoteTasks",
+    label: t("aiObservability.nav.remoteTasks"),
+    icon: "cloud-upload",
+    to: { name: "aiRemoteTasks", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-remote-tasks",
     group: "Experiment",
   },
   {

@@ -23,6 +23,13 @@ vi.mock("@vue-flow/core", () => ({
     template: '<path class="mock-base-edge" />',
     props: ["id", "style", "path", "markerEnd", "type"],
   },
+  // The label layer teleports to the viewport in the real lib; here it just renders
+  // its slot inline so the mid-edge `+` is queryable.
+  EdgeLabelRenderer: {
+    name: "EdgeLabelRenderer",
+    template: '<div class="mock-edge-label"><slot /></div>',
+  },
+  Position: { Top: "top", Right: "right", Bottom: "bottom", Left: "left" },
   getBezierPath: vi.fn((props: any) => [
     `M ${props.sourceX} ${props.sourceY} C ... ${props.targetX} ${props.targetY}`,
     props.sourceX,
@@ -121,6 +128,36 @@ describe("FlowEdge.vue", () => {
   describe("inheritAttrs", () => {
     it("sets inheritAttrs to false via the plain <script> block", () => {
       expect((FlowEdge as any).inheritAttrs).toBe(false);
+    });
+  });
+
+  describe("mid-edge insert + (insertable)", () => {
+    const addBtn = (w: any) => w.find('[data-test="workflow-edge-add"]');
+
+    it("does not render the insert + by default (pipelines opt out)", () => {
+      wrapper = createWrapper();
+      expect(addBtn(wrapper).exists()).toBe(false);
+    });
+
+    it("renders the insert + when insertable is set (Workflows opt in)", () => {
+      wrapper = createWrapper({ insertable: true });
+      expect(addBtn(wrapper).exists()).toBe(true);
+    });
+
+    it("emits insert with the click event when the + is clicked", async () => {
+      wrapper = createWrapper({ insertable: true });
+      await addBtn(wrapper).trigger("click");
+      expect(wrapper.emitted("insert")).toBeTruthy();
+      expect(wrapper.emitted("insert")).toHaveLength(1);
+    });
+
+    it("emits insert-enter / insert-leave as the cursor crosses the + chip", async () => {
+      wrapper = createWrapper({ insertable: true });
+      const chip = wrapper.find(".pointer-events-auto"); // the chip wrapper around the +
+      await chip.trigger("mouseenter");
+      await chip.trigger("mouseleave");
+      expect(wrapper.emitted("insert-enter")).toHaveLength(1);
+      expect(wrapper.emitted("insert-leave")).toHaveLength(1);
     });
   });
 

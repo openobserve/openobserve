@@ -1,6 +1,19 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
 import { usePanelDataLoader } from "./usePanelDataLoader";
+
+/**
+ * Lets the NEXT usePanelDataLoader() install its visibility observer.
+ *
+ * onMounted is stubbed to a no-op for this whole file, which leaves a loader
+ * permanently invisible — and every load, cache restore included, is gated on
+ * visibility. The composable registers the observer hook before the one that
+ * auto-loads, so running only the first keeps the "no automatic loadData"
+ * property these tests rely on.
+ */
+const allowPanelToBecomeVisible = () => {
+  vi.mocked(onMounted).mockImplementationOnce((cb: any) => cb());
+};
 
 // Mock all dependencies with enhanced functionality
 let mockSearchResults: any = [];
@@ -280,15 +293,18 @@ describe("usePanelDataLoader", () => {
       .spyOn(window, "removeEventListener")
       .mockImplementation(() => {});
 
-    // Mock IntersectionObserver for visibility detection
-    global.IntersectionObserver = vi.fn().mockImplementation((callback) => ({
-      observe: vi.fn().mockImplementation(() => {
+    // Mock IntersectionObserver for visibility detection.
+    // Must be a real (constructible) function — an arrow implementation throws
+    // "is not a constructor" at `new IntersectionObserver(...)`, which would
+    // leave every panel permanently invisible.
+    global.IntersectionObserver = vi.fn(function (this: any, callback: any) {
+      this.observe = vi.fn(() => {
         // Immediately trigger visibility
         callback([{ isIntersecting: true }]);
-      }),
-      unobserve: vi.fn(),
-      disconnect: vi.fn(),
-    }));
+      });
+      this.unobserve = vi.fn();
+      this.disconnect = vi.fn();
+    }) as any;
 
     // Mock setTimeout to work with promise-based async flows
     vi.spyOn(global, "setTimeout").mockImplementation((fn: any) => {
@@ -1517,6 +1533,8 @@ describe("usePanelDataLoader", () => {
           },
         };
 
+        allowPanelToBecomeVisible();
+
         const loader = usePanelDataLoader(
           panelSchema,
           selectedTimeObj,
@@ -1572,6 +1590,8 @@ describe("usePanelDataLoader", () => {
             end_time: Date.now(),
           },
         };
+
+        allowPanelToBecomeVisible();
 
         const loader = usePanelDataLoader(
           panelSchema,
@@ -1680,6 +1700,8 @@ describe("usePanelDataLoader", () => {
           },
         };
 
+        allowPanelToBecomeVisible();
+
         const loader = usePanelDataLoader(
           panelSchema,
           selectedTimeObj,
@@ -1697,13 +1719,15 @@ describe("usePanelDataLoader", () => {
           ref(false), // is_ui_histogram
         );
 
-        // Start loadData without waiting (it will be pending due to visibility check after cache attempt)
+        // Start loadData without waiting (the cache read happens once the panel
+        // is reported visible)
         loader.loadData();
 
-        // Give it a moment to attempt cache restore (happens before visibility wait)
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        // Give it a moment to attempt cache restore. setTimeout is stubbed to a
+        // microtask here, so drain a few rather than waiting on the clock.
+        for (let i = 0; i < 20; i++) await Promise.resolve();
 
-        // With forceLoad=false and runCount=0, cache restore is attempted (line 803)
+        // With forceLoad=false and runCount=0, cache restore is attempted
         // Cache operation count should be > 0 because getPanelCache was called
         expect(cacheOperationCount).toBeGreaterThan(0);
 

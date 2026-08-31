@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
       :subtitle="t('alerts.incidents.incident')"
       title-overflow="visible"
+      tabs-below
       bleed
     >
       <!-- Incident name — click the title to rename, Enter or blur saves,
@@ -118,49 +119,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </template>
 
+      <template #header-tabs>
+        <OTabs v-model="activeTab" align="left" class="flex-1" mobile-arrows :breakpoint="0">
+          <OTab
+            name="overview"
+            :label="t('alerts.insights.tabs.overview')"
+            data-test="incident-overview-tab"
+          />
+          <OTab
+            name="activity"
+            :label="t('alerts.incidents.activityTab')"
+            data-test="incident-activity-tab"
+          />
+          <OTab
+            name="incidentAnalysis"
+            :label="t('alerts.incidents.incidentAnalysis')"
+            data-test="incident-analysis-tab"
+          />
+          <OTab
+            name="serviceGraph"
+            :label="t('alerts.incidents.alertGraph')"
+            data-test="incident-alert-graph-tab"
+          />
+          <OTab name="alertTriggers" data-test="incident-alert-triggers-tab">
+            <template #default>
+              <div class="flex items-center gap-1.5">
+                <span>{{ t("alerts.incidents.alertTriggers") }}</span>
+                <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
+              </div>
+            </template>
+          </OTab>
+
+          <OTab name="logs" :label="t('common.logs')" data-test="incident-logs-tab" />
+          <OTab name="metrics" :label="t('search.metrics')" data-test="incident-metrics-tab" />
+          <OTab name="traces" :label="t('menu.traces')" data-test="incident-traces-tab" />
+        </OTabs>
+      </template>
+
       <!-- Content -->
       <div
         v-if="!loading && incidentDetails"
         class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        <div class="px-page-edge border-border-default flex-shrink-0 border-b">
-          <OTabs v-model="activeTab" align="left" class="flex-1" mobile-arrows :breakpoint="0">
-            <OTab
-              name="overview"
-              :label="t('alerts.insights.tabs.overview')"
-              data-test="incident-overview-tab"
-            />
-            <OTab
-              name="activity"
-              :label="t('alerts.incidents.activityTab')"
-              data-test="incident-activity-tab"
-            />
-            <OTab
-              name="incidentAnalysis"
-              :label="t('alerts.incidents.incidentAnalysis')"
-              data-test="incident-analysis-tab"
-            />
-            <OTab
-              name="serviceGraph"
-              :label="t('alerts.incidents.alertGraph')"
-              data-test="incident-alert-graph-tab"
-            />
-            <OTab name="alertTriggers" data-test="incident-alert-triggers-tab">
-              <template #default>
-                <div class="flex items-center gap-1.5">
-                  <span>{{ t("alerts.incidents.alertTriggers") }}</span>
-                  <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
-                </div>
-              </template>
-            </OTab>
-
-            <!-- Telemetry tabs always inline -->
-            <OTab name="logs" :label="t('common.logs')" data-test="incident-logs-tab" />
-            <OTab name="metrics" :label="t('search.metrics')" data-test="incident-metrics-tab" />
-            <OTab name="traces" :label="t('menu.traces')" data-test="incident-traces-tab" />
-          </OTabs>
-        </div>
-
         <!-- Tab Content Container -->
         <div class="flex flex-1 overflow-hidden">
           <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
@@ -877,10 +877,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="space-y-2">
                           <!-- Alert Name -->
                           <div class="flex flex-col gap-0.5">
-                            <span
-                              :class="'text-text-secondary'"
-                              class="text-3xs tracking-wide uppercase"
-                            >
+                            <span :class="'text-text-secondary'" class="text-3xs">
                               {{ t("alerts.incidents.alertName") }}
                             </span>
                             <span :class="'text-text-body'" class="text-sm font-medium">
@@ -893,10 +890,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             v-if="alerts[selectedAlertIndex]?.alert_type === 'composite'"
                             class="flex flex-col gap-0.5"
                           >
-                            <span
-                              :class="'text-text-secondary'"
-                              class="text-3xs tracking-wide uppercase"
-                            >
+                            <span :class="'text-text-secondary'" class="text-3xs">
                               {{ t("alerts.alertType") }}
                             </span>
                             <OTag type="alertType" :value="'composite'" class="w-fit" />
@@ -905,10 +899,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Stream Type & Name -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.streamType") }}
                               </span>
                               <OTag
@@ -918,10 +909,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               />
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.stream_name") }}
                               </span>
                               <span :class="'text-text-body'" class="truncate text-sm font-medium">
@@ -933,10 +921,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Threshold & Period -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.messages.thresholdMarkLine") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -948,10 +933,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.period") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -967,10 +949,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Frequency & Silence -->
                           <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.frequency") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -985,10 +964,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.silence") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -1016,10 +992,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               'border-border-default',
                             ]"
                           >
-                            <span
-                              :class="'text-text-secondary'"
-                              class="text-2xs font-semibold tracking-wide uppercase"
-                            >
+                            <span :class="'text-text-secondary'" class="text-2xs font-semibold">
                               {{
                                 alerts[selectedAlertIndex]?.query_condition?.type === "sql"
                                   ? t("alerts.alertDetails.sqlQuery")
@@ -2603,21 +2576,6 @@ export default defineComponent({
       }
     };
 
-    const getSeverityColorHex = (severity: string) => {
-      switch (severity) {
-        case "P1":
-          return "#b91c1c"; // red-700
-        case "P2":
-          return "#c2410c"; // orange-700
-        case "P3":
-          return "#d97706"; // amber-600
-        case "P4":
-          return "#6b7280"; // gray-500
-        default:
-          return "#6b7280"; // gray-500
-      }
-    };
-
     const formatPeriod = (periodInSeconds: number | undefined) => {
       if (!periodInSeconds) return raw("N/A");
 
@@ -3446,7 +3404,6 @@ export default defineComponent({
       handleSeverityChange,
       handleTriggerRowClick,
       getStatusLabel,
-      getSeverityColorHex,
       formatPeriod,
       formatCustomConditions,
       formatTimestamp,

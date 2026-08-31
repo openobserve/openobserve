@@ -105,6 +105,8 @@ export const DEFAULT_LOGS_CONFIG = {
   meta: {
     logsVisualizeToggle: "logs" as const,
     buildModeQueryEditorDisabled: false, // true when in build mode and customQuery is false
+    // One-shot hand-off of a saved view's builder chart to BuildQueryPage; not persisted.
+    savedBuildConfig: null as any,
     refreshInterval: 0 as number,
     refreshIntervalLabel: "Off",
     refreshHistogram: false,
@@ -113,7 +115,7 @@ export const DEFAULT_LOGS_CONFIG = {
     showHistogram: true,
     showPatterns: false,
     showDetailTab: false,
-    showTransformEditor: false, // by default function / actions editor should be hidden
+    showTransformEditor: false, // by default function editor should be hidden
     searchApplied: false,
     toggleSourceWrap: useLocalWrapContent() ? JSON.parse(useLocalWrapContent()) : false,
     histogramDirtyFlag: false,
@@ -157,7 +159,6 @@ export const DEFAULT_LOGS_CONFIG = {
     selectedTraceStream: "",
     showSearchScheduler: false,
     toggleFunction: false, // DEPRECATED use showTransformEditor instead
-    isActionsEnabled: false,
     resetPlotChart: false,
     clearCache: false,
     liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
@@ -215,7 +216,6 @@ export const DEFAULT_LOGS_CONFIG = {
     histogramInterval: 0 as any,
     transforms: [] as any[],
     transformType: "function",
-    actions: [] as any[],
     selectedTransform: null as any,
     queryResults: [] as any[],
     sortedQueryResults: [] as any[],
@@ -268,7 +268,6 @@ export const DEFAULT_LOGS_CONFIG = {
     lastHistogramTraceId: "" as string,
     isOperationCancelled: false,
     searchRetriesCount: {} as { [key: string]: number },
-    actionId: null,
     crossLinks: { stream_links: [], org_links: [] },
     crossLinkQuery: "",
     highlightQuery: "",

@@ -82,23 +82,30 @@ export interface RemoteTask {
 /**
  * A write carries Secret references, never Secret values — the write-only rule
  * the registration form depends on.
+ *
+ * These three are snake_case on the wire while every field around them is
+ * camelCase. `RemoteTaskRequestBody` carries `rename_all = "camelCase"` for its
+ * OWN fields only; the nested `RemoteTaskAuth` / `RemoteTaskSigning` /
+ * `RemoteTaskHeader` types have no field-renaming attribute, so serde reads
+ * `secret_ref` and `key_id`. Sending the camelCase spelling drops the reference
+ * silently for signing and headers, because those fields are `#[serde(default)]`.
  */
 export interface RemoteTaskAuthPayload {
   type: RemoteTaskAuthType;
-  secretRef?: string;
-  headerName?: string;
+  secret_ref?: string;
+  header_name?: string;
 }
 
 export interface RemoteTaskSigningPayload {
   enabled: boolean;
-  secretRef?: string;
-  keyId?: string;
+  secret_ref?: string;
+  key_id?: string;
 }
 
 export interface RemoteTaskHeaderPayload {
   key: string;
   value?: string;
-  secretRef?: string;
+  secret_ref?: string;
 }
 
 export interface RemoteTaskPayload {
@@ -115,6 +122,7 @@ export interface RemoteTaskPayload {
   maxAttempts?: number;
   maxConcurrency?: number;
   signing?: RemoteTaskSigningPayload;
+  /** Omitted credential fields retain their server-owned Secret references. */
   /** The published version an edit started from. Ignored when a draft exists. */
   fromVersion?: number;
 }
@@ -228,7 +236,8 @@ export interface RemoteTaskPublishResult {
   versionBumped: boolean;
   error?: string;
   task: RemoteTask;
-  report: RemoteTaskVerificationReport;
+  /** Null when a description-only update correctly skipped the connection test. */
+  report: RemoteTaskVerificationReport | null;
 }
 
 export interface RemoteTaskTestRunSample {
@@ -246,6 +255,8 @@ export interface RemoteTaskTestRunRow {
   rawResponse: string;
   httpStatus?: number;
   latencyMs: number;
+  /** Calls the registered retry policy actually made, so a retried sample reads as one. */
+  attempts: number;
   error?: string;
 }
 
