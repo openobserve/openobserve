@@ -631,6 +631,28 @@ export default defineComponent({
       zeroSizeReinitObserver.observe(chartRef.value);
     };
 
+    // The window resize listener misses container-only width changes (a rail
+    // collapsing, the mobile pane stack) — observe the element itself.
+    let containerResizeObserver: ResizeObserver | null = null;
+    let lastObservedSize = { w: 0, h: 0 };
+    const observeContainerResize = () => {
+      if (!chartRef.value || containerResizeObserver) return;
+      lastObservedSize = {
+        w: chartRef.value.clientWidth,
+        h: chartRef.value.clientHeight,
+      };
+      containerResizeObserver = new ResizeObserver(() => {
+        if (!chartRef.value) return;
+        const w = chartRef.value.clientWidth;
+        const h = chartRef.value.clientHeight;
+        if (w > 0 && h > 0 && (w !== lastObservedSize.w || h !== lastObservedSize.h)) {
+          lastObservedSize = { w, h };
+          chart?.resize();
+        }
+      });
+      containerResizeObserver.observe(chartRef.value);
+    };
+
     onMounted(async () => {
       try {
         await nextTick();
@@ -649,6 +671,7 @@ export default defineComponent({
           if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
             reinitWhenSized();
           }
+          observeContainerResize();
         }
         chart?.setOption(withChartFont(props?.data?.options || {}), {
           lazyUpdate: true,
@@ -669,6 +692,9 @@ export default defineComponent({
       // Clean up the zero-size re-init observer
       zeroSizeReinitObserver?.disconnect();
       zeroSizeReinitObserver = null;
+
+      containerResizeObserver?.disconnect();
+      containerResizeObserver = null;
 
       // Cancel throttled functions
       throttledSetHoveredSeriesName.cancel();
