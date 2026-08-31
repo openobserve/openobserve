@@ -768,7 +768,6 @@ pub(crate) async fn run_graph_search(
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,
-            action_id: None,
             histogram_interval: 0,
             streaming_id: None,
             streaming_output: false,

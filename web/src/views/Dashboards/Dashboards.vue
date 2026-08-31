@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="bg-surface-subtle text-text-body hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-accent/25 inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs leading-5 transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
+                class="bg-surface-subtle text-text-body hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-focus-ring-accent inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs leading-5 transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
@@ -964,12 +964,7 @@ export default defineComponent({
             const searchResults = await fetchSearchResults.execute(searchQuery.value);
             filteredResults.value = toRaw(searchResults);
           } catch (error) {
-            // Latent bug preserved: `!x === "AbortError"` compares a boolean to a
-            // string, so this body never runs. Kept as-is to avoid changing
-            // runtime behavior in a type-only fix; the mistaken comparison is
-            // what makes this branch dead, not the types.
-            // @ts-expect-error -- intentional no-op comparison (boolean vs string), see note
-            if (!asCaughtError(error).name === "AbortError") {
+            if (asCaughtError(error).name !== "AbortError") {
               filteredResults.value = [];
               // Handle error state
             }

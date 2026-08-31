@@ -152,17 +152,16 @@ describe("DbmRefreshButton last-refreshed", () => {
     expect(dot.classes()).not.toContain("bg-refresh-dot-critical");
   });
 
-  /** The age rides the button's own tooltip rather than costing toolbar width. */
+  // Before a load the button names the action alone; after one, the staleness reading rides the dot's tooltip.
   it("names the action alone before a load, and adds the age after one", () => {
     expect(mountButton().findAllComponents(OTooltip)[0].props("content")).toBe("Refresh");
 
     const loaded = mountButton({ lastRunAt: Date.now() });
-    // Two tooltips now — the dot's and the button's. The button's is last in
-    // tree order, since the dot is rendered before it.
+    // Two tooltips: the dot's (first in tree order) and the button's.
     const tooltips = loaded.findAllComponents(OTooltip);
     expect(tooltips).toHaveLength(2);
+    expect(String(tooltips[0].props("content"))).toContain("Last refreshed");
     expect(String(tooltips[1].props("content"))).toContain("Refresh");
-    expect(String(tooltips[1].props("content"))).toContain("Last refreshed");
   });
 
   /** The dot alone encodes nothing to a reader who has not learned the colours. */

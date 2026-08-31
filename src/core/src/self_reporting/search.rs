@@ -58,7 +58,6 @@ pub async fn get_usage(
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
-            action_id: None,
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,

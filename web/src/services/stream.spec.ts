@@ -367,7 +367,6 @@ describe("stream service", () => {
         regions: "us-west-1",
         clusters: "cluster1",
         no_count: true,
-        action_id: "action123",
       };
 
       mockHttpInstance.get.mockResolvedValue({ data: [] });
@@ -375,11 +374,11 @@ describe("stream service", () => {
       await stream.fieldValues(params);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${params.org_identifier}/${params.stream_name}/_values?fields=field1&size=${params.size}&start_time=${params.start_time}&end_time=${params.end_time}&sql=${params.query_context}&no_count=${params.no_count}&query_fn=${params.query_fn}&action_id=${params.action_id}&type=${params.type}&regions=${params.regions}&clusters=${params.clusters}`,
+        `/api/${params.org_identifier}/${params.stream_name}/_values?fields=field1&size=${params.size}&start_time=${params.start_time}&end_time=${params.end_time}&sql=${params.query_context}&no_count=${params.no_count}&query_fn=${params.query_fn}&type=${params.type}&regions=${params.regions}&clusters=${params.clusters}`,
       );
     });
 
-    it("should handle empty query_fn and action_id", async () => {
+    it("should handle empty query_fn", async () => {
       const params = {
         org_identifier: "org123",
         stream_name: "test_stream",
@@ -388,7 +387,6 @@ describe("stream service", () => {
         start_time: 1640995200,
         end_time: 1641081600,
         query_fn: "",
-        action_id: "  ",
       };
 
       mockHttpInstance.get.mockResolvedValue({ data: [] });

@@ -34,6 +34,11 @@
   --color-surface-overlay: var(--color-white);
   --color-surface-subtle: var(--color-grey-100);
   --color-surface-subtle-hover: var(--color-grey-200);
+  /* Floating chip/pill (e.g. the NDV's prev/next node buttons over the white
+     Input/Output panes) — a WHITE fill that reads via its border + shadow in light
+     mode; flips to a lifted grey on the dark canvas (dark.css). */
+  --color-surface-chip: var(--color-white);
+  --color-surface-chip-hover: var(--color-grey-100);
   /* Accent-tinted interaction surfaces. The ONE place the "hover/active on an
      accent-tinted control" treatment lives, so buttons, menu items, tabs, selected
      rows etc. share it — change it here and every accent hover/active surface moves. */
@@ -106,6 +111,23 @@
      on a row that carries both. Only the FILLED star uses this; unfavorited
      outlines stay neutral. */
   --color-favorite: #eab308;
+
+  /* Focus rings — the 27 component focus-ring tokens collapsed to 4 intents, so a
+     whole intent's ring changes in one place instead of 27.
+     This RECOLOURS focus rings, it is not a pure dedup: they carried 5 distinct light
+     values (and 6 dark), and every one was below the SC 1.4.11 3:1 floor on
+     --color-surface-base. Measured light, before -> after:
+       accent  primary-400 #79a1b4 2.77 -> primary-600 #3f7994 4.80
+       input   primary-200 #c5d7df 1.48 -> primary-600           4.80
+       danger  error-400   #f87171 2.77 -> error-500   #ef4444   3.76
+       success success-400 #4ade80 1.74 -> success-600 #16a34a   3.30
+       warning warning-400 @50% alpha    -> warning-700 #a16207  4.92 (now opaque)
+     The two warning rings lose their translucency; that is what a measurable ring
+     costs. brandThemes.spec.ts re-checks accent against every predefined brand. */
+  --color-focus-ring-accent: var(--color-primary-600);
+  --color-focus-ring-danger: var(--color-error-500);
+  --color-focus-ring-success: var(--color-success-600);
+  --color-focus-ring-warning: var(--color-warning-700);
 }
 
 /* ── Register ALL semantic tokens for Tailwind utilities ── */
@@ -129,6 +151,8 @@
   --color-surface-overlay: var(--color-surface-overlay);
   --color-surface-subtle: var(--color-surface-subtle);
   --color-surface-subtle-hover: var(--color-surface-subtle-hover);
+  --color-surface-chip: var(--color-surface-chip);
+  --color-surface-chip-hover: var(--color-surface-chip-hover);
   --color-surface-accent-hover: var(--color-surface-accent-hover);
   --color-surface-accent-active: var(--color-surface-accent-active);
   --color-icon-chip-primary-bg: var(--color-icon-chip-primary-bg);
@@ -159,6 +183,12 @@
 
   /* Accent */
   --color-accent: var(--color-accent);
+
+  /* Focus rings (see :root) */
+  --color-focus-ring-accent: var(--color-focus-ring-accent);
+  --color-focus-ring-danger: var(--color-focus-ring-danger);
+  --color-focus-ring-success: var(--color-focus-ring-success);
+  --color-focus-ring-warning: var(--color-focus-ring-warning);
 
   /* Series B (paired secondary series identity, see :root above) */
   --color-series-b: var(--color-series-b);

@@ -22,6 +22,11 @@ const organizationObj = {
   rumToken: {
     rum_token: "",
   },
+  // Mirror of the production organizationObj — see src/stores/index.ts.
+  correlatedTracesStreams: {
+    byTraceId: {} as Record<string, string>,
+    knownStreams: [] as string[],
+  },
   quotaThresholdMsg: "",
   functions: [],
   streams: {},
@@ -161,7 +166,6 @@ const store = createStore({
       },
       quotaThresholdMsg: "",
       functions: [],
-      actions: [],
       streams: {} as Record<string, unknown>,
       folders: [],
       organizationSettings: {
@@ -239,6 +243,12 @@ const store = createStore({
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
     },
+    setCorrelatedTracesStream(state, payload: { traceId: string; stream: string }) {
+      const cache = state.organizationData.correlatedTracesStreams;
+      if (Object.keys(cache.byTraceId).length >= 1000) cache.byTraceId = {};
+      cache.byTraceId[payload.traceId] = payload.stream;
+      if (!cache.knownStreams.includes(payload.stream)) cache.knownStreams.push(payload.stream);
+    },
     // setAllCurrentDashboards(state, payload) {
     //   state.allCurrentDashboards = payload;
     // },
@@ -268,9 +278,6 @@ const store = createStore({
     },
     setFunctions(state, payload) {
       state.organizationData.functions = payload;
-    },
-    setActions(state, payload) {
-      state.organizationData.actions = payload;
     },
     setStreams(state, payload) {
       state.organizationData.streams[payload.name] = payload;
@@ -524,9 +531,6 @@ const store = createStore({
     },
     setFunctions(context, payload) {
       context.commit("setFunctions", payload);
-    },
-    setActions(context, payload) {
-      context.commit("setActions", payload);
     },
     setStreams(context, payload) {
       context.commit("setStreams", payload);

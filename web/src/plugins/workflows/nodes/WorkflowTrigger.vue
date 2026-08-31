@@ -29,7 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   WorkflowEditor); there are no editable fields.
 -->
 <template>
-  <div data-test="workflow-trigger-body" class="flex w-full flex-col">
+  <div data-test="workflow-trigger-body" class="flex min-h-0 w-full flex-1 flex-col">
+    <!-- Config pane header (shared) — the trigger has no editable config, so this
+         pane is a read-only payload reference under the same header. -->
+    <WorkflowConfigHeader class="mb-2" />
     <p class="text-text-secondary mb-3 text-xs leading-normal">
       {{ t(introKey) }}
     </p>
@@ -100,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div
         data-test="workflow-trigger-structure"
-        class="rounded-default border-border-default h-110 w-full overflow-hidden border"
+        class="rounded-default border-border-default min-h-0 w-full flex-1 overflow-hidden border"
       >
         <QueryEditor
           editor-id="workflow-trigger-payload"
@@ -124,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineAsyncComponent, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import WorkflowConfigHeader from "./WorkflowConfigHeader.vue";
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import {
   triggerDef,

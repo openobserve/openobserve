@@ -642,4 +642,63 @@ describe("ONavGroup", () => {
       expect(query.get("query")).toBe("c2VydmljZQ==");
     });
   });
+  // A child with no top-level rail entry of its own (Alert Library, Destinations,
+  // Enrichment Tables…) is unreachable by MainLayout's linksList filter, and
+  // `requires` only tracks its PARENT. Matching custom_hide_menus against the
+  // child's own route name is what makes those hideable at all.
+  describe("custom_hide_menus names a child directly", () => {
+    function mountWithHidden(hidden: string) {
+      const hiddenStore = createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: { custom_hide_menus: hidden },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+      return mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children,
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [makeRouter(), hiddenStore, i18n],
+          stubs: { MenuLink: menuLinkStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+    }
+
+    async function openFlyout() {
+      await wrapper.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+      return wrapper.find('[data-test="nav-group-flyout-data"]');
+    }
+
+    it("drops the named child and keeps its siblings", async () => {
+      wrapper = mountWithHidden("openapi,reports,pipelines");
+      const panel = await openFlyout();
+      expect(panel.find('[data-test="nav-group-item-pipelines"]').exists()).toBe(false);
+      expect(panel.find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
+    });
+
+    it("keeps every child when the flag names none of them", async () => {
+      wrapper = mountWithHidden("openapi,reports");
+      const panel = await openFlyout();
+      expect(panel.find('[data-test="nav-group-item-pipelines"]').exists()).toBe(true);
+      expect(panel.find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
+    });
+
+    it("ignores an empty flag rather than hiding an unnamed child", async () => {
+      // "".split(",") is [""], so a child whose name is "" would match — none is,
+      // but the empty entry must not be treated as a wildcard either.
+      wrapper = mountWithHidden("");
+      const panel = await openFlyout();
+      expect(panel.find('[data-test="nav-group-item-logstreams"]').exists()).toBe(true);
+      expect(panel.find('[data-test="nav-group-item-pipelines"]').exists()).toBe(true);
+    });
+  });
 });

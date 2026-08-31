@@ -80,14 +80,16 @@ describe("ConditionBuilder", () => {
     expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("Contains");
   });
 
-  it("leaves operators untouched when normalizeOperators is false", () => {
+  it("canonicalizes operator spelling on load even without normalizeOperators", () => {
+    // ensureIds maps backend spellings to the select's option values on every
+    // load path now, so the select never renders empty for a saved operator.
     const saved = {
       filterType: "group",
       logicalOperator: "AND",
       conditions: [{ filterType: "condition", column: "msg", operator: "contains", value: "x" }],
     };
     const wrapper = createWrapper({ initialConditions: saved });
-    expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("contains");
+    expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("Contains");
   });
 
   it("submit resolves { version, conditions } for a valid rule", async () => {
@@ -99,6 +101,45 @@ describe("ConditionBuilder", () => {
     const payload = await (wrapper.vm as any).submit();
     expect(payload.version).toBe(2);
     expect(payload.conditions.conditions[0].column).toBe("level");
+  });
+
+  // Optional mode (Workflows dummy node): submit never blocks — it returns the rule
+  // with a `complete` flag so the host can save an incomplete rule as a placeholder.
+  it("optional: returns complete:true and the payload for a valid rule", async () => {
+    const saved = {
+      filterType: "group",
+      conditions: [{ filterType: "condition", column: "level", operator: "=", value: "error" }],
+    };
+    const wrapper = createWrapper({ initialConditions: saved, optional: true });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload.version).toBe(2);
+    expect(payload.complete).toBe(true);
+    expect(payload.conditions.conditions[0].column).toBe("level");
+  });
+
+  it("optional: returns complete:false (not null) for an incomplete rule", async () => {
+    const wrapper = createWrapper({
+      initialConditions: {
+        filterType: "group",
+        conditions: [{ filterType: "condition", column: "", operator: "" }],
+      },
+      optional: true,
+    });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload).not.toBeNull();
+    expect(payload.version).toBe(2);
+    expect(payload.complete).toBe(false);
+  });
+
+  it("does not add a complete flag in the default (non-optional) payload", async () => {
+    const saved = {
+      filterType: "group",
+      conditions: [{ filterType: "condition", column: "level", operator: "=", value: "error" }],
+    };
+    const wrapper = createWrapper({ initialConditions: saved });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload).toEqual({ version: 2, conditions: expect.any(Object) });
+    expect("complete" in payload).toBe(false);
   });
 
   it("normalizes dotted columns on submit when normalizeColumnNames is on", async () => {

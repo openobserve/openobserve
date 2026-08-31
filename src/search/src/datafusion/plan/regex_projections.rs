@@ -120,7 +120,6 @@ mod tests {
             uses_zo_fn: false,
             query_fn: "".to_string(),
             skip_wal: false,
-            action_id: "".to_string(),
             histogram_interval: 5,
             timezone: None,
             sampling_ratio: None,

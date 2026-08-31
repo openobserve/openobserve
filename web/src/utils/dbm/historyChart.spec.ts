@@ -26,6 +26,10 @@ const theme = {
   errors: "#5",
   axisLabel: "#7",
   splitLine: "#8",
+  tooltipBg: "#9",
+  tooltipBorder: "#a",
+  tooltipText: "#b",
+  crosshairBg: "#c",
 };
 
 const formatNs = (value: number | null | undefined) => (value == null ? "—" : `${value}ns`);
@@ -40,18 +44,19 @@ describe("buildSamplesOption", () => {
   ];
 
   it("separates errored samples into their own series", () => {
-    const option = buildSamplesOption(samples, theme, formatNs, String, {
+    const option = buildSamplesOption(samples, theme, formatNs, {
       ok: "ok",
       error: "error",
     });
     const series = seriesOf(option);
-    expect(series.find((s) => s.name === "ok")?.data).toEqual([[at(0), 100]]);
-    expect(series.find((s) => s.name === "error")?.data).toEqual([[at(1), 900]]);
+    // Points are plotted as epoch-MS (a `time` axis wants ms; samples are micros).
+    expect(series.find((s) => s.name === "ok")?.data).toEqual([[Math.floor(at(0) / 1000), 100]]);
+    expect(series.find((s) => s.name === "error")?.data).toEqual([[Math.floor(at(1) / 1000), 900]]);
   });
 
   /** Spread across time AND duration — the distribution, not only the tail. */
   it("plots on a time x-axis so the spread over the window is visible", () => {
-    const option = buildSamplesOption(samples, theme, formatNs, String, {
+    const option = buildSamplesOption(samples, theme, formatNs, {
       ok: "ok",
       error: "error",
     });
@@ -65,7 +70,7 @@ describe("buildSamplesOption", () => {
    * `{ value }` object would break the lookup silently.
    */
   it("emits bare [timestamp, duration] pairs so the trace pivot can match them", () => {
-    const option = buildSamplesOption(samples, theme, formatNs, String, {
+    const option = buildSamplesOption(samples, theme, formatNs, {
       ok: "ok",
       error: "error",
     });

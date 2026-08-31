@@ -101,6 +101,14 @@ describe("opsgenie template", () => {
       expect(priorityField?.options).toBeDefined();
       expect(priorityField?.options?.length).toBeGreaterThan(0);
     });
+
+    it("persists only non-secret region and priority fields in metadata", () => {
+      const persistentFields = opsgenieConfig.credentialFields
+        .filter((field) => field.persistInMetadata)
+        .map((field) => field.key);
+
+      expect(persistentFields).toEqual(["euRegion", "priority"]);
+    });
   });
 
   describe("opsgenieDestinationType", () => {

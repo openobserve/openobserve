@@ -25,7 +25,7 @@
   --color-button-primary-active: var(--color-primary-800);
   --color-button-primary-disabled: var(--color-primary-300);
   --color-button-primary-foreground: var(--color-white);
-  --color-button-primary-focus-ring: var(--color-primary-400);
+  --color-button-primary-focus-ring: var(--color-focus-ring-accent);
 
   /* Button — secondary */
   --color-button-secondary: var(--color-surface-panel);
@@ -34,7 +34,7 @@
   --color-button-secondary-hover: var(--color-surface-accent-hover);
   --color-button-secondary-active: var(--color-surface-accent-active);
   --color-button-secondary-disabled: var(--color-surface-panel);
-  --color-button-secondary-focus-ring: var(--color-primary-400);
+  --color-button-secondary-focus-ring: var(--color-focus-ring-accent);
 
   /* Button — outline */
   --color-button-outline-text: var(--color-text-heading);
@@ -42,20 +42,19 @@
   --color-button-outline-hover-bg: var(--color-interactive-hover-bg);
   --color-button-outline-hover-border: var(--color-primary-300);
   --color-button-outline-active-bg: var(--color-surface-accent-active);
-  --color-button-outline-focus-ring: var(--color-primary-200);
 
   /* Button — ghost */
   --color-button-ghost-text: var(--color-text-heading);
   --color-button-ghost-hover-bg: var(--color-surface-accent-hover);
   --color-button-ghost-active-bg: var(--color-surface-accent-active);
   --color-button-ghost-hover-ring: var(--color-primary-300);
-  --color-button-ghost-focus-ring: var(--color-primary-400);
+  --color-button-ghost-focus-ring: var(--color-focus-ring-accent);
 
   /* Button — ghost-primary (flat + primary color text) */
   --color-button-ghost-primary-text: var(--color-primary-600);
   --color-button-ghost-primary-hover-bg: var(--color-surface-accent-hover);
   --color-button-ghost-primary-active-bg: var(--color-surface-accent-active);
-  --color-button-ghost-primary-focus-ring: var(--color-primary-400);
+  --color-button-ghost-primary-focus-ring: var(--color-focus-ring-accent);
 
   /* Button — on-dark-primary (primary-colored text on a WHITE button that sits on
      a dark gradient panel). Fixed at primary-600 in BOTH themes — must NOT flip to
@@ -66,26 +65,26 @@
   --color-button-ghost-destructive-text: var(--color-error-600);
   --color-button-ghost-destructive-hover-bg: var(--color-error-50);
   --color-button-ghost-destructive-active-bg: var(--color-error-100);
-  --color-button-ghost-destructive-focus-ring: var(--color-error-400);
+  --color-button-ghost-destructive-focus-ring: var(--color-focus-ring-danger);
 
   /* Button — ghost-success (flat + positive green text) — play/resume actions */
   --color-button-ghost-success-text: var(--color-success-600);
   --color-button-ghost-success-hover-bg: var(--color-success-50);
   --color-button-ghost-success-active-bg: var(--color-success-100);
-  --color-button-ghost-success-focus-ring: var(--color-success-400);
+  --color-button-ghost-success-focus-ring: var(--color-focus-ring-success);
 
   /* Button — ghost-muted (secondary text at rest → primary text + bg on hover) */
   --color-button-ghost-muted-text: var(--color-text-secondary);
   --color-button-ghost-muted-hover-text: var(--color-primary-600);
   --color-button-ghost-muted-hover-bg: var(--color-surface-accent-hover);
   --color-button-ghost-muted-active-bg: var(--color-surface-accent-active);
-  --color-button-ghost-muted-focus-ring: var(--color-primary-400);
+  --color-button-ghost-muted-focus-ring: var(--color-focus-ring-accent);
 
   /* Button — ghost-subtle (secondary text, 60 % opacity at rest, full on hover) */
   --color-button-ghost-subtle-text: var(--color-text-secondary);
   --color-button-ghost-subtle-hover-bg: var(--color-surface-accent-hover);
   --color-button-ghost-subtle-active-bg: var(--color-surface-accent-active);
-  --color-button-ghost-subtle-focus-ring: var(--color-primary-400);
+  --color-button-ghost-subtle-focus-ring: var(--color-focus-ring-accent);
 
   /* Button — ghost-warning (yellow-600 text for contrast on white, faint yellow tint on hover) */
   --color-button-ghost-warning-text: var(--color-warning-600);
@@ -99,11 +98,7 @@
     var(--color-warning-400) 22%,
     transparent
   );
-  --color-button-ghost-warning-focus-ring: color-mix(
-    in srgb,
-    var(--color-warning-400) 50%,
-    transparent
-  );
+  --color-button-ghost-warning-focus-ring: var(--color-focus-ring-warning);
 
   /* Button — outline-warning (transparent bg, yellow-600 border + text) */
   --color-button-outline-warning-text: var(--color-warning-600);
@@ -118,11 +113,6 @@
     var(--color-warning-400) 22%,
     transparent
   );
-  --color-button-outline-warning-focus-ring: color-mix(
-    in srgb,
-    var(--color-warning-400) 50%,
-    transparent
-  );
 
   /* Button — warning (bright yellow-400 bg, yellow-500 hover — never goes brown) */
   --color-button-warning: var(--color-warning-400);
@@ -130,14 +120,13 @@
   --color-button-warning-active: var(--color-warning-600);
   --color-button-warning-foreground: var(--color-grey-900);
   --color-button-warning-border: var(--color-warning-400);
-  --color-button-warning-focus-ring: color-mix(in srgb, var(--color-warning-400) 50%, transparent);
+  --color-button-warning-focus-ring: var(--color-focus-ring-warning);
 
   /* Button — destructive */
   --color-button-destructive: var(--color-error-600);
   --color-button-destructive-hover: var(--color-error-700);
   --color-button-destructive-disabled: var(--color-error-300);
   --color-button-destructive-foreground: var(--color-white);
-  --color-button-destructive-focus-ring: var(--color-error-400);
 
   /* ButtonGroup */
   --color-button-group-divider: var(--color-border-default);
@@ -151,7 +140,7 @@
   --color-toggle-item-active-text: var(--color-primary-700);
   --color-toggle-item-disabled: var(--color-text-disabled);
   --color-toggle-border: var(--color-border-default);
-  --color-toggle-focus-ring: var(--color-primary-400);
+  --color-toggle-focus-ring: var(--color-focus-ring-accent);
   /* Insertion line shown while dragging to reorder (reorderable groups) */
   --color-toggle-drop-indicator: var(--color-primary-600);
 
@@ -202,7 +191,6 @@
   --color-tabs-hover-bg: color-mix(in srgb, var(--color-primary-100) 50%, var(--color-primary-50));
   --color-tabs-disabled-text: var(--color-text-disabled);
   --color-tabs-bar-border: var(--color-border-default);
-  --color-tabs-focus-ring: var(--color-primary-400);
   --spacing-tabs-height: var(--spacing-10);
   --spacing-tabs-height-dense: var(--spacing-8);
 
@@ -216,7 +204,7 @@
   --color-collapsible-icon: var(--color-text-secondary);
   --color-collapsible-trigger-hover-bg: var(--color-primary-100);
   --color-collapsible-trigger-active-bg: var(--color-surface-accent-active);
-  --color-collapsible-trigger-focus-ring: var(--color-primary-400);
+  --color-collapsible-trigger-focus-ring: var(--color-focus-ring-accent);
   /* Open-state accent (sidebar variant): highlighted header when expanded */
   --color-collapsible-trigger-open-bg: var(--color-primary-50);
   --color-collapsible-open-accent: var(--color-primary-600);
@@ -248,7 +236,7 @@
   --color-stepper-title-active: var(--color-text-heading);
   --color-stepper-title-done: var(--color-text-heading);
   --color-stepper-trigger-hover: var(--color-surface-subtle);
-  --color-stepper-trigger-focus-ring: var(--color-primary-400);
+  --color-stepper-trigger-focus-ring: var(--color-focus-ring-accent);
 
   /* ── Dialog ──────────────────────────────────────────────── */
 
@@ -276,7 +264,7 @@
   --color-dialog-close-text: var(--color-text-secondary);
   --color-dialog-close-hover-bg: var(--color-surface-subtle);
   --color-dialog-close-active-bg: var(--color-surface-subtle-hover);
-  --color-dialog-focus-ring: var(--color-primary-400);
+  --color-dialog-focus-ring: var(--color-focus-ring-accent);
 
   /* Page edge inset — THE single horizontal grid line of the app.
      Everything that sits at the edge of a page derives from this one knob: the
@@ -441,6 +429,30 @@
   --color-badge-blue-soft-bg: var(--color-blue-50);
   --color-badge-blue-soft-text: var(--color-blue-700);
 
+  /* Trace span-event markers.
+
+     Aliases onto the app-wide status vocabulary rather than defining colours of
+     their own, so a marker means what the same colour means everywhere else —
+     `TraceTree` already renders the span error icon and the event-count error
+     tally with `status-error-text`. The light/dark swap lives in the status
+     tokens, so these three need no dark override.
+
+     Info is `status-neutral-text`, not `status-info-text`. Standard info is blue,
+     and blue is the most heavily represented family in the span-bar palette, so a
+     blue tick would collide with the bars it is meant to stand out from.
+     Achromatic collides with nothing: every span-bar colour is saturated (min
+     OKLab chroma 0.110 light / 0.096 dark) against neutral's 0.022 / 0.012, so no
+     service bar is ever grey.
+
+     These carry hue, not contrast. No colour clears 3:1 against an arbitrary
+     service colour — the bar palette spans the whole hue circle across luminance
+     0.134-0.849, and only near-black clears it, by which point it has no chroma
+     left. Visibility comes from the tick overhanging its bar onto the row
+     background, where all three of these clear 3:1 in both themes. */
+  --color-trace-event-error: var(--color-status-error-text);
+  --color-trace-event-warning: var(--color-status-warning-text);
+  --color-trace-event-info: var(--color-status-neutral-text);
+
   /* Bracket-pair colorization — Monaco rainbow brackets (vs light) */
   --color-bracket-1: #0431fa;
   --color-bracket-2: #319331;
@@ -461,7 +473,7 @@
   --color-badge-indigo-soft-text: var(--color-indigo-700);
 
   /* Badge — shared */
-  --color-badge-focus-ring: var(--color-primary-400);
+  --color-badge-focus-ring: var(--color-focus-ring-accent);
 
   /* ── Toast ─────────────────────────────────────────────── */
   /* success */
@@ -554,11 +566,7 @@
 
   /* Input (OInput, OTextarea) */
   --color-input-bg: var(--color-surface-base);
-  /* `border-control`, not `border-default`: the edge IS the affordance here —
-     it is the only signal that this is something you type into — so WCAG 2.1
-     SC 1.4.11 applies and wants 3:1. `border-default` reaches 1.48:1, which is
-     right for a card outline and not for a control. */
-  --color-input-border: var(--color-border-control);
+  --color-input-border: var(--color-border-default);
   --color-input-border-hover: var(--color-primary-300);
   --color-input-border-focus: var(--color-primary-300);
   --color-input-border-error: var(--color-error-500);
@@ -568,7 +576,7 @@
   --color-input-disabled-bg: var(--color-grey-200);
   --color-input-disabled-border: var(--color-border-default);
   --color-input-disabled-text: var(--color-text-secondary);
-  --color-input-focus-ring: var(--color-primary-200);
+  --color-input-focus-ring: var(--color-focus-ring-accent);
   --color-input-text: var(--color-text-heading);
   --color-input-placeholder: var(--color-text-disabled);
   /* text-heading (not text-secondary) so labels don't read as disabled/hint text */
@@ -583,10 +591,7 @@
 
   /* Select (OSelect) */
   --color-select-bg: var(--color-surface-base);
-  /* Same reasoning as --color-input-border: an operable control's edge. */
-  --color-select-border: var(--color-border-control);
-  /* Quieted like the input's, so a disabled select does not keep drawing the
-     3:1 edge that means "you can operate this". */
+  --color-select-border: var(--color-border-default);
   --color-select-disabled-border: var(--color-border-default);
   --color-select-border-hover: var(--color-primary-300);
   --color-select-border-focus: var(--color-primary-300);
@@ -594,7 +599,6 @@
   /* Same rationale as input-disabled-bg. */
   --color-select-disabled-bg: var(--color-grey-200);
   --color-select-disabled-text: var(--color-text-secondary);
-  --color-select-focus-ring: var(--color-primary-200);
   --color-select-text: var(--color-text-soft);
   --color-select-placeholder: var(--color-text-disabled);
   /* text-heading, not text-secondary (same as input-label) */
@@ -610,7 +614,6 @@
   --color-select-item-disabled: var(--color-text-disabled);
 
   /* Switch (OSwitch) */
-  --color-switch-focus-ring: var(--color-primary-400);
   --color-switch-label: var(--color-text-heading);
   --color-switch-label-disabled: var(--color-text-secondary);
   /* Switch palette — single solid color (primary-500) for both border AND
@@ -637,7 +640,7 @@
   --color-checkbox-checked-fg: var(--color-white);
   --color-checkbox-disabled-bg: var(--color-surface-subtle);
   --color-checkbox-disabled-border: var(--color-border-default);
-  --color-checkbox-focus-ring: var(--color-primary-400);
+  --color-checkbox-focus-ring: var(--color-focus-ring-accent);
   --color-checkbox-label: var(--color-text-heading);
   --color-checkbox-label-disabled: var(--color-text-disabled);
 
@@ -650,7 +653,7 @@
   --color-radio-checked-dot: var(--color-primary-600);
   --color-radio-disabled-bg: var(--color-surface-subtle);
   --color-radio-disabled-border: var(--color-grey-300);
-  --color-radio-focus-ring: var(--color-primary-400);
+  --color-radio-focus-ring: var(--color-focus-ring-accent);
   --color-radio-label: var(--color-text-heading);
   --color-radio-label-disabled: var(--color-text-disabled);
 
@@ -662,7 +665,7 @@
   --color-slider-disabled-track: var(--color-grey-100);
   --color-slider-disabled-track-fill: var(--color-grey-300);
   --color-slider-disabled-thumb: var(--color-grey-400);
-  --color-slider-focus-ring: var(--color-primary-400);
+  --color-slider-focus-ring: var(--color-focus-ring-accent);
   --color-slider-label: var(--color-text-heading);
   --color-slider-value: var(--color-text-secondary);
   --color-slider-error-text: var(--color-error-600);
@@ -672,7 +675,7 @@
   --color-file-border: var(--color-border-strong);
   --color-file-hover-border: var(--color-primary-400);
   --color-file-focus-border: var(--color-primary-500);
-  --color-file-focus-ring: var(--color-primary-400);
+  --color-file-focus-ring: var(--color-focus-ring-accent);
   --color-file-disabled-bg: var(--color-surface-subtle);
   --color-file-disabled-border: var(--color-border-default);
   --color-file-text: var(--color-text-heading);
@@ -692,7 +695,7 @@
   --color-datepicker-border: var(--color-border-default);
   --color-datepicker-hover-border: var(--color-primary-300);
   --color-datepicker-focus-border: var(--color-primary-300);
-  --color-datepicker-focus-ring: var(--color-primary-400);
+  --color-datepicker-focus-ring: var(--color-focus-ring-accent);
   --color-datepicker-disabled-bg: var(--color-surface-subtle);
   --color-datepicker-disabled-border: var(--color-border-default);
   --color-datepicker-text: var(--color-text-heading);
@@ -1321,7 +1324,6 @@
   --color-button-outline-hover-bg: var(--color-button-outline-hover-bg);
   --color-button-outline-hover-border: var(--color-button-outline-hover-border);
   --color-button-outline-active-bg: var(--color-button-outline-active-bg);
-  --color-button-outline-focus-ring: var(--color-button-outline-focus-ring);
 
   /* Button — ghost */
   --color-button-ghost-text: var(--color-button-ghost-text);
@@ -1375,7 +1377,6 @@
   --color-button-outline-warning-border: var(--color-button-outline-warning-border);
   --color-button-outline-warning-hover-bg: var(--color-button-outline-warning-hover-bg);
   --color-button-outline-warning-active-bg: var(--color-button-outline-warning-active-bg);
-  --color-button-outline-warning-focus-ring: var(--color-button-outline-warning-focus-ring);
 
   /* Button — warning */
   --color-button-warning: var(--color-button-warning);
@@ -1390,7 +1391,6 @@
   --color-button-destructive-hover: var(--color-button-destructive-hover);
   --color-button-destructive-disabled: var(--color-button-destructive-disabled);
   --color-button-destructive-foreground: var(--color-button-destructive-foreground);
-  --color-button-destructive-focus-ring: var(--color-button-destructive-focus-ring);
 
   /* ButtonGroup */
   --color-button-group-divider: var(--color-button-group-divider);
@@ -1447,7 +1447,6 @@
   --color-tabs-hover-bg: var(--color-tabs-hover-bg);
   --color-tabs-disabled-text: var(--color-tabs-disabled-text);
   --color-tabs-bar-border: var(--color-tabs-bar-border);
-  --color-tabs-focus-ring: var(--color-tabs-focus-ring);
   --spacing-tabs-height: var(--spacing-tabs-height);
   --spacing-tabs-height-dense: var(--spacing-tabs-height-dense);
 
@@ -1489,7 +1488,6 @@
   --color-select-border-error: var(--color-select-border-error);
   --color-select-disabled-bg: var(--color-select-disabled-bg);
   --color-select-disabled-text: var(--color-select-disabled-text);
-  --color-select-focus-ring: var(--color-select-focus-ring);
   --color-select-text: var(--color-select-text);
   --color-select-placeholder: var(--color-select-placeholder);
   --color-select-label: var(--color-select-label);
@@ -1504,7 +1502,6 @@
   --color-select-item-disabled: var(--color-select-item-disabled);
 
   /* Switch (OSwitch) */
-  --color-switch-focus-ring: var(--color-switch-focus-ring);
   --color-switch-label: var(--color-switch-label);
   --color-switch-label-disabled: var(--color-switch-label-disabled);
   --color-switch-border: var(--color-switch-border);
@@ -1672,6 +1669,7 @@
   --color-dialog-close-active-bg: var(--color-dialog-close-active-bg);
   --color-dialog-focus-ring: var(--color-dialog-focus-ring);
   --spacing-page-edge: var(--spacing-page-edge);
+  --spacing-table-edge: var(--spacing-table-edge);
   --spacing-rail: var(--spacing-rail);
   --spacing-dialog-header-px: var(--spacing-dialog-header-px);
   --spacing-dialog-header-py: var(--spacing-dialog-header-py);
@@ -1804,6 +1802,11 @@
   --color-badge-blue-ol-text: var(--color-badge-blue-ol-text);
   --color-badge-blue-soft-bg: var(--color-badge-blue-soft-bg);
   --color-badge-blue-soft-text: var(--color-badge-blue-soft-text);
+
+  /* Trace span-event markers */
+  --color-trace-event-error: var(--color-trace-event-error);
+  --color-trace-event-warning: var(--color-trace-event-warning);
+  --color-trace-event-info: var(--color-trace-event-info);
 
   /* Editor bracket-pair colorization */
   --color-bracket-1: var(--color-bracket-1);
