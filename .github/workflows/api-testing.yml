@@ -73,7 +73,7 @@ jobs:
       needs.check_changes.outputs.has_changes == 'true' &&
       (github.event_name != 'pull_request' ||
        contains(github.event.pull_request.labels.*.name, 'e2e'))
-    runs-on: ubicloud-standard-8
+    runs-on: ubicloud-standard-4
     permissions:
       contents: read
     steps:
@@ -144,17 +144,8 @@ jobs:
       actions: read
       contents: read  # only need to checkout the repo
     steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Checkout git repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - name: Download OpenObserve debug binary
         uses: actions/download-artifact@v5
@@ -274,17 +265,8 @@ jobs:
       actions: read
       contents: read
     steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Checkout git repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - name: Download OpenObserve debug binary
         uses: actions/download-artifact@v5
@@ -398,15 +380,7 @@ jobs:
             env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false"
             target: tests/regression/test_logs_to_logs_join.py
     steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - uses: actions/checkout@v5
-        with: { fetch-depth: 0 }
 
       - name: Download OpenObserve debug binary
         uses: actions/download-artifact@v5
@@ -503,17 +477,8 @@ jobs:
       actions: read
       contents: read  # only need to checkout the repo
     steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Checkout git repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - name: Download OpenObserve debug binary
         uses: actions/download-artifact@v5
