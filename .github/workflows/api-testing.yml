@@ -97,16 +97,14 @@ jobs:
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          # Keep one cache identity for the canonical debug+mimalloc recipe instead
-          # of splitting it by job id. Include workspace crates for this measured
-          # warm-cache experiment; the default dependency-only cache restored a
-          # full 1.1 GB entry but still rebuilt 1,008 crates.
-          shared-key: backend-debug-mimalloc-workspace-v1
+          # Share one dependency build cache with the DB main-branch writer. Do
+          # not cache workspace crates: a measured warm cache still rebuilt all
+          # 42 workspace crates while increasing the archive from ~1.1 to 3.1 GiB.
+          shared-key: backend-debug-mimalloc-deps-v1
           add-job-id-key: false
-          cache-workspace-crates: true
-          # PR #14030 is the isolated cache-writer experiment. Remove this PR-only
-          # clause after the cold-save/warm-restore comparison; other PRs stay read-only.
-          save-if: ${{ github.event_name == 'merge_group' || github.ref == 'refs/heads/main' || github.event.pull_request.number == 14030 }}
+          # PR #14030 primes the isolated test key once. Remove this temporary
+          # writer after the cold-save/warm-restore comparison; normal PRs are read-only.
+          save-if: ${{ github.event.pull_request.number == 14030 }}
 
       - name: Install Protoc
         run: bash ./.github/protoc.sh

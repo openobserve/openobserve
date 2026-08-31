@@ -85,8 +85,10 @@ jobs:
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          cache-on-failure: true
-          shared-key: backend-debug-mimalloc
+          # This successful main-branch build is the single writer for the
+          # canonical debug+mimalloc dependency cache consumed by API and DB PRs.
+          shared-key: backend-debug-mimalloc-deps-v1
+          add-job-id-key: false
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
