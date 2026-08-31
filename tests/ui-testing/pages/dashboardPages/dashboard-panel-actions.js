@@ -91,11 +91,6 @@ export default class DashboardactionPage {
       .nth(index);
   }
 
-  //Click discard panel button
-  async discardPanel() {
-    await this.discardPanelBtn.click();
-  }
-
   //Verify no-data element is visible
   async verifyNoDataVisible() {
     await this.noDataElement.waitFor({ state: "visible" });
