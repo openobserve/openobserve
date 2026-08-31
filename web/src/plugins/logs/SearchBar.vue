@@ -5403,6 +5403,13 @@ export default defineComponent({
   opacity: 1;
 }
 
+/* Touch has no row hover — keep the row actions visible. */
+@media (max-width: 47.99rem) {
+  .saved-view-table :deep(.action-btn-hover) {
+    opacity: 1;
+  }
+}
+
 /* Remove outer box border so both panels blend into the dialog background
    Exclude elements that also have rounded-default (OInput wrapper) so the
    search input keeps its visible border. */

@@ -955,6 +955,13 @@ export default defineComponent({
   display: flex;
 }
 
+/* Touch has no row hover — keep the span quick-action visible. */
+@media (max-width: 47.99rem) {
+  .view-span-logs {
+    display: flex;
+  }
+}
+
 .span-row.span-row-selected::before {
   background-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
 }
