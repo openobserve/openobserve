@@ -19,9 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isSessionReplayEnabled">
       <div>
         <div class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5">
-          <div class="flex items-start gap-1">
+          <!-- < md the editor takes its own row and the controls wrap below. -->
+          <div class="flex items-start gap-1 max-md:flex-wrap">
             <!-- Query editor (flex-grow to fill available space) -->
-            <div class="relative min-w-0 flex-1">
+            <div class="relative min-w-0 flex-1 max-md:basis-full">
               <QueryEditor
                 ref="sessionQueryEditorRef"
                 editor-id="session-replay-query-editor"
@@ -52,7 +53,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Controls on the right -->
-            <div class="flex shrink-0 items-start gap-1">
+            <div class="flex shrink-0 items-start gap-1 max-md:w-full max-md:flex-wrap">
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                icon-left="menu"
+                class="md:hidden"
+                data-test="rum-sessions-mobile-fields-btn"
+                @click="mobileFieldsOpen = true"
+              >
+                <OTooltip :content="t('search.showFields')" />
+              </OButton>
               <SyntaxGuide />
               <DateTime
                 auto-apply
@@ -116,14 +127,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- end toolbar wrapper -->
 
+      <!-- < md the field list moves into a drawer (menu button in the toolbar);
+           the fixed 250px rail left the KPI strip ~110px. -->
+      <ODrawer
+        v-if="isMobile"
+        v-model:open="mobileFieldsOpen"
+        side="left"
+        :width="80"
+        bleed
+        :title="t('search.showFields')"
+        data-test="rum-sessions-mobile-fields-drawer"
+      >
+        <SearchFieldList
+          :fields="streamFields"
+          :time-stamp="{
+            startTime: dateTime.startTime,
+            endTime: dateTime.endTime,
+          }"
+          :stream-name="rumSessionStreamName"
+          stream-type="logs"
+          :enable-grouping="true"
+          :query="sessionState.data.editorValue"
+          :base-filter="fieldListBaseFilter"
+          :show-count="false"
+          @event-emitted="handleSidebarEvent"
+        />
+      </ODrawer>
       <OSplitter
         class="logs-horizontal-splitter min-h-0 flex-1"
         v-model="splitterModel"
         unit="px"
         :horizontal="false"
+        :limits="isMobile ? [0, 0] : undefined"
       >
         <template #before>
-          <div class="bg-surface-panel border-border-default h-full overflow-auto border-r py-1">
+          <div
+            v-if="!isMobile"
+            class="bg-surface-panel border-border-default h-full overflow-auto border-r py-1"
+          >
             <SearchFieldList
               :fields="streamFields"
               :time-stamp="{
@@ -429,7 +470,10 @@ import {
   onBeforeMount,
   defineAsyncComponent,
   computed,
+  watch,
 } from "vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
@@ -1318,6 +1362,15 @@ const updateDateChange = (date: any) => {
 };
 
 const splitterModel = ref(250);
+const { isMobile } = useBreakpoint();
+const mobileFieldsOpen = ref(false);
+watch(
+  isMobile,
+  (mobile) => {
+    splitterModel.value = mobile ? 0 : 250;
+  },
+  { immediate: true },
+);
 
 const rows = ref<Session[]>([]);
 

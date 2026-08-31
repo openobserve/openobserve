@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("pipeline_list.tab_realtime") }}
                 </OToggleGroupItem>
               </OToggleGroup>
-              <div class="min-w-0 flex-1">
+              <div class="min-w-0 flex-1 max-md:min-w-40">
                 <OInput
                   data-test="pipeline-list-search-input"
                   v-model="filterQuery"

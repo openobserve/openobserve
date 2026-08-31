@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              base so large numbers stay readable. -->
       <div
         v-if="!dataLoading && Object.keys(usageData).length > 0"
-        class="grid w-full grid-cols-3 gap-3 xl:grid-cols-6"
+        class="grid w-full grid-cols-3 gap-3 max-md:grid-cols-2 xl:grid-cols-6"
       >
         <div
           v-for="tile in usageTiles"

@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
             <OSearchInput
               v-model="searchQuery"
-              class="min-w-0 flex-1"
+              class="min-w-0 flex-1 max-md:min-w-40"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
               clearable

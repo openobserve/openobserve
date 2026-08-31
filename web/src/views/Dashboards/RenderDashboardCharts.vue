@@ -1838,6 +1838,12 @@ export default defineComponent({
     min-height: 20rem !important;
     margin-bottom: 0.5rem;
   }
+  /* Single-value tiles don't earn a chart's height. */
+  .displayDiv :deep(.grid-stack > .grid-stack-item:has([data-panel-type="metric"])),
+  .displayDiv :deep(.grid-stack > .grid-stack-item:has([data-panel-type="gauge"])) {
+    height: 10rem !important;
+    min-height: 10rem !important;
+  }
   .displayDiv :deep(.grid-stack > .grid-stack-item.panel-section-header) {
     height: 2.5rem !important;
     min-height: 2.5rem !important;

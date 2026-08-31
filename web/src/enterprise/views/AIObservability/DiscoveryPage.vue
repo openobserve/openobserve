@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex w-full items-center gap-2 max-md:contents">
             <OSearchInput
               v-model="search"
-              class="min-w-0 flex-1"
+              class="min-w-0 flex-1 max-md:min-w-40"
               :placeholder="t('aiObservability.discovery.searchPlaceholder')"
               data-test="ai-discovery-search-input"
               clearable
