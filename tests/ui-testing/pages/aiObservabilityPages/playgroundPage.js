@@ -22,8 +22,9 @@ class PlaygroundPage {
         this.variableBar = '[data-test="ai-playground-variable-bar"]';
         this.resetBtn = '[data-test="ai-playground-reset-btn"]';
 
-        // ── Confirm dialog (reset asks before clearing) ───────────────────────
-        this.confirmDialog = '[data-test="confirm-dialog"]';
+        // Reset uses the global useConfirmDialog composable, rendered via
+        // ConfirmDialogProvider — not the legacy ConfirmDialog component.
+        this.confirmDialog = '[data-test="confirm-dialog-provider"]';
         this.confirmSecondaryBtn = `${this.confirmDialog} [data-test="o-dialog-secondary-btn"]`;
     }
 
