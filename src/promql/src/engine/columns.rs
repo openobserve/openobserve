@@ -134,7 +134,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::{engine::test_util::*, exec::PromqlContext};
+    use crate::{engine::tests::*, exec::PromqlContext};
 
     #[test]
     fn test_extract_columns_from_prom_expr_number_literal() {

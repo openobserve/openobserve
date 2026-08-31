@@ -599,7 +599,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::{engine::test_util::*, exec::PromqlContext};
+    use crate::{engine::tests::*, exec::PromqlContext};
 
     #[test]
     fn test_flatten_partitioned_metrics_preserves_all_series() {

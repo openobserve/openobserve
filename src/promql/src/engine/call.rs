@@ -393,7 +393,7 @@ mod tests {
     use promql_parser::parser::{FunctionArgs, NumberLiteral};
 
     use super::*;
-    use crate::{engine::test_util::*, exec::PromqlContext};
+    use crate::{engine::tests::*, exec::PromqlContext};
 
     #[test]
     fn test_ensure_two_args() {
