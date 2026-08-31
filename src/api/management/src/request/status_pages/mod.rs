@@ -18,3 +18,27 @@
 
 pub mod admin;
 pub mod public;
+
+#[cfg(test)]
+mod shell_tests {
+    const SHELL: &str = include_str!("status_page.html");
+
+    #[test]
+    fn shell_has_the_password_unlock_form() {
+        assert!(SHELL.contains(r#"type="password""#));
+        assert!(SHELL.contains(r#"autocomplete="current-password""#));
+        assert!(SHELL.contains(r#"role="alert""#));
+        assert!(SHELL.contains("/auth\""));
+        assert!(SHELL.contains("credentials: \"same-origin\""));
+    }
+
+    // CSP allows 'unsafe-inline', so nothing enforces this at runtime; this test is the XSS guard.
+    #[test]
+    fn shell_builds_dom_without_innerhtml_or_inline_handlers() {
+        assert!(!SHELL.contains("innerHTML"));
+        assert!(!SHELL.contains("outerHTML"));
+        assert!(!SHELL.contains("insertAdjacentHTML"));
+        let inline_handler = regex::Regex::new(r"\son[a-z]+=").unwrap();
+        assert!(inline_handler.find(SHELL).is_none());
+    }
+}
