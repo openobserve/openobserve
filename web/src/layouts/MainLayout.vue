@@ -165,6 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommunitySlackInvite />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
+    <WhatsNewDialog />
   </div>
 </template>
 
@@ -223,6 +224,8 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
+import WhatsNewDialog from "@/components/whatsNew/WhatsNewDialog.vue";
+import { useWhatsNew } from "@/composables/useWhatsNew";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -243,6 +246,7 @@ export default defineComponent({
     AppHeader,
     WebinarBanner,
     AnnouncementBanner,
+    WhatsNewDialog,
     "keep-alive": KeepAlive,
     ONavbar,
     "router-view": RouterView,
@@ -620,6 +624,17 @@ export default defineComponent({
           getConfig();
         }
       },
+    );
+
+    // The running version arrives with the full config, which can land after
+    // mount — so the release notes wait for it rather than for onMounted.
+    const { openIfUnseen } = useWhatsNew();
+    watch(
+      () => store.state.zoConfig?.version,
+      (version) => {
+        if (version) openIfUnseen();
+      },
+      { immediate: true },
     );
 
     onMounted(async () => {

@@ -237,6 +237,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
 
+          <!-- UPDATE INDICATOR: self-hosted admins only; hides itself otherwise -->
+          <UpdateAvailableChip />
+
           <!-- THEME SWITCHER: Toggle between light and dark mode -->
           <ThemeSwitcher></ThemeSwitcher>
 
@@ -254,12 +257,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- HELP MENU: Contains links to docs, API, and about page -->
           <ODropdown side="bottom" align="end">
             <template #trigger>
-              <OButton variant="ghost" size="icon-toolbar" data-test="menu-link-help-item">
+              <OButton
+                variant="ghost"
+                size="icon-toolbar"
+                class="relative"
+                data-test="menu-link-help-item"
+              >
                 <OIcon name="help-outline" size="sm" class="size-5!" />
+                <!-- Unread release notes. Ring-matched to the bar so the dot
+                     reads as a marker on the icon, not a stray pixel. -->
+                <span
+                  v-if="hasUnreadNotes"
+                  class="bg-status-negative ring-surface-chrome absolute inset-e-1 top-1 size-2 rounded-full ring-2"
+                  aria-hidden="true"
+                  data-test="menu-link-help-unread-dot"
+                />
                 <OTooltip side="top" align="center" :content="t('menu.help')" />
               </OButton>
             </template>
             <div class="header-menu-bar min-w-62.5">
+              <!-- What's new — the on-demand route to the same notes the
+                   post-upgrade carousel shows -->
+              <ODropdownItem data-test="menu-link-whats-new-item" @select="openWhatsNew">
+                <span class="flex w-full items-center justify-between gap-2">
+                  {{ t("whatsNew.menuItem") }}
+                  <OBadge v-if="hasUnreadNotes" variant="error" size="xs">
+                    {{ t("whatsNew.newBadge") }}
+                  </OBadge>
+                </span>
+              </ODropdownItem>
+              <ODropdownSeparator />
+
               <!-- OpenAPI link (only for non-cloud deployments) -->
               <template
                 v-if="
@@ -437,7 +465,10 @@ import { useTheme } from "@/composables/useTheme";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
+import UpdateAvailableChip from "./whatsNew/UpdateAvailableChip.vue";
+import { useWhatsNew } from "@/composables/useWhatsNew";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -454,6 +485,8 @@ export default defineComponent({
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
     OrganizationSelector,
+    UpdateAvailableChip,
+    OBadge,
     OButton,
     OIcon,
     OTooltip,
@@ -561,6 +594,8 @@ export default defineComponent({
 
     // Enterprise upgrade dialog state
     const showEnterpriseDialog = ref(false);
+
+    const { openCarousel: openWhatsNew, hasUnreadNotes } = useWhatsNew();
 
     // Language sub-menu state (nested submenu pattern matching original UX)
     const showLanguageSubmenu = ref(false);
@@ -677,6 +712,8 @@ export default defineComponent({
       changeLanguage,
       openPredefinedThemes,
       openShortcuts,
+      openWhatsNew,
+      hasUnreadNotes,
       signout,
       handleMouseEnter,
       handleMouseLeave,

@@ -56,6 +56,7 @@ const props = withDefaults(defineProps<DialogProps>(), {
   persistent: false,
   size: "md",
   showClose: true,
+  bleed: false,
   width: undefined,
   maxHeight: undefined,
   primaryButtonVariant: "primary",
@@ -526,7 +527,7 @@ watch(internalOpen, (open) => {
           :class="[
             'min-h-0 overflow-x-hidden',
             isFullSize ? 'flex-1 overflow-hidden p-0' : 'overflow-y-auto',
-            !isFullSize && 'px-dialog-content-px py-dialog-content-py',
+            !isFullSize && !bleed && 'px-dialog-content-px py-dialog-content-py',
             'text-dialog-content-text',
             !isFullSize && canScrollUp && 'shadow-scroll-top',
             !isFullSize && canScrollDown && 'shadow-scroll-bottom',

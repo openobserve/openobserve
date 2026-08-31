@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360" role="img" aria-label="Sample screenshot">
+  <rect width="640" height="360" fill="#ffffff"/>
+  <rect x="28" y="24" width="128" height="14" rx="4" fill="#262626" opacity=".75"/>
+  <g>
+    <rect x="28" y="56" width="584" height="82" rx="8" fill="#fafafa" stroke="#ededed" stroke-width="2"/>
+    <rect x="28" y="56" width="6" height="82" rx="3" fill="#db3b4b"/>
+    <circle cx="62" cy="97" r="13" fill="#db3b4b" opacity=".16"/>
+    <circle cx="62" cy="97" r="5" fill="#db3b4b"/>
+    <rect x="88" y="80" width="216" height="12" rx="4" fill="#262626" opacity=".62"/>
+    <rect x="88" y="104" width="300" height="10" rx="4" fill="#a3a3a3" opacity=".7"/>
+    <rect x="490" y="86" width="98" height="24" rx="12" fill="#db3b4b" opacity=".14"/>
+    <text x="539" y="103" font-family="monospace" font-size="13" fill="#db3b4b" text-anchor="middle">12 grouped</text>
+  </g>
+  <g>
+    <rect x="28" y="150" width="584" height="82" rx="8" fill="#fafafa" stroke="#ededed" stroke-width="2"/>
+    <rect x="28" y="150" width="6" height="82" rx="3" fill="#df9303"/>
+    <circle cx="62" cy="191" r="13" fill="#df9303" opacity=".16"/>
+    <circle cx="62" cy="191" r="5" fill="#df9303"/>
+    <rect x="88" y="174" width="184" height="12" rx="4" fill="#262626" opacity=".62"/>
+    <rect x="88" y="198" width="252" height="10" rx="4" fill="#a3a3a3" opacity=".7"/>
+    <rect x="490" y="180" width="98" height="24" rx="12" fill="#df9303" opacity=".14"/>
+    <text x="539" y="197" font-family="monospace" font-size="13" fill="#df9303" text-anchor="middle">8 grouped</text>
+  </g>
+  <g>
+    <rect x="28" y="244" width="584" height="82" rx="8" fill="#fafafa" stroke="#ededed" stroke-width="2"/>
+    <rect x="28" y="244" width="6" height="82" rx="3" fill="#4682fa"/>
+    <circle cx="62" cy="285" r="13" fill="#4682fa" opacity=".16"/>
+    <circle cx="62" cy="285" r="5" fill="#4682fa"/>
+    <rect x="88" y="268" width="152" height="12" rx="4" fill="#262626" opacity=".62"/>
+    <rect x="88" y="292" width="208" height="10" rx="4" fill="#a3a3a3" opacity=".7"/>
+    <rect x="490" y="274" width="98" height="24" rx="12" fill="#4682fa" opacity=".14"/>
+    <text x="539" y="291" font-family="monospace" font-size="13" fill="#4682fa" text-anchor="middle">4 grouped</text>
+  </g>
+</svg>

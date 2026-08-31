@@ -16768,5 +16768,36 @@
       "allClearTitle": "Nothing crossed a threshold",
       "allClearDescription": "Every check ran and none crossed its threshold in this time range."
     }
+  },
+  "whatsNew": {
+    "title": "What's new",
+    "menuItem": "What's new",
+    "justUpdated": "Just updated",
+    "nowOn": "You're now on v{version}",
+    "changesForYou": "Changes for you",
+    "releasesApplied": "Releases applied",
+    "readTheDocs": "Read the docs",
+    "fullReleaseNotes": "Full release notes",
+    "outroTitle": "That's the tour",
+    "outroBody": "Full notes and everything that changed in earlier releases stay available under Help → What's new.",
+    "editionEnterprise": "Enterprise",
+    "skip": "Skip",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done",
+    "goToSlide": "Go to slide {number}",
+    "slideCount": "{current} / {total}",
+    "updateAvailable": "Update available",
+    "updateHeadline": "OpenObserve v{version} is available",
+    "releasesBehind": "{count} release behind | {count} releases behind",
+    "upgradeGuide": "Upgrade guide",
+    "copyCommand": "Copy upgrade command",
+    "later": "Later",
+    "skipVersion": "Skip this version",
+    "contents": "Release contents",
+    "overview": "Overview",
+    "released": "Released",
+    "alsoIncludes": "Also includes",
+    "newBadge": "New"
   }
 }

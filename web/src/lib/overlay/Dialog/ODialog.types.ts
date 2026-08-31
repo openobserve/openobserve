@@ -53,6 +53,17 @@ export interface DialogProps {
    */
   maxHeight?: number;
 
+  /**
+   * Full-bleed body. By default the body owns a single fixed inset — the
+   * `--spacing-dialog-content-*` token — so every dialog's content lines up
+   * identically and consumers never hand-roll their own body padding. Set
+   * `bleed` for the exceptions that must reach the edges: an edge-to-edge
+   * image, a split pane that supplies its own inset, an embedded editor.
+   * Mirrors `ODrawer.bleed`; this is the only body-spacing knob, on purpose.
+   * No effect when `size="full"`, which is already unpadded.
+   */
+  bleed?: boolean;
+
   // ── Header subtitle ────────────────────────────────────────────────────
 
   /**

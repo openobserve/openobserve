@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360" role="img" aria-label="Sample screenshot">
+  <rect width="640" height="360" fill="#0d1117"/>
+  <rect x="28" y="26" width="150" height="14" rx="4" fill="#e5e5e5" opacity=".75"/>
+  <rect x="28" y="60" width="584" height="172" rx="8" fill="#181818" stroke="#2d2d2d" stroke-width="2"/>
+  <path d="M52 200 L124 184 L196 168 L268 156 L340 124 L412 110 L484 80 L592 60" fill="none" stroke="#79a1b4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M52 200 L124 184 L196 168 L268 156 L340 124 L412 110 L484 80 L592 60 L592 216 L52 216 Z" fill="#79a1b4" opacity=".16"/>
+  <line x1="52" y1="92" x2="592" y2="92" stroke="#e37774" stroke-width="2.5" stroke-dasharray="8 6"/>
+  <text x="60" y="84" font-family="monospace" font-size="13" fill="#e37774">budget exhausted</text>
+  <circle cx="592" cy="60" r="7" fill="#79a1b4"/>
+  <rect x="28" y="252" width="184" height="80" rx="8" fill="#181818" stroke="#2d2d2d" stroke-width="2"/>
+  <text x="48" y="292" font-family="monospace" font-size="26" fill="#e5e5e5">99.4%</text>
+  <text x="48" y="314" font-family="sans-serif" font-size="12" fill="#737373">AVAILABILITY</text>
+  <rect x="228" y="252" width="184" height="80" rx="8" fill="#181818" stroke="#2d2d2d" stroke-width="2"/>
+  <text x="248" y="292" font-family="monospace" font-size="26" fill="#f2c55c">31%</text>
+  <text x="248" y="314" font-family="sans-serif" font-size="12" fill="#737373">BUDGET LEFT</text>
+  <rect x="428" y="252" width="184" height="80" rx="8" fill="#181818" stroke="#2d2d2d" stroke-width="2"/>
+  <text x="448" y="292" font-family="monospace" font-size="26" fill="#e5e5e5">2.4x</text>
+  <text x="448" y="314" font-family="sans-serif" font-size="12" fill="#737373">BURN RATE</text>
+</svg>
