@@ -162,6 +162,36 @@ describe("buildPanelAutoName", () => {
       ).toBe("Avg of duration by service");
     });
 
+    it("names a measure whose column is wrapped in a cast", () => {
+      const field = {
+        functionName: "sum",
+        treatAsNonTimestamp: true,
+        args: [
+          {
+            type: "function",
+            value: {
+              functionName: "try_cast",
+              args: [
+                { type: "field", value: { field: "usage_amount" } },
+                { type: "castType", value: "DOUBLE" },
+              ],
+            },
+          },
+        ],
+      };
+      expect(buildPanelAutoName(panel({ y: [field] }), t)).toBe("Sum of usage_amount");
+    });
+
+    it("falls back to the alias when no argument names a column", () => {
+      const field = {
+        functionName: "sum",
+        alias: "y_axis_1",
+        treatAsNonTimestamp: true,
+        args: [{ type: "function", value: { functionName: "try_cast", args: [] } }],
+      };
+      expect(buildPanelAutoName(panel({ y: [field] }), t)).toBe("Sum of y_axis_1");
+    });
+
     it("honours a deployment's custom timestamp_column for a builder count", () => {
       // Column matches the configured time column by NAME (no treatAsNonTimestamp).
       const field = {

@@ -208,7 +208,6 @@
     "failed_to_load_license_info": "e007b1915c47ee08",
     "failed_to_refresh_license": "6914c655325aee41",
     "failed_to_update_license": "3510dd6052b76ebe",
-    "feature_action_scripts": "560aeaf282f9e72b",
     "feature_alerts": "f62e9267d196c761",
     "feature_audit_trail": "c1ada08ce13857e4",
     "feature_column_name": "3d377ae910dce03a",
@@ -330,44 +329,6 @@
     "yes_update_license": "35c638433af4a5d5",
     "yourPlan": "bdaeec33ca6d1e39",
     "your_complete_license_key": "a9909fbea80f494c"
-  },
-  "actionScripts": {
-    "cancelActionChangesConfirm": "fbda2102e5edee68",
-    "confirmDeleteActionScripts": "1264a986d45f9111",
-    "deleteActionError": "d7284d31a7983721",
-    "deleteActionScriptsError": "0ec4ef0debe9d6d6",
-    "fetchActionError": "553824dbe0199959",
-    "fetchServiceAccountsError": "5f0fed9219206a94",
-    "invalidCronExpression": "74decabaa943b7d9"
-  },
-  "actions": {
-    "add": "79b92f59b828a1bf",
-    "cronExampleHint": "014ab85e9ca63e81",
-    "cronFormatHint": "f72b68246b1ad4dc",
-    "cronJob": "5b7bb1fa97159bc0",
-    "cronPatternHint": "6f2c0160cfbd1858",
-    "cronWildcardHint": "d158b7b2a61065ea",
-    "environmentalVariables": "b052aee0318070d5",
-    "fieldRequired": "8433d10c6c002791",
-    "frequency": "16b6668d9831a1b8",
-    "header": "ff8059dc6752afdd",
-    "immediateTriggerHint": "7128235b2e82e7c7",
-    "nameInvalidChars": "d8bde20824127188",
-    "once": "d88f6d8372f4d54e",
-    "pageSubtitle": "345ca390e1a5e91b",
-    "realTime": "6a654d0744a697e0",
-    "schedule": "f4830a1dae298044",
-    "search": "d47630dda5f8dac9",
-    "selectServiceAccount": "6e7bcc0cde1f7d00",
-    "serviceAccount": "562c51b88d992a9c",
-    "serviceAccountPermissionsHint": "d821a89f9eeec899",
-    "timezone": "4ceca1d52cede44d",
-    "type": "19a04d64582f05c5",
-    "update": "da0eda30c429c429",
-    "uploadCodeZip": "88a94d1a1538ebb3",
-    "zipFile": "370ea7b7d8c7b933",
-    "zipFileHint": "7496c14464ffe710",
-    "zipFileRequired": "d101bd629f5b1c86"
   },
   "aiAssistant": {
     "aiChat": {
@@ -1961,7 +1922,6 @@
     "usedByColumn": "681bf81aba87bd68"
   },
   "alert_destinations": {
-    "action": "64cff1319d2fd2cb",
     "actions": "ff8059dc6752afdd",
     "add": "da06bed30fc53669",
     "addTitle": "d908c17e64644bf1",
@@ -1973,7 +1933,6 @@
     "connectionStepTitle": "639a40e82b9a96f0",
     "createEmailTemplate": "d49eb7aafe07212b",
     "custom": "494ca78f7374e46f",
-    "customAction": "2a76c303f8939275",
     "customEmail": "c6d9970e7a82a94f",
     "customWebhook": "2f8d253b031dc481",
     "custom_headers": "f137eb09501fb682",
@@ -2007,10 +1966,6 @@
     "hostnameLabel": "2db533557011ec53",
     "hostnamePlaceholder": "5374d480a4cfb841",
     "import": {
-      "actionIdInvalid": "7c9a5f9e89ab1267",
-      "actionNotFound": "4e10cc45cdd31efa",
-      "actionTypeNotSupported": "1961159379211994",
-      "actions": "ff8059dc6752afdd",
       "createFailed": "8383ab89247b8ef4",
       "createSuccess": "11264a02310f9849",
       "destinationCreation": "e23525dacd08db82",
@@ -2082,6 +2037,48 @@
     "severityInfoDescription": "e1606a588e0aba25",
     "severityWarningDescription": "1f9ee82eca26c9b9",
     "skip_tls_verify": "bdeddcf346377495",
+    "slackOAuth": {
+      "authorizationDenied": "e7b0b4cf8149e3df",
+      "callbackError": "e12295d01c64ee92",
+      "callbackTitle": "b10e650618b45e5a",
+      "callbackWorking": "4a155bdd250bf8ae",
+      "connectSlack": "aa665ddf272707d7",
+      "connected": "1b6c77c87393d36f",
+      "connectionRequired": "68b438b0617de676",
+      "exchangeFailed": "a5a352370d2f4337",
+      "hideWebhook": "2922c523a3ab7497",
+      "manifestAppName": "b6896b3aed424d71",
+      "manifestAppNameHelp": "056521bd9d008478",
+      "manifestAppNameRequired": "a94c5c203ae1c163",
+      "manifestAppNameTooLong": "d59f88253a169ccc",
+      "manifestBack": "76900f1bfd16c8d4",
+      "manifestContinue": "31fbef162594de01",
+      "manifestMethodDescription": "399f0c1d882db8a0",
+      "manifestMethodTitle": "fd92bc4640db195c",
+      "manifestOpenSlack": "28e163f209af4443",
+      "manifestPermissionNote": "6cd0ad5f766f3534",
+      "manifestReviewHelp": "9011f469f70140f9",
+      "manifestStepApp": "baf8c5a4c7d66c0a",
+      "manifestStepReview": "f4cb759c7e355bef",
+      "manifestStepWebhook": "14a21c531f0660ff",
+      "manifestWhereToFind": "9d94cf6e029b2312",
+      "oauthMethodDescription": "82980eecc9fff7ec",
+      "oauthMethodTitle": "aa665ddf272707d7",
+      "permissionNote": "7cc82119715cba4e",
+      "popupBlocked": "10ed7483be2df2d1",
+      "popupClosed": "ea58d51287164900",
+      "previewDisclaimer": "ad69118e3b9ccecc",
+      "recommended": "d70604e843046137",
+      "reconnectSlack": "49de1e8399e4183d",
+      "revealWebhook": "b70f461509aa9a7e",
+      "setupMethodLabel": "afaedc7ea8a2e9f5",
+      "slackAppFallback": "d01baad846473c1e",
+      "startFailed": "d1499704d43a221a",
+      "successResponseBody": "c662c5f4e05c66e3",
+      "webhookMethodDescription": "ebc4303978f5340c",
+      "webhookMethodTitle": "c0bf3c248938570f",
+      "webhookSecretNote": "c7a764a356f4c8e9"
+    },
     "sourceLabel": "0e570ca6fabe24f9",
     "sourcePlaceholder": "fde9f02cb853c352",
     "sourceTypeLabel": "5e1d2bdf42f2cdea",
@@ -2441,7 +2438,6 @@
     "viewAlertLinkLabel": "13ba49a9f9acd0ea"
   },
   "alerts": {
-    "action": "64cff1319d2fd2cb",
     "actions": "ff8059dc6752afdd",
     "add": "a37e1cde334a2bdd",
     "addAlertMode": "02417a3769b09420",
@@ -2645,7 +2641,6 @@
     "applyVRL": "e423ed9722cca557",
     "applyVRLForOutput": "62c19ae8cf583e06",
     "asOf": "60097e7b87261bf9",
-    "bulkDeleteActionScriptsTitle": "ec466d4e35ba4e61",
     "cancel": "19766ed6ccb2f4a3",
     "clearMultiWindowsTitle": "16daf7202d6f8e54",
     "clone": "c820597b0d020f98",
@@ -2828,8 +2823,6 @@
     },
     "deduplicationConfiguredTooltip": "ac43a07ea8e2bd56",
     "delete": "e2d0a54968ead24e",
-    "deleteActionMessage": "dba417a79648682b",
-    "deleteActionTitle": "d35bf29864662fb6",
     "deleteAlertMessage": "52214ea4577cf866",
     "deleteAlertTitle": "73d4e7aa312ba1ac",
     "deleteAlertsTitle": "fab8eb8057c6dba0",
@@ -3381,7 +3374,7 @@
       "severityInfo": "170322a32f3c35b2",
       "severityWarning": "e981ddae45d8f4ca",
       "slackChannel": "bec401daa7bf9212",
-      "slackChannelHelp": "1009e5643916dfd2",
+      "slackChannelHelp": "d3eb93ee370703f5",
       "slackWebhookUrl": "5ca33affded521be",
       "slackWebhookUrlHelp": "8b08b32823e3c427",
       "usernameRequired": "d18de1563a616cb5"
@@ -3437,7 +3430,6 @@
       },
       "warnings": {
         "absoluteToRolling": "c60fe5bd3df3f626",
-        "actionsDropped": "6ccca2dfa94ba06f",
         "broadMatch": "be25c7f95c7368b8",
         "convertedToSql": "b9f0a519a7147ba9",
         "dbmFingerprintVersion": "0ded13dbfdbedccb",
@@ -3925,7 +3917,6 @@
   },
   "billing": {
     "action": "64cff1319d2fd2cb",
-    "actionScripts": "560aeaf282f9e72b",
     "activationTimeoutContactSupport": "123268f58ca67e8d",
     "aiContractExhaustedMessage": "2593eb81c67bd4c0",
     "aiCredits": "663f4705379da3db",
@@ -4691,7 +4682,6 @@
         "warn": "1440a7f63a8dd416"
       },
       "nodeRole": {
-        "actionserver": "78eda2aba8973694",
         "all": "a52ace420f2175d0",
         "compactor": "b05ed9b36936f140",
         "flattencompactor": "4fea0881162074d5",
@@ -6079,9 +6069,15 @@
     "selectFolderPlaceholder": "eee8512198f6c389",
     "selectFunction": {
       "add": "9fd728c66c9a256b",
+      "castSuggestion": {
+        "castTo": "b215fd739e9458ad",
+        "dismiss": "48845bff334a50a5",
+        "error": "c16009475b92e6c9"
+      },
       "enterNumber": "d007357c6060af71",
       "enterString": "e47df9ebefc0621c",
-      "parameter": "d5fba978230780ec"
+      "parameter": "d5fba978230780ec",
+      "selectCastType": "baaddf70fb5d432b"
     },
     "selectIndex": "1eec3071dd26e224",
     "selectLogsMode": "d4d9aae37b66b97e",
@@ -9675,8 +9671,6 @@
       "volumePeak": "bf93fc006bd2f0c2"
     },
     "searchBar": {
-      "actionAppliedRunQuery": "aa4ad2e994f2c961",
-      "actionAppliedSuccess": "d38627ff8d17e12c",
       "confirmUpdateFunction": "e1d34b768610df81",
       "confirmUpdateSavedViewMsg": "fcddac16b7648ca9",
       "createScheduledSearchAlt": "d638f215b33274b6",
@@ -9701,9 +9695,7 @@
       "provideValidViewName": "7003881350b98720",
       "rangeExceedsLimit": "2767534fb8dcdf97",
       "runQueryBeforeDownload": "8aa79db0bbf15bb3",
-      "selectActionToApply": "ba09cb73f36a9bd9",
       "selectStreamBeforeSchedule": "64c726ea7d3eb0f6",
-      "transformTypeAction": "64cff1319d2fd2cb",
       "transformTypeFunction": "c803710302d5769d",
       "updatingSavedView": "343e7786d740bcab",
       "viewAddedFavorites": "e12c9fbf6d185268",
@@ -9805,12 +9797,6 @@
       "sqlQueryCopied": "cf91800a4e788ae7",
       "tookSeconds": "ae1a4a1ee2175170"
     },
-    "transformSelector": {
-      "action": "64cff1319d2fd2cb",
-      "actionApplied": "d38627ff8d17e12c",
-      "function": "c803710302d5769d",
-      "transform": "d2d68041b53daa75"
-    },
     "visualizeLogsQuery": {
       "fixErrorsAndRetry": "e0fa7e73ce02634d",
       "selectAllNotSupported": "b803e03bfb4665f3"
@@ -9824,7 +9810,6 @@
   },
   "menu": {
     "about": "4efca0d10c5feb8e",
-    "actions": "ff8059dc6752afdd",
     "aiAssistant": "0ad1b06f64f2d3ba",
     "aiObservability": "11fb682be0a0233d",
     "alerts": "f62e9267d196c761",
@@ -12294,6 +12279,7 @@
     "regexPatterns": "83a58bf362610444",
     "searchScheduler": "ff78cae7d0ccaa32",
     "sessionDetails": "142027a259879fdd",
+    "slackOAuthCallback": "b10e650618b45e5a",
     "sloDetail": "57aec1a2d96ca59b",
     "storageSettings": "054a2371a02b7446",
     "streamExplorer": "702bd9cbb822e0e8",
@@ -12555,8 +12541,6 @@
     "zipFilesOnly": "e81c52f6dc41c8d1"
   },
   "search": {
-    "actionLabel": "64cff1319d2fd2cb",
-    "actionsNotFound": "7ae06001024b6526",
     "addFieldToTable": "739f7c5706b900b0",
     "addToDashboard": "7f53541f23366e47",
     "aggregationFieldsNeedAlias": "36877d674ebae7b1",
@@ -12777,7 +12761,6 @@
     "rows": "bc51e9e65d79e1c9",
     "runQuery": "1837e00c45e8663d",
     "runningAnalyze": "1e8f6a027cd4e5cf",
-    "saveActionDisabled": "9b5b124638be8b90",
     "saveFunctionName": "dae596892b2dd17c",
     "savedFunctionNotFound": "a330ceefc8dc19c1",
     "savedViewName": "da7a321c73c90d88",
@@ -12801,7 +12784,6 @@
     "selectStreamFirst": "cd88ffc83ec1dbd3",
     "selectStreamForAI": "8aab45914b3f7fa9",
     "selectToFilter": "fc0a8e8bdb89d803",
-    "selectTransformType": "6feb6e6d56d52814",
     "selectedEndTimeInvalid": "618da3e46f2c2cea",
     "selectedFunctionTooltip": "183f220f09c3bbf4",
     "selectedLabel": "d7cbbb688b2e506c",
@@ -12855,7 +12837,6 @@
     "totalRows": "819d8751b0f887d2",
     "totalTime": "893bd4a5ca6dabbe",
     "traceIdLabel": "13181f1360728438",
-    "transformLabel": "d2d68041b53daa75",
     "transformType": "658b33acde44acb7",
     "turnOffLiveMode": "c3dfdea2b88d959c",
     "turnOnLiveMode": "bcefde79656f0abc",
@@ -15417,19 +15398,6 @@
       "sourceMapsDeletedSuccessfullyForIn": "740b6272ab4a58b3",
       "sourceMapsUploadedSuccessfully": "16b743b279eb7002"
     },
-    "actionScripts": {
-      "actionSavedSuccessfully": "38921eab7b91e9ba",
-      "actionScriptsDeletedWithFailures": "25e2d555e558c8dd",
-      "actionUpdatedSuccessfully": "e7ceab4ca8f0ba73",
-      "errorWhilePullingActions": "e1b764db99765b4f",
-      "errorWhileSaving": "fab588fc897d8c34",
-      "errorWhileUpdating": "11f9bf50d3800414",
-      "failedToDeleteActionScripts": "3864bb4d925bde4b",
-      "noActionScriptsSelected": "34402cab0b9baf94",
-      "pleaseWait": "2dfd888fdd5e8018",
-      "pleaseWaitWhileLoadingActions": "858e41c246da65b6",
-      "successfullyDeletedActionScripts": "ed61581f481c7b56"
-    },
     "aitoolsets": {
       "failedToLoadToolset": "1cffb5c5606ce25f"
     },
@@ -15466,7 +15434,6 @@
       "errorResumingAlerts": "28f468c78533970f",
       "errorWhileFetchingDestinations": "9a6501f32460068c",
       "errorWhileFetchingTemplates": "547ad8bb06609ed8",
-      "errorWhileLoadingActions": "3aac079081c83646",
       "errorWhilePullingAlerts": "ca8e40fa0568dd22",
       "errorWhilePullingDestinations": "c16f9b31b93a10fe",
       "errorWhilePullingTemplates": "2196a7b34bc6724a",
@@ -15747,7 +15714,6 @@
     "useLogs": {
       "errorOccurredDuringTheSearchOperation": "6b5674ed49a501e8",
       "errorOccurredWhileSendingSocketMessage": "ea728f8b3819afed",
-      "errorWhileFetchingActions": "fd4d894693e9706d",
       "errorWhileFetchingData": "bab134e06d9e87cc",
       "errorWhileFetchingFunctions": "d0f9d72c75736325",
       "failedToCancelRunningQuery": "bb736b61d74c25e0",

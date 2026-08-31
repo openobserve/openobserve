@@ -241,14 +241,15 @@ const wrapperClasses = computed(() => [
   "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "bg-input-bg",
   !isTextarea.value ? heightClasses[props.size ?? "md"] : "",
-  /* Focus affordance = soft glow: a 4px translucent halo hugging the border
-     plus the focus border color. When the field has an ERROR, keep the red
-     error border on focus (don't let the focus color override it) and tint the
-     glow red — otherwise the focus border (blue) would hide the error state
-     while the field is focused. */
+  /* Focus affordance = a 2px ring hugging the border, plus the focus border color.
+     The normal ring is OPAQUE (--color-focus-ring-accent): at 25% alpha it measured
+     1.38:1 against the 3:1 SC 1.4.11 floor. Only the ERROR ring stays translucent
+     (/30) — there the red border already carries the state, and the ring is a tint
+     behind it. On error, keep that red border on focus rather than letting the focus
+     color override it, or the blue would hide the error while the field is focused. */
   hasError.value
     ? "border-input-border-error focus-within:ring-[0.125rem] focus-within:ring-input-border-error/30"
-    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-accent/25",
+    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
   /* Disabled inputs get a muted bg + dashed border so they read as obviously
      inactive at a glance. */
   props.disabled

@@ -38,6 +38,7 @@
 // ─── Public types ─────────────────────────────────────────────────────────────
 
 import { gt, raw, type I18nText } from "@/types/i18n";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 
 export interface SqlErrorRange {
   startLine: number;
@@ -844,6 +845,8 @@ export async function validateSql(
   lineOffset = 0,
   colOffset = 0,
 ): Promise<SqlErrorRange | null> {
+  if (maxParenDepth(sql) > SQL_PARSE_MAX_DEPTH) return null;
+
   const parser = await getParser();
   try {
     parser.astify(sql);
@@ -896,13 +899,18 @@ export async function rangesFromSqlParserDetail(
     //   (b) It hit a parser-limitation or unclassified fingerprint and suppressed.
     //       → Fall through and use the server-reported position with a cleaned message,
     //         because the server told us there IS a real parse error at a known location.
-    // Distinguish: re-parse and check if it throws at all.
-    const parser = await getParser();
-    let clientThrows = false;
-    try {
-      parser.astify(originalSql);
-    } catch {
-      clientThrows = true;
+    // Distinguish: re-parse and check if it throws at all. Skipped past
+    // SQL_PARSE_MAX_DEPTH for the same reason validateSql skips it above —
+    // treat as case (b) below rather than hang re-parsing a query we already
+    // know is too complex to check client-side.
+    let clientThrows = maxParenDepth(originalSql) > SQL_PARSE_MAX_DEPTH;
+    if (!clientThrows) {
+      const parser = await getParser();
+      try {
+        parser.astify(originalSql);
+      } catch {
+        clientThrows = true;
+      }
     }
     if (!clientThrows) return []; // case (a): client accepted — semantic error only
     // case (b): client rejected but suppressed — use server position + cleaned message

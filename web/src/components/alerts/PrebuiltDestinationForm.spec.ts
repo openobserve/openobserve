@@ -117,6 +117,32 @@ describe("PrebuiltDestinationForm - rendering per type", () => {
     expect(wrapper.find('[data-test="discord-webhook-url-input"]').exists()).toBe(false);
   });
 
+  it("masks the Slack webhook by default", () => {
+    wrapper = mountComp({ destinationType: "slack" });
+    expect(wrapper.find('[data-test="slack-webhook-url-input"] input').attributes("type")).toBe(
+      "password",
+    );
+  });
+
+  it("reveals and hides the Slack webhook with an accessible action", async () => {
+    wrapper = mountComp({ destinationType: "slack" });
+    const toggle = wrapper.find('[data-test="slack-webhook-toggle-visibility"]');
+    const revealLabel = toggle.attributes("aria-label");
+    expect(revealLabel).toBeTruthy();
+
+    await toggle.trigger("click");
+    expect(toggle.attributes("aria-label")).not.toBe(revealLabel);
+    expect(wrapper.find('[data-test="slack-webhook-url-input"] input').attributes("type")).toBe(
+      "text",
+    );
+
+    await toggle.trigger("click");
+    expect(toggle.attributes("aria-label")).toBe(revealLabel);
+    expect(wrapper.find('[data-test="slack-webhook-url-input"] input').attributes("type")).toBe(
+      "password",
+    );
+  });
+
   it("renders discord webhook + username inputs", () => {
     wrapper = mountComp({ destinationType: "discord" });
     expect(wrapper.find('[data-test="discord-webhook-url-input"]').exists()).toBe(true);

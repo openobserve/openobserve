@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { ref, computed, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 // Services
 import alertDestinationService from "@/services/alert_destination";
@@ -52,6 +52,80 @@ import type { Destination } from "@/ts/interfaces/alert";
 import { useStore } from "vuex";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
+export interface SlackSetupMetadata {
+  setup_method: "oauth" | "manifest" | "webhook";
+  slack_team_id?: string;
+  slack_team_name?: string;
+  slack_channel_id?: string;
+  slack_app_name?: string;
+}
+
+const persistedCredentialMetadata = (
+  type: string,
+  credentials: Record<string, unknown>,
+): Record<string, string> => {
+  const fields = getPrebuiltConfig(type)?.credentialFields ?? [];
+  const metadata: Record<string, string> = {};
+
+  for (const field of fields) {
+    if (field.persistInMetadata !== true) continue;
+    const value = credentials[field.key];
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string" && value.trim() === "") continue;
+    metadata[`credential_${field.key}`] = String(value);
+  }
+
+  return metadata;
+};
+
+const slackSetupMetadata = (type: string, setup?: SlackSetupMetadata): Record<string, string> => {
+  if (type !== "slack" || !setup) return {};
+  if (
+    setup.setup_method !== "oauth" &&
+    setup.setup_method !== "manifest" &&
+    setup.setup_method !== "webhook"
+  )
+    return {};
+
+  const metadata: Record<string, string> = { setup_method: setup.setup_method };
+  if (setup.setup_method === "oauth") {
+    const teamId = setup.slack_team_id?.trim();
+    const teamName = setup.slack_team_name?.trim();
+    const channelId = setup.slack_channel_id?.trim();
+    if (teamId) metadata.slack_team_id = teamId;
+    if (teamName) metadata.slack_team_name = teamName;
+    if (channelId) metadata.slack_channel_id = channelId;
+  } else if (setup.setup_method === "manifest") {
+    const appName = setup.slack_app_name?.trim();
+    if (appName) metadata.slack_app_name = appName;
+  }
+  return metadata;
+};
+
+const buildDestinationMetadata = (
+  type: string,
+  credentials: Record<string, unknown>,
+  setup?: SlackSetupMetadata,
+): Record<string, string> => ({
+  prebuilt_type: type,
+  ...persistedCredentialMetadata(type, credentials),
+  ...generatePrebuiltMetadata(type, credentials),
+  ...slackSetupMetadata(type, setup),
+});
+
+const requestErrorMessage = (error: unknown, fallback: I18nText): I18nText => {
+  if (!error || typeof error !== "object") return fallback;
+  const requestError = error as {
+    message?: unknown;
+    response?: { data?: { error?: unknown; message?: unknown } };
+  };
+  const candidate =
+    requestError.response?.data?.error ??
+    requestError.response?.data?.message ??
+    requestError.message;
+  return typeof candidate === "string" && candidate ? raw(candidate) : fallback;
+};
+
 /**
  * Parses a comma/space-separated string of email recipients into an array.
  */
@@ -75,6 +149,18 @@ export function usePrebuiltDestinations() {
   const isLoading = ref(false);
   const isTestInProgress = ref(false);
   const lastTestResult = ref<TestResult | null>(null);
+  let testRequestVersion = 0;
+
+  const clearTestResult = (): void => {
+    testRequestVersion += 1;
+    lastTestResult.value = null;
+    isTestInProgress.value = false;
+  };
+
+  const publishTestResult = (version: number, result: TestResult): TestResult => {
+    if (version === testRequestVersion) lastTestResult.value = result;
+    return result;
+  };
 
   // Computed properties
   const organizationIdentifier = computed(() => store.state.selectedOrganization.identifier);
@@ -278,6 +364,7 @@ export function usePrebuiltDestinations() {
     type: string,
     credentials: Record<string, any>,
   ): Promise<TestResult> {
+    const requestVersion = ++testRequestVersion;
     try {
       isTestInProgress.value = true;
 
@@ -290,8 +377,7 @@ export function usePrebuiltDestinations() {
           error: t("alerts.prebuilt.validationError", { error: firstError }),
           timestamp: Date.now(),
         };
-        lastTestResult.value = result;
-        return result;
+        return publishTestResult(requestVersion, result);
       }
 
       const config = getPrebuiltConfig(type);
@@ -301,8 +387,7 @@ export function usePrebuiltDestinations() {
           error: t("alerts.prebuilt.invalidDestinationType"),
           timestamp: Date.now(),
         };
-        lastTestResult.value = result;
-        return result;
+        return publishTestResult(requestVersion, result);
       }
 
       // Ensure system templates are fetched
@@ -389,14 +474,13 @@ export function usePrebuiltDestinations() {
           },
         });
 
-        lastTestResult.value = {
+        const result: TestResult = {
           success: testResult.data.success || false,
           timestamp: Date.now(),
           error: testResult.data.error,
           responseBody: testResult.data.responseBody,
         };
-
-        return lastTestResult.value;
+        return publishTestResult(requestVersion, result);
       }
 
       // Send test request via backend
@@ -410,26 +494,27 @@ export function usePrebuiltDestinations() {
         },
       });
 
-      lastTestResult.value = {
+      const result: TestResult = {
         success: testResult.data.success || false,
         timestamp: Date.now(),
         error: testResult.data.error,
         statusCode: testResult.data.statusCode,
         responseBody: testResult.data.responseBody,
       };
-
-      return lastTestResult.value;
-    } catch (error: any) {
+      return publishTestResult(requestVersion, result);
+    } catch (error: unknown) {
       const result: TestResult = {
         success: false,
-        error: error.message || t("alerts.prebuilt.testFailedUnknownError"),
+        error:
+          error instanceof Error && error.message
+            ? error.message
+            : t("alerts.prebuilt.testFailedUnknownError"),
         timestamp: Date.now(),
       };
 
-      lastTestResult.value = result;
-      return result;
+      return publishTestResult(requestVersion, result);
     } finally {
-      isTestInProgress.value = false;
+      if (requestVersion === testRequestVersion) isTestInProgress.value = false;
     }
   }
 
@@ -447,6 +532,7 @@ export function usePrebuiltDestinations() {
     headers: Record<string, string> = {},
     skipTlsVerify: boolean = false,
     templateOverride?: string,
+    setup?: SlackSetupMetadata,
   ): Promise<void> {
     try {
       isLoading.value = true;
@@ -488,23 +574,7 @@ export function usePrebuiltDestinations() {
           output_format: "json",
           destination_type_name: type,
           emails: parseEmailRecipients(credentials.recipients),
-          metadata: {
-            prebuilt_type: type,
-            // Flatten credentials into metadata (only non-sensitive fields)
-            ...Object.fromEntries(
-              Object.entries(credentials)
-                .filter(
-                  ([key]) =>
-                    !key.toLowerCase().includes("password") &&
-                    !key.toLowerCase().includes("key") &&
-                    !key.toLowerCase().includes("token"),
-                )
-                .map(([k, v]) => [`credential_${k}`, String(v)]),
-            ),
-            // Bare template-body variables the alert engine substitutes
-            // server-side (e.g. PagerDuty routing_key/severity/source).
-            ...generatePrebuiltMetadata(type, credentials),
-          },
+          metadata: buildDestinationMetadata(type, credentials, setup),
         };
       } else {
         // HTTP-based destinations (Slack, Teams, PagerDuty, Opsgenie, ServiceNow, Discord)
@@ -518,23 +588,7 @@ export function usePrebuiltDestinations() {
           headers: { ...destinationHeaders, ...headers },
           output_format: "json",
           destination_type_name: type,
-          metadata: {
-            prebuilt_type: type,
-            // Flatten credentials into metadata (only non-sensitive fields)
-            ...Object.fromEntries(
-              Object.entries(credentials)
-                .filter(
-                  ([key]) =>
-                    !key.toLowerCase().includes("password") &&
-                    !key.toLowerCase().includes("key") &&
-                    !key.toLowerCase().includes("token"),
-                )
-                .map(([k, v]) => [`credential_${k}`, String(v)]),
-            ),
-            // Bare template-body variables the alert engine substitutes
-            // server-side (e.g. PagerDuty routing_key/severity/source).
-            ...generatePrebuiltMetadata(type, credentials),
-          },
+          metadata: buildDestinationMetadata(type, credentials, setup),
         };
 
         // Special handling for ServiceNow - encode Basic Auth in Authorization header
@@ -558,11 +612,10 @@ export function usePrebuiltDestinations() {
         variant: "success",
         message: t("alert_destinations.saved"),
       });
-    } catch (error: any) {
-      console.error("Failed to create prebuilt destination:", error);
+    } catch (error: unknown) {
       toast({
         variant: "error",
-        message: error.response?.data?.error || error.response?.data?.message || error.message,
+        message: requestErrorMessage(error, t("alerts.prebuilt.testFailedUnknownError")),
       });
       throw error;
     } finally {
@@ -586,6 +639,7 @@ export function usePrebuiltDestinations() {
     headers: Record<string, string> = {},
     skipTlsVerify: boolean = false,
     templateOverride?: string,
+    setup?: SlackSetupMetadata,
   ): Promise<void> {
     try {
       isLoading.value = true;
@@ -618,22 +672,7 @@ export function usePrebuiltDestinations() {
           output_format: "json",
           destination_type_name: type,
           emails: parseEmailRecipients(credentials.recipients),
-          metadata: {
-            prebuilt_type: type,
-            ...Object.fromEntries(
-              Object.entries(credentials)
-                .filter(
-                  ([key]) =>
-                    !key.toLowerCase().includes("password") &&
-                    !key.toLowerCase().includes("key") &&
-                    !key.toLowerCase().includes("token"),
-                )
-                .map(([k, v]) => [`credential_${k}`, String(v)]),
-            ),
-            // Bare template-body variables the alert engine substitutes
-            // server-side (e.g. PagerDuty routing_key/severity/source).
-            ...generatePrebuiltMetadata(type, credentials),
-          },
+          metadata: buildDestinationMetadata(type, credentials, setup),
         };
       } else {
         destinationData = {
@@ -646,22 +685,7 @@ export function usePrebuiltDestinations() {
           headers: { ...destinationHeaders, ...headers },
           output_format: "json",
           destination_type_name: type,
-          metadata: {
-            prebuilt_type: type,
-            ...Object.fromEntries(
-              Object.entries(credentials)
-                .filter(
-                  ([key]) =>
-                    !key.toLowerCase().includes("password") &&
-                    !key.toLowerCase().includes("key") &&
-                    !key.toLowerCase().includes("token"),
-                )
-                .map(([k, v]) => [`credential_${k}`, String(v)]),
-            ),
-            // Bare template-body variables the alert engine substitutes
-            // server-side (e.g. PagerDuty routing_key/severity/source).
-            ...generatePrebuiltMetadata(type, credentials),
-          },
+          metadata: buildDestinationMetadata(type, credentials, setup),
         };
 
         if (type === "servicenow") {
@@ -695,11 +719,10 @@ export function usePrebuiltDestinations() {
         variant: "success",
         message: t("alert_destinations.saved"),
       });
-    } catch (error: any) {
-      console.error("Failed to update prebuilt destination:", error);
+    } catch (error: unknown) {
       toast({
         variant: "error",
-        message: error.response?.data?.error || error.response?.data?.message || error.message,
+        message: requestErrorMessage(error, t("alerts.prebuilt.testFailedUnknownError")),
       });
       throw error;
     } finally {
@@ -812,6 +835,7 @@ export function usePrebuiltDestinations() {
     isLoading,
     isTestInProgress,
     lastTestResult,
+    clearTestResult,
 
     // Computed
     availableTypes,

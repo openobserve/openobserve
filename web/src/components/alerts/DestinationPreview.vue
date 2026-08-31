@@ -31,26 +31,30 @@ limitations under the License.
         <div class="slack-message-container flex gap-3">
           <div class="slack-avatar">
             <div
-              class="avatar-circle rounded-default bg-brand-slack-aubergine flex h-9 w-9 items-center justify-center text-sm font-bold text-white"
+              data-test="slack-avatar-icon"
+              class="avatar-circle rounded-default border-border-default bg-surface-base text-text-secondary flex h-9 w-9 items-center justify-center border"
             >
-              {{ raw("OO") }}
+              <OIcon name="notifications" size="sm" />
             </div>
           </div>
           <div class="slack-content flex-1">
             <div class="slack-header mb-2 flex items-center gap-2">
-              <strong data-test="slack-bot-name" class="bot-name text-brand-slack-link text-sm">{{
-                raw("OpenObserve Bot")
-              }}</strong>
+              <strong data-test="slack-bot-name" class="bot-name text-brand-slack-link text-sm">
+                {{ t("alert_destinations.slackOAuth.slackAppFallback") }}
+              </strong>
               <span class="slack-timestamp text-brand-slack-meta text-xs">{{
                 getCurrentTime()
               }}</span>
             </div>
             <div data-test="slack-message-body" class="slack-body">
-              <div class="slack-block-header text-brand-slack-text mb-3 text-lg font-bold">
+              <div
+                data-test="slack-block-header"
+                class="slack-block-header text-brand-slack-text mb-3 text-lg font-bold"
+              >
                 {{ raw("🚨 High CPU Usage") }}
               </div>
               <div class="slack-fields mb-3 grid grid-cols-2 gap-2">
-                <div class="slack-field">
+                <div class="slack-field" data-test="slack-field-stream">
                   <div class="field-label text-brand-slack-text text-sm font-bold">
                     {{ raw("Stream:") }}
                   </div>
@@ -58,15 +62,18 @@ limitations under the License.
                     {{ raw("system-metrics") }}
                   </div>
                 </div>
-                <div class="slack-field">
+                <div class="slack-field" data-test="slack-field-type">
                   <div class="field-label text-brand-slack-text text-sm font-bold">
                     {{ raw("Type:") }}
                   </div>
-                  <div class="field-value text-brand-slack-meta text-sm">
-                    {{ raw("metrics") }}
+                  <div
+                    data-test="slack-stream-type"
+                    class="field-value text-brand-slack-meta text-sm"
+                  >
+                    {{ raw("logs") }}
                   </div>
                 </div>
-                <div class="slack-field">
+                <div class="slack-field" data-test="slack-field-status">
                   <div class="field-label text-brand-slack-text text-sm font-bold">
                     {{ raw("Status:") }}
                   </div>
@@ -74,7 +81,7 @@ limitations under the License.
                     {{ raw("🔴 Firing") }}
                   </div>
                 </div>
-                <div class="slack-field">
+                <div class="slack-field" data-test="slack-field-count">
                   <div class="field-label text-brand-slack-text text-sm font-bold">
                     {{ raw("Count:") }}
                   </div>
@@ -83,15 +90,23 @@ limitations under the License.
                   </div>
                 </div>
               </div>
-              <div class="slack-threshold text-brand-slack-text mb-3 text-sm">
+              <div
+                data-test="slack-threshold"
+                class="slack-threshold text-brand-slack-text mb-3 text-sm"
+              >
                 <strong>{{ raw("Threshold Exceeded:") }}</strong> {{ raw("greater than 80%") }}
               </div>
               <div class="slack-actions mt-4 flex justify-center">
-                <OButton variant="preview-slack">{{ raw("View in OpenObserve") }}</OButton>
+                <OButton data-test="slack-preview-action" variant="preview-slack">{{
+                  raw("View in OpenObserve")
+                }}</OButton>
               </div>
             </div>
           </div>
         </div>
+        <p data-test="slack-preview-disclaimer" class="text-text-secondary m-0 mt-3 text-xs">
+          {{ t("alert_destinations.slackOAuth.previewDisclaimer") }}
+        </p>
       </div>
 
       <!-- MS Teams Preview -->
@@ -402,22 +417,19 @@ limitations under the License.
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 
-const props = defineProps({
-  modelValue: {
-    type: Boolean,
-    default: false,
-  },
-  type: {
-    type: String,
-    required: true,
-  },
-  templateContent: {
-    type: String,
-    default: "",
-  },
+interface Props {
+  modelValue?: boolean;
+  type: string;
+  templateContent?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  modelValue: false,
+  templateContent: "",
 });
 
 const emit = defineEmits(["update:modelValue"]);
