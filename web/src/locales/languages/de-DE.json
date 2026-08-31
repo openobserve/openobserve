@@ -7600,7 +7600,6 @@
   "alert_library": {
     "header": "Alarm-Bibliothek",
     "subtitle": "Kuratierte, sofort installierbare Alarme, abgestimmt auf die Daten, die Sie bereits erfassen.",
-    "sectionTab": "Bibliothek",
     "contribute": "Auf GitHub beitragen",
     "searchPlaceholder": "Nach Name, Beschreibung oder Stream suchen",
     "searchLabel": "Alarm-Bibliothek durchsuchen",
@@ -7934,7 +7933,6 @@
     "destinationsLoadError": "Fehler beim Laden der Ziele"
   },
   "alert_destinations": {
-    "sectionTab": "Ziele",
     "chooseTypeTitle": "Typ auswählen",
     "selectDestinationType": "Zieltyp auswählen",
     "connectionStepTitle": "Verbindung",

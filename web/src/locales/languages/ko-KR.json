@@ -7600,7 +7600,6 @@
   "alert_library": {
     "header": "알림 라이브러리",
     "subtitle": "이미 수집 중인 데이터에 맞춰진, 엄선된 즉시 설치 가능한 알림",
-    "sectionTab": "라이브러리",
     "contribute": "GitHub에서 기여하기",
     "searchPlaceholder": "이름, 설명 또는 스트림으로 검색",
     "searchLabel": "알림 라이브러리 검색",
@@ -7934,7 +7933,6 @@
     "destinationsLoadError": "대상 불러오기 오류"
   },
   "alert_destinations": {
-    "sectionTab": "대상",
     "chooseTypeTitle": "유형 선택",
     "selectDestinationType": "대상 유형 선택",
     "connectionStepTitle": "연결",

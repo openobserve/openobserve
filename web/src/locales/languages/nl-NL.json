@@ -7600,7 +7600,6 @@
   "alert_library": {
     "header": "Meldingenbibliotheek",
     "subtitle": "Samengestelde, kant-en-klare meldingen, afgestemd op de gegevens die u al opneemt.",
-    "sectionTab": "Bibliotheek",
     "contribute": "Bijdragen op GitHub",
     "searchPlaceholder": "Zoeken op naam, beschrijving of stream",
     "searchLabel": "Doorzoek de meldingenbibliotheek",
@@ -7934,7 +7933,6 @@
     "destinationsLoadError": "Fout bij het laden van bestemmingen"
   },
   "alert_destinations": {
-    "sectionTab": "Bestemmingen",
     "chooseTypeTitle": "Kies type",
     "selectDestinationType": "Selecteer bestemmingstype",
     "connectionStepTitle": "Verbinding",

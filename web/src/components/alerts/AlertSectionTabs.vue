@@ -86,7 +86,7 @@ const sections = computed<Section[]>(() => {
     },
     {
       key: "alertDestinations",
-      label: t("alert_destinations.sectionTab"),
+      label: t("alert_destinations.header"),
       icon: "location-on",
       to: { name: "alertDestinations", query },
     },
@@ -103,7 +103,7 @@ const sections = computed<Section[]>(() => {
       : [
           {
             key: "alertLibrary",
-            label: t("alert_library.sectionTab"),
+            label: t("alert_library.header"),
             icon: "menu-book" as IconName,
             to: { name: "alertLibrary", query },
           },

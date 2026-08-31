@@ -7600,7 +7600,6 @@
   "alert_library": {
     "header": "Thư viện cảnh báo",
     "subtitle": "Các cảnh báo được tuyển chọn, sẵn sàng cài đặt, khớp với dữ liệu bạn đã thu thập",
-    "sectionTab": "Thư viện",
     "contribute": "Đóng góp trên GitHub",
     "searchPlaceholder": "Tìm kiếm theo tên, mô tả hoặc stream",
     "searchLabel": "Tìm kiếm thư viện cảnh báo",
@@ -7934,7 +7933,6 @@
     "destinationsLoadError": "Lỗi khi tải các đích"
   },
   "alert_destinations": {
-    "sectionTab": "Đích",
     "chooseTypeTitle": "Chọn Loại",
     "selectDestinationType": "Chọn Loại Đích",
     "connectionStepTitle": "Kết nối",

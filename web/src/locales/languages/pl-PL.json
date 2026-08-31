@@ -7600,7 +7600,6 @@
   "alert_library": {
     "header": "Biblioteka alertów",
     "subtitle": "Wyselekcjonowane, gotowe do instalacji alerty, dopasowane do danych, które już pozyskujesz.",
-    "sectionTab": "Biblioteka",
     "contribute": "Wnieś wkład na GitHub",
     "searchPlaceholder": "Szukaj po nazwie, opisie lub strumieniu",
     "searchLabel": "Przeszukaj bibliotekę alertów",
@@ -7934,7 +7933,6 @@
     "destinationsLoadError": "Błąd podczas ładowania celów"
   },
   "alert_destinations": {
-    "sectionTab": "Cele",
     "chooseTypeTitle": "Wybierz typ",
     "selectDestinationType": "Wybierz typ celu",
     "connectionStepTitle": "Połączenie",

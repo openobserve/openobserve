@@ -46,7 +46,12 @@ describe("AlertSectionTabs", () => {
     // work. The rail's Reliability flyout lists the same four in this order.
     const wrapper = mountTabs();
     const labels = wrapper.findAll('[role="tab"]').map((tab) => tab.text());
-    expect(labels).toEqual(["All Alerts", "Destinations", "Destination Templates", "Library"]);
+    expect(labels).toEqual([
+      "All Alerts",
+      "Notification Destinations",
+      "Destination Templates",
+      "Alert Library",
+    ]);
   });
 
   it("marks the tab for the current route active", async () => {
@@ -87,7 +92,7 @@ describe("AlertSectionTabs", () => {
     const wrapper = mountTabs();
     expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toEqual([
       "All Alerts",
-      "Destinations",
+      "Notification Destinations",
       "Destination Templates",
     ]);
   });
@@ -95,6 +100,8 @@ describe("AlertSectionTabs", () => {
   it("keeps the Library tab when the flag lists other menus", () => {
     store.state.zoConfig.custom_hide_menus = "openapi,reports";
     const wrapper = mountTabs();
-    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain("Library");
+    expect(wrapper.findAll('[role="tab"]').map((tab) => tab.text())).toContain(
+      "Alert Library",
+    );
   });
 });

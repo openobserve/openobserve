@@ -7595,7 +7595,6 @@
   "alert_library": {
     "header": "警示庫",
     "subtitle": "精選且可立即安裝的警示，與您已攝取的資料比對",
-    "sectionTab": "程式庫",
     "contribute": "在 GitHub 上貢獻",
     "searchPlaceholder": "依名稱、說明或串流搜尋",
     "searchLabel": "搜尋警示庫",
@@ -7929,7 +7928,6 @@
     "destinationsLoadError": "載入目標時發生錯誤"
   },
   "alert_destinations": {
-    "sectionTab": "目標",
     "chooseTypeTitle": "選擇類型",
     "selectDestinationType": "選擇目標類型",
     "connectionStepTitle": "連線",
