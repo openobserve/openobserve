@@ -74,6 +74,10 @@ jobs:
       (github.event_name != 'pull_request' ||
        contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
+    env:
+      # CI executes a stripped binary; omitting dependency debuginfo keeps the
+      # shared compile cache small while preserving dev-profile debug assertions.
+      CARGO_PROFILE_DEV_DEBUG: "0"
     permissions:
       contents: read
     steps:
@@ -100,10 +104,11 @@ jobs:
           # Share one dependency build cache with the DB main-branch writer. Do
           # not cache workspace crates: a measured warm cache still rebuilt all
           # 42 workspace crates while increasing the archive from ~1.1 to 3.1 GiB.
-          shared-key: backend-debug-mimalloc-deps-v1
+          shared-key: backend-debug0-mimalloc-deps-v1
           add-job-id-key: false
-          # The DB workflow's successful push:main build is the only writer.
-          save-if: false
+          # PR #14030 primes this isolated debug=0 cache for a cold/warm A/B.
+          # Remove the temporary clause after the experiment.
+          save-if: ${{ github.event.pull_request.number == 14030 }}
 
       - name: Install Protoc
         run: bash ./.github/protoc.sh

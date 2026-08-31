@@ -52,6 +52,8 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubicloud-standard-8
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
     permissions:
       contents: read
 
@@ -86,8 +88,8 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           # This successful main-branch build is the single writer for the
-          # canonical debug+mimalloc dependency cache consumed by API and DB PRs.
-          shared-key: backend-debug-mimalloc-deps-v1
+          # canonical dev(debug=0)+mimalloc cache consumed by API and DB PRs.
+          shared-key: backend-debug0-mimalloc-deps-v1
           add-job-id-key: false
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
