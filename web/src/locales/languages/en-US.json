@@ -14330,9 +14330,7 @@
       "txtValueCopied": "Record value copied",
       "nextStepVerify": "Verification runs automatically every {seconds} seconds. You can also verify now.",
       "nextStepCname": "Once verified, point {domain} at OpenObserve with a CNAME to this app's host so it serves your status page.",
-      "writeOnceWarning": "The record value is shown only now and cannot be retrieved later. If you lose it, remove this domain and add it again.",
-      "serving": "Verified. This domain now serves your status page, as long as its CNAME points at this app's host.",
-      "recordLost": "The TXT record value for this domain was only shown when it was added and cannot be retrieved. Remove this domain and add it again to get a new record."
+      "serving": "Verified. This domain now serves your status page, as long as its CNAME points at this app's host."
     },
     "preview": {
       "title": "Live preview",

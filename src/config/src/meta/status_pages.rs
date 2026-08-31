@@ -453,6 +453,11 @@ pub struct DomainAdminView {
     pub verified_at: Option<i64>,
     pub last_checked_at: Option<i64>,
     pub created_at: i64,
+    /// The ownership TXT record, served only while the domain is unverified —
+    /// it is not a secret (proving ownership means publishing it in public DNS),
+    /// and hiding it would strand a user who lost it before their DNS was right.
+    pub txt_name: Option<String>,
+    pub verification_token: Option<String>,
 }
 
 fn default_snooze_hours() -> i64 {

@@ -122,6 +122,9 @@ export interface StatusPageDomain {
   verified_at: number | null;
   last_checked_at: number | null;
   created_at: number;
+  // Served only while unverified; the record is public DNS data, not a secret.
+  txt_name: string | null;
+  verification_token: string | null;
 }
 
 const statusPagesService = {

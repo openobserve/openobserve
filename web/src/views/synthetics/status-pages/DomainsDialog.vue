@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OBanner>
 
         <div
-          v-if="d.verification_state !== 1 && pendingRecords[d.id]"
+          v-if="d.verification_state !== 1 && d.txt_name && d.verification_token"
           class="flex flex-col gap-3"
           :data-test="`status-page-domain-next-steps-${d.id}`"
         >
@@ -128,14 +128,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-label text-2xs font-medium">
                 {{ t("statusPages.domains.txtNameLabel") }}
               </span>
-              <div class="flex items-center gap-1">
-                <OCode truncate class="min-w-0 flex-1">{{ raw(pendingRecords[d.id].name) }}</OCode>
+              <div class="flex min-w-0 items-center gap-1">
+                <OCode truncate class="min-w-0">{{ raw(d.txt_name) }}</OCode>
                 <OButton
                   variant="ghost"
                   size="icon-xs"
                   icon-left="content-copy"
                   :data-test="`status-page-domain-copy-txt-name-${d.id}`"
-                  @click="copyTxtName(d.id)"
+                  @click="copyTxtName(d)"
                 >
                   <OTooltip side="bottom" :content="t('statusPages.domains.copyTxtName')" />
                 </OButton>
@@ -146,14 +146,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-label text-2xs font-medium">
                 {{ t("statusPages.domains.txtValueLabel") }}
               </span>
-              <div class="flex items-center gap-1">
-                <OCode truncate class="min-w-0 flex-1">{{ raw(pendingRecords[d.id].value) }}</OCode>
+              <div class="flex min-w-0 items-center gap-1">
+                <OCode truncate class="min-w-0">{{ raw(d.verification_token) }}</OCode>
                 <OButton
                   variant="ghost"
                   size="icon-xs"
                   icon-left="content-copy"
                   :data-test="`status-page-domain-copy-txt-value-${d.id}`"
-                  @click="copyTxtValue(d.id)"
+                  @click="copyTxtValue(d)"
                 >
                   <OTooltip side="bottom" :content="t('statusPages.domains.copyTxtValue')" />
                 </OButton>
@@ -174,25 +174,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("statusPages.domains.nextStepCname", { domain: d.domain }) }}
             </span>
           </div>
-
-          <OBanner
-            variant="warning"
-            icon="warning"
-            dense
-            :data-test="`status-page-domain-write-once-warning-${d.id}`"
-          >
-            {{ t("statusPages.domains.writeOnceWarning") }}
-          </OBanner>
-        </div>
-
-        <!-- The token is unrecoverable once the dialog closes, so a domain left
-             unverified from an earlier session can only be re-claimed. -->
-        <div
-          v-else-if="d.verification_state !== 1"
-          class="text-text-secondary text-xs"
-          :data-test="`status-page-domain-record-lost-${d.id}`"
-        >
-          {{ t("statusPages.domains.recordLost") }}
         </div>
       </div>
     </div>
@@ -214,16 +195,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import statusPagesService, {
-  type StatusPageDomain,
-  type CreateDomainResponse,
-} from "@/services/status_pages";
+import statusPagesService, { type StatusPageDomain } from "@/services/status_pages";
 import { domainStateBadge } from "./statusPageBadges";
-
-interface PendingRecord {
-  name: string;
-  value: string;
-}
 
 const props = defineProps<{
   open: boolean;
@@ -244,10 +217,6 @@ const loading = ref(false);
 const adding = ref(false);
 const verifyingId = ref<string | null>(null);
 const newDomain = ref("");
-// The TXT record shown right after claiming a domain — the create response is
-// the only place txt_value is ever returned; DomainAdminView omits it, so a
-// later list refresh cannot show it again and it is kept client-side per session.
-const pendingRecords = ref<Record<string, PendingRecord>>({});
 
 // Mirrors ZO_STATUS_PAGE_DOMAIN_VERIFY_INTERVAL's server-side default; the
 // backend exposes no endpoint for it, so an operator override drifts from this.
@@ -280,10 +249,8 @@ async function addDomain() {
   if (!domain || adding.value) return;
   adding.value = true;
   try {
-    const res = await statusPagesService.createDomain(props.orgIdentifier, props.pageId, domain);
-    const created = res.data as CreateDomainResponse;
+    await statusPagesService.createDomain(props.orgIdentifier, props.pageId, domain);
     newDomain.value = "";
-    pendingRecords.value[created.id] = { name: created.txt_name, value: created.txt_value };
     await load();
   } catch (err: any) {
     toast({
@@ -299,18 +266,16 @@ async function addDomain() {
   }
 }
 
-function copyTxtName(domainId: string) {
-  const record = pendingRecords.value[domainId];
-  if (!record) return;
-  copyToClipboard(record.name, t, {
+function copyTxtName(d: StatusPageDomain) {
+  if (!d.txt_name) return;
+  copyToClipboard(d.txt_name, t, {
     successMessage: t("statusPages.domains.txtNameCopied"),
   });
 }
 
-function copyTxtValue(domainId: string) {
-  const record = pendingRecords.value[domainId];
-  if (!record) return;
-  copyToClipboard(record.value, t, {
+function copyTxtValue(d: StatusPageDomain) {
+  if (!d.verification_token) return;
+  copyToClipboard(d.verification_token, t, {
     successMessage: t("statusPages.domains.txtValueCopied"),
   });
 }
@@ -350,7 +315,6 @@ async function confirmDelete(d: StatusPageDomain) {
   try {
     await statusPagesService.deleteDomain(props.orgIdentifier, d.id);
     domains.value = domains.value.filter((x) => x.id !== d.id);
-    delete pendingRecords.value[d.id];
     dismiss();
     toast({ variant: "success", message: t("statusPages.domains.deleted") });
   } catch (err: any) {

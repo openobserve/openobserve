@@ -65,6 +65,8 @@ function makeDomain(overrides: Partial<StatusPageDomain> = {}): StatusPageDomain
     verified_at: null,
     last_checked_at: null,
     created_at: 1_700_000_000_000_000,
+    txt_name: "_o2-verify.status.brandname.com",
+    verification_token: "o2v_abc123",
     ...overrides,
   };
 }
@@ -149,19 +151,7 @@ describe("DomainsDialog", () => {
   describe("TXT record copy affordances", () => {
     it("renders a copy button for the TXT name and one for the TXT value", async () => {
       mockListDomains.mockResolvedValue({ data: [makeDomain()] });
-      mockCreateDomain.mockResolvedValue({
-        data: {
-          id: "dom-1",
-          domain: "status.brandname.com",
-          txt_name: "_o2-verify.status.brandname.com",
-          txt_value: "o2v_abc123",
-        },
-      });
       wrapper = makeWrapper();
-      await flushPromises();
-
-      await wrapper.find('[data-test="status-page-domain-input"]').setValue("status.brandname.com");
-      await wrapper.find('[data-test="status-page-domain-add-btn"]').trigger("click");
       await flushPromises();
 
       expect(wrapper.find('[data-test="status-page-domain-copy-txt-name-dom-1"]').exists()).toBe(
@@ -174,19 +164,7 @@ describe("DomainsDialog", () => {
 
     it("copies the TXT name through the shared clipboard helper", async () => {
       mockListDomains.mockResolvedValue({ data: [makeDomain()] });
-      mockCreateDomain.mockResolvedValue({
-        data: {
-          id: "dom-1",
-          domain: "status.brandname.com",
-          txt_name: "_o2-verify.status.brandname.com",
-          txt_value: "o2v_abc123",
-        },
-      });
       wrapper = makeWrapper();
-      await flushPromises();
-
-      await wrapper.find('[data-test="status-page-domain-input"]').setValue("status.brandname.com");
-      await wrapper.find('[data-test="status-page-domain-add-btn"]').trigger("click");
       await flushPromises();
 
       await wrapper.find('[data-test="status-page-domain-copy-txt-name-dom-1"]').trigger("click");
@@ -198,21 +176,9 @@ describe("DomainsDialog", () => {
       );
     });
 
-    it("copies the write-once TXT value through the shared clipboard helper", async () => {
+    it("copies the TXT value through the shared clipboard helper", async () => {
       mockListDomains.mockResolvedValue({ data: [makeDomain()] });
-      mockCreateDomain.mockResolvedValue({
-        data: {
-          id: "dom-1",
-          domain: "status.brandname.com",
-          txt_name: "_o2-verify.status.brandname.com",
-          txt_value: "o2v_abc123",
-        },
-      });
       wrapper = makeWrapper();
-      await flushPromises();
-
-      await wrapper.find('[data-test="status-page-domain-input"]').setValue("status.brandname.com");
-      await wrapper.find('[data-test="status-page-domain-add-btn"]').trigger("click");
       await flushPromises();
 
       await wrapper.find('[data-test="status-page-domain-copy-txt-value-dom-1"]').trigger("click");
@@ -226,8 +192,32 @@ describe("DomainsDialog", () => {
   });
 
   describe("next-steps guidance", () => {
-    it("renders the next-steps block alongside a freshly claimed domain", async () => {
+    it("renders the next-steps block for a pending domain loaded from the list", async () => {
       mockListDomains.mockResolvedValue({ data: [makeDomain()] });
+      wrapper = makeWrapper();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="status-page-domain-next-steps-dom-1"]').exists()).toBe(true);
+      const values = wrapper.findAll("code").map((c) => c.text());
+      expect(values).toContain("_o2-verify.status.brandname.com");
+      expect(values).toContain("o2v_abc123");
+    });
+
+    it("keeps the record visible for a domain whose last check failed", async () => {
+      mockListDomains.mockResolvedValue({
+        data: [makeDomain({ verification_state: 2, verification_failure_reason: 0 })],
+      });
+      wrapper = makeWrapper();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="status-page-domain-next-steps-dom-1"]').exists()).toBe(true);
+      expect(wrapper.findAll("code").map((c) => c.text())).toContain("o2v_abc123");
+    });
+
+    it("renders the next-steps block alongside a freshly claimed domain", async () => {
+      mockListDomains.mockResolvedValueOnce({ data: [] }).mockResolvedValueOnce({
+        data: [makeDomain()],
+      });
       mockCreateDomain.mockResolvedValue({
         data: {
           id: "dom-1",
@@ -246,49 +236,16 @@ describe("DomainsDialog", () => {
       expect(wrapper.find('[data-test="status-page-domain-next-steps-dom-1"]').exists()).toBe(true);
     });
 
-    it("warns that the TXT value is shown only once", async () => {
-      mockListDomains.mockResolvedValue({ data: [makeDomain()] });
-      mockCreateDomain.mockResolvedValue({
-        data: {
-          id: "dom-1",
-          domain: "status.brandname.com",
-          txt_name: "_o2-verify.status.brandname.com",
-          txt_value: "o2v_abc123",
-        },
+    it("drops the next-steps block once the domain is verified", async () => {
+      mockListDomains.mockResolvedValue({
+        data: [makeDomain({ verification_state: 1, txt_name: null, verification_token: null })],
       });
-      wrapper = makeWrapper();
-      await flushPromises();
-
-      await wrapper.find('[data-test="status-page-domain-input"]').setValue("status.brandname.com");
-      await wrapper.find('[data-test="status-page-domain-add-btn"]').trigger("click");
-      await flushPromises();
-
-      const warning = wrapper.find('[data-test="status-page-domain-write-once-warning-dom-1"]');
-      expect(warning.exists()).toBe(true);
-      expect(warning.attributes("data-variant")).toBe("warning");
-    });
-
-    it("points a domain whose token was never seen this session at re-claiming", async () => {
-      mockListDomains.mockResolvedValue({ data: [makeDomain()] });
-      wrapper = makeWrapper();
-      await flushPromises();
-
-      expect(wrapper.find('[data-test="status-page-domain-record-lost-dom-1"]').exists()).toBe(
-        true,
-      );
-    });
-
-    it("hides the next-steps block for a domain whose token was never seen this session", async () => {
-      mockListDomains.mockResolvedValue({ data: [makeDomain()] });
       wrapper = makeWrapper();
       await flushPromises();
 
       expect(wrapper.find('[data-test="status-page-domain-next-steps-dom-1"]').exists()).toBe(
         false,
       );
-      expect(
-        wrapper.find('[data-test="status-page-domain-write-once-warning-dom-1"]').exists(),
-      ).toBe(false);
     });
   });
 
