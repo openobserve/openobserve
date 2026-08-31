@@ -14287,6 +14287,9 @@
       "deleting": "Removing update...",
       "deleted": "Update removed",
       "deleteFailed": "Failed to remove update",
+      "affects": "Affects",
+      "allComponents": "All components",
+      "componentsUnavailable": "Components no longer on this page",
       "state": {
         "scheduled": "Scheduled",
         "active": "Active",

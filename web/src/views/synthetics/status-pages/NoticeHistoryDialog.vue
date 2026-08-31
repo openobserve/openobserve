@@ -67,6 +67,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <p class="text-sm font-medium">{{ raw(notice.title) }}</p>
+        <div
+          class="flex flex-wrap items-center gap-1.5"
+          :data-test="`status-page-notice-components-${notice.id}`"
+        >
+          <span class="text-text-secondary text-xs">{{ t("statusPages.notices.affects") }}</span>
+          <template v-if="affectedNames(notice).length">
+            <OTag
+              v-for="name in affectedNames(notice)"
+              :key="name"
+              size="xs"
+              shape="rounded"
+              variant="default-soft"
+              :label="raw(name)"
+            />
+          </template>
+          <OTag
+            v-else
+            size="xs"
+            shape="rounded"
+            variant="default-soft"
+            :label="
+              notice.component_ids.length
+                ? t('statusPages.notices.componentsUnavailable')
+                : t('statusPages.notices.allComponents')
+            "
+          />
+        </div>
         <p class="text-text-secondary text-sm whitespace-pre-wrap">{{ raw(notice.body) }}</p>
 
         <div
@@ -94,11 +121,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -115,6 +143,7 @@ const props = defineProps<{
   orgIdentifier: string;
   pageId: string;
   pageName: string;
+  components: { id: string; name: string }[];
 }>();
 
 const emit = defineEmits<{
@@ -128,6 +157,17 @@ const { confirm } = useConfirmDialog();
 const notices = ref<StatusPageNotice[]>([]);
 const updatesByNotice = ref<Record<string, StatusPageNoticeUpdate[]>>({});
 const loading = ref(false);
+
+const componentNamesById = computed(
+  () => new Map(props.components.map((c) => [c.id, c.name] as const)),
+);
+
+// create_notice fans an empty component_ids out to every component, so empty reads "all", not "none".
+function affectedNames(notice: StatusPageNotice): string[] {
+  return notice.component_ids
+    .map((id) => componentNamesById.value.get(id))
+    .filter((name): name is string => !!name);
+}
 
 async function load() {
   if (!props.pageId) return;

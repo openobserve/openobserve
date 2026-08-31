@@ -384,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :org-identifier="orgIdentifier"
       :page-id="postUpdatePage.id"
       :page-name="postUpdatePage.name"
-      :components="postUpdateComponents"
+      :components="pageComponents"
       @posted="refreshPageHealth(postUpdatePage.id)"
     />
 
@@ -395,6 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :org-identifier="orgIdentifier"
       :page-id="noticeHistoryPage.id"
       :page-name="noticeHistoryPage.name"
+      :components="pageComponents"
       @deleted="refreshPageHealth(noticeHistoryPage.id)"
     />
 
@@ -931,30 +932,36 @@ const onStatusPageCreated = async (page: StatusPageListItem) => {
 
 const showPostUpdate = ref(false);
 const postUpdatePage = ref<StatusPageListItem | null>(null);
-const postUpdateComponents = ref<{ id: string; name: string }[]>([]);
+// Shared by the post-update picker and the history dialog's affected-component chips.
+const pageComponents = ref<{ id: string; name: string }[]>([]);
 
-const openPostUpdate = async (page: StatusPageListItem) => {
-  postUpdatePage.value = page;
-  postUpdateComponents.value = [];
-  showPostUpdate.value = true;
+const loadPageComponents = async (pageId: string) => {
+  pageComponents.value = [];
   try {
-    const res = await statusPagesService.get(orgIdentifier.value, page.id);
-    postUpdateComponents.value = ((res.data as any).components ?? []).map((c: any) => ({
+    const res = await statusPagesService.get(orgIdentifier.value, pageId);
+    pageComponents.value = ((res.data as any).components ?? []).map((c: any) => ({
       id: c.id,
       name: c.name,
     }));
   } catch (err) {
-    console.error("[status-pages] failed to load components for post-update", err);
+    console.error("[status-pages] failed to load components for page", err);
   }
+};
+
+const openPostUpdate = async (page: StatusPageListItem) => {
+  postUpdatePage.value = page;
+  showPostUpdate.value = true;
+  await loadPageComponents(page.id);
 };
 
 const showNoticeHistory = ref(false);
 const noticeHistoryPage = ref<StatusPageListItem | null>(null);
 
-const openNoticeHistory = (page: StatusPageListItem) => {
+const openNoticeHistory = async (page: StatusPageListItem) => {
   noticeHistoryPage.value = page;
   showNoticeHistory.value = true;
   refreshPageHealth(page.id);
+  await loadPageComponents(page.id);
 };
 
 const showDomains = ref(false);
