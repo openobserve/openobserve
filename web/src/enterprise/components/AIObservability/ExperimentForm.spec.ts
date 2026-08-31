@@ -21,6 +21,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import ExperimentForm from "./ExperimentForm.vue";
+import { MAX_TRIAL_COUNT } from "./ExperimentForm.schema";
 import llmExperimentsService from "@/services/llm-experiments.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
 import onlineEvalsService from "@/services/online-evals.service";
@@ -28,14 +29,16 @@ import i18n from "@/locales";
 
 const push = vi.fn();
 
+const { routeQuery } = vi.hoisted(() => ({ routeQuery: {} as Record<string, string> }));
+
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ query: {} }),
+  useRoute: () => ({ query: routeQuery }),
   useRouter: () => ({ push }),
   onBeforeRouteLeave: vi.fn(),
 }));
 
 vi.mock("@/services/llm-experiments.service", () => ({
-  default: { create: vi.fn(), preview: vi.fn() },
+  default: { create: vi.fn(), preview: vi.fn(), get: vi.fn(), clone: vi.fn() },
 }));
 vi.mock("@/services/llm-datasets.service", () => ({ default: { list: vi.fn() } }));
 vi.mock("@/services/online-evals.service", () => ({
@@ -122,6 +125,7 @@ describe("ExperimentForm", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    for (const key of Object.keys(routeQuery)) delete routeQuery[key];
     (llmDatasetsService.list as any).mockResolvedValue([dataset]);
     (onlineEvalsService.scorers.list as any).mockResolvedValue([scorer]);
     (onlineEvalsService.providers.list as any).mockResolvedValue([provider]);
@@ -291,20 +295,22 @@ describe("ExperimentForm", () => {
     expect(wrapper.find('[data-test="ai-experiment-form-sdk-snippet"]').exists()).toBe(false);
   });
 
-  // The backend accepts 1..100 (MAX_TRIAL_COUNT), so the field must not be
-  // restricted to a fixed list.
+  // The backend accepts 1..MAX_TRIAL_COUNT, so the field must not be restricted
+  // to a fixed list.
   it("accepts any trial count the backend allows", async () => {
     wrapper = await createWrapper();
     fillValid(wrapper);
-    setField(wrapper, "trialCount", 40);
+    setField(wrapper, "trialCount", MAX_TRIAL_COUNT);
     await submit(wrapper);
-    expect((llmExperimentsService.create as any).mock.calls[0][1].trialCount).toBe(40);
+    expect((llmExperimentsService.create as any).mock.calls[0][1].trialCount).toBe(MAX_TRIAL_COUNT);
   });
 
-  it("rejects a trial count outside 1..100", async () => {
+  // The server rejects anything above its own ceiling, so the form must not send
+  // it and then surface the refusal as a failed create.
+  it("rejects a trial count outside the server's range", async () => {
     wrapper = await createWrapper();
     fillValid(wrapper);
-    setField(wrapper, "trialCount", 101);
+    setField(wrapper, "trialCount", MAX_TRIAL_COUNT + 1);
     await submit(wrapper);
     expect(llmExperimentsService.create).not.toHaveBeenCalled();
 
@@ -358,5 +364,86 @@ describe("ExperimentForm", () => {
     expect(wrapper.find('[data-test="ai-experiment-form-preview"]').text()).toContain(
       "Finish the task section",
     );
+  });
+});
+
+// Cloning opens this same form seeded from the source run, so a copy can be
+// edited before it costs an execution.
+describe("ExperimentForm — clone", () => {
+  const source = {
+    id: "exp-source",
+    name: "prompt v3 probe",
+    description: "the run we are iterating on",
+    datasetId: "ds-1",
+    // Deliberately BEHIND the dataset's head (12): the clone must stay on it.
+    datasetVersion: 9,
+    datasetFilter: { sources: ["trace"] },
+    task: {
+      type: "inline_prompt",
+      messages: [
+        { role: "system", content: "You are terse." },
+        { role: "user", content: "Summarise {{ input }}" },
+      ],
+      providerId: "pr-1",
+      model: "gpt-4o",
+      params: { temperature: 0.7 },
+    },
+    scorers: [{ id: "sc-1", version: 2 }],
+    trialCount: 3,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    routeQuery.clone_of = "exp-source";
+    (llmDatasetsService.list as any).mockResolvedValue([dataset]);
+    (onlineEvalsService.scorers.list as any).mockResolvedValue([scorer]);
+    (onlineEvalsService.providers.list as any).mockResolvedValue([provider]);
+    (llmExperimentsService.preview as any).mockResolvedValue(previewResult);
+    (llmExperimentsService.get as any).mockResolvedValue({ experiment: source });
+    (llmExperimentsService.clone as any).mockResolvedValue({ id: "exp-copy" });
+  });
+
+  // `sampleSize` is validated server-side as 1..20, so 0 — the honest way to say
+  // "definition only" — comes back 400 and the form never seeds.
+  it("asks for a sample size the server accepts", async () => {
+    const wrapper = await createWrapper();
+    expect(llmExperimentsService.get).toHaveBeenCalledWith("test-org", "exp-source", 1);
+    wrapper.unmount();
+  });
+
+  it("seeds every field from the source and names the copy", async () => {
+    const wrapper = await createWrapper();
+    const values = oform(wrapper).form.state.values;
+
+    expect(values.name).toBe("prompt v3 probe (Copy)");
+    expect(values.datasetId).toBe("ds-1");
+    expect(values.sources).toEqual(["trace"]);
+    expect(values.providerId).toBe("pr-1");
+    expect(values.model).toBe("gpt-4o");
+    expect(values.systemPrompt).toBe("You are terse.");
+    expect(values.userPrompt).toBe("Summarise {{ input }}");
+    expect(values.temperature).toBe(0.7);
+    expect(values.scorerIds).toEqual(["sc-1"]);
+    expect(values.trialCount).toBe(3);
+    wrapper.unmount();
+  });
+
+  // Re-pinning to the dataset head would compare two runs over different rows
+  // and report the difference as a result.
+  it("clones through the clone endpoint and never re-pins the dataset", async () => {
+    const wrapper = await createWrapper();
+    await submit(wrapper);
+
+    expect(llmExperimentsService.create).not.toHaveBeenCalled();
+    const [org, sourceId, overrides] = (llmExperimentsService.clone as any).mock.calls[0];
+    expect(org).toBe("test-org");
+    expect(sourceId).toBe("exp-source");
+    expect(overrides).not.toHaveProperty("datasetId");
+    expect(overrides).not.toHaveProperty("datasetVersion");
+    expect(overrides.trialCount).toBe(3);
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ selected: "exp-copy" }) }),
+    );
+    wrapper.unmount();
   });
 });

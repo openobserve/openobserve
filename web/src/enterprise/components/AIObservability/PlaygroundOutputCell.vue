@@ -189,11 +189,13 @@ function scoreVariant(score: PlaygroundScore): BadgeVariant {
   return "primary-soft";
 }
 
+// Past tense here, unlike the scorer menu: by the time this renders the score
+// HAS been skipped, and "will be skipped" reads as something still avoidable.
 function scoreNote(score: PlaygroundScore) {
   if (score.status === "failed") return raw(score.error ?? "");
   return score.reason === "requires_trace"
     ? t("aiObservability.playground.scorerNeedsTrace")
-    : t("aiObservability.playground.scorerNeedsReference");
+    : t("aiObservability.playground.scoreSkippedNoReference");
 }
 
 const latencySeconds = computed(() => ((props.cell?.usage?.latencyMs ?? 0) / 1000).toFixed(1));

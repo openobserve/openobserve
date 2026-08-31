@@ -275,8 +275,10 @@ import {
 } from "@/enterprise/views/AIObservability/experimentDiscovery";
 import {
   aiExperimentCompareRoute,
+  aiExperimentCreateRoute,
   aiExperimentDetailRoute,
 } from "@/enterprise/views/AIObservability/experimentRoutes";
+import { canCloneInForm } from "./ExperimentForm.schema";
 
 const props = withDefaults(
   defineProps<{
@@ -537,9 +539,14 @@ function isBaseline(experiment: LlmExperiment) {
   return baselineByDataset.value[experiment.datasetId] === experiment.id;
 }
 
-// Cloning opens the copy, the same as cloning from the detail page — the new
-// run is the thing you wanted, and it is not visible in this list until then.
+// Cloning opens the create form seeded from the source rather than starting a
+// run outright: a clone costs a full execution, and the reason for making one is
+// almost always to change something first.
 async function cloneExperiment(experiment: LlmExperiment) {
+  if (canCloneInForm(experiment.task)) {
+    void router.push(aiExperimentCreateRoute(props.orgId, { cloneOf: experiment.id }));
+    return;
+  }
   cloningId.value = experiment.id;
   try {
     const clone = await llmExperimentsService.clone(props.orgId, experiment.id);
