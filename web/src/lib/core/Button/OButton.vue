@@ -309,10 +309,12 @@ const classes = computed<string[]>(() => [
   "font-medium transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
   "outline-none",
   /* Unified focus glow — identical to OInput/OSelect: a 2px translucent primary
-     halo hugging the control (no ring-offset gap). The trailing `!` overrides
-     each variant's own ring width/color below, so every button focuses with the
-     exact same soft glow regardless of variant. */
-  "focus-visible:ring-[0.125rem]! focus-visible:ring-accent/25!",
+     ring hugging the control (no ring-offset gap). The trailing `!` overrides
+     each variant's own ring width/color below, so every button focuses identically.
+     Reads --color-focus-ring-accent, NOT accent/25: at 25% alpha the ring measured
+     1.38:1 in light and 1.50:1 in dark, against the 3:1 SC 1.4.11 floor. Solid, it is
+     4.80:1 / 6.82:1. This override is why the per-variant ring classes never paint. */
+  "focus-visible:ring-[0.125rem]! focus-visible:ring-focus-ring-accent!",
   "disabled:cursor-not-allowed enabled:cursor-pointer",
   // Variant + size (active overrides variant to primary appearance)
   props.active ? activeClasses : variantClasses[props.variant],
