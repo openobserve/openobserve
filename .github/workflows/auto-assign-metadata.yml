@@ -233,14 +233,20 @@ jobs:
             && echo "Assigned simranquirky to stranger issue #$NUMBER" \
             || echo "::warning::Could not assign to stranger issue #$NUMBER"
 
-      # ── Stranger: assign PR to oasisk + hengfeiyang ──
-      - name: Assign stranger PR
+      # ── Stranger: assign PR to hengfeiyang + label as community (label skips bots) ──
+      - name: Assign and label stranger PR
         if: github.event_name == 'pull_request_target' && steps.classify.outputs.category == 'stranger'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.pull_request.number }}
+          USER_TYPE: ${{ github.event.pull_request.user.type }}
         run: |
-          gh pr edit "$NUMBER" --add-assignee "oasisk" --add-assignee "hengfeiyang" \
-            && echo "Assigned oasisk and hengfeiyang to stranger PR #$NUMBER" \
+          gh pr edit "$NUMBER" --add-assignee "hengfeiyang" \
+            && echo "Assigned hengfeiyang to stranger PR #$NUMBER" \
             || echo "::warning::Could not assign to stranger PR #$NUMBER"
+          if [ "$USER_TYPE" != "Bot" ]; then
+            gh pr edit "$NUMBER" --add-label "community" \
+              && echo "Labeled stranger PR #$NUMBER as community" \
+              || echo "::warning::Could not label stranger PR #$NUMBER"
+          fi
