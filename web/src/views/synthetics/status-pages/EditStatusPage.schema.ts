@@ -38,7 +38,6 @@ export const makeEditStatusPageSchema = (t: (k: string) => string) =>
       noindex: z.boolean().default(false),
       show_uptime_percent: z.boolean().default(true),
       show_timeline_bars: z.boolean().default(true),
-      show_response_time: z.boolean().default(true),
       // <input type="number"> emits a string — validate the raw value, coerce at use.
       confirm_failures: z
         .any()

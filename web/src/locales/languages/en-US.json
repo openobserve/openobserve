@@ -14227,8 +14227,6 @@
       "passwordSetHelp": "A password is already set. Leave blank to keep it, or type a new one to replace it.",
       "showUptimePercent": "Show uptime percentage",
       "showTimelineBars": "Show timeline bars",
-      "showResponseTime": "Show response time",
-      "showResponseTimeHelp": "Turn off so the page does not leak performance numbers.",
       "noindex": "Discourage search indexing",
       "noindexHelp": "Adds a noindex tag so search engines skip the public page.",
       "confirmFailures": "Confirm failures",

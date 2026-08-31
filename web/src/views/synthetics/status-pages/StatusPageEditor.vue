@@ -460,7 +460,6 @@ const emptyDefaults = (): EditStatusPageForm => ({
   noindex: false,
   show_uptime_percent: true,
   show_timeline_bars: true,
-  show_response_time: true,
   confirm_failures: "0",
   confirm_recovery: "0",
   _passwordSet: false,
@@ -483,7 +482,6 @@ function defaultsFromPage(p: StatusPageListItem): EditStatusPageForm {
     noindex: p.noindex,
     show_uptime_percent: p.show_uptime_percent,
     show_timeline_bars: p.show_timeline_bars,
-    show_response_time: p.show_response_time,
     confirm_failures: String(p.confirm_failures ?? 0),
     confirm_recovery: String(p.confirm_recovery ?? 0),
     _passwordSet: p.password_set,
@@ -639,7 +637,6 @@ async function saveSettings(values: EditStatusPageForm) {
     noindex: values.noindex,
     show_uptime_percent: values.show_uptime_percent,
     show_timeline_bars: values.show_timeline_bars,
-    show_response_time: values.show_response_time,
     confirm_failures: Number(values.confirm_failures),
     confirm_recovery: Number(values.confirm_recovery),
   };
