@@ -39,10 +39,13 @@ export type ButtonVariant =
   | "preview-slack"
   | "preview-teams"
   | "preview-email"
+  | "preview-opsgenie"
   // Generic preview action button — for destination previews with no specific brand color
   | "preview-action"
   // Webinar banner dismiss — inline text-link style button for the top bar banner
   | "webinar-dismiss"
+  // Banner action — inline text-link style button for actions inside an OBanner bar
+  | "banner-dismiss"
   // Pricing template chip — pill-shaped toggle chip for quick-setup template selection
   | "pricing-chip"
   // Outline with primary color text + border — for "always highlighted" branded badges (e.g. edition indicator)

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
+
 import { PromQLResponse, ConversionContext, PromQLChartConverter } from "./shared/types";
 import { processPromQLData } from "./shared/dataProcessor";
 import { TimeSeriesConverter } from "./convertPromQLTimeSeriesChart";
@@ -79,8 +81,10 @@ export async function convertPromQLChartData(
   if (!converter) {
     console.error(`No converter found for chart type: ${chartType}`);
     throw new Error(
-      `Unsupported chart type for PromQL: ${chartType}. ` +
-        `Supported types: ${CONVERTER_REGISTRY.flatMap((c) => c.supportedTypes).join(", ")}`,
+      gt("dashboard.utils.promqlUnsupportedChartType", {
+        chartType,
+        supportedTypes: CONVERTER_REGISTRY.flatMap((c) => c.supportedTypes).join(", "),
+      }),
     );
   }
 

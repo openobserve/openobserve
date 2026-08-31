@@ -19,87 +19,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OPageLayout
       bleed
       v-if="!showDestinationEditor && !showImportDestination"
-      :title="t('alert_destinations.header')"
+      :title="t('alerts.header')"
       title-data-test="alert-destinations-list-title"
-      icon="location-on"
-      :subtitle="t('alert_destinations.subtitle')"
+      icon="shield-alert-outline"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
     >
+      <template #header-tabs>
+        <AlertSectionTabs />
+      </template>
+
       <template #actions>
-        <OToggleGroup
-          :model-value="activeTab"
-          @update:model-value="
-            (v) => {
-              activeTab = v as 'all' | 'prebuilt' | 'custom';
-            }
-          "
-          data-test="destination-list-tabs"
-          class="max-md:hidden"
-        >
-          <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
-            <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-            {{ t("alert_destinations.filterAll") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
-            <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
-            {{ t("alert_destinations.filterPrebuilt") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
-            <template #icon-left><OIcon name="settings" size="sm" /></template>
-            {{ t("alert_destinations.filterCustom") }}
-          </OToggleGroupItem>
-        </OToggleGroup>
-        <OButton
-          variant="outline"
-          size="sm"
-          class="max-md:hidden"
-          @click="importDestination"
-          data-test="destination-import"
-          >{{ t(`dashboard.import`) }}</OButton
-        >
         <OButton
           data-test="alert-destination-list-add-alert-btn"
           variant="primary"
           size="sm"
+          icon-left="add"
           :disabled="!templates.length"
           @click="editDestination(null)"
           >{{ t(`alert_destinations.add`) }}</OButton
         >
       </template>
-      <!-- < md the filter tabs + Import move out of the header so it stays one
-           line; the header keeps only the primary New-destination action. -->
-      <div
-        class="border-border-default flex shrink-0 items-center justify-between gap-2 border-b px-3 py-1.5 md:hidden"
-      >
-        <OToggleGroup
-          :model-value="activeTab"
-          @update:model-value="
-            (v) => {
-              activeTab = v as 'all' | 'prebuilt' | 'custom';
-            }
-          "
-          data-test="destination-list-tabs-mobile"
-        >
-          <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all-mobile">
-            <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-            {{ t("alert_destinations.filterAll") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt-mobile">
-            <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
-            {{ t("alert_destinations.filterPrebuilt") }}
-          </OToggleGroupItem>
-          <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom-mobile">
-            <template #icon-left><OIcon name="settings" size="sm" /></template>
-            {{ t("alert_destinations.filterCustom") }}
-          </OToggleGroupItem>
-        </OToggleGroup>
+      <!-- Secondary: inline on desktop, behind "More" < md. -->
+      <template #actions-overflow>
         <OButton
           variant="outline"
           size="sm"
           @click="importDestination"
-          data-test="destination-import-mobile"
+          data-test="destination-import"
           >{{ t(`dashboard.import`) }}</OButton
         >
-      </div>
+      </template>
+
       <div class="bg-card-glass-bg min-h-0 flex-1">
         <OTable
           data-test="alert-destinations-list-table"
@@ -123,12 +74,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <OSearchInput
-              v-model="filterQuery"
-              data-test="destination-list-search-input"
-              class="flex-1"
-              :placeholder="t('alert_destinations.search')"
-            />
+            <div class="flex w-full items-center gap-2 max-md:flex-wrap max-md:gap-y-1">
+              <OToggleGroup
+                :model-value="activeTab"
+                @update:model-value="
+                  (v) => {
+                    activeTab = v as 'all' | 'prebuilt' | 'custom';
+                  }
+                "
+                data-test="destination-list-tabs"
+              >
+                <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
+                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                  {{ t("alert_destinations.filterAll") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
+                  <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+                  {{ t("alert_destinations.filterPrebuilt") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
+                  <template #icon-left><OIcon name="settings" size="sm" /></template>
+                  {{ t("alert_destinations.filterCustom") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+              <OSearchInput
+                v-model="filterQuery"
+                data-test="destination-list-search-input"
+                class="flex-1"
+                :placeholder="t('alert_destinations.search')"
+              />
+            </div>
           </template>
           <template #toolbar-trailing>
             <OButton
@@ -269,11 +244,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 :title="t('alert_destinations.delete')"
+                :loading="deletingDestinations.has(row.name)"
                 @click="conformDeleteDestination(row)"
               >
                 <OIcon name="delete" size="sm" />
               </OButton>
             </div>
+          </template>
+
+          <template #cell-used_by="{ row }">
+            <DependencyUsageCell
+              :graph="depGraph"
+              :focus="{ kind: 'destination', name: row.name }"
+              @deleted="onDependencyDeleted"
+            />
           </template>
         </OTable>
       </div>
@@ -329,7 +313,13 @@ import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
 
 import ImportDestination from "./ImportDestination.vue";
-import useActions from "@/composables/useActions";
+import DependencyUsageCell from "./DependencyUsageCell.vue";
+import useDependencyGraph, {
+  invalidateDependencyGraphCache,
+  applyDependencyDeletion,
+  depNodeId,
+} from "@/composables/alerts/useDependencyGraph";
+import type { DepNodeKind } from "@/composables/alerts/useDependencyGraph";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -340,6 +330,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -366,12 +357,14 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OPageLayout,
+    AlertSectionTabs,
+    DependencyUsageCell,
   },
   setup() {
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
     const { t } = useI18nTyped();
-    const { getAllActions } = useActions();
+    const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
     const { track } = useReo();
 
     const { detectPrebuiltType, availableTypes } = usePrebuiltDestinations();
@@ -428,11 +421,21 @@ export default defineComponent({
         meta: { align: "left" },
       },
       {
+        id: "used_by",
+        header: t("alert_dependencies.usedByColumn"),
+        cell: " ",
+        sortable: false,
+        resizable: true,
+        hideable: true,
+        size: 200,
+        meta: { align: "left" },
+      },
+      {
         id: "actions",
         header: t("alert_destinations.actions"),
         isAction: true,
         pinned: "right",
-        size: 120,
+        size: 130,
         meta: { align: "center", actionCount: 3 },
       },
     ];
@@ -450,6 +453,7 @@ export default defineComponent({
     const router = useRouter();
     const filterQuery = ref("");
     const resultTotal = ref(0);
+    const deletingDestinations = ref(new Set<string>());
 
     const selectedDestinationIds = computed(() =>
       selectedDestinations.value.map((d: any) => d.name),
@@ -467,7 +471,6 @@ export default defineComponent({
     onBeforeMount(() => {
       getDestinations();
       getTemplates();
-      getActions();
     });
 
     watch(
@@ -484,22 +487,31 @@ export default defineComponent({
       updateRoute();
     });
 
-    const getActions = async () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlertDestination"),
-        timeout: 0,
-      });
-      if (store.state.organizationData.actions.length == 0) {
-        await getAllActions()
-          .catch(() => {
-            toast({
-              variant: "error",
-              message: t("toastMessages.alerts.errorWhileLoadingActions"),
-            });
-          })
-          .finally(() => dismiss());
-      }
+    // A delete is one row leaving a list the server has already confirmed. Splice
+    // it out and prune the shared dependency graph rather than refetching: a
+    // refetch blanks the table behind its spinner and a "please wait" toast, which
+    // reads as a page reload, and takes the user's scroll and page with it.
+    const dropDestinations = (names: string[]) => {
+      if (!names.length) return;
+      const gone = new Set(names);
+      destinations.value = destinations.value.filter((d: any) => !gone.has(d.name));
+      // Anything that failed to delete stays selected, so a bulk retry is one click.
+      selectedDestinations.value = selectedDestinations.value.filter((d: any) => !gone.has(d.name));
+      const org = store.state.selectedOrganization.identifier;
+      for (const name of gone)
+        depGraph.value = applyDependencyDeletion(
+          org,
+          depNodeId("destination", name),
+          depGraph.value,
+        );
+    };
+
+    // Deleting an alert in the impact dialog leaves this list's rows untouched, so
+    // re-read the (already pruned) shared graph for the Used by counts instead of
+    // reloading the page's data.
+    const onDependencyDeleted = (kind: DepNodeKind) => {
+      if (kind === "destination") getDestinations();
+      else loadDepGraph(store.state.selectedOrganization.identifier);
     };
 
     const loading = ref(false);
@@ -521,13 +533,15 @@ export default defineComponent({
         })
         .then((res) => {
           res.data = res.data.filter(
-            (destination: any) =>
-              destination.type == "http" ||
-              destination.type == "email" ||
-              destination.type === "action",
+            (destination: any) => destination.type == "http" || destination.type == "email",
           );
           resultTotal.value = res.data.length;
           destinations.value = res.data;
+          // Any destination add/edit/delete lands here on refresh — drop the
+          // shared dependency-graph cache and rebuild it so the "Used by" counts
+          // (and the impact dialog) are current.
+          invalidateDependencyGraphCache();
+          loadDepGraph(store.state.selectedOrganization.identifier);
           updateRoute();
         })
         .catch((err) => {
@@ -593,34 +607,34 @@ export default defineComponent({
       editingDestination.value = null;
     };
     const deleteDestination = () => {
-      if (confirmDelete.value?.data?.name) {
-        destinationService
-          .delete({
-            org_identifier: store.state.selectedOrganization.identifier,
-            destination_name: confirmDelete.value.data.name,
-          })
-          .then(() => {
-            toast({
-              variant: "success",
-              message: t("toastMessages.alerts.destinationDeletedSuccessfully", {
-                name: confirmDelete.value.data.name,
-              }),
-            });
-            getDestinations();
-          })
-          .catch((err) => {
-            if (err.response.data.code === 409) {
-              const message =
-                err.response.data?.message ||
-                err.response.data?.error ||
-                "Error while deleting destination";
-              toast({
-                variant: "error",
-                message,
-              });
-            }
+      const name = confirmDelete.value?.data?.name;
+      if (!name) return;
+      deletingDestinations.value.add(name);
+      destinationService
+        .delete({
+          org_identifier: store.state.selectedOrganization.identifier,
+          destination_name: name,
+        })
+        .then(() => {
+          toast({
+            variant: "success",
+            message: t("toastMessages.alerts.destinationDeletedSuccessfully", { name }),
           });
-      }
+          dropDestinations([name]);
+        })
+        .catch((err: any) => {
+          // A network failure has no `err.response` at all, and a non-409 code used
+          // to fall through silently; the row stays either way, so it has to say why.
+          if (err?.response?.status === 403) return;
+          const message =
+            err?.response?.data?.message ||
+            err?.response?.data?.error ||
+            t("alerts.messages.deleteDestinationFailed");
+          toast({ variant: "error", message });
+        })
+        .finally(() => {
+          deletingDestinations.value.delete(name);
+        });
     };
     const conformDeleteDestination = (destination: any) => {
       confirmDelete.value.visible = true;
@@ -706,8 +720,6 @@ export default defineComponent({
         return t("alert_destinations.customWebhook");
       } else if (destination.type === "email") {
         return t("alert_destinations.customEmail");
-      } else if (destination.type === "action") {
-        return t("alert_destinations.customAction");
       }
       return t("alert_destinations.custom");
     };
@@ -716,7 +728,7 @@ export default defineComponent({
     // "prebuilt" matches any destination detectable as a prebuilt type
     // (Slack/Opsgenie/PagerDuty/ServiceNow/etc., identified via the
     // `prebuilt_type` metadata or URL/template pattern); "custom" is the
-    // negation, capturing user-defined HTTP/Email/Action destinations.
+    // negation, capturing user-defined HTTP/Email destinations.
     const activeTab = ref<"all" | "prebuilt" | "custom">("all");
 
     const visibleRows = computed(() => {
@@ -800,14 +812,20 @@ export default defineComponent({
           });
         }
 
-        selectedDestinations.value = [];
-        getDestinations();
+        // An unrecognised shape is NOT taken as "all of them" — splicing rows the
+        // server may have kept would show a delete that never happened.
+        if (Array.isArray(response.data?.successful)) {
+          dropDestinations(response.data.successful.map((entry: any) => entry?.name ?? entry));
+        } else {
+          selectedDestinations.value = [];
+          getDestinations();
+        }
       } catch (error: any) {
         dismiss();
         const errorMessage =
           error.response?.data?.message ||
           error?.message ||
-          "Error deleting destinations. Please try again.";
+          t("alerts.messages.bulkDeleteDestinationsFailed");
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             variant: "error",
@@ -852,6 +870,7 @@ export default defineComponent({
     ]);
     return {
       t,
+      depGraph,
       showDestinationEditor,
       destinations,
       columns,
@@ -865,6 +884,8 @@ export default defineComponent({
       templates,
       toggleDestinationEditor,
       getDestinations,
+      onDependencyDeleted,
+      deletingDestinations,
       deleteDestination,
       cancelDeleteDestination,
       confirmDelete,
@@ -874,7 +895,6 @@ export default defineComponent({
       showImportDestination,
       importDestination,
       store,
-      getActions,
       getTemplates,
       updateRoute,
       getDestinationByName,

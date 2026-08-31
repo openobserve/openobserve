@@ -14,28 +14,38 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
+import { useI18nTyped } from "@/types/i18n";
 
-const VRL_PROMPTS = [
-  'Write a VRL function. e.g. .status = "active"',
-  'Write a VRL function. e.g. if .level == "error" { .alert = true }',
-  "Write a VRL function. e.g. del(.sensitive_field)",
-  "Write a VRL function. e.g. .count = int!(.count) + 1",
-  "Write a VRL function. e.g. .message = downcase!(string!(.message))",
+// The prompts are built per call, not at module scope: a module-level array would
+// resolve `t()` at import time and freeze the boot locale. The `e.g.` samples stay
+// literal — they are VRL/JS source the user copies, not prose.
+const VRL_EXAMPLES = [
+  '.status = "active"',
+  'if .level == "error" { .alert = true }',
+  "del(.sensitive_field)",
+  ".count = int!(.count) + 1",
+  ".message = downcase!(string!(.message))",
 ];
 
-const JS_PROMPTS = [
-  'Write a JS function. e.g. row.status = "active";',
-  'Write a JS function. e.g. if (row.level === "error") row.alert = true;',
-  "Write a JS function. e.g. delete row.sensitive_field;",
-  "Write a JS function. e.g. row.count = parseInt(row.count) + 1;",
+const JS_EXAMPLES = [
+  'row.status = "active";',
+  'if (row.level === "error") row.alert = true;',
+  "delete row.sensitive_field;",
+  "row.count = parseInt(row.count) + 1;",
 ];
 
 /** Typewriter placeholder for VRL function editors. */
 export function useVrlPlaceholder() {
-  return useTypewriterPlaceholder(VRL_PROMPTS);
+  const { t } = useI18nTyped();
+  return useTypewriterPlaceholder(
+    VRL_EXAMPLES.map((example) => t("functions.vrlFunctionPlaceholder", { example })),
+  );
 }
 
 /** Typewriter placeholder for JavaScript function editors. */
 export function useJsPlaceholder() {
-  return useTypewriterPlaceholder(JS_PROMPTS);
+  const { t } = useI18nTyped();
+  return useTypewriterPlaceholder(
+    JS_EXAMPLES.map((example) => t("functions.jsFunctionPlaceholder", { example })),
+  );
 }

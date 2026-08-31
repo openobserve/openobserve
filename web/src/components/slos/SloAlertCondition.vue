@@ -64,12 +64,20 @@
           </span>
         </div>
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <!-- Selection styling copied from PredefinedThemes: same shape (a grid
+               of button-cards where one is applied), so the "this is the one in
+               effect" cue reads identically in both places. -->
           <button
             v-for="p in presets"
             :key="p.key"
             type="button"
-            class="rounded-default hover:border-primary border p-3 text-left transition-colors"
-            :class="isActivePreset(p) ? 'border-primary bg-primary/5' : 'border-border'"
+            class="rounded-default focus-visible:ring-accent/40 cursor-pointer border p-3 text-left transition-[border-color,background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:outline-none"
+            :class="
+              isActivePreset(p)
+                ? 'border-accent ring-accent bg-card-glass-tint-soft ring-1 ring-inset'
+                : 'border-border-default hover:border-accent hover:bg-card-glass-tint-subtle'
+            "
+            :aria-pressed="isActivePreset(p)"
             :data-test="`slos-sloalertcondition-preset-${p.key}`"
             @click="applyPreset(p)"
           >
@@ -98,8 +106,19 @@
              full row. Same for the inside labels — `labelPosition` is the API. -->
         <div class="flex flex-wrap items-center gap-2">
           <span>{{ t("slos.alert.burnRate") }}</span>
-          <OSelect v-model="model.operator" :options="operatorOptions" width="xs" />
-          <OInput v-model.number="model.critical" type="number" step="0.1" width="xs" />
+          <OSelect
+            v-model="model.operator"
+            :options="operatorOptions"
+            width="xs"
+            data-test="slos-sloalertcondition-operator"
+          />
+          <OInput
+            v-model.number="model.critical"
+            type="number"
+            step="0.1"
+            width="xs"
+            data-test="slos-sloalertcondition-critical"
+          />
           <span>{{ t("slos.alert.inBothWindows") }}</span>
           <OInput
             v-model.number="longHours"
@@ -108,6 +127,7 @@
             suffix="h"
             :label="t('slos.alert.long')"
             label-position="inside"
+            data-test="slos-sloalertcondition-long"
           />
           <OInput
             v-model.number="shortMinutes"
@@ -116,6 +136,7 @@
             suffix="min"
             :label="t('slos.alert.short')"
             label-position="inside"
+            data-test="slos-sloalertcondition-short"
           />
         </div>
 
@@ -183,7 +204,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -192,6 +213,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import sloService from "@/services/slos";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { Slo } from "@/ts/interfaces/slo";
 import { formatTimeToExhaust, formatWindow } from "@/composables/useSloFormat";
 
@@ -215,9 +237,9 @@ const selectedSlo = computed(
   () => props.slo ?? slos.value.find((s) => s.id === model.value.slo_id) ?? null,
 );
 
-const kindOptions = computed(() => [
+const kindOptions = computed<{ value: string; label: I18nText; icon: IconName }[]>(() => [
   { value: "burn_rate", label: t("slos.alert.kind.burnRate"), icon: "local-fire-department" },
-  { value: "error_budget", label: t("slos.alert.kind.errorBudget"), icon: "data_usage" },
+  { value: "error_budget", label: t("slos.alert.kind.errorBudget"), icon: "data-usage" },
 ]);
 
 const operatorOptions = [
@@ -320,14 +342,14 @@ function applyPreset(p: any) {
 }
 
 const longHours = computed({
-  get: () => (model.value.long_window_secs ?? 3600) / 3600,
+  get: () => model.value.long_window_secs / 3600,
   set: (v: number) => {
     model.value.long_window_secs = Math.round((Number(v) || 1) * 3600);
   },
 });
 
 const shortMinutes = computed({
-  get: () => (model.value.short_window_secs ?? 300) / 60,
+  get: () => model.value.short_window_secs / 60,
   set: (v: number) => {
     model.value.short_window_secs = Math.round((Number(v) || 5) * 60);
   },
@@ -350,7 +372,7 @@ const maxBurn = computed(() => {
 
 const defaultShortLabel = computed(() => {
   const long = model.value.long_window_secs ?? 3600;
-  return `${Math.round(long / 12 / 60)} min`;
+  return t("slos.alert.minutesShort", { count: Math.round(long / 12 / 60) });
 });
 
 /** How long the budget lasts at the configured rate — the number that makes a

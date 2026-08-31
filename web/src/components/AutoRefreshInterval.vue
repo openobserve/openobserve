@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="isAnimating ? 'auto-refresh-icon--spinning' : ''"
             size="sm"
           />
-          <OTooltip :content="raw(`${t('search.autoRefresh')}: ${selectedLabel}`)" />
+          <OTooltip :content="t('search.autoRefreshWithValue', { value: selectedLabel })" />
         </OButton>
       </template>
       <div class="w-75 p-2">
@@ -221,25 +221,27 @@ export default defineComponent({
     const btnRefreshInterval = ref(false);
     let intervalInstance = 0;
 
+    // The count lives inside each message ("{count} sec") rather than being
+    // prefixed to a translated unit — number/unit order is per-language.
     const refreshTimes = computed(() => [
       [
-        { label: `5 ${t("common.sec")}`, value: 5, disabled: false },
-        { label: `1 ${t("common.min")}`, value: 60, disabled: false },
-        { label: `1 ${t("common.hr")}`, value: 3600, disabled: false },
+        { label: t("common.secShort", { count: 5 }), value: 5, disabled: false },
+        { label: t("common.minShort", { count: 1 }), value: 60, disabled: false },
+        { label: t("common.hrShort", { count: 1 }), value: 3600, disabled: false },
       ],
       [
-        { label: `10 ${t("common.sec")}`, value: 10, disabled: false },
-        { label: `5 ${t("common.min")}`, value: 300, disabled: false },
-        { label: `2 ${t("common.hr")}`, value: 7200, disabled: false },
+        { label: t("common.secShort", { count: 10 }), value: 10, disabled: false },
+        { label: t("common.minShort", { count: 5 }), value: 300, disabled: false },
+        { label: t("common.hrShort", { count: 2 }), value: 7200, disabled: false },
       ],
       [
-        { label: `15 ${t("common.sec")}`, value: 15, disabled: false },
-        { label: `15 ${t("common.min")}`, value: 900, disabled: false },
-        { label: `1 ${t("common.day")}`, value: 86400, disabled: false },
+        { label: t("common.secShort", { count: 15 }), value: 15, disabled: false },
+        { label: t("common.minShort", { count: 15 }), value: 900, disabled: false },
+        { label: t("common.dayShort", { count: 1 }), value: 86400, disabled: false },
       ],
       [
-        { label: `30 ${t("common.sec")}`, value: 30, disabled: false },
-        { label: `30 ${t("common.min")}`, value: 1800, disabled: false },
+        { label: t("common.secShort", { count: 30 }), value: 30, disabled: false },
+        { label: t("common.minShort", { count: 30 }), value: 1800, disabled: false },
       ],
     ]);
 

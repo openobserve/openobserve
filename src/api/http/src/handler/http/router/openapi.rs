@@ -18,8 +18,7 @@ use config::{get_config, meta::stream::StreamType};
 use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
 use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
 use openobserve_api_management::request::{
-    actions, gen_ai, keys, kv, service_accounts, service_streams, short_url, status, stream,
-    synthetics,
+    gen_ai, keys, kv, service_accounts, service_streams, short_url, status, stream, synthetics,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::search::patterns;
@@ -60,6 +59,9 @@ use crate::{
         openobserve_api_management::request::organization::system_settings::set_user_setting,
         openobserve_api_management::request::organization::system_settings::delete_org_setting,
         openobserve_api_management::request::organization::system_settings::delete_user_setting,
+        openobserve_api_management::request::announcements::get_announcements,
+        openobserve_api_management::request::announcements::get_announcements_config,
+        openobserve_api_management::request::announcements::set_announcements_config,
         stream::list,
         stream::schema,
         stream::create,
@@ -75,6 +77,9 @@ use crate::{
         openobserve_api_search::traces::session::get_latest_sessions,
         openobserve_api_search::traces::session::get_session_details,
         openobserve_api_search::traces::user::get_latest_users,
+        openobserve_api_search::traces::details::get_trace_details,
+        openobserve_api_search::traces::time_index::get_trace_time_range,
+        openobserve_api_search::traces::time_index::get_org_trace_time_range,
         openobserve_api_search::traces::dag::get_trace_dag,
         metrics::ingest::json,
         openobserve_api_search::promql::remote_write,
@@ -136,6 +141,9 @@ use crate::{
         openobserve_api_management::request::dashboards::timed_annotations::update_annotations,
         openobserve_api_management::request::dashboards::timed_annotations::delete_annotation_panels,
         openobserve_api_management::request::alerts::create_alert,
+        openobserve_api_management::request::alerts::validate_composite_alert,
+        openobserve_api_management::request::alerts::get_composite_references,
+        openobserve_api_management::request::alerts::get_composite_timeline,
         openobserve_api_management::request::alerts::get_alert,
         openobserve_api_management::request::alerts::export_alert,
         openobserve_api_management::request::alerts::update_alert,
@@ -216,12 +224,6 @@ use crate::{
         openobserve_api_management::request::dashboards::reports::enable_report_v2,
         openobserve_api_management::request::dashboards::reports::trigger_report_v2,
         openobserve_api_management::request::dashboards::reports::move_reports,
-        actions::action::upload_zipped_action,
-        actions::action::delete_action,
-        actions::action::serve_action_zip,
-        actions::action::update_action_details,
-        actions::action::list_actions,
-        actions::action::get_action_from_id,
         openobserve_api_management::request::authz::fga::create_role,
         openobserve_api_management::request::authz::fga::delete_role,
         openobserve_api_management::request::authz::fga::get_roles,
@@ -516,6 +518,7 @@ use crate::{
         (name = "Patterns", description = "Log pattern extraction operations (enterprise)"),
         (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
         (name = "Synthetics", description = "Synthetic monitoring — uptime and browser checks (enterprise)"),
+        (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
@@ -524,10 +527,66 @@ use crate::{
 )]
 pub struct ApiDoc;
 
+#[cfg(feature = "enterprise")]
+#[derive(OpenApi)]
+#[openapi(paths(
+    openobserve_api_management::request::experiments::preview_experiment,
+    openobserve_api_management::request::experiments::create_experiment,
+    openobserve_api_management::request::experiments::list_experiments,
+    openobserve_api_management::request::experiments::compare_experiments,
+    openobserve_api_management::request::experiments::get_experiment,
+    openobserve_api_management::request::experiments::get_experiment_row,
+    openobserve_api_management::request::experiments::retry_experiment_slot,
+    openobserve_api_management::request::experiments::cancel_experiment,
+    openobserve_api_management::request::experiments::retry_experiment,
+    openobserve_api_management::request::experiments::clone_experiment,
+    openobserve_api_management::request::experiments::delete_experiment,
+    openobserve_api_management::request::experiments::set_experiment_baseline,
+    openobserve_api_management::request::experiments::clear_experiment_baseline,
+    openobserve_api_management::request::playground::share_playground_snapshot,
+    openobserve_api_management::request::playground::get_playground_snapshot,
+    openobserve_api_management::request::playground::run_playground_cell,
+    openobserve_api_management::request::playground::score_playground_cell,
+    openobserve_api_management::request::remote_tasks::list_remote_tasks,
+    openobserve_api_management::request::remote_tasks::create_remote_task,
+    openobserve_api_management::request::remote_tasks::test_remote_task,
+    openobserve_api_management::request::remote_tasks::get_remote_task,
+    openobserve_api_management::request::remote_tasks::list_remote_task_versions,
+    openobserve_api_management::request::remote_tasks::get_remote_task_stats,
+    openobserve_api_management::request::remote_tasks::save_remote_task_draft,
+    openobserve_api_management::request::remote_tasks::get_remote_task_draft,
+    openobserve_api_management::request::remote_tasks::discard_remote_task_draft,
+    openobserve_api_management::request::remote_tasks::publish_remote_task,
+    openobserve_api_management::request::remote_tasks::delete_remote_task,
+    openobserve_api_management::request::remote_tasks::test_run_remote_task,
+    openobserve_api_management::request::remote_tasks::replace_remote_task_auth_secret,
+    openobserve_api_management::request::remote_tasks::revoke_remote_task_auth_secret,
+    openobserve_api_management::request::remote_tasks::replace_remote_task_header_secret,
+    openobserve_api_management::request::remote_tasks::revoke_remote_task_header_secret,
+    openobserve_api_management::request::remote_tasks::get_remote_task_signing_status,
+    openobserve_api_management::request::remote_tasks::rotate_remote_task_signing_secret,
+    openobserve_api_management::request::remote_tasks::test_remote_task_signing_candidate,
+    openobserve_api_management::request::remote_tasks::activate_remote_task_signing_candidate,
+    openobserve_api_management::request::remote_tasks::end_remote_task_signing_grace,
+    openobserve_api_management::request::remote_tasks::revoke_remote_task_signing_secret,
+))]
+struct EnterpriseExperimentApiDoc;
+
 pub struct SecurityAddon;
 
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        #[cfg(feature = "enterprise")]
+        {
+            let enterprise = EnterpriseExperimentApiDoc::openapi();
+            openapi.paths.paths.extend(enterprise.paths.paths);
+            if let (Some(components), Some(enterprise_components)) =
+                (openapi.components.as_mut(), enterprise.components)
+            {
+                components.schemas.extend(enterprise_components.schemas);
+                components.responses.extend(enterprise_components.responses);
+            }
+        }
         let cfg = get_config();
         if !cfg.common.base_uri.is_empty() {
             openapi.servers = Some(vec![utoipa::openapi::Server::new(&cfg.common.base_uri)]);
@@ -613,4 +672,45 @@ pub async fn openapi_info() -> OpenapiInfo {
     }
 
     tag_operations
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod experiment_tests {
+    use super::*;
+
+    #[test]
+    fn coordinate_retry_is_registered_in_openapi() {
+        let api = EnterpriseExperimentApiDoc::openapi();
+        let path = api
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/{experiment_id}/rows/{row_id}/trials/{trial_index}/retry")
+            .expect("coordinate retry path must be documented");
+        assert_eq!(
+            path.post
+                .as_ref()
+                .and_then(|operation| operation.operation_id.as_deref()),
+            Some("RetryExperimentSlot")
+        );
+        let row_detail = api
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/{experiment_id}/rows/{row_id}")
+            .and_then(|path| path.get.as_ref())
+            .expect("row detail path must be documented");
+        assert!(row_detail.responses.responses.contains_key("403"));
+
+        let comparison = api
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/compare")
+            .and_then(|path| path.get.as_ref())
+            .expect("comparison path must be documented");
+        assert_eq!(
+            comparison.operation_id.as_deref(),
+            Some("CompareExperiments")
+        );
+        assert!(comparison.responses.responses.contains_key("400"));
+        assert!(comparison.responses.responses.contains_key("403"));
+    }
 }

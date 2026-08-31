@@ -51,6 +51,12 @@ const emit = defineEmits<DropdownEmits>();
 
 defineSlots<DropdownSlots>();
 
+// Match the nested drawer/dialog layer (6000 + depth*1000) so a portaled menu
+// sits above the surface that owns it instead of a fixed z-6000.
+const drawerDepth = inject<number>("o2DrawerDepth", 0);
+const dialogDepth = inject<number>("o2DialogDepth", 0);
+const contentZIndex = computed(() => 6000 + Math.max(drawerDepth, dialogDepth) * 1000);
+
 // Vue boolean-casts absent `open` prop to `false`, which would lock
 // DropdownMenuRoot into controlled-closed mode. We manage state ourselves
 // so reka-ui stays responsive in both uncontrolled and controlled usage.
@@ -289,11 +295,11 @@ onBeforeUnmount(() => {
         :collision-padding="8"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
+        :style="{ zIndex: contentZIndex }"
         :class="[
-          // Layout + stacking — overlay layer 6000 (clears header 2000; ties with
-          // drawer/dialog content broken by later DOM order). See tokens/base.css.
-          // max-w keeps wide menus on-screen on small viewports.
-          'z-6000 max-w-[calc(100vw-1rem)] min-w-40 p-1',
+          // Layout — max-w keeps wide menus on-screen on small viewports.
+          // Stacking is the inline z-index above, not a class.
+          'max-w-[calc(100vw-1rem)] min-w-40 p-1',
           // Surface
           'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
           // Typography

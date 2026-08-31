@@ -163,6 +163,60 @@ describe("metricsUrlState · applyMetricsBlob", () => {
     expect(target.data.queries[0].fields.stream_type).toBe("metrics");
     expect(target.data.queries[1].fields.stream_type).toBe("metrics");
   });
+
+  // A shared link can be hand-written or truncated, and the panel reads
+  // fields.x.length / fields.filter.conditions.length unguarded — a query short
+  // of the schema used to throw mid-render and blank the whole metrics page.
+  it("fills a hand-written query out to the full field schema", () => {
+    const blob = b64EncodeUnicode(
+      JSON.stringify({
+        v: METRICS_BLOB_VERSION,
+        data: { type: "line", queries: [{ query: "cpu_usage", queryType: "promql" }] },
+      }),
+    ) as string;
+
+    const target = getDefaultDashboardPanelData(store);
+    expect(applyMetricsBlob(blob, target)).toBe(true);
+
+    const q = target.data.queries[0];
+    expect(q.query).toBe("cpu_usage");
+    expect(q.fields.stream_type).toBe("metrics");
+    expect(q.fields.x).toEqual([]);
+    expect(q.fields.y).toEqual([]);
+    expect(q.fields.z).toEqual([]);
+    expect(q.fields.filter.conditions).toEqual([]);
+    expect(q.config).toBeDefined();
+  });
+
+  it("keeps a partial fields object's own values while filling the rest", () => {
+    const blob = b64EncodeUnicode(
+      JSON.stringify({
+        v: METRICS_BLOB_VERSION,
+        data: { queries: [{ query: "up", fields: { stream: "up", stream_type: "logs" } }] },
+      }),
+    ) as string;
+
+    const target = getDefaultDashboardPanelData(store);
+    applyMetricsBlob(blob, target);
+
+    const q = target.data.queries[0];
+    expect(q.fields.stream).toBe("up");
+    expect(q.fields.stream_type).toBe("metrics");
+    expect(q.fields.filter.conditions).toEqual([]);
+  });
+
+  it("keeps the default query when the blob carries an empty queries array", () => {
+    const blob = b64EncodeUnicode(
+      JSON.stringify({ v: METRICS_BLOB_VERSION, data: { type: "bar", queries: [] } }),
+    ) as string;
+
+    const target = getDefaultDashboardPanelData(store);
+    applyMetricsBlob(blob, target);
+
+    expect(target.data.type).toBe("bar");
+    expect(target.data.queries).toHaveLength(1);
+    expect(target.data.queries[0].fields.filter.conditions).toEqual([]);
+  });
 });
 
 describe("metricsUrlState · applyDeepLinkOverrides (integration)", () => {

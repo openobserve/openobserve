@@ -25,6 +25,7 @@ pub mod peak_memory_pool;
 pub mod plan;
 pub mod plan_metrics;
 pub mod planner;
+pub mod sort_order;
 pub mod storage;
 pub mod table_provider;
 pub mod udaf;

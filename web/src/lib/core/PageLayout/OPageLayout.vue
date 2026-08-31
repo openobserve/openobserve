@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #separator>
         <slot name="separator">
           <div
-            class="h-full w-1 bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+            class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors duration-300"
           ></div>
         </slot>
       </template>
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="!!slots.sidebar" class="flex min-h-0 flex-1">
       <aside
         class="border-border-default flex h-full shrink-0 flex-col overflow-hidden border-r"
-        :style="{ width: (sidebarWidth ?? 200) + 'px' }"
+        :style="{ width: sidebarWidth + 'px' }"
       >
         <slot name="sidebar" />
       </aside>
@@ -208,6 +208,8 @@ interface BackTarget {
   dataTest?: string;
 }
 
+const RAIL_WIDTH = 230;
+
 const props = withDefaults(
   defineProps<{
     // Header (from props)
@@ -244,7 +246,7 @@ const props = withDefaults(
     bleed: false,
     padY: false,
     scroll: false,
-    sidebarWidth: 200,
+    sidebarWidth: RAIL_WIDTH,
     resizable: false,
     splitterLimits: () => [0, 400] as [number, number],
     constrained: false,

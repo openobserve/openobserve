@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="info-banner-text text-text-body text-sm leading-relaxed">
           {{ t("settings.correlation.discoveredServicesDescription") }}
           <a
-            class="rounded-default border-text-link text-text-link bg-badge-blue-soft-bg mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background] duration-150 hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
+            class="rounded-default border-text-link text-text-link bg-badge-blue-soft-bg hover:bg-badge-blue-ol-border/18 mx-1 inline-block cursor-pointer border px-2 py-0.5 align-middle text-xs font-semibold no-underline transition-[background] duration-150"
             @click.prevent="$emit('navigate-to-configuration')"
             >{{ t("settings.correlation.goToConfiguration") }}</a
           >
@@ -308,13 +308,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex h-9 w-full items-center justify-between">
                 <div class="mr-md w-[15.625rem] text-xs font-normal">
                   {{
-                    filteredGroupCount === 1
-                      ? t("settings.correlation.serviceCountSingular", {
-                          count: filteredGroupCount,
-                        })
-                      : t("settings.correlation.serviceCountPlural", {
-                          count: filteredGroupCount,
-                        })
+                    t("settings.correlation.serviceCountSingular", {
+                      count: filteredGroupCount,
+                    })
                   }}
                   {{
                     t("settings.correlation.instancesCount", {

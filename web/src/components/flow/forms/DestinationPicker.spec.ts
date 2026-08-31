@@ -123,6 +123,24 @@ describe("DestinationPicker", () => {
     expect(payload.org_id).toBeDefined();
   });
 
+  // `optional` (Workflows placeholder): an empty selection is ALLOWED — submit()
+  // resolves an empty destination_name instead of null, and no required check runs.
+  it("optional: submit resolves an empty destination_name when nothing is selected", async () => {
+    const wrapper = createWrapper({ optional: true });
+    await flushPromises();
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload).not.toBeNull();
+    expect(payload.destination_name).toBe("");
+    expect(payload.org_id).toBeDefined();
+  });
+
+  it("optional: still resolves the selected destination when one is chosen", async () => {
+    const wrapper = createWrapper({ initialName: "sink-a", optional: true });
+    await flushPromises();
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload.destination_name).toBe("sink-a");
+  });
+
   it("emits expand when toggling create mode", async () => {
     const wrapper = createWrapper();
     await flushPromises();
@@ -221,5 +239,78 @@ describe("DestinationPicker", () => {
     await wrapper.find(".o-switch").trigger("click"); // off
     await flushPromises();
     expect(mockList).toHaveBeenCalled();
+  });
+
+  // ── forcedType="custom" narrows the list (Workflows) ──────────────────────
+  // The pipeline endpoint returns every destination type, but a workflow node can
+  // only execute a custom webhook.
+
+  const mixedResponse = {
+    data: [
+      { name: "webhook", url: "http://w.example.com", destination_type_name: "custom" },
+      { name: "splunk-hec", url: "http://s.example.com", destination_type_name: "splunk" },
+      { name: "dd-events", url: "http://d.example.com", destination_type: "datadog" },
+      { name: "legacy", url: "http://l.example.com" }, // no type at all
+    ],
+  };
+
+  it("forcedType custom: lists only custom destinations", async () => {
+    mockList.mockResolvedValueOnce(mixedResponse);
+    const wrapper = createWrapper({ forcedType: "custom" });
+    await flushPromises();
+    expect((wrapper.vm as any).destinationOptions.map((o: any) => o.value)).toEqual(["webhook"]);
+  });
+
+  // An untyped record is a prebuilt "openobserve" destination as far as the edit
+  // form is concerned, so it is NOT treated as custom.
+  it("forcedType custom: an untyped destination is not treated as custom", async () => {
+    mockList.mockResolvedValueOnce(mixedResponse);
+    const wrapper = createWrapper({ forcedType: "custom" });
+    await flushPromises();
+    const values = (wrapper.vm as any).destinationOptions.map((o: any) => o.value);
+    expect(values).not.toContain("legacy");
+  });
+
+  it("without forcedType: every destination is listed (pipelines are unaffected)", async () => {
+    mockList.mockResolvedValueOnce(mixedResponse);
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect((wrapper.vm as any).destinationOptions).toHaveLength(4);
+  });
+
+  it("matches the type case-insensitively", async () => {
+    mockList.mockResolvedValueOnce({
+      data: [{ name: "shouty", url: "http://x.example.com", destination_type_name: " CUSTOM " }],
+    });
+    const wrapper = createWrapper({ forcedType: "custom" });
+    await flushPromises();
+    expect((wrapper.vm as any).destinationOptions.map((o: any) => o.value)).toEqual(["shouty"]);
+  });
+
+  // The important one: a node saved before the filter existed must not silently
+  // lose its destination when the drawer reopens.
+  it("keeps an already-saved non-custom destination in the list, flagged", async () => {
+    mockList.mockResolvedValueOnce(mixedResponse);
+    const wrapper = createWrapper({ forcedType: "custom", initialName: "splunk-hec" });
+    await flushPromises();
+    const opts = (wrapper.vm as any).destinationOptions;
+    expect(opts.map((o: any) => o.value)).toEqual(["splunk-hec", "webhook"]);
+    expect(opts[0].subLabel).toBe("Unsupported Type — Workflows Support Custom Destinations Only");
+  });
+
+  it("still resolves the retained non-custom destination on submit", async () => {
+    mockList.mockResolvedValueOnce(mixedResponse);
+    const wrapper = createWrapper({ forcedType: "custom", initialName: "splunk-hec" });
+    await flushPromises();
+    await expect((wrapper.vm as any).submit()).resolves.toMatchObject({
+      destination_name: "splunk-hec",
+    });
+  });
+
+  it("does not duplicate an already-saved custom destination", async () => {
+    mockList.mockResolvedValueOnce(mixedResponse);
+    const wrapper = createWrapper({ forcedType: "custom", initialName: "webhook" });
+    await flushPromises();
+    expect((wrapper.vm as any).destinationOptions.map((o: any) => o.value)).toEqual(["webhook"]);
   });
 });

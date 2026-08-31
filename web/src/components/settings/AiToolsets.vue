@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, watch, onMounted, onUpdated, Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -267,7 +267,9 @@ export default defineComponent({
           if (err?.status !== 403) {
             toast({
               variant: "error",
-              message: err?.response?.data?.message || t("aiToolset.loadFailed"),
+              message:
+                err?.response?.data?.message ||
+                t("aiToolset.loadFailed", { product: raw("AI Toolsets") }),
               timeout: 5000,
             });
           }
@@ -373,7 +375,9 @@ export default defineComponent({
           if (err?.status !== 403) {
             toast({
               variant: "error",
-              message: err?.response?.data?.message || t("aiToolset.deleteFailed"),
+              message:
+                err?.response?.data?.message ||
+                t("aiToolset.deleteFailed", { product: raw("AI Toolset") }),
             });
           }
         })

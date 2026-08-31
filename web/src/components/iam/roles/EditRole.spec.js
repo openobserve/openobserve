@@ -209,9 +209,6 @@ vi.mock("@/services/reports", () => ({
 vi.mock("@/services/alert_templates", () => ({
   default: { list: vi.fn(async () => ({ data: [{ name: "t1" }] })) },
 }));
-vi.mock("@/services/action_scripts", () => ({
-  default: { list: vi.fn(async () => ({ data: [{ id: "ac1", name: "AC1" }] })) },
-}));
 vi.mock("@/services/alert_destination", () => ({
   default: { list: vi.fn(async () => ({ data: [{ name: "dest1" }] })) },
 }));

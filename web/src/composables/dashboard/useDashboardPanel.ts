@@ -19,6 +19,7 @@ import { useStore } from "vuex";
 import useNotifications from "../useNotifications";
 import { b64EncodeUnicode, isStreamingEnabled } from "@/utils/zincutils";
 import { extractFields, getStreamNameFromQuery } from "@/utils/query/sqlUtils";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 import { validatePanel } from "@/utils/dashboard/panelValidation";
 import { CUSTOM_QUERY_CHART_TYPES } from "@/utils/dashboard/constants";
 import useStreams from "../useStreams";
@@ -47,6 +48,10 @@ import {
 let parser: any;
 
 const dashboardPanelDataObj: any = {};
+
+// Read-only handle on a page's shared panel state for callers that must not
+// register this composable's watchers (SearchBar reading the build page).
+export const getPanelDataForPageKey = (pageKey: string) => dashboardPanelDataObj[pageKey] ?? null;
 
 const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) => {
   const store = useStore();
@@ -303,9 +308,9 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
           (field: any) => field?.name,
         );
       } else {
-        const currentStream =
-          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
-            .stream;
+        const activeFields =
+          dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields;
+        const currentStream = activeFields?.stream;
         if (!currentStream) return;
 
         // Collect streams (main + joins)
@@ -454,7 +459,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       const errorDetailValue =
         error.response?.data.error_detail ||
         error.response?.data.message ||
-        "Something went wrong!";
+        t("dashboard.somethingWentWrong");
       const trimmedErrorMessage =
         errorDetailValue.length > 300 ? errorDetailValue.slice(0, 300) + " ..." : errorDetailValue;
 
@@ -494,7 +499,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
       const errorDetailValue =
         error.response?.data.error_detail ||
         error.response?.data.message ||
-        "Something went wrong!";
+        t("dashboard.somethingWentWrong");
       const trimmedErrorMessage =
         errorDetailValue.length > 300 ? errorDetailValue.slice(0, 300) + " ..." : errorDetailValue;
       showErrorNotification(trimmedErrorMessage);
@@ -956,8 +961,12 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
   // based on chart type it will create auto sql query
   const makeAutoSQLQuery = async () => {
+    // Bail if the current query index is transiently out of range (e.g. mid org-switch/reset).
+    const activeQuery =
+      dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex];
+    if (!activeQuery) return;
     // only continue if current mode is auto query generation
-    if (!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery) {
+    if (!activeQuery?.customQuery) {
       if (!dashboardPanelData?.meta?.streamFields?.groupedFields?.length) {
         return;
       }
@@ -990,6 +999,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
   // Replace the existing validatePanel function with a wrapper that calls the generic function
   const validatePanelWrapper = (errors: string[], isFieldsValidationRequired: boolean = true) => {
     validatePanel(
+      t,
       dashboardPanelData,
       errors,
       isFieldsValidationRequired,
@@ -1066,10 +1076,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
     // dashboardPanelData.meta.editorValue = value;
     // dashboardPanelData.data.query = value;
 
+    // Current query can be transiently absent (org-switch / panel reset).
+    const activeQuery =
+      dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex];
+    if (!activeQuery) return;
+
     if (
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+      activeQuery.customQuery &&
       dashboardPanelData.data.queryType != "promql" &&
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query
+      activeQuery.query
     ) {
       // empty the errors
       dashboardPanelData.meta.errors.queryErrors = [];
@@ -1097,6 +1112,15 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
           /(?:\$\{\s*[a-zA-Z0-9_-]+\s*:\s*pipe\s*\})|(?:\{\{\s*[a-zA-Z0-9_-]+\s*:\s*pipe\s*\}\})/g,
           "1|2",
         );
+
+        // astify() is exponential in paren nesting depth — skip parsing a
+        // pathologically nested query rather than freeze the tab for seconds.
+        // The query still runs fine server-side; only these client-side
+        // custom-fields/errors go unpopulated.
+        if (maxParenDepth(currentQuery) > SQL_PARSE_MAX_DEPTH) {
+          dashboardPanelData.meta.parsedQuery = null;
+          return;
+        }
 
         const variables = extractVariables(currentQuery); // Extract all unique variables
         const validatedQuery = validateQuery(currentQuery, variables);
@@ -1148,7 +1172,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
         // update the existing x and y axis fields
         updateXYFieldsOnCustomQueryChange(oldCustomQueryFields);
       } else if (!shouldSkipCustomQueryFields) {
-        dashboardPanelData.meta.errors.queryErrors.push("Invalid Columns");
+        dashboardPanelData.meta.errors.queryErrors.push(t("dashboard.invalidColumns"));
       }
 
       const currentQuery =
@@ -1217,8 +1241,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
   watch(
     () => [
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query,
-      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery, // Only watch for custom query mode changes
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.query,
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery, // Only watch for custom query mode changes
       selectedStreamFieldsBasedOnUserDefinedSchema.value,
       dashboardPanelData.layout.currentQueryIndex,
     ],
@@ -1233,7 +1257,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
       // Only continue if the current mode is "show custom query"
       if (
-        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery &&
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery &&
         dashboardPanelData.data.queryType == "sql"
       ) {
         // Call the updateQueryValue function
@@ -1252,16 +1276,16 @@ const useDashboardPanelData = (pageKey: string = "dashboard", t: TranslateFn) =>
 
   const currentXLabel = computed(() => {
     if (dashboardPanelData.data.type == "table") {
-      return isPivotMode.value ? "Row Fields" : "First Column";
+      return isPivotMode.value ? t("panel.rowFields") : t("panel.firstColumn");
     }
-    return dashboardPanelData.data.type == "h-bar" ? "Y-Axis" : "X-Axis";
+    return dashboardPanelData.data.type == "h-bar" ? t("panel.yAxisShort") : t("panel.xAxisShort");
   });
 
   const currentYLabel = computed(() => {
     if (dashboardPanelData.data.type == "table") {
-      return isPivotMode.value ? "Value Fields" : "Other Columns";
+      return isPivotMode.value ? t("panel.valueFields") : t("panel.otherColumn");
     }
-    return dashboardPanelData.data.type == "h-bar" ? "X-Axis" : "Y-Axis";
+    return dashboardPanelData.data.type == "h-bar" ? t("panel.xAxisShort") : t("panel.yAxisShort");
   });
 
   // Function to get result schema

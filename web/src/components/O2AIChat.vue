@@ -1346,7 +1346,7 @@
                 @click="sendMessage"
                 variant="primary"
                 size="icon-xs-circle"
-                class="send-button"
+                class="send-button hover:bg-gradient-ai!"
               >
                 <OIcon name="arrow-upward" size="sm" />
               </OButton>
@@ -1357,7 +1357,7 @@
                 @click="cancelCurrentRequest"
                 variant="ghost"
                 size="icon-xs-circle"
-                class="stop-button shadow-status-negative/30! hover:shadow-status-negative/40! active:shadow-status-negative/30! bg-(image:--color-gradient-danger)! shadow-lg! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:bg-(image:--color-gradient-danger-hover)! hover:shadow-lg! active:translate-y-0! active:shadow-md!"
+                class="stop-button shadow-status-negative/30! hover:shadow-status-negative/40! active:shadow-status-negative/30! bg-gradient-danger! hover:bg-gradient-danger-hover! shadow-lg! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:shadow-lg! active:translate-y-0! active:shadow-md!"
               >
                 <OIcon name="stop" size="sm" />
               </OButton>
@@ -1425,7 +1425,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import { UNAUTHORIZED_MESSAGE, isAuthError } from "@/utils/authErrors";
+import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
@@ -1601,8 +1601,8 @@ export default defineComponent({
     });
     const inputPlaceholder = computed(() =>
       props.centeredStart && chatMessages.value.length === 0
-        ? typewriterPlaceholder.value || "Write your prompt"
-        : "Write your prompt",
+        ? typewriterPlaceholder.value || t("common.writeYourPrompt")
+        : t("common.writeYourPrompt"),
     );
 
     // Chat history composable
@@ -1616,6 +1616,7 @@ export default defineComponent({
     } = useChatHistory(
       () => store.state.userInfo.email ?? "",
       () => store.state.selectedOrganization.identifier ?? "",
+      t,
     );
 
     const currentChatTimestamp = ref<string | null>(null);
@@ -1728,26 +1729,26 @@ export default defineComponent({
 
     // Analyzing messages for loading indicator
     const ANALYZING_MESSAGES = [
-      "Analyzing...",
-      "Thinking...",
-      "Processing...",
-      "Examining data...",
-      "Reviewing context...",
-      "Formulating response...",
-      "Checking details...",
-      "Gathering insights...",
-      "Evaluating options...",
-      "Synthesizing information...",
-      "Working on it...",
-      "Almost there...",
-      "Diving deeper...",
-      "Connecting the dots...",
-      "Crunching numbers...",
-      "Exploring possibilities...",
-      "Refining answer...",
-      "Still thinking...",
-      "Making progress...",
-      "Piecing together...",
+      t("aiAssistant.aiChat.analyzingMessages.analyzing"),
+      t("aiAssistant.aiChat.analyzingMessages.thinking"),
+      t("aiAssistant.aiChat.analyzingMessages.processing"),
+      t("aiAssistant.aiChat.analyzingMessages.examiningData"),
+      t("aiAssistant.aiChat.analyzingMessages.reviewingContext"),
+      t("aiAssistant.aiChat.analyzingMessages.formulatingResponse"),
+      t("aiAssistant.aiChat.analyzingMessages.checkingDetails"),
+      t("aiAssistant.aiChat.analyzingMessages.gatheringInsights"),
+      t("aiAssistant.aiChat.analyzingMessages.evaluatingOptions"),
+      t("aiAssistant.aiChat.analyzingMessages.synthesizingInformation"),
+      t("aiAssistant.aiChat.analyzingMessages.workingOnIt"),
+      t("aiAssistant.aiChat.analyzingMessages.almostThere"),
+      t("aiAssistant.aiChat.analyzingMessages.divingDeeper"),
+      t("aiAssistant.aiChat.analyzingMessages.connectingTheDots"),
+      t("aiAssistant.aiChat.analyzingMessages.crunchingNumbers"),
+      t("aiAssistant.aiChat.analyzingMessages.exploringPossibilities"),
+      t("aiAssistant.aiChat.analyzingMessages.refiningAnswer"),
+      t("aiAssistant.aiChat.analyzingMessages.stillThinking"),
+      t("aiAssistant.aiChat.analyzingMessages.makingProgress"),
+      t("aiAssistant.aiChat.analyzingMessages.piecingTogether"),
     ];
     const currentAnalyzingMessage = ref(ANALYZING_MESSAGES[0]);
     const analyzingRotationInterval = ref<NodeJS.Timeout | null>(null);
@@ -2151,7 +2152,10 @@ export default defineComponent({
           // Create a reference chip from the context
           const contextChip: ReferenceChip = {
             id: `context-${Date.now()}`,
-            filename: "Log Entry",
+            // Not translated: this filename is spliced verbatim into the
+            // `--- Log Entry ---` delimiter of the prompt sent to the LLM, so the
+            // delimiter must stay stable across locales.
+            filename: raw("Log Entry"),
             preview: createPreview(newAiChatInputContext, 10),
             fullContent: newAiChatInputContext,
             charCount: newAiChatInputContext.length,
@@ -2374,7 +2378,7 @@ export default defineComponent({
                     if (!isActive()) {
                       try {
                         const orgId = store.state.selectedOrganization.identifier;
-                        await fetch(
+                        const res = await fetch(
                           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
                             method: "POST",
@@ -2383,6 +2387,13 @@ export default defineComponent({
                             body: JSON.stringify({ approved: false }),
                           },
                         );
+                        // Detached stream, so there is nothing to show the user —
+                        // but a silent failure leaves the agent paused.
+                        if (!res.ok) {
+                          console.error(
+                            `Auto-deny not registered (HTTP ${res.status}) for background stream ${ctxSessionId}`,
+                          );
+                        }
                       } catch (error) {
                         console.error(
                           "Error auto-denying confirmation for background stream:",
@@ -2397,7 +2408,7 @@ export default defineComponent({
                       // Auto-approve navigation without showing confirmation
                       try {
                         const orgId = store.state.selectedOrganization.identifier;
-                        await fetch(
+                        const res = await fetch(
                           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
                             method: "POST",
@@ -2406,6 +2417,11 @@ export default defineComponent({
                             body: JSON.stringify({ approved: true }),
                           },
                         );
+                        if (!res.ok) {
+                          console.error(
+                            `Auto-approval not registered (HTTP ${res.status}) for session ${ctxSessionId}`,
+                          );
+                        }
                       } catch (error) {
                         console.error("Error auto-confirming navigation:", error);
                       }
@@ -2442,7 +2458,9 @@ export default defineComponent({
                     pendingConfirmation.value = {
                       tool: data.tool,
                       args: data.args || {},
-                      message: data.message || `Confirm execution of ${data.tool}?`,
+                      message:
+                        data.message ||
+                        t("aiAssistant.aiChat.confirmToolExecution", { tool: data.tool }),
                     };
                     await scrollToBottom();
                     continue;
@@ -2485,6 +2503,12 @@ export default defineComponent({
 
                   // Handle error events - display error message to user
                   if (data && data.type === "error") {
+                    // Owning replica is gone — flag and stop; sendMessage
+                    // restores the conversation once the stream ends.
+                    if (data.code === "session_owner_unavailable") {
+                      streamOwnerUnavailable.value = true;
+                      continue;
+                    }
                     // Complete any active tool call first
                     let lastMessage = msgs[msgs.length - 1];
                     if (activeToolCall.value) {
@@ -2506,13 +2530,19 @@ export default defineComponent({
 
                     // Format error message with suggestion if available
                     // Handle case where error/message might be an object instead of string
-                    const rawError = data.error ?? data.message ?? "An unexpected error occurred";
+                    const rawError =
+                      data.error ?? data.message ?? t("aiAssistant.aiChat.unexpectedError");
                     const errorText =
                       typeof rawError === "string" ? rawError : JSON.stringify(rawError, null, 2);
 
                     // Check if this is an authorization/access error
                     const authErr = isAuthError(errorText, data.error_type);
-                    let errorMessage = authErr ? UNAUTHORIZED_MESSAGE : `Error: ${errorText}`;
+                    // Widened to `string`: the branded `I18nText` from t() does not survive
+                    // the `+=` below, and `data.suggestion` is server prose appended as a
+                    // separate paragraph, not a spliced sentence fragment.
+                    let errorMessage: string = authErr
+                      ? t(UNAUTHORIZED_MESSAGE_KEY)
+                      : t("common.errorPrefix", { message: errorText });
                     if (data.suggestion && !authErr) {
                       errorMessage += `\n\n${data.suggestion}`;
                     }
@@ -2746,7 +2776,7 @@ export default defineComponent({
                       const confirmBlock: ContentBlock = {
                         type: "tool_call",
                         tool: "navigation_action",
-                        message: data.label || "Navigate",
+                        message: data.label || t("aiAssistant.aiChat.navigateConfirmQuestion"),
                         context: { navAction },
                         pendingConfirmation: true,
                         confirmationMessage: data.label,
@@ -2771,7 +2801,7 @@ export default defineComponent({
                       pendingConfirmation.value = {
                         tool: "navigation_action",
                         args: data.target || {},
-                        message: data.label || "Navigate",
+                        message: data.label || t("aiAssistant.aiChat.navigateConfirmQuestion"),
                       };
 
                       // Store the navigation action for later execution
@@ -2784,6 +2814,13 @@ export default defineComponent({
 
                   // Handle error events - stream-level errors
                   if (data && data.type === "error") {
+                    // Owning replica is gone — flag and stop; sendMessage restores
+                    // the conversation once the stream ends. Rendering the raw
+                    // error too would dead-end above the restored conversation.
+                    if (data.code === "session_owner_unavailable") {
+                      streamOwnerUnavailable.value = true;
+                      continue;
+                    }
                     // Complete any active tool call as failed
                     if (activeToolCall.value) {
                       const failedToolBlock: ContentBlock = {
@@ -2793,7 +2830,7 @@ export default defineComponent({
                         context: activeToolCall.value.context,
                         call_id: activeToolCall.value.call_id,
                         success: false,
-                        resultMessage: data.message || "Tool execution failed",
+                        resultMessage: data.message || t("aiAssistant.aiChat.toolExecutionFailed"),
                         errorType: data.error_type || undefined,
                         suggestion: data.suggestion || undefined,
                       };
@@ -2808,11 +2845,12 @@ export default defineComponent({
                     }
 
                     // Add inline error block
-                    const rawErrorMessage = data.message || data.error || "An error occurred";
+                    const rawErrorMessage =
+                      data.message || data.error || t("aiAssistant.aiChat.errorOccurred");
                     const authErr = isAuthError(rawErrorMessage, data.error_type);
                     const errorBlock: ContentBlock = {
                       type: "error",
-                      message: authErr ? UNAUTHORIZED_MESSAGE : rawErrorMessage,
+                      message: authErr ? t(UNAUTHORIZED_MESSAGE_KEY) : rawErrorMessage,
                       errorType: data.error_type || undefined,
                       suggestion: authErr ? undefined : data.suggestion || undefined,
                       recoverable: authErr ? false : (data.recoverable ?? undefined),
@@ -3009,6 +3047,12 @@ export default defineComponent({
 
                 // Handle error events
                 if (data && data.type === "error") {
+                  // Owning replica is gone — flag and stop; sendMessage
+                  // restores the conversation once the stream ends.
+                  if (data.code === "session_owner_unavailable") {
+                    streamOwnerUnavailable.value = true;
+                    continue;
+                  }
                   let lastMessage = msgs[msgs.length - 1];
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
@@ -3027,13 +3071,17 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
-                  const rawError = data.error ?? data.message ?? "An unexpected error occurred";
+                  const rawError =
+                    data.error ?? data.message ?? t("aiAssistant.aiChat.unexpectedError");
                   const errorText =
                     typeof rawError === "string" ? rawError : JSON.stringify(rawError, null, 2);
 
                   // Check if this is an authorization/access error
                   const authErr = isAuthError(errorText, data.error_type);
-                  let errorMessage = authErr ? UNAUTHORIZED_MESSAGE : `Error: ${errorText}`;
+                  // Widened to `string` — see the note on the sibling handler above.
+                  let errorMessage: string = authErr
+                    ? t(UNAUTHORIZED_MESSAGE_KEY)
+                    : t("common.errorPrefix", { message: errorText });
                   if (data.suggestion && !authErr) {
                     errorMessage += `\n\n${data.suggestion}`;
                   }
@@ -3166,6 +3214,12 @@ export default defineComponent({
 
                 // Handle error events - stream-level errors
                 if (data && data.type === "error") {
+                  // Owning replica is gone — flag and stop; sendMessage
+                  // restores the conversation once the stream ends.
+                  if (data.code === "session_owner_unavailable") {
+                    streamOwnerUnavailable.value = true;
+                    continue;
+                  }
                   if (activeToolCall.value) {
                     const failedToolBlock: ContentBlock = {
                       type: "tool_call",
@@ -3174,7 +3228,7 @@ export default defineComponent({
                       context: activeToolCall.value.context,
                       call_id: activeToolCall.value.call_id,
                       success: false,
-                      resultMessage: data.message || "Tool execution failed",
+                      resultMessage: data.message || t("aiAssistant.aiChat.toolExecutionFailed"),
                       errorType: data.error_type || undefined,
                       suggestion: data.suggestion || undefined,
                     };
@@ -3188,11 +3242,12 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
-                  const rawErrorMessage = data.message || data.error || "An error occurred";
+                  const rawErrorMessage =
+                    data.message || data.error || t("aiAssistant.aiChat.errorOccurred");
                   const authErr = isAuthError(rawErrorMessage, data.error_type);
                   const errorBlock: ContentBlock = {
                     type: "error",
-                    message: authErr ? UNAUTHORIZED_MESSAGE : rawErrorMessage,
+                    message: authErr ? t(UNAUTHORIZED_MESSAGE_KEY) : rawErrorMessage,
                     errorType: data.error_type || undefined,
                     suggestion: authErr ? undefined : data.suggestion || undefined,
                     recoverable: authErr ? false : (data.recoverable ?? undefined),
@@ -3586,12 +3641,83 @@ export default defineComponent({
               block.pendingConfirmation = false;
               if (!approved) {
                 block.success = false;
-                block.resultMessage = "Action cancelled by user";
+                block.resultMessage = t("aiAssistant.aiChat.actionCancelledByUser");
               }
               return;
             }
           }
         }
+      }
+    };
+
+    // Set by processStream when a session's owning replica is gone. The stream has
+    // already returned 200 by then, so sendMessage reads this once it ends.
+    const streamOwnerUnavailable = ref(false);
+
+    // Shown after a successful restore: only the dialogue came back, not the tool
+    // results, files or permission decisions from before the interruption.
+    const RESTORED_NOTICE =
+      "This conversation was interrupted and has been restored. Earlier messages are preserved, but any files, queries or other actions from before the interruption were not carried over.";
+
+    // Keyed on the explicit server code, never guessed from a generic failure:
+    // restoring means abandoning the current session.
+    const isSessionOwnerUnavailable = (errorBody: unknown): boolean => {
+      // `unknown`, not `any` — narrow before reading, or a non-object body throws.
+      if (typeof errorBody !== "object" || errorBody === null) return false;
+      const body = errorBody as { code?: unknown; detail?: { code?: unknown } };
+      const code = body.detail?.code ?? body.code;
+      return code === "session_owner_unavailable";
+    };
+
+    /** Surface a message inline in the transcript, as stream errors are shown. */
+    const appendErrorBlock = (message: string, recoverable = false) => {
+      const block: ContentBlock = { type: "error", message: raw(message), recoverable };
+      const msgs = chatMessages.value;
+      const last = msgs[msgs.length - 1];
+      if (last && last.role === "assistant") {
+        if (!last.contentBlocks) last.contentBlocks = [];
+        last.contentBlocks.push(block);
+      } else {
+        msgs.push({ role: "assistant", content: raw(""), contentBlocks: [block] });
+      }
+    };
+
+    /**
+     * POST a confirmation answer and report whether it landed. The response used
+     * to be discarded, so an answer reaching a replica with no record of the
+     * pending confirmation 404'd invisibly while the agent auto-denied on timeout.
+     */
+    const sendConfirmation = async (sessionId: string, approved: boolean): Promise<boolean> => {
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        const res = await fetch(
+          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${sessionId}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ approved }),
+          },
+        );
+
+        if (!res.ok) {
+          console.error(
+            `Confirmation not registered (HTTP ${res.status}) for session ${sessionId}`,
+          );
+          appendErrorBlock(
+            approved
+              ? "Your approval could not be delivered — the assistant may have already cancelled this action. Please check the result before retrying."
+              : "Your response could not be delivered — the assistant may have already cancelled this action.",
+          );
+          return false;
+        }
+        return true;
+      } catch (error) {
+        console.error("Error sending confirmation:", error);
+        appendErrorBlock(
+          "Your response could not be delivered. Please check your connection and try again.",
+        );
+        return false;
       }
     };
 
@@ -3610,20 +3736,7 @@ export default defineComponent({
 
       if (!currentSessionId.value) return;
 
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        await fetch(
-          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ approved: true }),
-          },
-        );
-      } catch (error) {
-        console.error("Error confirming action:", error);
-      }
+      await sendConfirmation(currentSessionId.value, true);
       pendingConfirmation.value = null;
     };
 
@@ -3639,20 +3752,7 @@ export default defineComponent({
 
       if (!currentSessionId.value) return;
 
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        await fetch(
-          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ approved: false }),
-          },
-        );
-      } catch (error) {
-        console.error("Error cancelling action:", error);
-      }
+      await sendConfirmation(currentSessionId.value, false);
       pendingConfirmation.value = null;
     };
 
@@ -3675,20 +3775,7 @@ export default defineComponent({
 
       if (!currentSessionId.value) return;
 
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        await fetch(
-          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ approved: true }),
-          },
-        );
-      } catch (error) {
-        console.error("Error confirming action:", error);
-      }
+      await sendConfirmation(currentSessionId.value, true);
       pendingConfirmation.value = null;
     };
 
@@ -4192,6 +4279,16 @@ export default defineComponent({
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
 
+      // Reseed state for this turn: at most one restore attempt, and a pending
+      // notice to show once the replacement request succeeds.
+      let hasReseeded = false;
+      let reseedNotice = false;
+
+      // Clear any flag left by a previous turn that threw or was aborted before
+      // the clear at the end of the try block — a stale `true` abandons a healthy
+      // session.
+      streamOwnerUnavailable.value = false;
+
       try {
         // Don't add empty assistant message here - wait for actual content
         await scrollToLoadingIndicator(); // Scroll directly to loading indicator
@@ -4226,10 +4323,55 @@ export default defineComponent({
           } catch (_) {
             // body may not be JSON
           }
-          const err: any = new Error(errorBody?.message || `Server error (${response.status})`);
+
+          // The session is gone but the transcript is still here, so resend under
+          // a fresh session and let the server seed it from those messages.
+          // Deliberately narrow — this code only, once only.
+          if (isSessionOwnerUnavailable(errorBody) && !hasReseeded) {
+            hasReseeded = true;
+            console.warn(
+              `Session ${currentSessionId.value} is no longer available; restoring the conversation in a new session.`,
+            );
+
+            // A NEW id — reusing the old one would be refused again. streamSessionId
+            // (captured above) stays pinned to the original, and cleanup keys off it.
+            currentSessionId.value = getUUIDv7();
+            reseedNotice = true;
+
+            response = await fetchAiChat(
+              chatMessages.value,
+              "",
+              store.state.selectedOrganization.identifier,
+              currentAbortController.value?.signal,
+              undefined,
+              currentSessionId.value,
+              hasImages ? messagesToSend : undefined,
+            );
+          }
+        }
+
+        // Re-check: the reseed above may have produced a fresh response.
+        if (!response.ok) {
+          let errorBody = null;
+          try {
+            errorBody = await response.json();
+          } catch (_) {
+            // body may not be JSON
+          }
+          const err: any = new Error(
+            errorBody?.message ||
+              t("aiAssistant.aiChat.serverErrorStatus", { status: response.status }),
+          );
           err.status = response.status;
           err.errorBody = errorBody;
           throw err;
+        }
+
+        // Tell the user before the content arrives — continuing silently hides
+        // that the assistant lost the earlier tool results and file state.
+        if (reseedNotice) {
+          reseedNotice = false;
+          appendErrorBlock(RESTORED_NOTICE, true);
         }
 
         if (!response.body) {
@@ -4244,6 +4386,58 @@ export default defineComponent({
         const streamMsgs = chatMessages.value;
 
         await processStream(reader);
+
+        // The streaming counterpart of the pre-stream 409 above: once the stream
+        // has opened the failure arrives as an SSE event inside a 200, so
+        // response.ok can no longer be branched on. Same recovery.
+        //
+        // Only while this turn is still on screen — if the user switched chats
+        // mid-stream, restoring would clobber THAT conversation's session id and
+        // transcript instead. They can resend from the affected chat.
+        const stillOnScreen = chatMessages.value === streamMsgs;
+        if (streamOwnerUnavailable.value && !hasReseeded && stillOnScreen) {
+          streamOwnerUnavailable.value = false;
+          hasReseeded = true;
+
+          if (streamController) backgroundStreams.delete(streamController);
+          if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
+
+          // The cross-instance streaming registry has to follow the new id, or
+          // another instance re-attaching never sees this stream finish.
+          const restoredSessionId = getUUIDv7();
+          currentSessionId.value = restoredSessionId;
+          sessionStreamingState[restoredSessionId] = true;
+
+          const retry: any = await fetchAiChat(
+            chatMessages.value,
+            "",
+            store.state.selectedOrganization.identifier,
+            currentAbortController.value?.signal,
+            undefined,
+            currentSessionId.value,
+            hasImages ? messagesToSend : undefined,
+          );
+
+          if (retry && !retry.cancelled && retry.ok && retry.body) {
+            // Announced only once the replacement request is accepted, as on the
+            // pre-stream path — otherwise the claim can turn out to be false.
+            appendErrorBlock(RESTORED_NOTICE, true);
+            await processStream(retry.body.getReader());
+          } else if (!(retry && retry.cancelled)) {
+            // The retry failed — non-OK, no body, or null (a network error).
+            // hasReseeded blocks any further attempt, so staying quiet here would
+            // end the turn with no answer and no explanation. A cancel is silent.
+            appendErrorBlock(
+              "This conversation was interrupted and could not be restored. Please try sending your message again.",
+            );
+          }
+
+          // The restored turn is done either way; clear its entry, or a
+          // re-attaching instance shows a loading indicator forever.
+          sessionStreamingState[restoredSessionId] = false;
+          backgroundStreamMap.delete(restoredSessionId);
+        }
+        streamOwnerUnavailable.value = false;
 
         // Remove controller from background set and clean up re-attachment map
         if (streamController) backgroundStreams.delete(streamController);
@@ -4267,11 +4461,11 @@ export default defineComponent({
         }
         let errorMessage: string;
         if (error.status === 403) {
-          errorMessage = UNAUTHORIZED_MESSAGE;
+          errorMessage = t(UNAUTHORIZED_MESSAGE_KEY);
         } else if (error.message && error.message !== "No response body") {
           errorMessage = error.message;
         } else {
-          errorMessage = "Error: Unable to get response from the server. Please try again later.";
+          errorMessage = t("aiAssistant.aiChat.serverResponseError");
         }
         chatMessages.value.push({
           role: "assistant",
@@ -5484,62 +5678,81 @@ export default defineComponent({
       return getToolCallDisplayData(block.context) !== null;
     };
 
+    // Splits an already-interpolated sentence around the value that renders bold,
+    // so the header stays ONE translatable sentence instead of two fragments.
+    const splitAroundHighlight = (full: string, highlight: string) => {
+      const at = full.indexOf(highlight);
+      if (at < 0) return { text: full, highlight: null as string | null, suffix: "" };
+      return {
+        text: full.slice(0, at),
+        highlight: highlight as string | null,
+        suffix: full.slice(at + highlight.length),
+      };
+    };
+
     const formatToolCallMessage = (block: ContentBlock & { response?: Record<string, any> }) => {
       // Show error message for failed tools
       // Tool-specific messages (both success and error)
       if (block.tool === "testFunction") {
         if (block.success === false) {
-          return { text: "VRL validation failed", highlight: null, suffix: "" };
+          return {
+            text: t("aiAssistant.aiChat.toolVrlValidationFailed"),
+            highlight: null,
+            suffix: "",
+          };
         }
-        return { text: "Validated VRL", highlight: null, suffix: "" };
+        return { text: t("aiAssistant.aiChat.toolVrlValidated"), highlight: null, suffix: "" };
       }
       if (block.tool === "SearchSQL") {
         if (block.success === false) {
-          return { text: "Query failed", highlight: null, suffix: "" };
+          return {
+            text: t("aiAssistant.aiChat.toolQueryFailed"),
+            highlight: null,
+            suffix: "",
+          };
         }
         if (block.response?.total !== undefined) {
           const streamType = block.context?.type || "logs";
           return {
-            text: `Queried ${streamType} `,
-            highlight: `(${block.response.total} results)`,
+            text: t("aiAssistant.aiChat.toolQueriedStream", { type: streamType }),
+            highlight: t("aiAssistant.aiChat.toolResultsCount", {
+              count: block.response.total,
+            }),
             suffix: "",
           };
         }
       }
       if (block.tool === "StreamSchema" && block.context?.stream_name) {
-        return {
-          text: "Fetched ",
-          highlight: block.context.stream_name,
-          suffix: " stream schema",
-        };
+        const streamName = block.context.stream_name;
+        return splitAroundHighlight(
+          t("aiAssistant.aiChat.toolStreamSchema", { name: streamName }),
+          streamName,
+        );
       }
       if (block.tool === "GetIncident" && block.context?.incident_id) {
-        return {
-          text: "Retrieved incident ",
-          highlight: block.context.incident_id,
-          suffix: "",
-        };
+        const incidentId = block.context.incident_id;
+        return splitAroundHighlight(
+          t("aiAssistant.aiChat.toolGetIncident", { id: incidentId }),
+          incidentId,
+        );
       }
       if (block.tool === "GetAlert" && block.context?.alert_id) {
-        return {
-          text: "Fetched alert ",
-          highlight: block.context.alert_id,
-          suffix: "",
-        };
+        const alertId = block.context.alert_id;
+        return splitAroundHighlight(t("aiAssistant.aiChat.toolGetAlert", { id: alertId }), alertId);
       }
       if (block.tool === "GetDashboard" && block.context?.dashboard_id) {
-        return {
-          text: "Fetched dashboard ",
-          highlight: block.context.dashboard_id,
-          suffix: "",
-        };
+        const dashboardId = block.context.dashboard_id;
+        return splitAroundHighlight(
+          t("aiAssistant.aiChat.toolGetDashboard", { id: dashboardId }),
+          dashboardId,
+        );
       }
       // List tools: show count from normalized { total, items } response
       if (block.response?.total !== undefined && block.success !== false) {
-        const base = block.message || block.tool || "Listed";
+        const base = block.message || block.tool || t("aiAssistant.aiChat.toolListedFallback");
         return {
           text: base + " ",
-          highlight: `(Found ${block.response.total})`,
+          highlight: t("aiAssistant.aiChat.toolFoundCount", { count: block.response.total }),
           suffix: "",
         };
       }
@@ -5553,10 +5766,10 @@ export default defineComponent({
         return { text: msg, highlight: null, suffix: "" };
       }
       if (block.success !== false && block.summary?.count !== undefined) {
-        const base = block.message || block.tool || "Tool";
+        const base = block.message || block.tool || t("aiAssistant.aiChat.toolFallback");
         return {
           text: base + " ",
-          highlight: `(${block.summary.count} results)`,
+          highlight: t("aiAssistant.aiChat.toolResultsCount", { count: block.summary.count }),
           suffix: "",
         };
       }
@@ -5564,7 +5777,7 @@ export default defineComponent({
     };
 
     const formatTimestamp = (timestamp: number) => {
-      if (!timestamp || timestamp === 0) return "Not specified";
+      if (!timestamp || timestamp === 0) return t("aiAssistant.aiChat.notSpecified");
       // Timestamp is in microseconds, convert to milliseconds
       const ms = timestamp > 1e15 ? timestamp / 1000 : timestamp;
       const date = new Date(ms);
@@ -5674,6 +5887,12 @@ export default defineComponent({
       handleToolCancel,
       handleToolAlwaysConfirm,
       handleNavigationAction,
+      sendConfirmation,
+      // Session restore
+      isSessionOwnerUnavailable,
+      appendErrorBlock,
+      streamOwnerUnavailable,
+      currentSessionId,
       // Auto navigation
       isAutoNavigationEnabled,
       processedMessages,
@@ -5882,13 +6101,19 @@ export default defineComponent({
    Tailwind's `enabled:` variant only covers the last two.
    ============================================================ */
 .send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
-  background: var(--color-gradient-ai) !important;
-  box-shadow: 0 0.375rem 1.25rem 0 color-mix(in srgb, var(--color-ai-accent) 40%, transparent) !important;
+  /* The hover gradient is `hover:bg-gradient-ai!` on the button itself. It used to
+     be restated here, then dropped when the template briefly carried the gradient
+     unconditionally — and main later moved the button back to variant="primary",
+     so between the two changes the gradient stopped painting at all. */
+  box-shadow: var(--shadow-glow-xl-geom) color-mix(in srgb, var(--color-ai-accent) 40%, transparent) !important;
   transform: translateY(-0.0625rem) !important;
 }
 .send-button:active:not(.disabled):not([disabled]):not(:disabled) {
   transform: translateY(0) !important;
-  box-shadow: 0 0.125rem 0.625rem 0 color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
+  /* Pressed keeps the accent, dimmer than hover — NOT --shadow-glow, which is a
+     neutral black ring and turns the press state grey. */
+  box-shadow: var(--shadow-glow-press-geom)
+    color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
 }
 
 /* ============================================================

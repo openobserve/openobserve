@@ -19,13 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="trace-row-status-pill"
     type="spanStatus"
     :value="hasErrors ? 'error' : 'success'"
-    :label="raw(label)"
+    :label="label"
   />
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 
 const { t } = useI18nTyped();
@@ -36,9 +36,12 @@ const props = defineProps<{
 
 const hasErrors = computed(() => (props.item.errors ?? 0) > 0);
 
+// A vue-i18n plural message, not `count + (count === 1 ? singular : plural)`:
+// the count's position in the phrase and which forms exist are the translator's
+// to decide (many languages have more than two).
 const label = computed(() =>
   hasErrors.value
-    ? `${props.item.errors} ${props.item.errors !== 1 ? t("traces.errors") : t("traces.error")}`
+    ? t("traces.errorCount", { n: props.item.errors }, props.item.errors)
     : t("traces.success"),
 );
 </script>

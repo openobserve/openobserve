@@ -38,7 +38,13 @@ function buildWrapper(open = true, editingIntegration: any = undefined) {
       API_ENDPOINT: "http://localhost:5080",
     },
   });
-  const i18n = createI18n({ legacy: false, locale: "en", messages: { en: {} } });
+  const i18n = createI18n({
+    legacy: false,
+    locale: "en",
+    messages: {
+      en: { alert_sources: { connectedFormat: "Connected — format detected: {format}" } },
+    },
+  });
   const router = createRouter({
     history: createWebHistory(),
     routes: [
@@ -250,7 +256,7 @@ describe("AddExternalAlertSource", () => {
     expect((wrapper.vm as any).detectedFormat).toBe("grafana");
   });
 
-  it("connectedLabel shows the detected format without needing an interpolated locale key", async () => {
+  it("connectedLabel interpolates the detected format into the connected message", async () => {
     (alertSources.create as any).mockResolvedValue({
       data: { id: "int-1", token: "o2iat_abc", name: "grafana-staging" },
     });

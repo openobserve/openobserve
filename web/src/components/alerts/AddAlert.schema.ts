@@ -41,6 +41,7 @@ import {
   type Translator,
 } from "./steps/QueryConfig.schema";
 import { createAlertSettingsSchema } from "./steps/AlertSettings.schema";
+import { validateExpression } from "./composite/expression";
 
 // Topbar messages are i18n-driven, resolved via the injected `t`:
 //   name required      → alerts.nameRequired
@@ -131,6 +132,9 @@ export const makeAddAlertSchema = (
       stream_type: z.string().optional(),
       stream_name: z.string().optional(),
       is_real_time: z.string().optional(),
+      alert_type: z.string().optional(),
+      composite_condition: z.looseObject({}).optional(),
+      children: z.array(z.looseObject({})).optional(),
       destinations: z.array(z.string()).optional(),
       creates_incident: z.boolean().optional(),
       trigger_condition: z.looseObject({}).optional(),
@@ -159,6 +163,58 @@ export const makeAddAlertSchema = (
             code: z.ZodIssueCode.custom,
             path: ["name"],
             message: t("alerts.anomalyNameRequired"),
+          });
+        }
+        return;
+      }
+
+      if (mode === "composite") {
+        if (isBlank(val.name)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["name"],
+            message: t("alerts.nameRequired"),
+          });
+        } else if (ALERT_NAME_UNSUPPORTED_CHARS.test(String(val.name))) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["name"],
+            message: t("alerts.nameNoSpecialChars"),
+          });
+        }
+
+        const localValidation = validateExpression(
+          String(val.composite_condition?.expression ?? ""),
+          Array.isArray(val.children) ? val.children : [],
+        );
+        if (!localValidation.valid) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["composite_condition", "expression"],
+            message: t("alerts.composite.invalidExpression"),
+          });
+        }
+
+        const silence = val.trigger_condition?.silence;
+        if (isBlank(silence) || Number.isNaN(Number(silence)) || Number(silence) < 0) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["trigger_condition", "silence"],
+            message: t("alerts.validation.silenceNonNegative"),
+          });
+        }
+        if (
+          (val.destinations?.length ?? 0) === 0 &&
+          (!allowWorkflows || (val.workflows?.length ?? 0) === 0)
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["destinations"],
+            message: t(
+              allowWorkflows
+                ? "alerts.destinationOrWorkflowRequired"
+                : "alerts.validation.destinationRequired",
+            ),
           });
         }
         return;

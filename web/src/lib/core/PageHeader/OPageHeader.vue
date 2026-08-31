@@ -283,7 +283,9 @@ const hasTabs = computed(() => slotHasContent("tabs"));
 const hasActions = computed(() => slotHasContent("actions"));
 const hasActionsOverflow = computed(() => slotHasContent("actions-overflow"));
 const hasBack = computed(() => Boolean(props.back) || slotHasContent("back"));
-const backLabel = computed(() => (props.back?.label ? `Back to ${props.back.label}` : "Back"));
+const backLabel = computed(() =>
+  props.back?.label ? t("common.backTo", { label: props.back.label }) : t("common.back"),
+);
 
 const onBack = () => {
   if (props.back?.onClick) props.back.onClick();

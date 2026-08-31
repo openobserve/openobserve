@@ -19,11 +19,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-#[cfg(feature = "enterprise")]
-use axum::http::HeaderMap;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
-#[cfg(feature = "enterprise")]
-use common::utils::http::get_or_create_trace_id;
 use config::{
     SMTP_CLIENT, TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -55,18 +51,12 @@ use db::{
 };
 #[cfg(feature = "enterprise")]
 use infra::table::workflows::WorkflowTriggerEntity;
-use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
-    schema::unwrap_stream_settings,
-    table,
-};
+use infra::{db::get_orm_client_ro, schema::unwrap_stream_settings, table};
 use itertools::Itertools;
 use lettre::{
     AsyncTransport, Message,
     message::{Attachment, MultiPart, SinglePart},
 };
-#[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::actions::meta::{TriggerActionRequest, TriggerSource};
 #[cfg(feature = "enterprise")]
 use o2_openfga::{
     authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
@@ -75,8 +65,6 @@ use o2_openfga::{
 use sea_orm::{ConnectionTrait, TransactionTrait};
 use search::sql::RE_ONLY_SELECT;
 use svix_ksuid::Ksuid;
-#[cfg(feature = "enterprise")]
-use tracing::{Level, span};
 
 #[cfg(feature = "enterprise")]
 use crate::auth::check_permissions;
@@ -273,6 +261,16 @@ pub enum AlertError {
     )]
     AlertSourceOfSlos { slos: String },
 
+    #[error("this alert is referenced by one or more composite alerts")]
+    AlertReferencedByComposites {
+        /// Captured while holding the organization graph lock. HTTP callers
+        /// filter this snapshot through current folder RBAC before returning it.
+        parents: Vec<CompositeParentReference>,
+    },
+
+    #[error("composite graph lock unavailable: {0}")]
+    CompositeGraphLockUnavailable(String),
+
     /// S-16 PR 4. Save-time validation only holds at save time: an edit to the
     /// source alert can break the SLI's eligibility invariants (§5.1, §5.4)
     /// afterwards, with no signal, leaving the SLO frozen forever on a config
@@ -335,6 +333,7 @@ pub(crate) async fn create_default_alerts_folder(org_id: &str) -> Result<Folder,
         folder_id: DEFAULT_FOLDER.to_owned(),
         name: "default".to_owned(),
         description: "default".to_owned(),
+        icon: None,
     };
     folders::save_folder(org_id, default_folder, FolderType::Alerts, true)
         .await
@@ -1057,7 +1056,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
 }
 
 pub async fn get_by_id_db(org_id: &str, alert_id: Ksuid) -> Result<Alert, AlertError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     get_by_id(conn, org_id, alert_id).await.map(|f_a| f_a.1)
 }
 
@@ -1109,11 +1108,11 @@ pub async fn list(
     }
 }
 
-/// Gets a list of alerts from the database `ORM_CLIENT`.
+/// Gets a list of alerts from the database.
 pub async fn list_with_folders_db(
     params: ListAlertsParams,
 ) -> Result<Vec<(Folder, Alert)>, AlertError> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_ro().await;
     db::alerts::alert::list_with_folders(conn, params)
         .await
         .map_err(|e| e.into())
@@ -1203,30 +1202,139 @@ pub(crate) async fn delete_by_id<C: ConnectionTrait>(
 /// again the moment it resumes, and by then the source would be gone.
 ///
 /// Deliberately a wrapper rather than a check inside [`delete_by_id`]: org
-/// teardown deletes SLOs first and then every alert in the org
-/// (`org_cleanup::step_delete_db_resources`), and a guard on the shared
-/// primitive would let one surviving SLO row stall the whole teardown. The
-/// cascade in `slo::service::delete` needs the unguarded primitive for the same
-/// reason.
-///
-/// Scope, stated exactly: this covers deletion **by id**, which is every alert
-/// delete endpoint. It does not cover `DELETE /streams/{name}?delete_all=true`,
-/// which sweeps a stream's alerts through `db::alerts::alert::delete_by_name`
-/// and reaches neither this function nor [`delete_by_id`] — so it already
-/// bypasses the run-state and ledger teardown too. That is a pre-existing gap
-/// in the stream path, not one this guard opens.
+/// teardown is the one explicit bypass and deletes the entire composite graph
+/// before ordinary alerts. SLO and stream cascades use
+/// [`delete_many_for_cascade`], which applies the composite-reference guard to
+/// the complete target set without applying the dependent-SLO guard.
 pub async fn delete_by_id_user<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     alert_id: Ksuid,
 ) -> Result<(), AlertError> {
-    let dependents = crate::slo::service::slos_sourced_from_alert(org_id, &alert_id.to_string())
-        .await
-        .map_err(|e| AlertError::InfraError(infra::errors::Error::Message(e.to_string())))?;
-    if let Some(refusal) = delete_blocked_by(&dependents) {
-        return Err(refusal);
+    let locker = lock_composite_graph(org_id).await?;
+    let result = async {
+        ensure_alerts_not_referenced(conn, org_id, &[alert_id]).await?;
+        let dependents =
+            crate::slo::service::slos_sourced_from_alert(org_id, &alert_id.to_string())
+                .await
+                .map_err(|e| {
+                    AlertError::InfraError(infra::errors::Error::Message(e.to_string()))
+                })?;
+        if let Some(refusal) = delete_blocked_by(&dependents) {
+            return Err(refusal);
+        }
+        delete_by_id(conn, org_id, alert_id).await
     }
-    delete_by_id(conn, org_id, alert_id).await
+    .await;
+    finish_graph_locked(result, locker).await
+}
+
+/// A readable parent snapshot captured by the guarded-delete service.
+///
+/// Keeping IDs and folders here (instead of formatting only names into the
+/// error string) lets the HTTP boundary reveal only parents the caller may
+/// currently read and report the rest as a hidden count.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompositeParentReference {
+    pub alert_id: String,
+    pub name: String,
+    pub folder_id: String,
+}
+
+/// Delete every ordinary-alert member of an internal cascade.
+///
+/// All reverse-reference checks happen while holding the same graph lock used
+/// by composite mutations, and every target is checked before the first delete.
+/// This is intentionally distinct from [`delete_by_id_user`]: an SLO deleting
+/// its generated alerts and a stream deleting its alerts must not trip the
+/// dependent-SLO guard, but they must honor composite references.
+pub(crate) async fn delete_many_for_cascade<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_ids: &[Ksuid],
+) -> Result<(), AlertError> {
+    if alert_ids.is_empty() {
+        return Ok(());
+    }
+    let locker = lock_composite_graph(org_id).await?;
+    let result = async {
+        ensure_alerts_not_referenced(conn, org_id, alert_ids).await?;
+        for alert_id in alert_ids {
+            delete_by_id(conn, org_id, *alert_id).await?;
+        }
+        Ok(())
+    }
+    .await;
+    finish_graph_locked(result, locker).await
+}
+
+async fn lock_composite_graph(
+    org_id: &str,
+) -> Result<super::composite_graph_lock::CompositeGraphGuard, AlertError> {
+    super::composite_graph_lock::lock(org_id)
+        .await
+        .map_err(|error| AlertError::CompositeGraphLockUnavailable(error.to_string()))
+}
+
+async fn finish_graph_locked<T>(
+    result: Result<T, AlertError>,
+    locker: super::composite_graph_lock::CompositeGraphGuard,
+) -> Result<T, AlertError> {
+    let unlock = locker
+        .release()
+        .await
+        .map_err(|error| AlertError::CompositeGraphLockUnavailable(error.to_string()));
+    match result {
+        Ok(value) => {
+            unlock?;
+            Ok(value)
+        }
+        Err(error) => {
+            if let Err(unlock_error) = unlock {
+                log::error!(
+                    "failed to release composite graph lock after delete refusal: {unlock_error}"
+                );
+            }
+            Err(error)
+        }
+    }
+}
+
+async fn ensure_alerts_not_referenced<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    alert_ids: &[Ksuid],
+) -> Result<(), AlertError> {
+    let mut parents = Vec::new();
+    for alert_id in alert_ids {
+        parents.extend(
+            infra::table::alert_composites::list_parents(
+                conn,
+                org_id,
+                infra::table::alert_composites::ChildKind::Alert,
+                &alert_id.to_string(),
+            )
+            .await
+            .map_err(|error| {
+                AlertError::InfraError(infra::errors::Error::Message(error.to_string()))
+            })?,
+        );
+    }
+    if parents.is_empty() {
+        return Ok(());
+    }
+    parents.sort_by(|left, right| left.id.cmp(&right.id));
+    parents.dedup_by(|left, right| left.id == right.id);
+    Err(AlertError::AlertReferencedByComposites {
+        parents: parents
+            .into_iter()
+            .map(|parent| CompositeParentReference {
+                alert_id: parent.id,
+                name: parent.name,
+                folder_id: parent.folder_id,
+            })
+            .collect(),
+    })
 }
 
 /// The refusal a delete owes the SLOs measuring from this alert, or `None` when
@@ -1676,19 +1784,13 @@ pub async fn delete_by_name(
     stream_name: &str,
     name: &str,
 ) -> Result<(), AlertError> {
-    if db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name)
+    let alert = db::alerts::alert::get_by_name(org_id, stream_type, stream_name, name)
         .await
-        .is_err()
-    {
-        return Err(AlertError::AlertNotFound);
-    }
-    match db::alerts::alert::delete_by_name(org_id, stream_type, stream_name, name).await {
-        Ok(_) => {
-            remove_ownership(org_id, "alerts", Authz::new(name)).await;
-            Ok(())
-        }
-        Err(e) => Err(e.into()),
-    }
+        .map_err(|_| AlertError::AlertNotFound)?
+        .ok_or(AlertError::AlertNotFound)?;
+    let alert_id = alert.id.ok_or(AlertError::AlertNotFound)?;
+    let client = infra::db::get_orm_client_rw().await;
+    delete_by_id_user(client, org_id, alert_id).await
 }
 
 /// Enables an alert.
@@ -2483,10 +2585,8 @@ async fn send_to_destination(
                 (RenderedMessage::Http { body }, DestinationType::Http(endpoint)) => {
                     // Discord with a rendered chart: upload the PNG in the
                     // same webhook POST (the embed references it as
-                    // `attachment://`). Actions destinations keep the plain
-                    // JSON path — their payload is rewritten server-side.
+                    // `attachment://`).
                     if matches!(format, ChannelFormat::Discord)
-                        && endpoint.action_id.is_none()
                         && let Some(png) = ctx.chart_png.clone()
                     {
                         send_discord_with_attachment(endpoint, body, png).await
@@ -2596,37 +2696,6 @@ pub(crate) async fn dispatch_test_message(
 }
 
 async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
-    #[cfg(feature = "enterprise")]
-    let msg = if endpoint.action_id.is_some() {
-        let incoming_msg = serde_json::from_str::<serde_json::Value>(&msg)
-            .map_err(|e| anyhow::anyhow!("Message should be valid JSON for actions: {e}"))?;
-        let inputs = if incoming_msg.is_object() {
-            vec![incoming_msg]
-        } else if incoming_msg.is_array() {
-            incoming_msg.as_array().unwrap().to_vec()
-        } else {
-            return Err(anyhow::anyhow!(
-                "Unsupported message format for actions: {}",
-                msg
-            ));
-        };
-
-        let trace_id = get_or_create_trace_id(
-            &HeaderMap::new(),
-            &span!(Level::TRACE, "action_destinations"),
-        );
-
-        let req = TriggerActionRequest {
-            inputs,
-            trigger_source: TriggerSource::Alerts,
-            trace_id,
-        };
-        serde_json::to_string(&req)
-            .map_err(|e| anyhow::anyhow!("Request should be valid JSON for actions: {e}"))?
-    } else {
-        msg
-    };
-
     // Block SSRF: validate the destination URL (including DNS resolution) before
     // making any outbound request. The client is built through `build_safe_client`
     // so that redirect targets and per-connect DNS resolution are re-validated.
@@ -3506,7 +3575,7 @@ pub(super) fn to_float(val: &Value) -> f64 {
     }
 }
 #[cfg(not(feature = "enterprise"))]
-async fn permitted_alerts(
+pub async fn permitted_alerts(
     _org_id: &str,
     _user_id: Option<&str>,
     _folder_id: Option<&str>,
@@ -3515,7 +3584,7 @@ async fn permitted_alerts(
 }
 
 #[cfg(feature = "enterprise")]
-async fn permitted_alerts(
+pub async fn permitted_alerts(
     org_id: &str,
     user_id: Option<&str>,
     folder_id: Option<&str>,
@@ -3691,8 +3760,8 @@ mod threshold_validation_tests {
     // every one of them green.
     //
     // Closing that needs `prepare_alert` itself, which reaches for folders,
-    // `get_by_id_db` and `infra::schema::get` — all through the global
-    // `ORM_CLIENT` rather than an injectable connection. The infra SQLite
+    // `get_by_id_db` and `infra::schema::get` — all through the global ORM
+    // clients rather than an injectable connection. The infra SQLite
     // harness cannot reach it without first making that global overridable in
     // tests; until then the wiring is verified by review, not by test.
 
@@ -6903,11 +6972,7 @@ async fn validate_slo_alert_wiring(
             .map_err(AlertError::InvalidSloAlert);
     };
 
-    let db = infra::db::ORM_CLIENT.get().ok_or_else(|| {
-        AlertError::InfraError(infra::errors::Error::Message(
-            "database not initialized".into(),
-        ))
-    })?;
+    let db = get_orm_client_ro().await;
 
     let slo = infra::table::slos::get(db, org_id, &cond.slo_id)
         .await

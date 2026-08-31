@@ -106,6 +106,14 @@ describe("pagerduty template", () => {
       expect(severityField?.type).toBe("select");
       expect(severityField?.options).toBeDefined();
     });
+
+    it("keeps PagerDuty substitution metadata out of generic credential metadata", () => {
+      const persistentFields = pagerdutyConfig.credentialFields
+        .filter((field) => field.persistInMetadata)
+        .map((field) => field.key);
+
+      expect(persistentFields).toEqual([]);
+    });
   });
 
   describe("pagerdutyDestinationType", () => {

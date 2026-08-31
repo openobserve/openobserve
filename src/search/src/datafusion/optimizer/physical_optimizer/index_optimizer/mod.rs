@@ -40,7 +40,10 @@ mod topn;
 mod utils;
 
 use crate::datafusion::{
-    distributed_plan::{empty_exec::NewEmptyExec, remote_scan_exec::RemoteScanExec},
+    distributed_plan::{
+        aggregate_topk_exec::AggregateTopkExec, empty_exec::NewEmptyExec,
+        remote_scan_exec::RemoteScanExec,
+    },
     optimizer::physical_optimizer::index_optimizer::{
         count::is_simple_count,
         distinct::is_simple_distinct,
@@ -276,12 +279,19 @@ impl TreeNodeRewriter for LeaderIndexOptimizer {
 #[derive(Debug)]
 struct IndexOptimizerRewrite {
     index_optimizer_mode: IndexOptimizeMode,
+    remove_aggregate_topk: bool,
 }
 
 impl IndexOptimizerRewrite {
     fn new(index_optimizer_mode: IndexOptimizeMode) -> Self {
+        // SimpleTopN produces one partial aggregate row per (file, group key).
+        // AggregateTopkExec ranks those individual rows before the final aggregate can merge
+        // duplicate group keys, so the two optimizations cannot safely be combined.
+        let remove_aggregate_topk =
+            matches!(index_optimizer_mode, IndexOptimizeMode::SimpleTopN(..));
         IndexOptimizerRewrite {
             index_optimizer_mode,
+            remove_aggregate_topk,
         }
     }
 }
@@ -290,6 +300,10 @@ impl TreeNodeRewriter for IndexOptimizerRewrite {
     type Node = Arc<dyn ExecutionPlan>;
 
     fn f_up(&mut self, node: Arc<dyn ExecutionPlan>) -> Result<Transformed<Self::Node>> {
+        if self.remove_aggregate_topk && node.downcast_ref::<AggregateTopkExec>().is_some() {
+            return Ok(Transformed::yes(node.children()[0].clone()));
+        }
+
         if let Some(remote) = node.downcast_ref::<RemoteScanExec>() {
             let remote = Arc::new(
                 remote
@@ -342,8 +356,10 @@ mod tests {
     use crate::datafusion::{
         distributed_plan::node::RemoteScanNode,
         optimizer::physical_optimizer::{
-            index_optimizer::utils::tests::get_remote_scan, remote_scan::RemoteScanRule,
+            aggregate_topk::AggregateTopkRule, index_optimizer::utils::tests::get_remote_scan,
+            remote_scan::RemoteScanRule,
         },
+        sort_order::FileSortOrder,
         table_provider::empty_table::NewEmptyTable,
     };
 
@@ -356,7 +372,7 @@ mod tests {
             None,
             &[],
             None,
-            false,
+            FileSortOrder::None,
             schema.clone(),
         ));
 
@@ -379,7 +395,7 @@ mod tests {
             None,
             &[],
             None,
-            false,
+            FileSortOrder::None,
             schema.clone(),
         ));
 
@@ -463,7 +479,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_leader_rule_topn() {
+    async fn test_leader_rule_topn_removes_conflicting_aggregate_topk() {
         let schema = Arc::new(Schema::new(vec![
             Field::new("_timestamp", DataType::Int64, false),
             Field::new("name", DataType::Utf8, false),
@@ -483,7 +499,7 @@ mod tests {
             .with_config(SessionConfig::new().with_target_partitions(12))
             .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
             .with_physical_optimizer_rule(Arc::new(remote_scan_rule))
-            .with_physical_optimizer_rule(Arc::new(LeaderIndexOptimizerRule::new(index_fields)))
+            .with_physical_optimizer_rule(Arc::new(AggregateTopkRule::new(10)))
             .with_default_features()
             .build();
         let ctx = SessionContext::new_with_state(state);
@@ -493,6 +509,25 @@ mod tests {
         let sql = "select name, count(*) as cnt from t group by name order by cnt desc limit 10";
         let plan = ctx.state().create_logical_plan(sql).await.unwrap();
         let plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+
+        let plan_before_index_optimizer = datafusion::physical_plan::displayable(plan.as_ref())
+            .indent(true)
+            .to_string();
+        assert!(
+            plan_before_index_optimizer.contains("AggregateTopkExec"),
+            "the regression setup must contain AggregateTopkExec before SimpleTopN is selected:\n{plan_before_index_optimizer}"
+        );
+
+        let plan = LeaderIndexOptimizerRule::new(index_fields)
+            .optimize(plan, &ConfigOptions::new())
+            .unwrap();
+        let plan_after_index_optimizer = datafusion::physical_plan::displayable(plan.as_ref())
+            .indent(true)
+            .to_string();
+        assert!(
+            !plan_after_index_optimizer.contains("AggregateTopkExec"),
+            "SimpleTopN must not truncate file-local rows before the final aggregate:\n{plan_after_index_optimizer}"
+        );
 
         let remote_scan = get_remote_scan(plan);
         assert_eq!(

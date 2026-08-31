@@ -74,6 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #cell-user_id="{ row }">
       <OUserCell :value="row.user_id" />
     </template>
+    <!-- `search_type_label` is the machine value ("dashboards" / "ui" / "Others") kept
+         for sorting; only the rendered text is translated. -->
+    <template #cell-search_type_label="{ row }">
+      {{ searchTypeLabel(row.search_type_label) }}
+    </template>
     <template #cell-duration="{ row }">
       {{ durationFormatter(row.duration) }}
     </template>
@@ -98,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { ref, defineComponent, computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -139,16 +144,27 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const { isMetaOrg } = useIsMetaOrg();
+    const { t } = useI18nTyped();
     const loadingState = ref(false);
+
+    /**
+     * Display label for the Search Type column. Mirrors the map RunningQueriesList
+     * already uses; the row value stays the machine token so sorting is unaffected.
+     */
+    const searchTypeLabel = (value: string): I18nText => {
+      if (value === "dashboards") return t("queries.searchTypeDashboards");
+      if (value === "ui") return t("queries.searchTypeUi");
+      if (value === "Others") return t("queries.searchTypeOthers");
+      return raw(value ?? "");
+    };
 
     const deleteDialog = ref({
       show: false,
-      title: "Delete Running Query",
-      message: "Are you sure you want to delete this running query?",
+      title: t("queries.deleteRunningQueryTitle"),
+      message: t("queries.deleteRunningQueryMessage"),
       data: null as any,
     });
 
-    const { t } = useI18nTyped();
     const showListSchemaDialog = ref(false);
 
     const pageSize = ref(20);
@@ -235,6 +251,7 @@ export default defineComponent({
 
     return {
       t,
+      searchTypeLabel,
       columns,
       confirmDeleteAction,
       deleteDialog,

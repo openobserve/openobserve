@@ -30,10 +30,30 @@ export async function reopenPanelConfig(page, pm) {
   // Wait for the add_panel page to fully load before interacting with the config sidebar
   await page.waitForURL(/\/add_panel/, { timeout: 15000 });
   await page.locator('[data-test="dashboard-sidebar"]').waitFor({ state: "visible", timeout: 15000 });
-  // Config panel may already be open (state preserved); only open if not already visible
-  const isConfigOpen = await page.locator('[data-test="dashboard-config-description"]').isVisible();
-  if (!isConfigOpen) {
+
+  // Ask whether the sidebar is COLLAPSED, which is the app's own condition:
+  // `panel-sidebar-header-collapsed` is rendered under v-if="!isOpen", and
+  // openConfigPanel() clicks exactly that element to expand the sidebar.
+  //
+  // The previous probe used `dashboard-config-description` as the "already open"
+  // signal, which cannot work: that field lives inside the General OCollapsible,
+  // and every section starts collapsed on mount (no section sets defaultExpanded).
+  // So an open sidebar with collapsed sections read as "closed", openConfigPanel()
+  // then waited for a collapsed-header element that does not exist while the
+  // sidebar is open, and the helper died on a selector timeout. The sidebar's own
+  // open flag lives in the shared dashboardPanelData.layout store while
+  // expandedSections is per-mount state, so the two genuinely can disagree.
+  const isCollapsed = await pm.dashboardPanelConfigs.configBtn
+    .isVisible()
+    .catch(() => false);
+
+  if (isCollapsed) {
+    // openConfigPanel() expands the sidebar and then expands all sections.
     await pm.dashboardPanelConfigs.openConfigPanel();
+  } else {
+    // Already open — the sections still need expanding, since config controls are
+    // inside collapsibles. expandAllConfigSections() is idempotent.
+    await pm.dashboardPanelConfigs.expandAllConfigSections();
   }
 }
 
@@ -86,12 +106,16 @@ async function buildPanel(page, pm, dashboardName, {
   panelName = "Test Panel",
   yField = "kubernetes_container_hash",
   breakdownField = null,
+  xField = null,
 }) {
   await setupTestDashboard(page, pm, dashboardName);
   await pm.dashboardCreate.addPanel();
   await pm.chartTypeSelector.selectChartType(chartType);
   await pm.chartTypeSelector.selectStreamType("logs");
   await pm.chartTypeSelector.selectStream("e2e_automate");
+  if (xField) {
+    await pm.chartTypeSelector.searchAndAddField(xField, "x");
+  }
   // remove the auto-seeded default y-axis before adding this panel's measure
   await pm.chartTypeSelector.removeField("y_axis_1", "y");
   await pm.chartTypeSelector.searchAndAddField(yField, "y");
@@ -172,6 +196,28 @@ export async function setupTablePanelWithConfig(page, pm, dashboardName, panelNa
   await buildPanel(page, pm, dashboardName, { chartType: "table", panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("Table panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * Table chart panel WITH a plain group-by dimension column (x-axis) plus a
+ * measure (y-axis). The dimension column is a non-aggregate field, which is
+ * what makes a cell drillable via the interactive-table "explore in logs"
+ * search icon. Config sidebar NOT opened. Leaves the panel APPLIED in the
+ * add_panel preview; caller decides whether to save + view the dashboard.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {object} pm
+ * @param {string} dashboardName
+ * @param {string} [panelName]
+ */
+export async function setupTablePanelWithDimension(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPanel(page, pm, dashboardName, {
+    chartType: "table",
+    panelName,
+    xField: "kubernetes_namespace_name",
+    yField: "kubernetes_container_hash",
+  });
+  testLogger.info("Table panel with drillable dimension ready", { dashboardName, panelName });
 }
 
 /**

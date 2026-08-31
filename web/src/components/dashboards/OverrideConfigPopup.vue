@@ -32,9 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="-mx-dialog-content-px -my-dialog-content-py grid h-[calc(86vh-9.375rem)] grid-cols-[16.5rem_minmax(0,1fr)_22.5rem] overflow-hidden max-[56.25rem]:grid-cols-[13.75rem_minmax(0,1fr)]"
     >
       <!-- Left: add-field dropdown + list of added fields -->
-      <div
-        class="flex min-w-0 flex-col gap-2.5 border-r border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)] p-3"
-      >
+      <div class="border-border-strong/18 flex min-w-0 flex-col gap-2.5 border-r p-3">
         <ODropdown
           v-model:open="addOpenLeft"
           align="start"
@@ -44,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               data-test="dashboard-addpanel-config-add-column"
-              class="rounded-default text-accent hover:border-accent flex w-full shrink-0 cursor-pointer items-center justify-center gap-1.5 border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_50%,transparent)] bg-transparent p-2.25 text-sm font-medium transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary-600)_5%,transparent)]"
+              class="rounded-default text-accent hover:border-accent border-accent/50 hover:bg-accent/5 flex w-full shrink-0 cursor-pointer items-center justify-center gap-1.5 border border-dashed bg-transparent p-2.25 text-sm font-medium transition-colors"
             >
               <OIcon name="add" size="sm" />
               {{ t("dashboard.columnFormattingAddField") }}
@@ -83,12 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             role="button"
             tabindex="0"
             :data-test="`override-config-row-${idx}`"
-            class="group rounded-default relative flex w-full cursor-pointer items-center gap-2 border-l-[0.1875rem] border-transparent py-2 pr-1.5 pl-2.25 transition-colors outline-none hover:bg-[color-mix(in_srgb,var(--color-grey-500)_5%,transparent)]"
-            :class="
-              idx === selectedIdx
-                ? 'border-l-primary-600! bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)]'
-                : ''
-            "
+            class="group rounded-default hover:bg-border-strong/5 relative flex w-full cursor-pointer items-center gap-2 border-l-[0.1875rem] border-transparent py-2 pr-1.5 pl-2.25 transition-colors outline-none"
+            :class="idx === selectedIdx ? 'border-l-primary-600! bg-accent/6' : ''"
             @click="selectedIdx = idx"
             @keydown.enter.prevent="selectedIdx = idx"
             @keydown.space.prevent="selectedIdx = idx"
@@ -135,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ColumnFormatControls :col="selectedCol" :is-numeric="isNumericColumn(selectedCol)" />
         </div>
         <div
-          class="flex min-w-0 flex-col gap-2 overflow-y-auto border-l border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)] p-3"
+          class="border-border-strong/18 flex min-w-0 flex-col gap-2 overflow-y-auto border-l p-3"
         >
           <div
             class="text-3xs text-text-secondary flex items-center gap-1.25 font-bold tracking-[0.06em] uppercase"
@@ -144,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span>{{ t("dashboard.inlinePreview") }}</span>
           </div>
           <div
-            class="rounded-default overflow-hidden border border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)] [&_[data-test^=o2-table-cell-copy-]]:hidden!"
+            class="rounded-default border-border-strong/18 overflow-hidden border [&_[data-test^=o2-table-cell-copy-]]:hidden!"
           >
             <TableRenderer
               v-if="selectedPreview"
@@ -172,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #illustration>
             <div
-              class="rounded-default text-text-secondary flex h-18 w-18 items-center justify-center bg-[color-mix(in_srgb,var(--color-grey-500)_8%,transparent)]"
+              class="rounded-default text-text-secondary bg-border-strong/8 flex h-18 w-18 items-center justify-center"
             >
               <OIcon name="tune" size="xl" />
             </div>
@@ -371,7 +365,7 @@ export default defineComponent({
       const n = columnOverrides.value.length;
       if (n === 0) return t("dashboard.columnFormattingNoFieldsToFormat");
       if (n === 1) return t("dashboard.columnFormattingOneFieldToFormat");
-      return `${n} ${t("dashboard.columnFormattingFieldsToFormat")}`;
+      return t("dashboard.columnFormattingFieldsToFormatCount", { count: n });
     });
 
     // Field-type badge colour (num = blue, text = grey).

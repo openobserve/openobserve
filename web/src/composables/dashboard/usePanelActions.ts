@@ -20,7 +20,7 @@ import { downloadFile } from "@/utils/dom";
 import { toast } from "@/lib/feedback/Toast/useToast";
 // `gt`, not useI18nTyped: this composable takes router/store as injected deps
 // so it can be constructed outside a component, and useI18n() throws there.
-import { gt } from "@/types/i18n";
+import { gt, type TranslateFn } from "@/types/i18n";
 
 // Helper function to properly wrap CSV values
 export const wrapCsvValue = (val: any): string => {
@@ -212,6 +212,7 @@ export function usePanelDownload({
   tableRendererRef,
   showErrorNotification,
   showPositiveNotification,
+  t,
 }: {
   panelSchema: any;
   data: any;
@@ -219,6 +220,7 @@ export function usePanelDownload({
   tableRendererRef: any;
   showErrorNotification: any;
   showPositiveNotification: any;
+  t: TranslateFn;
 }) {
   const downloadDataAsCSV = (title: string) => {
     // if panel type is table then download data as csv
@@ -229,7 +231,7 @@ export function usePanelDownload({
       try {
         // Check if data exists
         if (!data?.value || data?.value?.length === 0) {
-          showErrorNotification("No data available to download");
+          showErrorNotification(t("dashboard.noDataAvailableToDownload"));
           return;
         }
 
@@ -307,7 +309,7 @@ export function usePanelDownload({
 
           // If after flattening we have no data, show notification and return
           if (flattenedData.length === 0) {
-            showErrorNotification("No data available to download");
+            showErrorNotification(t("dashboard.noDataAvailableToDownload"));
             return;
           }
 
@@ -332,14 +334,14 @@ export function usePanelDownload({
         const status = downloadFile((title ?? "chart-export") + ".csv", csvContent, "text/csv");
 
         if (status === true) {
-          showPositiveNotification("Chart data downloaded as a CSV file", {
+          showPositiveNotification(t("dashboard.chartDataDownloadedCsv"), {
             timeout: 2000,
           });
         } else {
-          showErrorNotification("Browser denied file download...");
+          showErrorNotification(t("dashboard.browserDeniedFileDownload"));
         }
       } catch (error) {
-        showErrorNotification("Failed to download data as CSV");
+        showErrorNotification(t("dashboard.failedToDownloadCsv"));
       }
     }
   };
@@ -356,7 +358,7 @@ export function usePanelDownload({
           panelSchema.value.queryType === "promql" ? filteredData.value : data.value;
 
         if (!chartData || !chartData.length) {
-          showErrorNotification("No data available to download");
+          showErrorNotification(t("dashboard.noDataAvailableToDownload"));
           return;
         }
 
@@ -370,15 +372,15 @@ export function usePanelDownload({
         );
 
         if (status === true) {
-          showPositiveNotification("Chart data downloaded as a JSON file", {
+          showPositiveNotification(t("dashboard.chartDataDownloadedJson"), {
             timeout: 2000,
           });
         } else {
-          showErrorNotification("Browser denied file download...");
+          showErrorNotification(t("dashboard.browserDeniedFileDownload"));
         }
       }
     } catch (error) {
-      showErrorNotification("Failed to download data as JSON");
+      showErrorNotification(t("dashboard.failedToDownloadJson"));
     }
   };
 

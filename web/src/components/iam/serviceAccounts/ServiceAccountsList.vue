@@ -727,7 +727,7 @@ export default defineComponent({
       },
     ];
     const userEmail: any = ref("");
-    const options = ref([{ label: "Admin", value: "admin" }]);
+    const options = ref([{ label: t("iam.roleAdmin"), value: "admin" }]);
     const selectedRole = ref(options.value[0].value);
     const currentUserRole = ref("");
     let deleteUserEmail = "";

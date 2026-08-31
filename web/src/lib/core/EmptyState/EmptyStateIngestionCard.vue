@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click="emit('click')"
   >
     <span
-      class="es-ing-card__icon rounded-default bg-tabs-active-bg text-tabs-active-text inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
+      class="es-ing-card__icon rounded-default group-hover:bg-button-primary inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150 group-hover:text-white"
       :class="iconClass"
     >
       <OIcon :name="icon" size="md" />
@@ -63,39 +63,19 @@ const props = withDefaults(
 
 const emit = defineEmits<{ click: [] }>();
 
-const iconClass = computed(() =>
-  props.iconVariant === "default" ? "" : `es-ing-card__icon--${props.iconVariant}`,
-);
+// Each variant carries BOTH its resting background and its resting colour. They
+// are not split between here and the base class on purpose: two plain utilities
+// setting the same property differ only by Tailwind's emit order, so
+// `text-tabs-active-text` in the base class silently won over every
+// `text-ingest-accent-*` and all five variants rendered one colour.
+const ICON_VARIANT_CLASS: Record<IconVariant, string> = {
+  default: "bg-tabs-active-bg text-tabs-active-text",
+  blue: "bg-ingest-tint-blue text-ingest-accent-blue",
+  teal: "bg-ingest-tint-teal text-ingest-accent-teal",
+  purple: "bg-ingest-tint-purple text-ingest-accent-purple",
+  amber: "bg-ingest-tint-amber text-ingest-accent-amber",
+  orange: "bg-ingest-tint-orange text-ingest-accent-orange",
+};
+
+const iconClass = computed(() => ICON_VARIANT_CLASS[props.iconVariant]);
 </script>
-
-<style scoped>
-/* keep(brand): decorative icon accent tints — color-mix on palette tokens has
-   no semantic equivalent; the parent-hover override must outrank the variant
-   classes, so both live here rather than as utilities. */
-.es-ing-card__icon--blue {
-  background: color-mix(in srgb, var(--color-blue-500) 12%, transparent);
-  color: var(--color-blue-500);
-}
-.es-ing-card__icon--teal {
-  background: color-mix(in srgb, var(--color-teal-600) 12%, transparent);
-  color: var(--color-teal-600);
-}
-.es-ing-card__icon--purple {
-  background: color-mix(in srgb, var(--color-purple-500) 12%, transparent);
-  color: var(--color-purple-500);
-}
-.es-ing-card__icon--amber {
-  background: color-mix(in srgb, var(--color-amber-600) 12%, transparent);
-  color: var(--color-amber-600);
-}
-.es-ing-card__icon--orange {
-  background: color-mix(in srgb, var(--color-orange-500) 12%, transparent);
-  color: var(--color-orange-500);
-}
-
-.es-ing-card:hover .es-ing-card__icon,
-.es-ing-card:hover [class*="es-ing-card__icon--"] {
-  background: var(--color-primary-600);
-  color: var(--color-white);
-}
-</style>

@@ -340,7 +340,7 @@ describe("CorrelatedLogsTable.vue", () => {
       const sourceColumn = columns.find((col: any) => col.id === "source");
 
       expect(sourceColumn).toBeDefined();
-      expect(sourceColumn.header).toBe("Source");
+      expect(sourceColumn.header).toBe("_source");
     });
 
     it("should not show source column when other fields are visible", () => {

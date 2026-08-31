@@ -135,15 +135,44 @@ describe("DestinationPreview", () => {
     expect(wrapper.find('[data-test="slack-preview"]').exists()).toBe(true);
   });
 
-  it("should display Slack bot name", () => {
+  it("uses a generic Slack sender", () => {
     wrapper = mountComponent({ type: "slack" });
     const botName = wrapper.find('[data-test="slack-bot-name"]');
-    expect(botName.text()).toBe("OpenObserve Bot");
+    expect(botName.text()).toBe("Slack app");
+  });
+
+  it("uses a neutral avatar and explains Slack-owned icon and channel details", () => {
+    wrapper = mountComponent({ type: "slack" });
+
+    expect(wrapper.find('[data-test="slack-avatar-icon"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="slack-avatar-initials"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="slack-preview-disclaimer"]').exists()).toBe(true);
   });
 
   it("should display Slack message body", () => {
     wrapper = mountComponent({ type: "slack" });
     expect(wrapper.find('[data-test="slack-message-body"]').exists()).toBe(true);
+  });
+
+  it("keeps the Slack preview aligned with the fallback Block Kit sample", () => {
+    wrapper = mountComponent({ type: "slack" });
+
+    expect(wrapper.find('[data-test="slack-block-header"]').text()).toBe("🚨 High CPU Usage");
+    expect(wrapper.findAll('[data-test^="slack-field-"]').map((field) => field.text())).toEqual([
+      "Stream:system-metrics",
+      "Type:logs",
+      "Status:🔴 Firing",
+      "Count:15",
+    ]);
+    expect(wrapper.find('[data-test="slack-stream-type"]').text()).toBe("logs");
+    expect(wrapper.find('[data-test="slack-threshold"]').text()).toContain("greater than 80%");
+    expect(wrapper.find('[data-test="slack-preview-action"]').text()).toBe("View in OpenObserve");
+    expect(
+      wrapper
+        .find('[data-test="slack-preview"]')
+        .classes()
+        .some((className) => className.startsWith("border-l")),
+    ).toBe(false);
   });
 
   it("should render MS Teams preview when type is msteams", () => {

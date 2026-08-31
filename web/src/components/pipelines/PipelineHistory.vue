@@ -749,7 +749,8 @@ const fetchPipelineHistory = async () => {
     console.error("Error response:", error.response);
     toast({
       variant: "error",
-      message: error.response?.data?.message || error.message || "Failed to fetch pipeline history",
+      message:
+        error.response?.data?.message || error.message || t("pipeline.fetchPipelineHistoryFailed"),
     });
   } finally {
     loading.value = false;

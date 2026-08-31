@@ -328,7 +328,7 @@ import {
   watch,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
@@ -363,7 +363,7 @@ import {
 import { parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useTracesTableColumns } from "./composables/useTracesTableColumns";
-import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
+import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { isLLMTrace } from "@/utils/llmUtils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -388,6 +388,9 @@ const SanitizedHtmlRenderer = defineAsyncComponent(
 );
 const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
 const ServicesCatalog = defineAsyncComponent(() => import("./ServicesCatalog.vue"));
+
+const supportedTraceSearchMode = (value: unknown): TraceSearchMode =>
+  resolveTraceSearchMode(value, config.isEnterprise === "true");
 
 const store = useStore();
 const activeTab = computed(() => {
@@ -666,16 +669,12 @@ function buildSearch() {
     req.query.start_time = timestamps.startTime;
     req.query.end_time = timestamps.endTime;
 
-    let parseQuery = query.split("|");
-    let queryFunctions = "";
-    let whereClause = "";
-
-    if (parseQuery.length > 1) {
-      queryFunctions = "," + parseQuery[0].trim();
-      whereClause = parseQuery[1].trim();
-    } else {
-      whereClause = parseQuery[0].trim();
-    }
+    // The whole query IS the where clause. Do not split on "|": the legacy
+    // "function | where" syntax is gone, and the split is quote-unaware, so a pipe
+    // inside a term such as match_all('text | error') would push half the term into
+    // the [QUERY_FUNCTIONS] slot before FROM and leave a broken where clause.
+    const queryFunctions = "";
+    let whereClause = query.trim();
 
     if (whereClause.trim() != "") {
       // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
@@ -862,10 +861,10 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
     queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
     // Filters are already in editorValue (set by metrics dashboard brush selections).
-    // Mirror buildSearch: split on | so only the WHERE-clause portion (after the pipe)
-    // is passed to parseDurationWhereClause, not the query-functions prefix.
-    const editorParts = searchObj.data.editorValue.trim().split("|");
-    let filter = (editorParts.length > 1 ? editorParts[1] : editorParts[0]).trim();
+    // Mirror buildSearch: the whole editor value is the where clause. Never split on
+    // "|" — the split is quote-unaware and would truncate a term such as
+    // match_all('text | error') before it reaches parseDurationWhereClause.
+    let filter = searchObj.data.editorValue.trim();
     const filterParseResult = parseDurationWhereClause(
       filter,
       tracesParser.value,
@@ -1053,7 +1052,10 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
             if (customMessage) errorMsg = t(customMessage);
           }
           if (trace_id) {
-            errorMsg += ` <br><span class='text-base font-medium'>TraceID: ${trace_id}</span>`;
+            // Markup + an English "TraceID:" label on purpose: useQueryError reads
+            // the id back out of this string with /TraceID:\s*([a-f0-9A-F-]+)/i, so a
+            // translated label would stop QueryErrorState from finding the trace id.
+            errorMsg += raw(` <br><span class='text-base font-medium'>TraceID: ${trace_id}</span>`);
           }
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";
@@ -1279,7 +1281,7 @@ function generateHistogramData() {
   var trace1 = {
     x: xData,
     y: yData,
-    name: "Trace",
+    name: t("traces.trace"),
     type: "scatter",
     mode: "markers",
     hovertemplate: "%{x} <br> %{y}", // hovertemplate for custom tooltip
@@ -1441,16 +1443,7 @@ function restoreUrlQueryParams() {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
   }
 
-  const tab = typeof queryParams.tab === "string" ? queryParams.tab : undefined;
-  if (
-    tab !== undefined &&
-    (["service-graph", "traces", "spans", "services-catalog"] as const).includes(
-      tab as "service-graph" | "traces" | "spans" | "services-catalog",
-    )
-  ) {
-    if (tab === "service-graph" && config.isEnterprise !== "true") return;
-    searchObj.meta.searchMode = tab as TraceSearchMode;
-  }
+  searchObj.meta.searchMode = supportedTraceSearchMode(queryParams.tab);
 
   if (queryParams.stream && searchObj.data.stream.selectedStream.value !== queryParams.stream) {
     searchObj.data.stream.selectedStream = {
@@ -1537,7 +1530,7 @@ const onErrorOnlyToggled = (value: boolean) => {
 };
 
 // Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
-const onSearchModeChange = (mode: "traces" | "spans" | "service-graph" | "services-catalog") => {
+const onSearchModeChange = (mode: TraceSearchMode) => {
   searchObj.meta.searchMode = mode;
   if (mode === "service-graph" || mode === "services-catalog") return;
   if (
@@ -1558,6 +1551,26 @@ const onSearchModeChange = (mode: "traces" | "spans" | "service-graph" | "servic
   };
   getQueryData();
 };
+
+watch(
+  () => [router.currentRoute.value.name, router.currentRoute.value.query.tab] as const,
+  ([routeName, tab]) => {
+    if (routeName !== "traces") return;
+    const mode = supportedTraceSearchMode(tab);
+    if (mode !== searchObj.meta.searchMode) {
+      onSearchModeChange(mode);
+      return;
+    }
+    if (tab !== mode) {
+      const query = { ...router.currentRoute.value.query };
+      delete query.search_mode;
+      query.tab = mode;
+      router.replace({
+        query,
+      });
+    }
+  },
+);
 
 // Handler for Reset Filters button
 // Clears all filters including brush selections
@@ -1683,9 +1696,11 @@ const onAskAiTracing = () => {
   const errorText = (el.textContent ?? "").trim();
   const errorContext = errorText ? ` Error: ${errorText}.` : "";
 
+  // Model input, not screen copy — kept English so the assistant reads the same
+  // wording regardless of the user's locale.
   const outcome = errorContext
-    ? `The traces query produced an error.${errorContext}`
-    : `The traces query ran successfully but returned no results.`;
+    ? raw(`The traces query produced an error.${errorContext}`)
+    : raw(`The traces query ran successfully but returned no results.`);
 
   const mode = searchObj.meta.searchMode === "spans" ? "spans" : "traces";
   const stream = searchObj.data.stream.selectedStream?.value || "unknown";
@@ -1693,7 +1708,9 @@ const onAskAiTracing = () => {
 
   emit(
     "sendToAiChat",
-    `${outcome} I am searching ${mode}. The filter expression is: ${filter}. This is a WHERE-clause filter — not a full SQL query. Stream: ${stream}. Time range: ${timeRange}. Can you help me adjust the filter to get results?`,
+    raw(
+      `${outcome} I am searching ${mode}. The filter expression is: ${filter}. This is a WHERE-clause filter — not a full SQL query. Stream: ${stream}. Time range: ${timeRange}. Can you help me adjust the filter to get results?`,
+    ),
     false,
   );
 };
@@ -1703,7 +1720,9 @@ const onAskAiTracing = () => {
 const onAskAiSetupTracing = () => {
   emit(
     "sendToAiChat",
-    `I don't have any trace streams in OpenObserve yet and want to start sending traces. How do I instrument my services to send traces (e.g. via OpenTelemetry / OTLP)?`,
+    raw(
+      `I don't have any trace streams in OpenObserve yet and want to start sending traces. How do I instrument my services to send traces (e.g. via OpenTelemetry / OTLP)?`,
+    ),
     false,
   );
 };
@@ -1723,8 +1742,9 @@ const extractTracesColName = (col: any): string | null => {
  * Wraps the traces WHERE clause (stored in editorValue) into a full SQL
  * statement so that fnParsedSQL can parse it.
  *
- * The traces query editor only stores the WHERE portion of the query,
- * optionally pipe-separated (e.g. "| status='200' and duration>100").
+ * The traces query editor stores the WHERE portion of the query in full, so the
+ * whole editor value is the where clause. It is never split on "|" — the split is
+ * quote-unaware and would truncate a term such as match_all('text | error').
  * fnParsedSQL requires a complete SELECT statement, so we synthesise one.
  *
  * Returns an empty string when there is no active WHERE clause.
@@ -1732,8 +1752,7 @@ const extractTracesColName = (col: any): string | null => {
 const buildTracesWhereSQL = (): string => {
   const query = searchObj.data.editorValue?.trim();
   if (!query) return "";
-  const parts = query.split("|");
-  const whereClause = (parts.length > 1 ? parts[1] : parts[0]).trim();
+  const whereClause = query;
   if (!whereClause) return "";
   const streamName = searchObj.data.stream.selectedStream?.value || "stream";
   return `SELECT * FROM "${streamName}" WHERE ${whereClause}`;
@@ -2040,15 +2059,8 @@ const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => 
 };
 
 /**
- * Hydrate a handoff from the standalone Service Graph / Services Catalog routes.
- *
- * Those views navigate here with the filter, stream, mode and time range as
- * query params (see `viewTracesQuery` in ./viewTracesHandoff), rather than
- * mutating the shared search state from inside a sibling tab. Applying them
- * here keeps the handoff URL bookmarkable and reload-safe.
- *
- * `restoreUrlQueryParams` already applies `stream`, `from`/`to` and `tab`, so
- * this only adds the prebuilt filter and re-runs the query.
+ * Hydrate a bookmarkable filter handoff. `restoreUrlQueryParams` applies the
+ * stream, time range and tab; this restores the prebuilt filter.
  */
 const applyHandoffFilter = (): boolean => {
   const filter = router.currentRoute.value.query.filter;
@@ -2070,12 +2082,15 @@ const applyHandoffFilter = (): boolean => {
 watch(
   () => searchObj.meta.searchMode,
   (mode) => {
-    const query = { ...router.currentRoute.value.query };
-    if (mode !== "spans") {
-      query.tab = mode;
-    } else {
-      delete query.tab;
+    if (
+      router.currentRoute.value.query.tab === mode &&
+      router.currentRoute.value.query.search_mode === undefined
+    ) {
+      return;
     }
+    const query = { ...router.currentRoute.value.query };
+    delete query.search_mode;
+    query.tab = mode;
     router.replace({ query });
   },
 );

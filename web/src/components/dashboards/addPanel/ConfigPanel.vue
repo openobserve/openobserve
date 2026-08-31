@@ -103,7 +103,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelDataModel.data.config.step_value"
           type="text"
           :label="t('dashboard.stepValue')"
-          :placeholder="t('dashboard.intervalInputPlaceholder')"
+          :placeholder="
+            t('dashboard.intervalInputPlaceholder', {
+              example: raw('30s, 1m, 5m, 1h'),
+            })
+          "
           data-test="dashboard-config-step-value"
         >
           <template #tooltip>
@@ -112,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <b>{{ t("dashboard.stepPrefix") }}</b>
                 {{ t("dashboard.stepValueTooltip") }}
                 <br />
-                {{ t("dashboard.stepValueExample") }}
+                {{ t("dashboard.stepValueExample", { example: raw("10s, 1h") }) }}
               </template>
             </OTooltip>
           </template>
@@ -440,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
-              :label="raw(`${t('dashboard.queryLabel')} ${Number(index) + 1}`)"
+              :label="t('common.queryNumber', { index: Number(index) + 1 })"
               :data-test="`dashboard-config-query-tab-${index}`"
             >
             </OTab>
@@ -573,7 +577,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
-              :label="tab.tabName || t('dashboard.queryLabel') + ' ' + (Number(index) + 1)"
+              :label="
+                tab.tabName
+                  ? raw(tab.tabName)
+                  : t('common.queryNumber', { index: Number(index) + 1 })
+              "
               :data-test="`dashboard-config-query-tab-${index}`"
             >
             </OTab>
@@ -1496,7 +1504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <b>{{
                     hasTimeShifts
                       ? t("dashboard.trellisTimeShiftTooltip")
-                      : t("dashboard.trellisTooltip")
+                      : t("dashboard.trellisTooltip", { product: raw("Trellis") })
                   }}</b>
                 </template>
               </OTooltip>
@@ -1530,7 +1538,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <b>{{
                     hasTimeShifts
                       ? t("dashboard.trellisTimeShiftTooltip")
-                      : t("dashboard.trellisTooltip")
+                      : t("dashboard.trellisTooltip", { product: raw("Trellis") })
                   }}</b>
                 </template>
               </OTooltip>
@@ -1881,7 +1889,7 @@ export default defineComponent({
 
     const basemapTypeOptions = [
       {
-        label: t("dashboard.openStreetMap"),
+        label: raw("OpenStreetMap"),
         value: "osm",
       },
     ];

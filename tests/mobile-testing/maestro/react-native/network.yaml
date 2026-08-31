@@ -1,0 +1,12 @@
+# Drives O2RumTester: make a successful and a 404 network request (resource tracking / A4).
+appId: com.o2rumtester
+---
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "O2 RUM Tester"
+    timeout: 40000
+- tapOn: "Fetch data (success)"
+- tapOn: "Fetch data (404 error)"
+- waitForAnimationToEnd:
+    timeout: 3000

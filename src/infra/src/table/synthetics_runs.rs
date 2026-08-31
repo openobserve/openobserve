@@ -67,6 +67,7 @@ pub async fn insert_run<C: ConnectionTrait>(
              run_result, created_at, completed_at)
         VALUES ($1, $2, $3, $4, $5, $6, 0, NULL, $7, NULL)
     "#;
+
     conn.execute(Statement::from_sql_and_values(
         conn.get_database_backend(),
         sql,

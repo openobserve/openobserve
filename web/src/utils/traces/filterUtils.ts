@@ -53,8 +53,8 @@ export const replaceExistingFieldCondition = (
 
 /**
  * Removes all conditions for `fieldName` from `queryStr`.
- * Handles pipe-separated queries (`SELECT ... | WHERE conditions`) by operating
- * only on the WHERE part. Cleans up dangling AND connectors after removal.
+ * The whole string is treated as the WHERE clause. Cleans up dangling AND
+ * connectors after removal.
  */
 export const removeFieldCondition = (queryStr: string, fieldName: string): string => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -76,12 +76,11 @@ export const removeFieldCondition = (queryStr: string, fieldName: string): strin
     return remaining.join(" AND ");
   };
 
-  const parts = queryStr.split("|");
-  if (parts.length > 1) {
-    parts[1] = removeFromClause(parts[1] as string);
-    return parts.join("| ");
-  }
-  return removeFromClause(parts[0] as string);
+  // The whole string is the where clause. Do not split on "|": the legacy
+  // "function | where" syntax is gone, and the split is quote-unaware, so a pipe
+  // inside a term such as match_all('text | error') would hide the conditions
+  // before the pipe from removal and corrupt the term on rejoin.
+  return removeFromClause(queryStr);
 };
 
 /**
@@ -100,28 +99,15 @@ export const applyFilterTerm = (filterTerm: string, baseValue: string): string =
       .replace(/'null'/, "null");
   }
 
-  const parts = baseValue.split("|");
-  if (parts.length > 1) {
-    if (parts[1].trim() !== "") {
-      const fieldName = getFieldFromExpression(filter);
-      const replaced = fieldName
-        ? replaceExistingFieldCondition(parts[1], fieldName, filter)
-        : null;
-      parts[1] = replaced !== null ? replaced : parts[1] + " and " + filter;
-    } else {
-      parts[1] = filter;
-    }
-    return parts.join("| ");
-  } else {
-    const fieldName = getFieldFromExpression(filter);
-    const replaced = fieldName
-      ? replaceExistingFieldCondition(parts[0] as string, fieldName, filter)
-      : null;
+  // The whole base value is the where clause — never split it on "|". The split
+  // is quote-unaware, so a pipe inside a term such as match_all('text | error')
+  // would be rejoined as "| " and silently alter the search term.
+  const fieldName = getFieldFromExpression(filter);
+  const replaced = fieldName ? replaceExistingFieldCondition(baseValue, fieldName, filter) : null;
 
-    if (replaced !== null) return replaced;
+  if (replaced !== null) return replaced;
 
-    return (parts[0] as string) !== "" ? (parts[0] as string) + " and " + filter : filter;
-  }
+  return baseValue !== "" ? baseValue + " and " + filter : filter;
 };
 
 /**

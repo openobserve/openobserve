@@ -23,9 +23,25 @@ const logData = require("../../fixtures/log.json");
 const { ingestTestData, waitForStreamData } = require('../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
+const TC008_SECOND_STREAM = 'e2e_automate_fts2_tc008';
+
 test.describe("FTS Default Column Selection testcases", () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;
+
+  // Only TC-FTS-008 needs this stream and it outlives every test, so ingest it once per worker here rather than in the beforeEach shared by all 9 tests.
+  // The stream popover filters a list the frontend caches at page load, so it must exist before the beforeEach goto; beforeAll still runs first, and beforeAll has no `page` fixture.
+  test.beforeAll(async ({ browser }) => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    try {
+      await ingestTestData(page, TC008_SECOND_STREAM);
+      expect(await waitForStreamData(page, TC008_SECOND_STREAM, 1, 30000),
+        `stream ${TC008_SECOND_STREAM} never became queryable within 30s of ingestion`).toBe(true);
+    } finally {
+      await context.close();
+    }
+  });
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -309,14 +325,8 @@ test.describe("FTS Default Column Selection testcases", () => {
     const firstFtsField = await pm.logsPage.resolveFtsDefaultField(10000);
     await pm.logsPage.expectFieldInTableHeader(firstFtsField);
 
-    // Ingest the same test data to a second stream so it has FTS-key fields.
-    const secondStream = 'e2e_automate_fts2_tc008';
-    await ingestTestData(page, secondStream);
-    await page.waitForLoadState('domcontentloaded');
-    await waitForStreamData(page, secondStream, 1, 30000);
-
     // Switch to the second stream (stay on the same page — skipNavigation).
-    await pm.logsPage.selectStream(secondStream, 5, null, true);
+    await pm.logsPage.selectStream(TC008_SECOND_STREAM, 5, null, true);
 
     // Run a search so the watcher re-resolves FTS for the new stream.
     let resultsReady = false;

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
+import { gt } from "@/types/i18n";
 import { wrapCsvValue, usePanelAlertCreation, usePanelDownload } from "./usePanelActions";
 import { downloadFile } from "@/utils/dom";
 import { readAlertPrefill } from "@/utils/alerts/alertPrefillStorage";
@@ -186,6 +187,7 @@ describe("usePanelActions", () => {
       },
       showErrorNotification: vi.fn(),
       showPositiveNotification: vi.fn(),
+      t: gt,
     });
 
     it("delegates table downloads to table renderer", () => {

@@ -37,9 +37,10 @@ pub struct ListAlertsResponseBody {
 
 /// An item in the list returned by the `ListAlerts` endpoint.
 ///
-/// For `scheduled` and `realtime` alert types, `condition` and
-/// `trigger_condition` are always present. For `anomaly_detection` items they
-/// are absent; use `last_trained_at` and `status` instead.
+/// `condition` is always present: a concrete query for `scheduled`/`realtime`,
+/// `null` for `composite` and `anomaly_detection` (which have no query). Use
+/// `last_trained_at` and `status` for anomaly state. `trigger_condition` is
+/// present for `scheduled`/`realtime` and omitted otherwise.
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 pub struct ListAlertsResponseBodyItem {
     #[schema(value_type = String)]
@@ -49,9 +50,8 @@ pub struct ListAlertsResponseBodyItem {
     pub name: String,
     pub owner: Option<String>,
     pub description: Option<String>,
-    /// Discriminator: "scheduled" | "realtime" | "anomaly_detection"
+    /// Discriminator: "scheduled" | "realtime" | "slo" | "anomaly_detection" | "composite"
     pub alert_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub condition: Option<QueryCondition>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trigger_condition: Option<TriggerCondition>,
@@ -105,6 +105,16 @@ pub struct ListAlertsResponseBodyItem {
     /// Normalized selection tags (PT-6). Omitted when empty.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+    /// Names of the notification destinations this alert delivers to
+    /// (`Alert.destinations`). Lets the destination↔alert dependency view build
+    /// the linkage from the list alone; omitted when empty.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub destinations: Vec<String>,
+    /// Alert-level template override (`Alert.template`): when set it replaces the
+    /// destination-level template for every destination above. Absent when the
+    /// alert defers to each destination's own template.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
     /// Multi-alerts only (§5.4): how many groups the last evaluation observed,
     /// counted **before** the M-6 cap truncated them. Absent for every alert
     /// that has not opted in.
@@ -128,6 +138,165 @@ pub struct ListAlertsResponseBodyItem {
     /// `groups_observed` does not.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub groups_firing_is_lower_bound: Option<bool>,
+    /// Composite rows only: number of referenced children.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub child_count: Option<usize>,
+    /// Count of parent composites currently readable to the caller.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub referenced_by_composite_count: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeChildResponse {
+    /// Child alert ID.
+    pub alert_id: String,
+    /// Whether the caller may read this child.
+    pub accessible: bool,
+    /// Child name; `None` when the child is not accessible to the caller.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// Child alert type ("scheduled" | "composite" | "slo").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alert_type: Option<String>,
+    /// Folder containing the child.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub folder_id: Option<String>,
+    /// Whether the child is enabled.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    /// Current severity level of the child's last evaluation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    /// When `level` was last recorded.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level_at: Option<i64>,
+    /// Effective evaluation cadence in seconds.
+    ///
+    /// Reserved and currently unpopulated (always omitted) — cadence is not yet
+    /// propagated through child evaluation. Do not rely on this field being set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effective_cadence_seconds: Option<i64>,
+    /// Deadline after which a missing evaluation marks the child stale.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stale_deadline: Option<i64>,
+    /// Whether the child's latest state is stale.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stale: Option<bool>,
+    /// Whether the child currently evaluates true.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub truth: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeValidationResponse {
+    /// Whether the expression is syntactically valid.
+    pub valid: bool,
+    /// Canonicalized form of the expression.
+    pub canonical_expression: Option<String>,
+    /// Resolved child references.
+    pub children: Vec<CompositeChildResponse>,
+    /// Advisory evaluation result (null when indeterminate).
+    pub result: Option<bool>,
+    /// Advisory severity of the result.
+    pub result_level: Option<String>,
+    /// Advisory warnings (e.g. disabled or never-evaluated children).
+    pub warnings: Vec<CompositeValidationWarning>,
+}
+
+/// One advisory warning on a composite validation/preview.
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeValidationWarning {
+    /// Machine-readable warning code.
+    pub code: String,
+    /// Alert ID the warning refers to.
+    pub alert_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeReferenceItem {
+    /// Referencing composite alert ID.
+    pub alert_id: String,
+    /// Referencing composite alert name.
+    pub name: String,
+    /// Folder containing the referencing composite alert.
+    pub folder_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+pub struct CompositeReferencesResponse {
+    /// Composite alerts referencing the queried alert that the caller can read.
+    pub references: Vec<CompositeReferenceItem>,
+    /// Number of referencing composites hidden from the caller by permissions.
+    pub hidden_reference_count: usize,
+}
+
+/// One conflict reported by bulk alert deletion: an alert that could not be
+/// deleted because one or more composite alerts still reference it.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct BulkDeleteConflict {
+    /// Alert ID that could not be deleted.
+    pub alert_id: String,
+    /// Machine-readable conflict code (e.g. "child_referenced").
+    pub code: String,
+    /// Referencing composites the caller can read.
+    pub references: Vec<serde_json::Value>,
+    /// Number of referencing composites hidden from the caller by permissions.
+    pub hidden_reference_count: usize,
+}
+
+/// Bulk alert deletion result. Carries a `conflicts` field that the shared
+/// `BulkDeleteResponse` does not, so generated clients can see which IDs were
+/// retained because they are referenced by composite alerts.
+#[derive(Default, Serialize, ToSchema)]
+pub struct BulkDeleteAlertResponse {
+    pub successful: Vec<String>,
+    pub unsuccessful: Vec<String>,
+    pub err: Option<String>,
+    pub conflicts: Vec<BulkDeleteConflict>,
+}
+
+/// One child-level change inside a composite status timeline window. `to_level`
+/// is in effect from `at` until the next row (or the window end).
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct CompositeTimelineTransition {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_level: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to_level: Option<String>,
+    pub at: i64,
+}
+
+/// A single status lane: one child (or the composite itself) over a window.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct CompositeTimelineLane {
+    /// Redacted (`None`) when the child is not readable to the caller, so an
+    /// inaccessible child never leaks its stable KSUID.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alert_id: Option<String>,
+    /// Position among the composite's children (A=0), for the letter chip.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slot: Option<usize>,
+    /// `None` when the child is not readable to the caller.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub accessible: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_level: Option<String>,
+    /// When `current_level` last changed; the lane paints this from now.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level_since: Option<i64>,
+    pub transitions: Vec<CompositeTimelineTransition>,
+}
+
+/// HTTP response body for the composite status-timeline endpoint.
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct CompositeTimelineResponse {
+    pub from: i64,
+    pub to: i64,
+    /// One lane per child, in the same display order as the detail response.
+    pub children: Vec<CompositeTimelineLane>,
+    /// The composite's own result lane.
+    pub result: CompositeTimelineLane,
 }
 
 /// One tracked group of a multi-alert (§5.4's group table).
@@ -267,7 +436,9 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             alert.get_last_triggered_at(trigger.as_ref()),
             alert.get_last_satisfied_at(trigger.as_ref()),
         );
-        let alert_type = if alert.is_real_time {
+        let alert_type = if alert.query_condition.slo_condition.is_some() {
+            "slo".to_string()
+        } else if alert.is_real_time {
             "realtime".to_string()
         } else {
             "scheduled".to_string()
@@ -296,12 +467,16 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             level_since: None,
             priority: alert.priority.map(|p| p.to_i32() as u8),
             tags: alert.tags,
+            destinations: alert.destinations,
+            template: alert.template,
             // Filled from the rollup state row by `enrich_with_run_state`,
             // alongside the other run-state fields above.
             groups_observed: None,
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            child_count: None,
+            referenced_by_composite_count: None,
         })
     }
 }
@@ -341,7 +516,7 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
     let trigger_condition = Some(TriggerCondition {
         period_minutes,
         frequency_minutes,
-        frequency_type: FrequencyType::Minutes,
+        frequency_type: Some(FrequencyType::Minutes),
         ..Default::default()
     });
 
@@ -395,11 +570,16 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
             .get("tags")
             .and_then(|t| serde_json::from_value::<Vec<String>>(t.clone()).ok())
             .unwrap_or_default(),
+        // Anomaly configs deliver through their own path, not alert destinations.
+        destinations: Vec::new(),
+        template: None,
         // Anomaly configs have no grouping, so there is nothing to count.
         groups_observed: None,
         groups_firing: None,
         groups_observed_is_lower_bound: None,
         groups_firing_is_lower_bound: None,
+        child_count: None,
+        referenced_by_composite_count: None,
     })
 }
 
@@ -480,18 +660,25 @@ mod tests {
             level_since: None,
             priority: None,
             tags: vec![],
+            destinations: vec![],
+            template: None,
             groups_observed: None,
             groups_firing: None,
             groups_observed_is_lower_bound: None,
             groups_firing_is_lower_bound: None,
+            child_count: None,
+            referenced_by_composite_count: None,
         };
         let json = serde_json::to_value(&item).unwrap();
         let obj = json.as_object().unwrap();
-        assert!(!obj.contains_key("condition"));
+        assert!(obj.get("condition").is_some_and(serde_json::Value::is_null));
         assert!(!obj.contains_key("trigger_condition"));
         assert!(!obj.contains_key("last_trained_at"));
         assert!(!obj.contains_key("status"));
         assert!(!obj.contains_key("last_error"));
+        // Empty destinations / no override template are omitted from the wire.
+        assert!(!obj.contains_key("destinations"));
+        assert!(!obj.contains_key("template"));
         // §5.4: a non-multi alert must not advertise a group summary at all —
         // an absent field reads as "not a multi-alert", a zero would read as
         // "observed no groups".
@@ -614,6 +801,7 @@ mod tests {
             folder_id: "f1".to_string(),
             name: "Folder".to_string(),
             description: String::new(),
+            icon: None,
         };
         let item = ListAlertsResponseBodyItem::try_from((folder, alert, None)).unwrap();
         assert_eq!(item.alert_type, "realtime");
@@ -631,6 +819,38 @@ mod tests {
         assert_eq!(item.alert_type, "scheduled");
         assert_eq!(item.name, "my-alert");
         assert!(!item.is_real_time);
+    }
+
+    #[test]
+    fn slo_alert_list_discriminator_precedes_realtime_and_scheduled() {
+        use config::meta::{
+            alerts::Operator,
+            slo::condition::{SloAlertKind, SloCondition},
+        };
+
+        for is_real_time in [false, true] {
+            let mut alert = meta_alerts::Alert::default();
+            alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+            alert.is_real_time = is_real_time;
+            alert.query_condition.slo_condition = Some(SloCondition {
+                slo_id: "3H0eMU7B6x12345678901234567".to_string(),
+                kind: SloAlertKind::ErrorBudget,
+                operator: Operator::GreaterThan,
+                critical: 10.0,
+                warning: None,
+                long_window_secs: None,
+                short_window_secs: None,
+                multi_alert: false,
+            });
+
+            let item = ListAlertsResponseBodyItem::try_from((
+                meta_folders::Folder::default(),
+                alert,
+                None,
+            ))
+            .unwrap();
+            assert_eq!(item.alert_type, "slo");
+        }
     }
 
     #[test]

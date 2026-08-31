@@ -159,7 +159,85 @@ mod m20260731_000003_create_llm_dataset_tables;
 mod m20260802_000001_add_template_kind;
 mod m20260803_000001_add_destinations_to_incident_integrations;
 mod m20260803_000001_add_down_notified_at_to_synthetics_locations;
+mod m20260804_000001_create_workflow_drafts_table;
 mod m20260809_000001_create_alert_eval_intervals_table;
+mod m20260811_000001_create_llm_experiments;
+mod m20260812_000001_add_provider_rate_limits;
+mod m20260812_000001_create_composite_alerts;
+mod m20260818_000001_create_llm_idempotency_records;
+mod m20260818_000002_create_llm_remote_tasks;
+mod m20260820_000001_add_icon_to_folders;
+mod m20260820_000003_create_llm_secrets;
+mod m20260824_000001_create_llm_playground_snapshots;
+mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
+mod m20260827_000001_drop_table_action_scripts;
+
+#[cfg(test)]
+pub(crate) async fn create_scheduled_jobs_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    let manager = SchemaManager::new(db);
+    manager
+        .create_table(
+            Table::create()
+                .table(Alias::new("scheduled_jobs"))
+                .if_not_exists()
+                .col(
+                    ColumnDef::new(Alias::new("id"))
+                        .big_integer()
+                        .not_null()
+                        .primary_key()
+                        .auto_increment(),
+                )
+                // The scheduler owns `claim_epoch` (see infra::scheduler's
+                // idempotent bootstrap); the test helper mirrors that so the
+                // composite migration never has to add it.
+                .col(
+                    ColumnDef::new(Alias::new("claim_epoch"))
+                        .big_integer()
+                        .not_null()
+                        .default(0),
+                )
+                .to_owned(),
+        )
+        .await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_composite_alert_tables_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+
+    create_scheduled_jobs_for_test(db).await?;
+    let manager = SchemaManager::new(db);
+    m20260812_000001_create_composite_alerts::Migration
+        .up(&manager)
+        .await
+}
+
+#[cfg(test)]
+pub(crate) fn composite_alert_migration_sql_for_test(
+    backend: sea_orm::DatabaseBackend,
+) -> Vec<String> {
+    use m20260812_000001_create_composite_alerts as migration;
+
+    let mut sql = vec![
+        backend
+            .build(&migration::composites_statement())
+            .to_string(),
+        backend.build(&migration::children_statement()).to_string(),
+        backend
+            .build(&migration::reverse_index_statement())
+            .to_string(),
+    ];
+    sql.extend(
+        migration::composite_indexes()
+            .iter()
+            .map(|statement| backend.build(statement).to_string()),
+    );
+    sql
+}
 
 /// Apply **only** the SLO tables, for targeted integration tests.
 ///
@@ -326,7 +404,18 @@ impl MigratorTrait for Migrator {
             Box::new(m20260802_000001_add_template_kind::Migration),
             Box::new(m20260803_000001_add_down_notified_at_to_synthetics_locations::Migration),
             Box::new(m20260803_000001_add_destinations_to_incident_integrations::Migration),
+            Box::new(m20260804_000001_create_workflow_drafts_table::Migration),
             Box::new(m20260809_000001_create_alert_eval_intervals_table::Migration),
+            Box::new(m20260811_000001_create_llm_experiments::Migration),
+            Box::new(m20260812_000001_add_provider_rate_limits::Migration),
+            Box::new(m20260812_000001_create_composite_alerts::Migration),
+            Box::new(m20260818_000001_create_llm_idempotency_records::Migration),
+            Box::new(m20260818_000002_create_llm_remote_tasks::Migration),
+            Box::new(m20260820_000001_add_icon_to_folders::Migration),
+            Box::new(m20260820_000003_create_llm_secrets::Migration),
+            Box::new(m20260824_000001_create_llm_playground_snapshots::Migration),
+            Box::new(m20260825_000001_add_steps_configured_to_synthetics_jobs::Migration),
+            Box::new(m20260827_000001_drop_table_action_scripts::Migration),
         ]
     }
 }
@@ -350,5 +439,20 @@ mod tests {
     #[test]
     fn test_get_text_type_returns_text() {
         assert_eq!(get_text_type(), "text");
+    }
+
+    #[test]
+    fn composite_alert_migration_is_registered_after_existing_migrations() {
+        let names: Vec<String> = Migrator::migrations()
+            .into_iter()
+            .map(|migration| migration.name().to_string())
+            .collect();
+        assert_eq!(
+            names
+                .iter()
+                .filter(|name| name.as_str() == "m20260812_000001_create_composite_alerts")
+                .count(),
+            1
+        );
     }
 }

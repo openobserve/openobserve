@@ -1,0 +1,28 @@
+[
+  {
+    "id": "cap-go-pg-disablequery-unknown-bucket",
+    "dialect": "postgresql",
+    "input": {
+      "attrs": {
+        "deployment.environment.name": "capture-env-a",
+        "db.system": "postgresql"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": null,
+      "operation": null,
+      "stmt_class": "query",
+      "system": "postgresql",
+      "namespace": null,
+      "instance": null,
+      "env": "capture-env-a",
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "postgresql-S01-unknown",
+    "literals": [],
+    "source": "tests/dbm-capture/fixtures/go-pg-legacy.json"
+  }
+]

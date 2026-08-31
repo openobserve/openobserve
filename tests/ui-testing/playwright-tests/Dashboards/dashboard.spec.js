@@ -13,7 +13,10 @@ import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/das
 import PageManager from "../../pages/page-manager";
 import { waitForStreamComplete, waitForTableWithData } from "../utils/streaming-helpers.js";
 
-const randomDashboardName =
+// Each test runs in parallel (mode: "parallel" below), so the name must be
+// generated fresh per test — a single shared name caused cross-test races
+// where one test's create/delete collided with another's mid-flight.
+const generateDashboardName = () =>
   "Dashboard_" + Math.random().toString(36).substr(2, 9);
 
 test.describe.configure({ mode: "parallel" });
@@ -32,6 +35,7 @@ test.describe("dashboard UI testcases", () => {
   });
   test("should add and delete the dashboard", async ({ page }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Navigate to the dashboard list
     await pm.dashboardList.menuItem("dashboards-item");
@@ -51,6 +55,7 @@ test.describe("dashboard UI testcases", () => {
   test("should create a duplicate of the dashboard", async ({ page }) => {
     // Initialize Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     //navigate to the dashboard list
     await pm.dashboardList.menuItem("dashboards-item");
@@ -82,6 +87,7 @@ test.describe("dashboard UI testcases", () => {
   test("should create a dashboard and add the breakdown", async ({ page }) => {
     // Initialize Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate a unique panel name
     const panelName =
@@ -112,8 +118,11 @@ test.describe("dashboard UI testcases", () => {
       "b"
     );
 
-    // Apply panel changes
+    // Apply panel changes. Wait for the query to finish before saving: savePanel()
+    // races an error toast, and clicking Save mid-stream is what surfaces as an
+    // intermittent "panel did not save" much later in the test.
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
 
@@ -129,6 +138,7 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Initialize only the used Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate a unique panel name
     const panelName =
@@ -161,6 +171,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Apply and save the panel
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
 
@@ -175,6 +186,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate unique panel name
     const panelName =
@@ -194,12 +206,18 @@ test.describe("dashboard UI testcases", () => {
       'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" GROUP BY x_axis_1, breakdown_1'
     );
 
+    // Wait for the SQL parser to extract fields and render them in the field
+    // list before adding them — on alpha1 this parse can take longer than the
+    // 10s default in searchAndAddField's own waitFor, causing a race.
+    await pm.chartTypeSelector.waitForFieldListRow("y_axis_1", 20000);
+
     // Map query results to chart axes
     await pm.chartTypeSelector.searchAndAddField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("breakdown_1", "b");
 
     // Apply and save the panel
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
 
@@ -213,6 +231,7 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Initialize Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate a unique panel name
     const panelName =
@@ -246,6 +265,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Apply and save the panel
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.savePanel();
 
     // Return to dashboards list
@@ -259,6 +279,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -302,6 +323,7 @@ test.describe("dashboard UI testcases", () => {
     );
 
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Save the panel
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -316,6 +338,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -344,6 +367,7 @@ test.describe("dashboard UI testcases", () => {
     );
 
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     await pm.dashboardVariables.addAdhocVariable(
       "kubernetes_container_hash",
@@ -355,6 +379,7 @@ test.describe("dashboard UI testcases", () => {
 
     await pm.dashboardPanelEdit.editPanel(panelName);
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.savePanel();
     await pm.dashboardPanelEdit.deletePanel(panelName);
 
@@ -368,6 +393,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
     // const dateTimeHelper = new DateTimeHelper(page);
@@ -421,6 +447,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -449,15 +476,20 @@ test.describe("dashboard UI testcases", () => {
     await pm.dateTimeHelper.setRelativeTimeRange("15-m");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Save the panel
     await pm.dashboardPanelActions.addPanelName(panelName);
     await pm.dashboardPanelActions.savePanel();
 
-    // Test Share Link feature
-    await pm.dashboardShareExport.shareDashboard();
-    // Success toast (data-test) should not be visible before share completes
+    // Test Share Link feature. The toast is asynchronous - it only appears once the
+    // short-URL call returns - so the "not yet shown" check has to happen BEFORE the
+    // click. Asserting toBeHidden() after shareDashboard() (as this did) was a
+    // coin-flip on how fast that call returned, and it asserted the opposite of the
+    // feature this test is named for: a share that never produced a link passed.
     await expect(pm.dashboardShareExport.getShareSuccessToast()).toBeHidden();
+    await pm.dashboardShareExport.shareDashboard();
+    await pm.dashboardShareExport.waitForShareSuccess();
 
     // Hover over the panel container to make the fullscreen button visible
     await pm.dashboardPanelEdit.fullscreenPanel(panelName);
@@ -472,6 +504,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -499,6 +532,7 @@ test.describe("dashboard UI testcases", () => {
     await waitForDateTimeButtonToBeEnabled(page);
     await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // The panel title auto-generates from the configured stream/fields, so it is
     // never empty — a name is always present without the user typing one. Assert
@@ -527,6 +561,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -560,6 +595,7 @@ test.describe("dashboard UI testcases", () => {
     // Set time range and apply
     await pm.dateTimeHelper.setRelativeTimeRange("15-m");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Apply "Is Null" filter
     await pm.dashboardFilter.addFilterCondition(
@@ -570,6 +606,7 @@ test.describe("dashboard UI testcases", () => {
       ""
     );
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
     // Add assertion if possible: expect some filtered chart result or no data text
 
     // Apply "Is Not Null" filter
@@ -581,6 +618,7 @@ test.describe("dashboard UI testcases", () => {
       ""
     );
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
     // Add assertion if possible: expect some filtered chart result or different behavior
 
     // Save and delete panel
@@ -599,6 +637,7 @@ test.describe("dashboard UI testcases", () => {
   }) => {
     // Initialize only the necessary Page Objects
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Generate a unique panel name
     const panelName =
@@ -644,6 +683,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
     // Navigate to dashboards
@@ -686,6 +726,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -707,14 +748,27 @@ test.describe("dashboard UI testcases", () => {
       'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
     );
 
+    // Wait for the SQL parser to extract fields and render them in the field
+    // list before adding them — avoids a race on alpha1 where parsing takes
+    // longer than searchAndAddField's own 10s waitFor.
+    await pm.chartTypeSelector.waitForFieldListRow("xAxis1", 20000);
+
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
+
+    // Wait for the query to actually finish before asserting on rendered rows.
+    // Its two camelCase siblings (line chart, zero-values) both wait here; this one
+    // went straight to a 10s waitForSelector, so it was asserting against whatever
+    // the table happened to hold mid-stream.
+    const tableStreamPromise = waitForStreamComplete(page);
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await tableStreamPromise;
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // Verify table data is loaded correctly
     await page.waitForSelector('[data-test="dashboard-panel-table"]', {
       state: "visible",
-      timeout: 10000,
+      timeout: 15000,
     });
 
     // Rows use data-test="o2-table-row-<index>" / "o2-table-cell-<columnId>"
@@ -735,6 +789,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("line-panel-test");
 
@@ -752,6 +807,11 @@ test.describe("dashboard UI testcases", () => {
     await pm.chartTypeSelector.setCustomSQL(
       'SELECT histogram(_timestamp) as xAxis1, count(_timestamp) as yAxis1, kubernetes_container_name as breakdown1 FROM "e2e_automate" GROUP BY xAxis1, breakdown1'
     );
+
+    // Wait for the SQL parser to extract fields and render them in the field
+    // list before adding them — avoids a race on alpha1 where parsing takes
+    // longer than searchAndAddField's own 10s waitFor.
+    await pm.chartTypeSelector.waitForFieldListRow("xAxis1", 20000);
 
     await pm.chartTypeSelector.searchAndAddField("xAxis1", "x");
     await pm.chartTypeSelector.searchAndAddField("yAxis1", "y");
@@ -827,6 +887,7 @@ test.describe("dashboard UI testcases", () => {
     page,
   }) => {
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("complex-case-panel-test");
 
@@ -860,8 +921,10 @@ GROUP BY _time
 ORDER BY _time ASC`
     );
 
-    // Wait for the SQL parser to extract fields and render them in the field list
-    await pm.chartTypeSelector.waitForFieldListRow("_time");
+    // Wait for the SQL parser to extract fields and render them in the field list.
+    // 20s to match the two sibling camelCase tests - on alpha1 this parse regularly
+    // exceeds the helper's 10s default.
+    await pm.chartTypeSelector.waitForFieldListRow("_time", 20000);
 
     await pm.chartTypeSelector.searchAndAddField("_time", "x");
     await pm.chartTypeSelector.searchAndAddField("4xxErrorCount", "y");

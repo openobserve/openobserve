@@ -68,11 +68,28 @@ export default class DashboardPanel {
 
     // VERIFIED: Chart renderer (ChartRenderer.vue:19)
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
+    // VERIFIED: no-data empty-state overlay (PanelSchemaRenderer.vue) — same
+    // locator dashboard-panel-actions.js exposes as noDataElement/getNoDataLocator().
+    this.noDataElement = page.locator('[data-test="no-data"]');
   }
 
   // Click the in-editor "data view" query inspector button
   async clickDataViewQueryInspector() {
     await this.dataViewQueryInspectorBtn.click();
+  }
+
+  // Wait for the query inspector to be open AND its query rows rendered. The
+  // dialog becomes visible before the rows are populated, so waiting on the
+  // dialog alone lets an assertion run against an empty body.
+  async waitForQueryInspector(index = 0) {
+    await this.page
+      .locator('[data-test="query-inspector-dialog"]')
+      .first()
+      .waitFor({ state: "visible", timeout: 15000 });
+    await this.getExecutedQuery(index).waitFor({
+      state: "visible",
+      timeout: 15000,
+    });
   }
 
   // Query inspector editor content locator (chain .filter()/.last() as needed)
@@ -204,6 +221,20 @@ export default class DashboardPanel {
   async rightClickChartForAlert(maxRetries = 3) {
     const chartCanvas = this.chartRendererCanvas.first();
     await chartCanvas.waitFor({ state: "visible", timeout: 15000 });
+
+    // savePanel() triggers a fresh panel query; chart-renderer's DOM node stays
+    // "visible" the whole time, but a same-sized "no-data" empty-state overlay
+    // (absolute inset-0 sibling) covers it and intercepts clicks until that
+    // re-query resolves. A waitForResponse on the search-stream call isn't
+    // enough here (the caller already awaits one) — the DOM/no-data state
+    // updates a beat after the network response resolves, via Vue reactivity.
+    // Wait for the overlay to clear before right-clicking, otherwise the
+    // click lands on the overlay instead of the chart.
+    await this.noDataElement
+      .first()
+      .waitFor({ state: "hidden", timeout: 20000 })
+      .catch(() => {});
+
     const box = await chartCanvas.boundingBox();
     const position = box
       ? { x: Math.floor(box.width / 2), y: Math.floor(box.height / 2) }

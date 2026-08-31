@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          the canvas, so the graph stays readable while choosing. -->
     <div class="fixed inset-0 z-6000" :data-test="testPrefix + '-backdrop'" @click="emit('close')">
       <div
-        class="rounded-surface border-border-default bg-card-bg absolute top-[var(--sp-y)] left-[var(--sp-x)] flex max-h-96 w-80 flex-col overflow-hidden border shadow-[0_0.5rem_1.5rem_color-mix(in_srgb,var(--color-black)_18%,transparent)]"
+        class="rounded-surface border-border-default bg-card-bg absolute top-[var(--sp-y)] left-[var(--sp-x)] flex max-h-96 w-80 flex-col overflow-hidden border shadow-lg"
         :style="{ '--sp-x': panelX + 'px', '--sp-y': panelY + 'px' }"
         :data-test="testPrefix + '-dialog'"
         @click.stop
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="item in filtered"
             :key="item.key"
             type="button"
-            class="flow-step-card rounded-default flex cursor-pointer items-center gap-2.5 bg-transparent p-2 text-left transition-colors duration-[120ms] hover:bg-[color-mix(in_srgb,var(--color-primary-600)_8%,transparent)]"
+            class="flow-step-card rounded-default hover:bg-accent/8 flex cursor-pointer items-center gap-2.5 bg-transparent p-2 text-left transition-colors duration-[120ms]"
             :data-test="`${testPrefix}-${item.key}`"
             @click="emit('pick', item)"
           >

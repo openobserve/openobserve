@@ -259,7 +259,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <template #icon-left
                                 ><OIcon name="format-list-bulleted" size="sm"
                               /></template>
-                              {{ computedSchemaFieldsName }} ({{ indexData.schema.length }})
+                              {{
+                                t("logStream.allFieldsCount", { count: indexData.schema.length })
+                              }}
                             </OToggleGroupItem>
                           </OToggleGroup>
                         </div>
@@ -1116,13 +1118,17 @@ export default defineComponent({
     const tabs = computed(() => [
       {
         value: "schemaFields",
-        label: `User Defined Schema (${indexData.value.defined_schema_fields.length})`,
+        label: t("logStream.userDefinedSchemaCount", {
+          count: indexData.value.defined_schema_fields.length,
+        }),
         disabled: !hasUserDefinedSchema.value,
         hide: !hasUserDefinedSchema.value,
       },
       {
         value: "allFields",
-        label: `${computedSchemaFieldsName} (${indexData.value.schema.length})`,
+        // Whole sentence in the message, matching the userDefinedSchemaCount
+        // sibling above — the count's placement is per-language.
+        label: t("logStream.allFieldsCount", { count: indexData.value.schema.length }),
         disabled: false,
         hide: false,
       },
@@ -1130,17 +1136,17 @@ export default defineComponent({
     const mainTabs = computed(() => [
       {
         value: "schemaSettings",
-        label: `Schema Settings`,
+        label: t("logStream.schemaSettingsTab"),
         disabled: false,
       },
       {
         value: "redButton",
-        label: `Extended Retention`,
+        label: t("logStream.extendedRetentionTab"),
         disabled: false,
       },
     ]);
     // here we are setting the schema field name always be "All Fields"
-    const computedSchemaFieldsName = "All Fields";
+    const computedSchemaFieldsName = t("logStream.allFields");
 
     const streamIndexType = [
       { label: t("logStream.indexTypeOptions.fullTextSearch"), value: "fullTextSearchKey" },
@@ -1877,7 +1883,7 @@ export default defineComponent({
         ? [
             {
               id: "patterns",
-              header: t("logStream.regexPatterns"),
+              header: raw("SDR"),
               accessorKey: "patterns",
               sortable: false,
               size: COL.template,
@@ -2597,7 +2603,7 @@ export default defineComponent({
   height: 2.1875rem;
 }
 
-.indexDetailsContainer :deep(.o2-schema-table .o2-schema-table tbody td:after) {
+.indexDetailsContainer :deep(.o2-schema-table .o2-schema-table tbody td::after) {
   background: none !important;
 }
 

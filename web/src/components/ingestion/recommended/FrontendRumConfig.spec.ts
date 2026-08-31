@@ -38,7 +38,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
 
 // ── vi.mock() must be at the top — hoisted by Vitest ──────────────────────────
 
@@ -103,30 +102,11 @@ function makeStore(
   });
 }
 
-const i18n = createI18n({
-  locale: "en",
-  messages: {
-    en: {
-      ingestion: {
-        generateRUMTokenMessage: "Generate RUM Token to enable RUM for your organization.",
-        rumPlatform: "Platform",
-        rumPlatformBrowser: "Browser",
-        rumPlatformReactNative: "React Native",
-        rumPlatformAndroid: "Android",
-        rumPlatformIOS: "iOS",
-      },
-      common: {
-        beta: "Beta",
-      },
-    },
-  },
-});
-
 function mountComponent(storeOverrides: Parameters<typeof makeStore>[0] = {}) {
   const store = makeStore(storeOverrides);
   const wrapper = mount(FrontendRumConfig, {
     props: { currOrgIdentifier: ORG_ID, currUserEmail: "user@example.com" },
-    global: { plugins: [store, i18n] },
+    global: { plugins: [store] },
   });
   return { wrapper, store };
 }
@@ -269,7 +249,7 @@ describe("FrontendRumConfig", () => {
         mutations: {},
       });
       wrapper = mount(FrontendRumConfig, {
-        global: { plugins: [store, i18n] },
+        global: { plugins: [store] },
       });
 
       expect(wrapper.find('[data-test="rum-web-no-token-message"]').exists()).toBe(true);
@@ -360,7 +340,7 @@ describe("FrontendRumConfig", () => {
         mutations: {},
       });
       wrapper = mount(FrontendRumConfig, {
-        global: { plugins: [store, i18n] },
+        global: { plugins: [store] },
       });
 
       const card = wrapper.findComponent({ name: "SetupCardRenderer" });
@@ -380,7 +360,7 @@ describe("FrontendRumConfig", () => {
     it("mounts without currOrgIdentifier and currUserEmail (both optional)", () => {
       const store = makeStore();
       const w = mount(FrontendRumConfig, {
-        global: { plugins: [store, i18n] },
+        global: { plugins: [store] },
       });
       expect(w.exists()).toBe(true);
       w.unmount();
@@ -390,7 +370,7 @@ describe("FrontendRumConfig", () => {
       const store = makeStore();
       const w = mount(FrontendRumConfig, {
         props: { currOrgIdentifier: "alt-org", currUserEmail: "alt@example.com" },
-        global: { plugins: [store, i18n] },
+        global: { plugins: [store] },
       });
       expect(w.exists()).toBe(true);
       w.unmount();

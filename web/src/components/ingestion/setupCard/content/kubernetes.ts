@@ -29,7 +29,7 @@
 // The raw Helm sequence stays a secondary, collapsed path (extras.advanced),
 // mirroring the "Advanced Installation" accordion it replaces.
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
@@ -130,7 +130,7 @@ const LANGUAGES: { id: string; label: string; icon: string; extra?: string }[] =
   },
 ];
 
-const instrumentVariants = (): RichCardStepVariant[] =>
+const instrumentVariants = (t: TranslateFn): RichCardStepVariant[] =>
   LANGUAGES.map((l) => ({
     id: l.id,
     label: raw(l.label),
@@ -138,25 +138,23 @@ const instrumentVariants = (): RichCardStepVariant[] =>
     code: { lang: "bash", raw: annotate(l.id, l.extra) },
     note:
       l.id === "go"
-        ? "Point otel-go-auto-target-exe at the compiled binary inside the container — eBPF attaches to that executable, not to the pod."
-        : "Annotate a single pod spec instead of the namespace to instrument one workload at a time.",
+        ? t("ingestion.setupCard.k8sGoEbpfNote")
+        : t("ingestion.setupCard.k8sAnnotatePodNote"),
   }));
 
 // ── card ─────────────────────────────────────────────────────────────────────
 
-export default function kubernetesCard(subs: CardSubstitutions): RichCardContent {
+export default function kubernetesCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const isCloud = config.isCloud === "true";
 
-  const INSTALLER_NOTE =
-    "This installs cert-manager, the OpenTelemetry operator and the OpenObserve collector automatically.";
+  const INSTALLER_NOTE = t("ingestion.setupCard.k8sInstallerNote");
 
   // The manual Helm path sits in a collapsed section below the steps, which is
   // past the auto-instrument and verify steps — point at it from here, where the
   // user is actually choosing how to install. `(#advanced)` renders as a jump
   // link that opens that accordion and scrolls to it (see noteMd in
   // SetupCardRenderer), so the user never has to go looking for it.
-  const ADVANCED_HINT =
-    "Prefer Helm, or need to pin versions and customise chart values? Go to [Advanced Installation (Manual Steps)](#advanced).";
+  const ADVANCED_HINT = t("ingestion.setupCard.k8sAdvancedHint");
 
   const externalCode = codeFor(scriptInstall("--o2-url={url}"), subs);
 
@@ -169,30 +167,27 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
           id: "external",
           labelKey: "ingestion.setupCard.externalEndpointVariant",
           code: externalCode,
-          note: `${INSTALLER_NOTE} ${ADVANCED_HINT}`,
+          note: raw(`${INSTALLER_NOTE} ${ADVANCED_HINT}`),
         },
         {
           id: "internal",
           labelKey: "ingestion.setupCard.internalEndpointVariant",
           code: codeFor(scriptInstall(`--internal-endpoint=${IN_CLUSTER_URL}`), subs),
-          note: `Use this when OpenObserve runs in this same cluster — traffic never leaves it. ${INSTALLER_NOTE} ${ADVANCED_HINT}`,
+          note: raw(
+            `${t("ingestion.setupCard.k8sInternalEndpointNote")} ${INSTALLER_NOTE} ${ADVANCED_HINT}`,
+          ),
         },
       ];
 
   return {
     provider: {
-      name: "Kubernetes",
-      tagline: gt("ingestion.setupCard.taglineKubernetes"),
+      name: raw("Kubernetes"),
+      tagline: t("ingestion.setupCard.taglineKubernetes"),
       logo: getImageURL("images/common/kubernetes.svg"),
       tone: "#326ce5",
-      runtime: "Cluster",
-      setupTime: "~3 min",
-      metaBadges: [
-        gt("common.logs"),
-        gt("common.metrics"),
-        gt("common.events"),
-        gt("common.traces"),
-      ],
+      runtime: t("ingestion.setupCard.runtimeCluster"),
+      setupTime: t("ingestion.setupCard.setupTime3Min"),
+      metaBadges: [t("common.logs"), t("common.metrics"), t("common.events"), t("common.traces")],
     },
     steps: [
       {
@@ -218,7 +213,7 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
         // The note rides on each variant when there are variants, so it only
         // lives on the step itself in the cloud (no-variant) case.
         code: isCloud ? externalCode : undefined,
-        note: isCloud ? `${INSTALLER_NOTE} ${ADVANCED_HINT}` : undefined,
+        note: isCloud ? raw(`${INSTALLER_NOTE} ${ADVANCED_HINT}`) : undefined,
         variants: installVariants,
       },
       {
@@ -227,7 +222,7 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
         descriptionKey: "ingestion.setupCard.autoInstrumentTracesDesc",
         chip: { kind: "editor", labelKey: "ingestion.setupCard.optionalLabel" },
         completeOn: "copy",
-        variants: instrumentVariants(),
+        variants: instrumentVariants(t),
       },
       {
         id: "verify",
@@ -237,11 +232,11 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
         completeOn: "detect",
         detectionAnchor: true,
         pills: [
-          gt("ingestion.setupCard.pillContainerLogs"),
-          gt("ingestion.setupCard.pillKubernetesEvents"),
-          gt("ingestion.setupCard.pillNodeMetrics"),
-          gt("ingestion.setupCard.pillPodMetrics"),
-          gt("common.traces"),
+          t("ingestion.setupCard.pillContainerLogs"),
+          t("ingestion.setupCard.pillKubernetesEvents"),
+          t("ingestion.setupCard.pillNodeMetrics"),
+          t("ingestion.setupCard.pillPodMetrics"),
+          t("common.traces"),
         ],
       },
     ],
@@ -262,39 +257,38 @@ export default function kubernetesCard(subs: CardSubstitutions): RichCardContent
         // Not `descriptionKey`: the self-hosted copy interpolates the in-cluster
         // URL, which key-only resolution (no params) can't express.
         description: isCloud
-          ? gt("ingestion.setupCard.advancedInstallDescCloud")
-          : gt("ingestion.setupCard.advancedInstallDescSelfHosted", { url: IN_CLUSTER_URL }),
+          ? t("ingestion.setupCard.advancedInstallDescCloud")
+          : t("ingestion.setupCard.advancedInstallDescSelfHosted", { url: IN_CLUSTER_URL }),
         code: codeFor(helmInstall("{url}"), subs),
       },
-      fixTitle: "Wait For The cert-manager Webhook",
-      fixBody:
-        "The OpenTelemetry operator fails to start until cert-manager's webhook is serving, and a collector that never starts sends nothing. Check that both are running, then test again:",
+      fixTitle: t("ingestion.setupCard.k8sFixTitle"),
+      fixBody: t("ingestion.setupCard.k8sFixBody"),
       fixLang: "bash",
       fixSnippet: `kubectl wait --for=condition=Available --timeout=300s \\
   -n cert-manager deployment/cert-manager-webhook
 kubectl get pods -n openobserve-collector`,
       troubleshooting: [
         {
-          q: "The install fails with an error about the admission webhook",
-          a: "The OpenTelemetry operator's webhook needs cert-manager's webhook to be serving first. Run `kubectl wait --for=condition=Available --timeout=300s -n cert-manager deployment/cert-manager-webhook`, then re-run the install — it is idempotent.",
+          q: t("ingestion.setupCard.k8sTroubleWebhookQ"),
+          a: t("ingestion.setupCard.k8sTroubleWebhookA"),
         },
         {
-          q: "The collector pods are running but nothing arrives",
-          a: "Check the collector's own logs with `kubectl logs -n openobserve-collector -l app.kubernetes.io/name=openobserve-collector`. A 401 means the access key is stale — re-copy the command from this page. A connection timeout usually means the cluster cannot reach the endpoint: if OpenObserve runs in this same cluster, switch to an **In-Cluster** variant above.",
+          q: t("ingestion.setupCard.k8sTroubleNoDataQ"),
+          a: t("ingestion.setupCard.k8sTroubleNoDataA"),
         },
         {
-          q: "Which endpoint should I use — external or in-cluster?",
-          a: `Use **In-Cluster** only when OpenObserve itself runs in this cluster; traffic then stays inside it and never crosses the network. The URL is \`http://<helm-release>-openobserve-router.<namespace>.svc.cluster.local:5080\` — the default assumes release \`o2\` in namespace \`openobserve\`, so edit it if yours differ. Everyone else uses the external endpoint.`,
+          q: t("ingestion.setupCard.k8sTroubleEndpointQ"),
+          a: t("ingestion.setupCard.k8sTroubleEndpointA"),
         },
         {
-          q: "I annotated a namespace but no traces appear",
-          a: "Injection happens at pod creation, so existing pods are unaffected until they restart — run `kubectl rollout restart deployment -n my-namespace`. Confirm the annotation landed with `kubectl get ns my-namespace -o yaml`, and check that the value matches `openobserve-collector/openobserve-<language>`. For Go, `otel-go-auto-target-exe` must be the binary's path **inside** the container.",
+          q: t("ingestion.setupCard.k8sTroubleAnnotationQ"),
+          a: t("ingestion.setupCard.k8sTroubleAnnotationA"),
         },
         {
-          q: "Can I see a working example?",
+          q: t("ingestion.setupCard.k8sTroubleExampleQ"),
           // inlineMd renders **bold** and `code` only, so both references are
           // real links in the footer (docLinks) rather than text here.
-          a: "Yes — **HOT commerce** is a sample application wired up end to end, and the **OpenTelemetry Operator** docs carry the full annotation reference. Both are linked at the bottom of this page.",
+          a: t("ingestion.setupCard.k8sTroubleExampleA"),
         },
       ],
     },
@@ -302,11 +296,11 @@ kubectl get pods -n openobserve-collector`,
     // Both links the page carried before the migration, restored as anchors.
     docLinks: [
       {
-        label: "HOT Commerce Example",
+        label: t("ingestion.setupCard.hotCommerceExampleLink"),
         url: "https://github.com/openobserve/hotcommerce",
       },
       {
-        label: "OpenTelemetry Operator",
+        label: raw("OpenTelemetry Operator"),
         url: "https://github.com/open-telemetry/opentelemetry-operator",
       },
     ],

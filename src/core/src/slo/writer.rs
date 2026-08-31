@@ -21,8 +21,9 @@
 //! which it is false. A write built any other way would be rejected by the
 //! guard protecting the stream from users.
 
-use config::{meta::stream::StreamType, utils::json};
+use config::{cluster::LOCAL_NODE, meta::stream::StreamType, utils::json};
 use ingestion_common::{self as ingestion, IngestUser, SystemJobType};
+use proto::cluster_rpc;
 
 /// Publish rows to a reserved internal stream.
 pub async fn publish(org: &str, stream: &str, rows: Vec<json::Value>) -> Result<(), anyhow::Error> {
@@ -31,20 +32,49 @@ pub async fn publish(org: &str, stream: &str, rows: Vec<json::Value>) -> Result<
     }
     ensure_schema(org, stream).await;
 
-    let bytes = bytes::Bytes::from(json::to_string(&rows)?);
-    let req = ingestion::IngestionRequest::Usage(bytes);
-    crate::logs::ingest::ingest(
-        0,
-        org,
-        stream,
-        req,
-        IngestUser::SystemJob(SystemJobType::SelfReporting),
-        None,
-        false,
-    )
-    .await
-    .map_err(|e| anyhow::anyhow!("failed to write {stream} for {org}: {e}"))?;
-    Ok(())
+    if LOCAL_NODE.is_ingester() {
+        let bytes = bytes::Bytes::from(json::to_string(&rows)?);
+        let req = ingestion::IngestionRequest::Usage(bytes);
+        crate::logs::ingest::ingest(
+            0,
+            org,
+            stream,
+            req,
+            IngestUser::SystemJob(SystemJobType::SelfReporting),
+            None,
+            false,
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to write {stream} for {org}: {e}"))?;
+        Ok(())
+    } else {
+        // call gRPC ingestion service
+
+        let req = cluster_rpc::IngestionRequest {
+            org_id: org.to_string(),
+            stream_name: stream.to_string(),
+            stream_type: StreamType::Logs.to_string(),
+            data: Some(cluster_rpc::IngestionData::from(rows)),
+            ingestion_type: Some(cluster_rpc::IngestionType::Usage.into()),
+            metadata: None,
+        };
+
+        match crate::ingestion::ingestion_service::ingest(req).await {
+            Ok(resp) if resp.status_code == 200 => {
+                log::debug!(
+                    "[SLO-REPORTING] slo data successfully ingested to stream {org}/{stream}"
+                );
+                Ok(())
+            }
+            error => {
+                let err = error.map_or_else(|e| e.to_string(), |resp| resp.message);
+                log::error!(
+                    "[SLO-REPORTING] slo data reporting errored while ingesting to stream {org}/{stream}. Error: {err}"
+                );
+                Err(anyhow::anyhow!("{err}"))
+            }
+        }
+    }
 }
 
 /// Create the stream's schema by reflection before the first write, so every

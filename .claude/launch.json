@@ -1,0 +1,13 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web-responsive",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--port", "8091", "--strictPort"],
+      "cwd": "web",
+      "port": 8091,
+      "autoPort": false
+    }
+  ]
+}

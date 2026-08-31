@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <!-- selected window: drag the body to pan, or either edge to resize -->
         <div
-          class="rounded-default absolute top-0 bottom-0 border border-[color-mix(in_srgb,var(--color-text-heading)_45%,transparent)] bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
+          class="rounded-default border-text-heading/45 bg-text-heading/8 absolute top-0 bottom-0 border"
           :class="dragging ? 'cursor-grabbing' : 'cursor-grab'"
           :style="{ left: brushLeftPct + '%', width: brushWidthPct + '%' }"
           @pointerdown.stop="(e) => beginDrag('pan', e)"
@@ -148,18 +148,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="absolute top-0 bottom-0 -left-1 flex w-2.25 cursor-ew-resize items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-left', e)"
           >
-            <div
-              class="rounded-default h-[55%] w-0.5 bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]"
-            />
+            <div class="rounded-default bg-text-heading/60 h-[55%] w-0.5" />
           </div>
           <!-- right resize handle -->
           <div
             class="absolute top-0 -right-1 bottom-0 flex w-2.25 cursor-ew-resize items-center justify-center"
             @pointerdown.stop="(e) => beginDrag('resize-right', e)"
           >
-            <div
-              class="rounded-default h-[55%] w-0.5 bg-[color-mix(in_srgb,var(--color-text-heading)_60%,transparent)]"
-            />
+            <div class="rounded-default bg-text-heading/60 h-[55%] w-0.5" />
           </div>
         </div>
       </div>

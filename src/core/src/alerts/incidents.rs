@@ -23,8 +23,9 @@ use config::{
     meta::alerts::{
         alert::Alert,
         incidents::{
-            AlertEdge, AlertKind, AlertNode, CorrelationReason, EdgeType, Incident, IncidentAlert,
-            IncidentCorrelationOutcome, IncidentEvent, IncidentTopology, IncidentWithAlerts,
+            AlertEdge, AlertKind, AlertNode, CompositeAlertSummary, CorrelationReason, EdgeType,
+            Incident, IncidentAlert, IncidentCorrelationOutcome, IncidentEvent, IncidentTopology,
+            IncidentWithAlerts,
         },
     },
     utils::json::{Map, Value},
@@ -1666,6 +1667,7 @@ pub async fn get_incident_with_alerts(
 
     // Fetch full alert details for each unique alert name
     let mut alerts = Vec::new();
+    let mut composite_alerts = Vec::new();
     for alert_name in unique_alert_names {
         // We need to fetch by name, but we don't have stream_type and stream_name
         // We'll need to get these from the alert record itself
@@ -1676,11 +1678,35 @@ pub async fn get_incident_with_alerts(
                 match super::alert::get_by_id_db(&incident_org_id, alert_ksuid).await {
                     Ok(alert) => alerts.push(alert),
                     Err(e) => {
-                        log::warn!(
-                            "Failed to fetch alert details for {}: {}",
-                            trigger.alert_id,
-                            e
-                        );
+                        // Not an ordinary alert — a composite has no `alerts`
+                        // row, so fall back to the composite graph (§9.6).
+                        match super::composite::get_composite(&incident_org_id, &trigger.alert_id)
+                            .await
+                        {
+                            Ok(Some(composite)) => {
+                                composite_alerts.push(CompositeAlertSummary {
+                                    id: composite.definition.id,
+                                    name: composite.definition.name,
+                                    alert_type: "composite".to_string(),
+                                    enabled: composite.definition.enabled,
+                                    folder_id: composite.definition.folder_id,
+                                });
+                            }
+                            Ok(None) => {
+                                log::warn!(
+                                    "Failed to fetch alert details for {}: {}",
+                                    trigger.alert_id,
+                                    e
+                                );
+                            }
+                            Err(composite_error) => {
+                                log::warn!(
+                                    "Failed to fetch composite details for {}: {}",
+                                    trigger.alert_id,
+                                    composite_error
+                                );
+                            }
+                        }
                     }
                 }
             }
@@ -1691,6 +1717,7 @@ pub async fn get_incident_with_alerts(
         incident: incident_data,
         triggers,
         alerts,
+        composite_alerts,
     }))
 }
 
@@ -1893,7 +1920,7 @@ pub async fn enrich_with_topology(
 /// Trigger RCA for a single incident immediately after creation
 ///
 /// Called asynchronously via tokio::spawn to avoid blocking incident creation.
-/// Reuses RcaAgentClient configuration from enterprise crate.
+/// Reuses AiAgentClient configuration from enterprise crate.
 ///
 /// # Arguments
 /// * `org_id` - Organization ID

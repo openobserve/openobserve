@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the list it filters pushed the list itself off a phone screen. The row
            names the active folder so the scope stays visible while collapsed. -->
       <div
-        class="text-text-heading pl-page-edge flex items-center justify-between gap-2 py-2 pr-1.5 text-sm font-semibold"
+        class="text-text-heading pl-page-edge flex items-center justify-between gap-2 py-1.5 pr-1.5 text-sm font-semibold"
         :class="isMobile ? 'cursor-pointer' : ''"
         :data-test="isMobile ? 'folder-list-mobile-toggle' : undefined"
         @click="isMobile && (mobileExpanded = !mobileExpanded)"
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- Search Input -->
-      <div v-show="!isMobile || mobileExpanded" class="px-1.5 pb-2">
+      <div v-show="!isMobile || mobileExpanded" class="px-1.5 pb-1.5">
         <OSearchInput
           v-model="searchQuery"
           data-test="folder-search"
@@ -82,23 +82,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="onTabClick(tab.folderId)"
         >
           <div
-            class="folder-item group/row flex min-h-6 w-full flex-nowrap items-center justify-between gap-2"
+            class="folder-item group/row flex min-h-6 w-full flex-nowrap items-center gap-1.5"
             :data-test="`dashboard-folder-tab-name-${tab.name}`"
           >
-            <div class="flex min-w-0 flex-1 items-center gap-1.5">
-              <span
-                class="folder-name min-w-0 truncate text-left"
-                :title="tab.name"
-                :data-test="`dashboard-folder-name-${tab.name}`"
-                >{{ tab.name }}</span
-              >
-              <OIcon
-                v-if="tab.folderId === FAVORITES_FOLDER_ID"
-                name="star"
-                size="sm"
-                class="text-favorite shrink-0"
-              />
-            </div>
+            <!-- Fixed-width icon slot. Always rendered, so every folder name
+                 starts on the same x-position whether or not it has an icon. -->
+            <FolderIcon
+              :token="iconFor(tab)"
+              :favorite="tab.folderId === FAVORITES_FOLDER_ID"
+              :data-test="`dashboard-folder-icon-${tab.name}`"
+            />
+            <span
+              class="folder-name min-w-0 flex-1 truncate text-left"
+              :title="tab.name"
+              :data-test="`dashboard-folder-name-${tab.name}`"
+              >{{ tab.name }}</span
+            >
+            <!-- Kept in flow rather than overlaid: an overlay needs a backdrop
+                 matching the row, and OTab only paints a hover background on
+                 INACTIVE tabs, so it would read wrong on the open folder. -->
             <div
               v-if="tab.folderId.toLowerCase() != 'default' && tab.folderId !== FAVORITES_FOLDER_ID"
               class="hidden shrink-0 items-center group-hover/row:flex has-[[data-state=open]]:flex"
@@ -109,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="icon"
                     variant="ghost"
                     icon-left="more-vert"
-                    class="h-6 w-6"
+                    class="h-5 w-5"
                     data-test="dashboard-more-icon"
                   />
                 </template>
@@ -173,15 +175,18 @@ import { useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { deleteFolderByIdByType, getFoldersListByType } from "@/utils/commons";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import FolderIcon from "./FolderIcon.vue";
 import AddFolder from "./AddFolder.vue";
 import useNotifications from "@/composables/useNotifications";
 import { FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
+import { useFolderIcons } from "@/composables/useFolderIcons";
 import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
   name: "FolderList",
   components: {
     OIcon,
+    FolderIcon,
     ConfirmDialog,
     AddFolder,
     OTabs,
@@ -222,6 +227,7 @@ export default defineComponent({
     const confirmDeleteFolderDialog = ref(false);
     const searchQuery = ref("");
     const { track } = useReo();
+    const { iconFor } = useFolderIcons();
 
     const router = useRouter();
 
@@ -353,6 +359,7 @@ export default defineComponent({
       filteredTabs,
       searchQuery,
       onTabClick,
+      iconFor,
       FAVORITES_FOLDER_ID,
     };
   },
@@ -361,9 +368,8 @@ export default defineComponent({
 
 <style scoped>
 /* keep(lib-override:OTabs): targets OTabs' internal rendered DOM (.o-tabs,
-   .o-tab, .o-tab__label) which is a child component and never receives this
-   component's scope id — reached via :deep(). Not expressible as template
-   utilities. */
+   .o-tab) which is a child component and never receives this component's scope
+   id — reached via :deep(). Not expressible as template utilities. */
 .folders-tabs :deep(.o-tabs) {
   height: auto !important;
   max-height: none !important;
@@ -383,11 +389,6 @@ export default defineComponent({
      (record-name weight), not 600, so the list reads calm. Active state is
      inherited from OTab vertical (tint bg + primary text) so the folder rail
      matches the IAM/Settings rails exactly. */
-  font-weight: 500;
-}
-
-.folders-tabs :deep(.o-tabs--vertical .o-tab__content.tab_content .o-tab__icon + .o-tab__label) {
-  padding-left: 0.875rem;
   font-weight: 500;
 }
 </style>

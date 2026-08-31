@@ -380,6 +380,10 @@ export const usePanelDataLoader = (
 
       state.lastTriggeredAt = new Date().getTime();
 
+      // Wait for visibility BEFORE the cache restore below — restoring first
+      // rendered every cached panel on mount, visible or not.
+      await waitForThePanelToBecomeVisible(abortController.signal);
+
       // if force load is true, skip restoring from cache
       if (runCount == 0 && forceLoad?.value != true) {
         log("loadData: panelcache: run count is 0");
@@ -394,9 +398,6 @@ export const usePanelDataLoader = (
           return;
         }
       }
-
-      // Wait for isVisible to become true
-      await waitForThePanelToBecomeVisible(abortController.signal);
 
       log("loadData: now waiting for the variables to load");
 

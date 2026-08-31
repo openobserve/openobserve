@@ -159,7 +159,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -315,7 +315,7 @@ const deleteUserGroup = (group: any) => {
 // Blast-radius warning for the single-group delete dialog. We resolve the live
 // member count with one getGroup call on delete-click (the group detail payload
 // carries the users array; the list payload does not).
-const deleteImpactMessage = ref("");
+const deleteImpactMessage = ref(raw(""));
 
 const fetchGroupMemberCount = async (groupName: string): Promise<number> => {
   const res = await getGroup(groupName, store.state.selectedOrganization.identifier);
@@ -344,7 +344,7 @@ const _deleteGroup = () => {
 // Blast-radius warning for the bulk-delete dialog. With exactly one group
 // selected we resolve its live member count, matching the per-row delete. For
 // 2+ groups we keep static copy to avoid N requests.
-const bulkDeleteImpactMessage = ref("");
+const bulkDeleteImpactMessage = ref(raw(""));
 
 const openBulkDeleteDialog = async () => {
   confirmBulkDelete.value = true;

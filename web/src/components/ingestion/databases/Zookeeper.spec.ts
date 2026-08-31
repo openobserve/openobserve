@@ -21,6 +21,7 @@ import { ref } from "vue";
 import Zookeeper from "./Zookeeper.vue";
 import zookeeperCard from "@/components/ingestion/setupCard/content/zookeeper";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
 const mockEndpoint = ref({
   url: "https://test.openobserve.ai",
@@ -52,7 +53,7 @@ const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVz
 
 describe("zookeeperCard builder", () => {
   it("builds metadata + step flow (no prepare step)", () => {
-    const card = zookeeperCard(SUBS);
+    const card = zookeeperCard(SUBS, gt);
     expect(card.provider.name).toBe("Zookeeper");
     expect(card.detect).toMatchObject({
       streamType: "metrics",
@@ -62,7 +63,7 @@ describe("zookeeperCard builder", () => {
     expect(card.steps.map((s) => s.id)).toEqual(["install", "configure", "run", "verify"]);
   });
   it("has a zookeeper receiver config with the org's exporter", () => {
-    const config = zookeeperCard(SUBS)
+    const config = zookeeperCard(SUBS, gt)
       .steps.find((s) => s.id === "configure")!
       .variants!.find((v) => v.id === "linux-amd64")!.code.raw;
     expect(config).toContain("zookeeper:");
@@ -76,7 +77,7 @@ describe("Zookeeper.vue", () => {
     if (wrapper) wrapper.unmount();
   });
   it("renders the shared card", () => {
-    expect(getDataSourceCard("zookeeper", SUBS)?.provider.name).toBe("Zookeeper");
+    expect(getDataSourceCard("zookeeper", SUBS, gt)?.provider.name).toBe("Zookeeper");
     wrapper = mount(Zookeeper, { global: { plugins: [mockStore, mockI18n] } });
     expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
   });

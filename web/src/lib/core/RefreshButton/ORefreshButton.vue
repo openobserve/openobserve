@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "../Button/OButton.vue";
+import OTooltip from "../../overlay/Tooltip/OTooltip.vue";
 import type { RefreshButtonProps, RefreshButtonEmits } from "./ORefreshButton.types";
 
 const { t } = useI18nTyped();
@@ -10,6 +11,7 @@ const props = withDefaults(defineProps<RefreshButtonProps>(), {
   lastRunAt: null,
   loading: false,
   disabled: false,
+  variant: "ghost",
 });
 
 const emit = defineEmits<RefreshButtonEmits>();
@@ -84,46 +86,27 @@ function handleClick(e: MouseEvent) {
 <template>
   <div class="inline-flex items-center gap-1.5">
     <!-- staleness dot -->
-    <span
-      :class="['size-2 shrink-0 rounded-full transition-colors duration-700', dotColor]"
-      :title="dotTitle"
-    />
+    <span :class="['size-2 shrink-0 rounded-full transition-colors duration-700', dotColor]">
+      <OTooltip :content="dotTitle" />
+    </span>
     <!-- relative timestamp; < md the dot + tooltip carry the same info -->
     <span
       v-if="lastRunAt"
       class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none max-md:hidden"
-      :title="exactTime"
     >
       {{ relativeTime || t("refreshButton.justNow") }}
+      <OTooltip :content="exactTime" />
     </span>
-    <!-- refresh icon button -->
     <OButton
-      variant="ghost"
-      size="icon"
+      :variant="variant"
+      size="icon-toolbar"
+      icon-left="refresh"
       :loading="loading"
       :disabled="disabled"
-      :title="exactTime"
       data-test="refresh-button"
-      class="size-7"
       @click="handleClick"
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        :class="{ 'animate-spin': loading }"
-      >
-        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-        <path d="M21 3v5h-5" />
-        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-        <path d="M8 16H3v5" />
-      </svg>
+      <OTooltip :content="exactTime" />
     </OButton>
   </div>
 </template>

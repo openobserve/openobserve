@@ -489,7 +489,7 @@ import PanelBar from "@/components/common/PanelBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import { BADGE_LABELS, cardColorForIndex } from "@/utils/metrics/metricPalette";
+import { BADGE_LABEL_KEYS, cardColorForIndex } from "@/utils/metrics/metricPalette";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
 import { hasSamples, type CardPreview } from "@/composables/metrics/useMetricsExplorerGrid";
@@ -575,8 +575,8 @@ export default defineComponent({
     const color = computed(() => cardColorForIndex(props.index, isDark.value));
     // Kept for the card's aria label; the VISIBLE badge renders through the
     // registry's metricType group, which owns the label and colour.
-    const badgeLabel = computed(
-      () => BADGE_LABELS[props.card.typeFilterBucket] ?? t("metrics.metricCard.other"),
+    const badgeLabel = computed(() =>
+      t(BADGE_LABEL_KEYS[props.card.typeFilterBucket] ?? "metrics.badge.other"),
     );
 
     const o2Unit = computed(() => toO2Unit(props.preview?.unit ?? props.card.unit));

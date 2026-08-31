@@ -17,9 +17,9 @@
 use axum::response::Response;
 #[cfg(feature = "enterprise")]
 use common::meta::http::HttpResponse as MetaHttpResponse;
-use config::meta::user::UserRole;
 #[cfg(feature = "enterprise")]
-use config::meta::{stream::StreamType, user::User};
+use config::meta::stream::StreamType;
+use config::meta::user::UserRole;
 #[cfg(feature = "enterprise")]
 use db::user::is_root_user;
 
@@ -52,7 +52,12 @@ pub async fn check_stream_permissions(
         meta::mapping::{LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY, OFGA_MODELS},
     };
 
-    let user: User = crate::users::get_user(Some(org_id), user_id).await.unwrap();
+    // A user can hit this with an org they are not a member of (e.g. the search
+    // profile endpoint always checks against _meta), so a missing user is a
+    // deny, not a panic.
+    let Some(user) = crate::users::get_user(Some(org_id), user_id).await else {
+        return Some(MetaHttpResponse::forbidden("Unauthorized Access"));
+    };
     let stream_type_str = stream_type.as_str();
     let config = get_config();
     let mut o2_model_type = "";

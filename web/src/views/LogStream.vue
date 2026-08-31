@@ -230,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="h-3.5 w-3.5 shrink-0 object-contain"
                         alt=""
                       />
-                      {{ t("logStream.emptyKubernetes") }}
+                      {{ raw("Kubernetes") }}
                     </EmptyStateIngestionChip>
                     <EmptyStateIngestionChip
                       data-test="log-stream-empty-aws-btn"
@@ -262,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="h-3.5 w-3.5 shrink-0 object-contain"
                         alt=""
                       />
-                      {{ t("logStream.emptyLinux") }}
+                      {{ raw("Linux") }}
                     </EmptyStateIngestionChip>
                     <EmptyStateIngestionChip
                       data-test="log-stream-empty-windows-btn"
@@ -278,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="h-3.5 w-3.5 shrink-0 object-contain"
                         alt=""
                       />
-                      {{ t("logStream.emptyWindows") }}
+                      {{ raw("Windows") }}
                     </EmptyStateIngestionChip>
                   </div>
                 </template>
@@ -724,7 +724,7 @@ export default defineComponent({
             if (err.response?.status != 403) {
               toast({
                 variant: "error",
-                message: err.response?.data?.message || "Error while fetching streams.",
+                message: err.response?.data?.message || t("logStream.errorWhileFetchingStreams"),
               });
             }
             loadingState.value = false;
@@ -788,7 +788,7 @@ export default defineComponent({
           : s === "empty"
             ? "var(--color-grey-400)"
             : "var(--color-success-500)";
-      return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+      return { boxShadow: `var(--shadow-rail-geom) ${color}` };
     };
 
     // ── Org-wide stream footprint (summary strip) ────────────────────────────
@@ -1020,7 +1020,7 @@ export default defineComponent({
         .catch((error) => {
           if (error.response.status != 403) {
             toast({
-              message: error.response?.data?.message || "Error while deleting streams.",
+              message: error.response?.data?.message || t("logStream.errorWhileDeletingStreams"),
               variant: "error",
             });
           }
@@ -1221,6 +1221,7 @@ export default defineComponent({
     ]);
     return {
       t,
+      raw,
       router,
       store,
       logStream: logStream,

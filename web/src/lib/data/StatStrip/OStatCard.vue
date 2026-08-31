@@ -27,6 +27,12 @@ const props = withDefaults(
   defineProps<{
     label?: I18nText;
     value?: string | number;
+    /**
+     * Short qualifier shown beside the label — what the value IS, when the
+     * label alone is ambiguous (e.g. "wait time" under a generic "Database
+     * time"). Not a second metric and never a trend.
+     */
+    sub?: I18nText;
     icon?: IconName;
     tone?: StatTone;
     trend?: StatTrend;
@@ -161,6 +167,11 @@ const trendClass = computed(() =>
         <span v-if="trend" class="text-2xs shrink-0 font-semibold" :class="trendClass"
           >{{ trendArrow }} {{ trend.label }}</span
         >
+        <!-- A QUALIFIER on the value, not a second metric: it says what the
+             number IS (which measurement, whose count), so a tile under a
+             generic heading cannot be read as the wrong quantity. Truncates
+             before the value does — the value never shrinks. -->
+        <span v-if="sub" class="text-text-label text-2xs min-w-0 truncate">{{ sub }}</span>
       </div>
       <span
         v-if="icon || slots.icon"

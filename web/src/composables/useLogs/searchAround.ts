@@ -125,11 +125,6 @@ export const useSearchAround = () => {
         queryFunction = b64EncodeUnicode(searchObj.data.tempFunctionContent) ?? "";
       }
 
-      let actionId = "";
-      if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
-        actionId = searchObj.data.selectedTransform.id;
-      }
-
       let streamName = "";
       if (searchObj.data.stream.selectedStream.length > 1) {
         streamName = b64EncodeUnicode(searchObj.data.stream.selectedStream.join(",")) || "";
@@ -156,7 +151,6 @@ export const useSearchAround = () => {
           clusters: Object.prototype.hasOwnProperty.call(searchObj.meta, "clusters")
             ? searchObj.meta.clusters.join(",")
             : "",
-          action_id: actionId,
           is_multistream: searchObj.data.stream.selectedStream.length > 1,
           traceparent,
         })
@@ -188,7 +182,7 @@ export const useSearchAround = () => {
         })
         .catch((error: SearchAroundError) => {
           let traceId = "";
-          searchObj.data.errorMsg = "Error while processing search request.";
+          searchObj.data.errorMsg = t("search.errorWhileProcessingSearchRequest");
 
           if (error.response !== undefined) {
             searchObj.data.errorMsg = error.response.data.error;
@@ -206,7 +200,9 @@ export const useSearchAround = () => {
           const customMessage = logsErrorMessage(error.response?.data?.code || 0);
           searchObj.data.errorCode = error.response?.data?.code || 0;
           if (customMessage !== "") {
-            searchObj.data.errorMsg = customMessage;
+            // `logsErrorMessage()` returns an i18n KEY, not text — the sibling call
+            // sites (usePagination, useSearchResponseHandler) resolve it the same way.
+            searchObj.data.errorMsg = t(customMessage);
           }
 
           const status = error?.request?.status;
@@ -227,7 +223,8 @@ export const useSearchAround = () => {
         });
     } catch (error: unknown) {
       searchObj.loading = false;
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      const errorMessage =
+        error instanceof Error ? error.message : t("search.unknownErrorOccurred");
       showErrorNotification(
         t("toastMessages.useLogs.errorWhileFetchingData", { error: errorMessage }),
       );

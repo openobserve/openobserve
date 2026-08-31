@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { raw } from "@/types/i18n";
 import { PrebuiltConfig, PrebuiltType } from "./types";
 
 const TEAMS_WEBHOOK_ALLOWED_HOSTS = ["outlook.office.com", "webhook.office.com"];
@@ -136,7 +137,7 @@ import msteamsLogo from "@/assets/images/alerts/destinations/msteams.png";
 
 export const msteamsDestinationType: PrebuiltType = {
   id: "msteams",
-  name: "Microsoft Teams",
+  name: raw("Microsoft Teams"),
   descriptionKey: "alert_destinations.prebuilt.msteamsDescription",
   icon: "msteams",
   image: msteamsLogo,

@@ -1,10 +1,12 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { ingestTestData } = require('../utils/data-ingestion.js');
+const { ingestTestData, waitForStreamData } = require('../utils/data-ingestion.js');
 
-const STREAM_A = "e2e_automate";
-const STREAM_B = "e2e_stream1";
+// Cross-link settings are one whole-object PUT per stream, so each parallel worker owns its own streams and concurrent tests can never clobber one another.
+const WORKER_SLOT = process.env.TEST_PARALLEL_INDEX || '0';
+const STREAM_A = `e2e_crosslink_ms_w${WORKER_SLOT}_a`;
+const STREAM_B = `e2e_crosslink_ms_w${WORKER_SLOT}_b`;
 
 test.describe("Cross-Linking Multi-Stream testcases", () => {
     test.describe.configure({ mode: 'serial' });
@@ -20,7 +22,11 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         if (!dataIngested) {
             await ingestTestData(page, STREAM_A);
             await ingestTestData(page, STREAM_B);
-            await page.waitForTimeout(1000);
+            // These streams are created only here, so nothing else masks the lag before they are queryable and listed.
+            for (const streamName of [STREAM_A, STREAM_B]) {
+                expect(await waitForStreamData(page, streamName, 1, 30000),
+                    `stream ${streamName} never became queryable within 30s of ingestion`).toBe(true);
+            }
             dataIngested = true;
             testLogger.info('Test data ingested into both streams');
         }
@@ -409,11 +415,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         const crossLinkNameA = `CL-DashA-${Date.now()}`;
         const crossLinkNameB = `CL-DashB-${Date.now()}`;
 
-        // Step 1: Feature-gate check — navigate to STREAM_A only to verify cross-linking
-        // is enabled, without fully configuring it yet. The actual cross-link setup is
-        // deferred until right before the result_schema call (see Step 3) to minimise
-        // the window in which crossLinking.spec.js — which runs in parallel on CI and
-        // repeatedly calls deleteAllCrossLinks() on e2e_automate — can wipe the link.
+        // Probe the feature gate before building the dashboard so an unsupported build skips instead of failing deep in the panel setup.
         const featureCheckResult = await (async () => {
             await pm.crossLinkPage.navigateToStreams();
             await pm.crossLinkPage.searchStream(STREAM_A);
@@ -469,10 +471,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         // Capture the dashboard view URL so we can reload it after cross-link setup.
         const dashboardViewUrl = page.url();
 
-        // Step 3: Set up cross-links as late as possible — immediately before
-        // navigating back to the dashboard so result_schema fires with both links
-        // still present. Set up STREAM_B first (safe: no concurrent test touches it)
-        // then STREAM_A last (minimises the gap between A's save and result_schema call).
+        // Step 3: Set up both cross-links immediately before navigating back so result_schema fires with both present.
         const featureEnabledB = await setupStreamCrossLink(page, pm, STREAM_B, {
             name: crossLinkNameB,
             url: 'https://dash-union-b.example.com/${field.__value}',
@@ -482,10 +481,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
             test.skip(true, 'Cross-linking feature not enabled on second stream');
         }
 
-        // Step 3b: Retry loop — set up A's cross-link, immediately reload the
-        // dashboard, and verify the result_schema response body contains both links.
-        // If crossLinking.spec.js deletes A's link in the small window between setup
-        // and the API response, we re-setup and retry (up to 3 attempts total).
+        // result_schema can be served without a just-saved cross-link, so re-set A and reload rather than failing on the first miss.
         let crossLinkResponseData = null;
         for (let attempt = 1; attempt <= 3; attempt++) {
             // (Re-)set up A's cross-link immediately before navigating back.

@@ -273,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="anomalySql"
                     @click="
                       copyToClipboard(anomalySql, t, {
-                        successMessage: 'SQL Copied Successfully!',
+                        successMessage: t('common.itemCopiedSuccessfully', { item: 'SQL' }),
                         timeout: 3000,
                       })
                     "
@@ -321,12 +321,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     @click="
                       copyToClipboard(alertDetails.conditions, t, {
-                        successMessage:
-                          (alertDetails.type === 'sql'
-                            ? t('alerts.alertDetails.sqlQuery')
-                            : alertDetails.type === 'promql'
-                              ? t('alerts.alertDetails.promqlQuery')
-                              : t('alerts.alertDetails.conditions')) + ' Copied Successfully!',
+                        successMessage: t('common.itemCopiedSuccessfully', {
+                          item:
+                            alertDetails.type === 'sql'
+                              ? t('alerts.alertDetails.sqlQuery')
+                              : alertDetails.type === 'promql'
+                                ? t('alerts.alertDetails.promqlQuery')
+                                : t('alerts.alertDetails.conditions'),
+                        }),
                       })
                     "
                     variant="ghost-muted"
@@ -357,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Description (only show if exists) -->
             <div v-if="alertDetails.description" class="mt-3 shrink-0">
               <div
-                class="mb-1 flex items-center gap-1.5 text-xs font-semibold tracking-wider uppercase"
+                class="mb-1 flex items-center gap-1.5 text-xs font-semibold"
                 :class="'text-text-secondary'"
               >
                 <OIcon name="info-outline" size="xs" />
@@ -749,7 +751,7 @@ const historyTableColumns = computed(() =>
 const getRowClass = (row: any) => {
   if (row?._flappingGroup) {
     // Violet-tinted highlight for flapping-group rows; token carries the theme.
-    return "!bg-[color-mix(in_srgb,var(--color-sql-accent)_8%,var(--color-surface-base))]";
+    return "!bg-surface-tint-sql";
   }
   if (row?._child) {
     return "!bg-surface-subtle";
@@ -765,7 +767,7 @@ const getRowClass = (row: any) => {
 };
 
 const formatTimestampFull = (timestamp: number) => {
-  if (!timestamp) return "N/A";
+  if (!timestamp) return raw("N/A");
   return formatTimestamp(timestamp, "MMM DD, YYYY HH:mm:ss");
 };
 

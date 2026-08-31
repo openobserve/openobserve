@@ -131,10 +131,47 @@ export default class DashboardactionPage {
 
   // Add panel name
   async addPanelName(panelName) {
-    // Open the inline editor, then fill the revealed input.
-    await this.panelNameTrigger.click();
-    await this.panelNameInput.waitFor({ state: "visible" });
-    await this.panelNameInput.fill(panelName);
+    // The panel name input is NOT a plain text box — when left untouched it
+    // mirrors an auto-generated name derived from the chart config ("Count of
+    // Kubernetes Namespace Name, Count of ... by ..."). Every config change
+    // recomputes that name and re-renders the input, replacing the DOM node.
+    //
+    // A fill() issued while such a re-render is in flight hits a node that is
+    // detached mid-action; Playwright retries internally but keeps resolving
+    // into nodes that are themselves replaced, so it burns the full timeout
+    // ("element was detached from the DOM, retrying"). A re-render landing
+    // just AFTER a successful fill is equally bad: it silently restores the
+    // auto-generated name and the panel saves under the wrong title.
+    //
+    // Re-open and re-fill until the value actually sticks, so a re-render
+    // costs one attempt rather than the whole call, and verify the result
+    // instead of assuming the fill held.
+    const maxAttempts = 3;
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        // The trigger is only present while the editor is closed — clicking it
+        // when the input is already open would toggle the editor shut.
+        if (!(await this.panelNameInput.isVisible().catch(() => false))) {
+          await this.panelNameTrigger.click({ timeout: 10000 });
+        }
+        await this.panelNameInput.waitFor({ state: "visible", timeout: 10000 });
+        await this.panelNameInput.fill(panelName, { timeout: 10000 });
+
+        // Confirm the value survived any re-render that raced the fill.
+        if ((await this.panelNameInput.inputValue()) === panelName) return;
+        lastError = new Error(
+          `panel name reverted after fill (auto-generated name won the race)`
+        );
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    throw new Error(
+      `addPanelName: could not set panel name to "${panelName}" after ${maxAttempts} attempts. Last error: ${lastError?.message}`
+    );
   }
 
   // Save panel button locator (for callers that only need a raw click)
@@ -160,6 +197,33 @@ export default class DashboardactionPage {
       this.errorToast.waitFor({ state: "visible", timeout: 20000 }),
       this.panelNameError.waitFor({ state: "visible", timeout: 20000 }),
     ]).catch(() => {});
+  }
+
+  /**
+   * Discard the current panel and return to the dashboard view page.
+   * Use this for teardown when the panel intentionally holds an
+   * incomplete/invalid config (which cannot pass save validation) or when the
+   * test does not need to persist the panel. Discarding an edited panel fires
+   * a native window.confirm — Playwright auto-dismisses dialogs by default,
+   * which would cancel the navigation and leave the page on add_panel — so
+   * accept it for the duration of the discard.
+   * (Same handling as dashboard-multi-sql.js discardPanel; this is the
+   * generic home for it since discard is not a multi-SQL-specific action.)
+   */
+  async discardPanel() {
+    const discardBtn = this.page.locator('[data-test="dashboard-panel-discard"]');
+    const dialogHandler = (dialog) => dialog.accept();
+    this.page.on("dialog", dialogHandler);
+    try {
+      await discardBtn.waitFor({ state: "visible", timeout: 15000 });
+      await discardBtn.click();
+      // Discard navigates to the dashboard view page (/dashboards/view).
+      await this.page.waitForURL((url) => !url.pathname.includes("add_panel"), {
+        timeout: 30000,
+      });
+    } finally {
+      this.page.off("dialog", dialogHandler);
+    }
   }
 
   //Apply dashboard button

@@ -418,8 +418,8 @@ const resultTotal = ref<number>(0);
 
 const deleteDialog = ref({
   show: false,
-  title: "Delete Report",
-  message: "Are you sure you want to delete report?",
+  title: t("reports.deleteReportTitle"),
+  message: t("reports.deleteReportMessage"),
   data: null as any, // { report_id, name }
 });
 const confirmBulkDelete = ref<boolean>(false);
@@ -556,7 +556,7 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
     if (err?.response?.status !== 403) {
       toast({
         variant: "error",
-        message: err?.data?.message || "Error while fetching reports!",
+        message: err?.data?.message || t("reports.fetchReportsError"),
       });
     }
   } finally {
@@ -742,7 +742,7 @@ const toggleReportState = (report: any) => {
       if (err?.response?.status !== 403) {
         toast({
           variant: "error",
-          message: err?.data?.message || "Error while updating report state!",
+          message: err?.data?.message || t("reports.updateReportStateError"),
         });
       }
     })
@@ -755,7 +755,9 @@ const toggleReportState = (report: any) => {
 // Delete — uses report_id (v2)
 const confirmDeleteReport = (report: any) => {
   deleteDialog.value.show = true;
-  deleteDialog.value.message = `Are you sure you want to delete report "${report.name}"`;
+  deleteDialog.value.message = t("reports.deleteReportNamedMessage", {
+    name: report.name,
+  });
   deleteDialog.value.data = { report_id: report.report_id, name: report.name };
 };
 
@@ -781,7 +783,7 @@ const deleteReport = () => {
       if (err?.response?.status !== 403) {
         toast({
           variant: "error",
-          message: err?.data?.message || "Error while deleting report!",
+          message: err?.data?.message || t("reports.deleteReportError"),
         });
       }
     })
@@ -847,7 +849,8 @@ const bulkDeleteReports = async () => {
     selectedReports.value = [];
   } catch (error: any) {
     dismiss();
-    const msg = error.response?.data?.message || error?.message || "Error deleting reports.";
+    const msg =
+      error.response?.data?.message || error?.message || t("reports.bulkDeleteReportsError");
     if (error.response?.status !== 403) {
       toast({ variant: "error", message: msg });
     }
