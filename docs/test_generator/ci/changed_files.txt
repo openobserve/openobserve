@@ -1,2 +1,0 @@
-src/api/management/src/request/status_pages/status_page.html
-web/src/views/synthetics/status-pages/StatusPagePreview.vue

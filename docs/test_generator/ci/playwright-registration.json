@@ -1,6 +1,0 @@
-{
-  "group": "GeneralTests",
-  "spec_filename": "statusPageBrandLink.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}
