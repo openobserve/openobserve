@@ -1144,6 +1144,13 @@ struct PersonTally {
     count: i64,
 }
 
+#[derive(Debug, FromQueryResult)]
+struct DeliveryTally {
+    who: String,
+    delivered: Option<bool>,
+    count: i64,
+}
+
 /// How many of the team's pages each person acknowledged, grouped in SQL.
 ///
 /// The fairness question's third column. Records nobody acknowledged have a
@@ -1179,6 +1186,65 @@ pub async fn acks_by_person(
 ///
 /// `night_windows` are the same absolute intervals [`team_page_stats`] takes;
 /// passing an empty slice asks only for the totals.
+/// Whether the transport has actually been taking pages to each person lately.
+///
+/// `(delivered, failed)` per recipient over the window, from the delivery
+/// ledger. Reachability could previously only say whether a channel was
+/// CONFIGURED, so a deployment whose SMTP credentials had been rejected on
+/// every send still reported `would_a_page_land: true` — the one screen whose
+/// job is answering that question, answering it wrong in the dangerous
+/// direction.
+///
+/// Scoped to the team so the query stays one indexed range scan rather than a
+/// walk over the org's whole ledger.
+pub async fn delivery_health(
+    org_id: &str,
+    team_id: &str,
+    since: i64,
+) -> Result<std::collections::HashMap<String, (i64, i64)>, errors::Error> {
+    use sea_orm::sea_query::Query;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let rows: Vec<DeliveryTally> = oncall_response_events::Entity::find()
+        .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Delivery.to_i32()))
+        .filter(oncall_response_events::Column::Recipient.is_not_null())
+        .filter(oncall_response_events::Column::At.gte(since))
+        .filter(
+            oncall_response_events::Column::ResponseId.in_subquery(
+                Query::select()
+                    .column(oncall_responses::Column::Id)
+                    .from(oncall_responses::Entity)
+                    .and_where(Expr::col(oncall_responses::Column::OrgId).eq(org_id))
+                    .and_where(Expr::col(oncall_responses::Column::TeamId).eq(team_id))
+                    .to_owned(),
+            ),
+        )
+        .select_only()
+        .column_as(oncall_response_events::Column::Recipient, "who")
+        .column_as(oncall_response_events::Column::Delivered, "delivered")
+        .column_as(oncall_response_events::Column::Id.count(), "count")
+        .group_by(oncall_response_events::Column::Recipient)
+        .group_by(oncall_response_events::Column::Delivered)
+        .into_model()
+        .all(client)
+        .await?;
+
+    let mut out: std::collections::HashMap<String, (i64, i64)> =
+        std::collections::HashMap::new();
+    for row in rows {
+        let entry = out.entry(row.who).or_insert((0, 0));
+        // A NULL `delivered` predates the column carrying an outcome. Counted
+        // as neither: guessing it succeeded would hide a real failure, and
+        // guessing it failed would invent one.
+        match row.delivered {
+            Some(true) => entry.0 += row.count,
+            Some(false) => entry.1 += row.count,
+            None => {}
+        }
+    }
+    Ok(out)
+}
+
 pub async fn deliveries_by_person(
     org_id: &str,
     team_id: &str,

@@ -745,13 +745,20 @@ impl EscalationPolicy {
             repeat_count: DEFAULT_REPEAT_COUNT,
             final_action: FinalAction::Stop,
             rungs: vec![
+                // Three whole-team steps, not four. There is only one target
+                // a team with no rotations has, so every step of this ladder
+                // reads identically — and four of the same line is not an
+                // escalation, it is the same page sent again on a timer. The
+                // rungs that survive are the ones that change something: now,
+                // once more in case the first was missed, and a last one
+                // before the ladder stops.
                 PriorityRung {
                     priority: P1,
-                    ..everybody(&[0, 5 * m, 15 * m, 30 * m])
+                    ..everybody(&[0, 5 * m, 15 * m])
                 },
                 PriorityRung {
                     priority: P2,
-                    ..everybody(&[0, 15 * m, 30 * m])
+                    ..everybody(&[0, 15 * m])
                 },
                 PriorityRung {
                     priority: P3,
