@@ -322,6 +322,7 @@ export default defineComponent({
       },
       {
         id: "status",
+        hideBelowMd: true,
         header: t("ingestion.tokenStatus"),
         accessorKey: "enabled",
         sortable: true,
@@ -331,6 +332,7 @@ export default defineComponent({
       },
       {
         id: "created_by",
+        hideBelowMd: true,
         header: t("ingestion.createdBy"),
         accessorKey: "created_by",
         sortable: true,

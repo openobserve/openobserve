@@ -271,15 +271,26 @@ export default {
         }
       },
     );
+    const fitToNodes = () => {
+      if (!vueFlowRef.value) return;
+      if (pipelineObj.currentSelectedPipeline.nodes.length > 4) {
+        vueFlowRef.value.fitView({ padding: 0.1 });
+      } else {
+        vueFlowRef.value.fitView({ padding: 1 });
+      }
+    };
     onMounted(async () => {
-      setTimeout(() => {
-        if (vueFlowRef.value && pipelineObj.currentSelectedPipeline.nodes.length > 4) {
-          vueFlowRef.value.fitView({ padding: 0.1 });
-        } else if (vueFlowRef.value) {
-          vueFlowRef.value.fitView({ padding: 1 });
-        }
-      }, 100);
+      setTimeout(fitToNodes, 100);
     });
+    // Editing an existing pipeline loads its nodes async, after the mount-time
+    // fit ran on an empty graph — desktop-saved coordinates then sit outside a
+    // small viewport entirely. Re-fit when the nodes actually arrive.
+    watch(
+      () => pipelineObj.currentSelectedPipeline.nodes.length,
+      (len, prev) => {
+        if (len > 0 && !prev) setTimeout(fitToNodes, 100);
+      },
+    );
 
     function resetTransform() {
       setViewport({ x: 0, y: 0, zoom: 1 });
