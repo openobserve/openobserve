@@ -437,6 +437,13 @@ export default class DashboardDrilldownPage {
     return this.page.url();
   }
 
+  // Currently-selected tab in the destination dashboard's tab list.
+  getSelectedDashboardTab() {
+    return this.page
+      .locator('[data-test="dashboard-tab-list"]')
+      .getByRole("tab", { selected: true });
+  }
+
   /**
    * Returns locator for the drilldown item at the given index in the config list.
    */

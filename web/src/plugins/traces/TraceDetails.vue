@@ -1272,7 +1272,6 @@ export default defineComponent({
       hConnectorWidth: 20,
       dotConnectorWidth: 6,
       dotConnectorHeight: 6,
-      colors: ["#b7885e", "#1ab8be", "#ffcb99", "#f89570", "#839ae2"],
     };
     const parentContainer = ref<HTMLElement | null>(null);
     const traceScrollContainer = ref<HTMLElement | null>(null);

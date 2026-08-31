@@ -1171,21 +1171,6 @@ export class AlertsPage {
 
     // ==================== ALERTS 4.0 (MULTI-ALERT) FORM HELPERS ====================
 
-    /**
-     * Select an alert destination by name in the create/edit form.
-     * @param {string} destinationName
-     */
-    async selectDestinationByName(destinationName) {
-        const dropdown = this.page.locator(this.locators.alertDestinationsSelect);
-        await dropdown.waitFor({ state: 'visible', timeout: 10000 });
-        await openOSelectDropdown(this.page, dropdown);
-        await this.page
-            .locator(`[data-test="alert-destinations-select-option"][data-test-value="dest:${destinationName}"]`)
-            .first()
-            .click();
-        await this.page.keyboard.press('Escape');
-        testLogger.info('Selected alert destination', { destinationName });
-    }
 
     /**
      * Submit the alert create/edit form. The submit button sits in a scroll
