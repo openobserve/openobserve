@@ -31,13 +31,7 @@
 
 /** Canonical outcomes the backend can send. */
 export type RunOutcome =
-  | "firing"
-  | "normal"
-  | "succeeded"
-  | "error"
-  | "notify_failed"
-  | "skipped"
-  | "pending";
+  "firing" | "normal" | "succeeded" | "error" | "notify_failed" | "skipped" | "pending";
 
 /**
  * Coarse bucket used for colouring and counting.

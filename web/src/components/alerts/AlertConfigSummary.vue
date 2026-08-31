@@ -288,9 +288,7 @@ const sections = computed(() => [
         label: t("alerts.queryConfig.pendingPeriod"),
         // Seconds on the alert, minutes everywhere else in this summary.
         value:
-          props.alert?.pending_period_sec != null
-            ? props.alert.pending_period_sec / 60
-            : EMPTY,
+          props.alert?.pending_period_sec != null ? props.alert.pending_period_sec / 60 : EMPTY,
       },
       {
         key: "destinations",

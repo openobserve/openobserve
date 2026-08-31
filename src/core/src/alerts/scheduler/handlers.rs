@@ -2194,6 +2194,7 @@ async fn handle_alert_triggers(
                         publish_triggers_usage(trigger_data_stream);
                         return Ok(());
                     }
+                    #[allow(clippy::collapsible_match)]
                     (Some(RunOutcome::Pending), Some(last)) => {
                         // last state was pending, so check if the the pending state exists for more
                         // than pending seconds or not.

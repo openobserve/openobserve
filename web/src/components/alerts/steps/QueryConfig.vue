@@ -948,9 +948,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #error />
                     </OFormInput>
-                    <span class="text-text-secondary text-compact font-semibold whitespace-nowrap">{{
-                      t("alerts.minutes")
-                    }}</span>
+                    <span
+                      class="text-text-secondary text-compact font-semibold whitespace-nowrap"
+                      >{{ t("alerts.minutes") }}</span
+                    >
                   </div>
                   <div
                     v-if="pendingPeriodWarning"
@@ -1345,9 +1346,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #error />
                     </OFormInput>
-                    <span class="text-text-secondary text-compact font-semibold whitespace-nowrap">{{
-                      t("alerts.minutes")
-                    }}</span>
+                    <span
+                      class="text-text-secondary text-compact font-semibold whitespace-nowrap"
+                      >{{ t("alerts.minutes") }}</span
+                    >
                   </div>
                   <div
                     v-if="pendingPeriodWarning"
