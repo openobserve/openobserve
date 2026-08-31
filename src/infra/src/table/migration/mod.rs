@@ -165,6 +165,7 @@ mod m20260812_000002_create_oncall_overrides;
 mod m20260812_000003_create_oncall_contacts_and_reads;
 mod m20260813_000001_create_oncall_unavailability;
 mod m20260824_000001_add_incident_acknowledged_columns;
+mod m20260831_000001_add_exhausted_at_to_oncall_responses;
 
 /// Apply **only** the SLO tables, for targeted integration tests.
 ///
@@ -337,6 +338,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260812_000003_create_oncall_contacts_and_reads::Migration),
             Box::new(m20260813_000001_create_oncall_unavailability::Migration),
             Box::new(m20260824_000001_add_incident_acknowledged_columns::Migration),
+            Box::new(m20260831_000001_add_exhausted_at_to_oncall_responses::Migration),
         ]
     }
 }

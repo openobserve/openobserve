@@ -416,6 +416,7 @@ pub async fn put_response(response: &Response) -> Result<(), errors::Error> {
         // yet replicated the alert shows no runbook rather than failing the
         // replication.
         runbook_url: None,
+        exhausted_at: response.exhausted_at,
     };
     match oncall_responses::Entity::find_by_id(&response.id)
         .one(client)

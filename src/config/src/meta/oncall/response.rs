@@ -600,6 +600,16 @@ pub struct Response {
     pub priority: i32,
     #[serde(default = "owner_role")]
     pub responder_role: ResponderRole,
+    /// When the ladder ran out with nobody answering. `None` while it is still
+    /// climbing, or once somebody took it before it ran out.
+    ///
+    /// Deliberately NOT a `ResponseState`. An exhausted page can still be
+    /// acknowledged and resolved — somebody finds it an hour later and takes
+    /// it — so a lifecycle state would force a false either/or between "the
+    /// ladder is spent" and "a human has it". Exhaustion is a property of the
+    /// ladder; the state is a property of the human.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exhausted_at: Option<i64>,
     /// For an impacted record, the owner record it was opened alongside.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub origin_response_id: Option<String>,
@@ -658,6 +668,11 @@ impl Response {
             // A page being handed over is being looked at, so a snooze the
             // previous owner set is theirs and ends with their ownership.
             snoozed_until: None,
+            // A new run has rungs left to climb, so the previous run's
+            // exhaustion is history. Leaving it set would report the fresh
+            // ladder as spent before it had paged anybody — and, worse, stop
+            // the mid-rung guard from ever letting it dispatch.
+            exhausted_at: None,
             ladder_anchor: Some(now),
             ladder_run: Some(next_ladder_run(self.ladder_run)),
             ..self.clone()
@@ -667,6 +682,23 @@ impl Response {
     /// Whether paging is currently suppressed.
     pub fn is_snoozed(&self, now: i64) -> bool {
         self.snoozed_until.is_some_and(|until| now < until)
+    }
+
+    /// Whether the ladder is still climbing towards somebody.
+    ///
+    /// `state.is_escalating()` alone answers only half of it: a page whose
+    /// ladder has run out keeps the `Triggered` state — there is no
+    /// `Exhausted` state and deliberately so — so a screen reading the state
+    /// showed "escalating" beside a timeline that said the ladder was spent.
+    /// Ask the record, not the enum.
+    pub fn is_escalating(&self) -> bool {
+        self.state.is_escalating() && self.exhausted_at.is_none()
+    }
+
+    /// The ladder ran out and nobody answered. Still open, still somebody's
+    /// problem, just with nothing left to try automatically.
+    pub fn is_exhausted(&self) -> bool {
+        self.exhausted_at.is_some() && !self.state.is_terminal()
     }
 }
 
@@ -1409,6 +1441,7 @@ mod tests {
             acked_at,
             closed_at,
             incident_id: None,
+            exhausted_at: None,
         }
     }
 
@@ -1494,6 +1527,53 @@ mod tests {
     /// A snooze says "I know, stop shouting" and belongs to the person who set
     /// it. Carrying it across a handoff would hand somebody a page that is
     /// already quiet.
+    /// The bug: there is no `Exhausted` state, so a spent ladder keeps
+    /// `Triggered` and every screen reading the state said "escalating" beside
+    /// a timeline that said the ladder had run out.
+    #[test]
+    fn test_a_spent_ladder_is_not_escalating_even_though_its_state_says_triggered() {
+        let mut r = sample(None, None);
+        r.state = ResponseState::Triggered;
+        assert!(r.is_escalating(), "a live ladder climbs");
+
+        r.exhausted_at = Some(9_000);
+        assert!(
+            r.state.is_escalating(),
+            "the STATE still says triggered — that is the whole trap",
+        );
+        assert!(!r.is_escalating(), "the RECORD knows better");
+        assert!(r.is_exhausted());
+        assert!(r.state.is_unresolved(), "still somebody's problem");
+    }
+
+    /// Exhaustion is a property of the ladder, not of the human. Somebody
+    /// finding a spent page an hour later and taking it is the ordinary case,
+    /// and a lifecycle state would have made it inexpressible.
+    #[test]
+    fn test_an_exhausted_page_can_still_be_acknowledged() {
+        let mut r = sample(None, None);
+        r.exhausted_at = Some(9_000);
+        assert!(
+            ResponseState::Triggered.can_transition_to(ResponseState::Acknowledged),
+            "the ladder running out must not close the door on a human taking it",
+        );
+        r.state = ResponseState::Acknowledged;
+        assert!(!r.is_escalating());
+        assert!(r.is_exhausted(), "acknowledged late is still a page nobody answered in time");
+    }
+
+    /// A repeat pass has rungs left to climb. Carrying the previous run's
+    /// exhaustion would report the fresh ladder as spent before it paged
+    /// anybody — and stop the mid-rung guard letting it dispatch at all.
+    #[test]
+    fn test_a_new_run_clears_the_previous_run_s_exhaustion() {
+        let mut r = sample(None, None);
+        r.exhausted_at = Some(9_000);
+        let next = r.handed_over(None, 20_000);
+        assert_eq!(next.exhausted_at, None);
+        assert!(next.is_escalating());
+    }
+
     #[test]
     fn test_a_handoff_does_not_inherit_the_previous_owner_s_snooze() {
         let mut r = sample(None, None);

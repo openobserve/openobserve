@@ -27,6 +27,8 @@ pub struct Model {
     /// The runbook the alert named when this record opened. Copied, not
     /// joined: a page has to keep saying what it said when it fired.
     pub runbook_url: Option<String>,
+    /// When the ladder ran out with nobody answering. `None` while it climbs.
+    pub exhausted_at: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

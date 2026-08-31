@@ -62,6 +62,7 @@ fn to_response(m: oncall_responses::Model) -> Option<Response> {
         acked_at: m.acked_at,
         closed_at: m.closed_at,
         incident_id: m.incident_id,
+        exhausted_at: m.exhausted_at,
     })
 }
 
@@ -123,6 +124,7 @@ pub async fn open(
         // Copied at open, so the page keeps pointing where the alert pointed
         // when it fired.
         runbook_url: Set(runbook_for(org_id, subject).await),
+        exhausted_at: Set(None),
     };
     let inserted = model.insert(client).await?;
     to_response(inserted).ok_or_else(|| {
@@ -490,6 +492,33 @@ pub async fn list_by_team(
 }
 
 /// Quiets a record until `until`, without claiming it.
+/// Records that the ladder ran out with nobody answering.
+///
+/// Idempotent: the reconcile sweep and the engine can both reach exhaustion for
+/// the same record, and the first instant is the true one. Leaves `state`
+/// alone — an exhausted page is still somebody's problem and can still be
+/// acknowledged, which is exactly why this is not a state.
+pub async fn mark_exhausted(
+    org_id: &str,
+    id: &str,
+    at: i64,
+) -> Result<Option<Response>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let Some(existing) = oncall_responses::Entity::find_by_id(id)
+        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .one(client)
+        .await?
+    else {
+        return Ok(None);
+    };
+    if existing.exhausted_at.is_some() {
+        return Ok(to_response(existing));
+    }
+    let mut model: oncall_responses::ActiveModel = existing.into();
+    model.exhausted_at = Set(Some(at));
+    Ok(to_response(model.update(client).await?))
+}
+
 pub async fn snooze(
     org_id: &str,
     id: &str,
@@ -605,6 +634,9 @@ async fn hand_over(
     model.snoozed_until = Set(next.snoozed_until);
     model.ladder_anchor = Set(next.ladder_anchor);
     model.ladder_run = Set(next.ladder_run);
+    // Cleared by `handed_over` because the new run has rungs left. Written
+    // here, or the decision would be made and then thrown away.
+    model.exhausted_at = Set(next.exhausted_at);
     Ok(to_response(model.update(client).await?))
 }
 
@@ -724,7 +756,10 @@ fn escalating_states() -> Vec<i32> {
 pub async fn is_escalating(org_id: &str, id: &str) -> Result<bool, errors::Error> {
     Ok(get(org_id, id)
         .await?
-        .is_some_and(|r| r.state.is_escalating()))
+        // The RECORD, not the state: a spent ladder keeps the `Triggered`
+        // state, and a rung still in flight when it ran out has nothing left
+        // to reach. Safe against repeats because a new run clears the flag.
+        .is_some_and(|r| r.is_escalating()))
 }
 
 /// Resolves a record. Idempotent — a second resolve keeps the first time.
