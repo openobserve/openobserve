@@ -25,13 +25,15 @@
 
 use axum::{
     body::Body,
+    extract::Request,
     http::{Method, StatusCode, Uri, header},
+    middleware::Next,
     response::Response,
 };
 use chrono::{DateTime, Utc};
 use common::infra::config::USERS;
 use config::meta::password_policy::{
-    EnforcementMode, PasswordPolicy, PasswordResetReason, RotationStatus,
+    EnforcementMode, PasswordPolicy, PasswordResetReason, ROTATION_WARNING_HEADER, RotationStatus,
 };
 use infra::table::users::UserRecord;
 
@@ -40,13 +42,13 @@ use infra::table::users::UserRecord;
 /// clear the flag and so would loop.
 const RESET_REQUIRED_CODE: &str = "password_reset_required";
 
-/// Days left before the password expires. Advisory: it rides along with the response the caller
-/// actually asked for, so a warning can never break a working client that ignores it.
-pub const ROTATION_WARNING_HEADER: &str = "x-password-rotation-warning";
+/// The header `auth_middleware` writes the authenticated email into. Reading it here rather than
+/// re-validating is what keeps this a layer of its own; `audit_middleware` consumes the same one.
+const USER_ID_HEADER: &str = "user_id";
 
 /// What the policy says about a request.
 #[derive(Debug, PartialEq, Eq)]
-pub enum PolicyDecision {
+enum PolicyDecision {
     Allow,
     /// Inside the rotation warning window: the request proceeds and carries a countdown.
     Warn {
@@ -57,8 +59,8 @@ pub enum PolicyDecision {
     },
 }
 
-/// The middleware's view of [`PolicyDecision`], with the block already rendered.
-pub enum RequestOutcome {
+/// [`PolicyDecision`] with the block already rendered.
+enum RequestOutcome {
     Proceed,
     Warn {
         days_remaining: i64,
@@ -67,11 +69,43 @@ pub enum RequestOutcome {
     Block(Box<Response>),
 }
 
+/// Refuse a request whose user owes the instance a new password, or tag it with how long they have
+/// left before they do.
+///
+/// Must be layered *inside* `auth_middleware`: the email comes from the header that authentication
+/// writes, and a request that never authenticated has no user to hold to a policy. A request
+/// arriving without that header is passed straight through — this layer authenticates nobody and
+/// must not appear to.
+pub async fn password_policy_middleware(request: Request, next: Next) -> Response {
+    let Some(user_email) = request
+        .headers()
+        .get(USER_ID_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_string)
+    else {
+        return next.run(request).await;
+    };
+
+    let warning = match check_request(&user_email, request.uri(), request.method()).await {
+        RequestOutcome::Proceed => None,
+        RequestOutcome::Warn { days_remaining } => Some(days_remaining),
+        RequestOutcome::Block(blocked) => return *blocked,
+    };
+
+    let mut response = next.run(request).await;
+    // The deadline is advisory until it passes, so the warning rides on whatever response the
+    // request produced rather than interrupting it.
+    if let Some(days_remaining) = warning {
+        attach_rotation_warning(&mut response, days_remaining);
+    }
+    response
+}
+
 /// Decide whether a request may proceed.
 ///
 /// Split from the middleware so it is testable without axum's `Next` machinery; the middleware
-/// below is only the glue that turns [`PolicyDecision`] into a response.
-pub fn decide(
+/// above is only the glue that turns [`PolicyDecision`] into a response.
+fn decide(
     user: &UserRecord,
     uri: &Uri,
     method: &Method,
@@ -178,7 +212,7 @@ fn is_read_only(method: &Method) -> bool {
 }
 
 /// Look the user up and apply the policy.
-pub async fn check_request(user_email: &str, uri: &Uri, method: &Method) -> RequestOutcome {
+async fn check_request(user_email: &str, uri: &Uri, method: &Method) -> RequestOutcome {
     // Served from the cluster-consistent users cache, so this costs no database round trip on the
     // authenticated hot path.
     let Some(user) = USERS.get(&user_email.to_lowercase()) else {
@@ -205,7 +239,7 @@ pub async fn check_request(user_email: &str, uri: &Uri, method: &Method) -> Requ
 ///
 /// A warning must not change what the caller asked for, so an unrepresentable value is dropped
 /// rather than turned into an error.
-pub fn attach_rotation_warning(response: &mut Response, days_remaining: i64) {
+fn attach_rotation_warning(response: &mut Response, days_remaining: i64) {
     if let Ok(value) = header::HeaderValue::from_str(&days_remaining.to_string()) {
         response.headers_mut().insert(
             header::HeaderName::from_static(ROTATION_WARNING_HEADER),
@@ -600,6 +634,66 @@ mod tests {
         let mut response = Response::new(Body::empty());
         attach_rotation_warning(&mut response, 3);
         assert_eq!(response.headers()[ROTATION_WARNING_HEADER], "3");
+    }
+
+    /// Layered outside the gate, so the gate sees exactly what `auth_middleware` leaves behind.
+    async fn stub_auth(email: &'static str, mut request: Request, next: Next) -> Response {
+        request
+            .headers_mut()
+            .insert(USER_ID_HEADER, email.parse().unwrap());
+        next.run(request).await
+    }
+
+    /// An unauthenticated request must come out the other side untouched: this layer decides
+    /// nothing about identity, and a 401 here would hide whatever the route itself answers.
+    #[tokio::test]
+    async fn a_request_carrying_no_authenticated_email_passes_through() {
+        use axum::{Router, body::Body, routing::get};
+        use tower::ServiceExt;
+
+        let app = Router::new()
+            .route("/default/streams", get(|| async { "ok" }))
+            .layer(axum::middleware::from_fn(password_policy_middleware));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/default/streams")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(!response.headers().contains_key(ROTATION_WARNING_HEADER));
+    }
+
+    /// Authentication succeeded against an identity the users cache does not hold — a token, or an
+    /// enterprise login. There is no local password to have a policy about.
+    #[tokio::test]
+    async fn a_user_the_cache_does_not_hold_passes_through() {
+        use axum::{Router, body::Body, routing::get};
+        use tower::ServiceExt;
+
+        let app = Router::new()
+            .route("/default/streams", get(|| async { "ok" }))
+            .layer(axum::middleware::from_fn(password_policy_middleware))
+            .layer(axum::middleware::from_fn(|request, next| async move {
+                stub_auth("nobody@b.com", request, next).await
+            }));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/default/streams")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
     }
 
     /// The unit tests above feed `decide` a path string directly, so they cannot catch the case

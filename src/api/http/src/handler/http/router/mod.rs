@@ -23,7 +23,7 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, patch, post, put},
 };
-use config::get_config;
+use config::{get_config, meta::password_policy::ROTATION_WARNING_HEADER};
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
 use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
 #[cfg(feature = "cloud")]
@@ -72,8 +72,7 @@ use crate::{
             RequestData, oo_validator, validator_aws, validator_gcp, validator_proxy_url,
             validator_rum,
         },
-        password_policy,
-        router::middlewares::blocked_orgs_middleware,
+        router::middlewares::{blocked_orgs_middleware, password_policy_middleware},
     },
 };
 
@@ -110,9 +109,7 @@ pub fn cors_layer() -> CorsLayer {
         ])
         // Response headers are invisible to a cross-origin caller unless listed here, and the
         // rotation countdown is only useful if the console can read it.
-        .expose_headers([header::HeaderName::from_static(
-            password_policy::ROTATION_WARNING_HEADER,
-        )])
+        .expose_headers([header::HeaderName::from_static(ROTATION_WARNING_HEADER)])
         // Restrict CORS to the configured web_url origin, plus any extra origins in
         // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
         // allows any origin to make credentialed requests — effectively disabling same-origin
@@ -249,7 +246,10 @@ fn attach_mcp_www_authenticate(_org_id: &str, resp: Response) -> Response {
     resp
 }
 
-/// Authentication middleware for API routes
+/// Authentication middleware for API routes.
+///
+/// Pair it with `password_policy_middleware` layered inside it on every router that uses it: this
+/// one answers who the caller is, that one whether their password still entitles them to be here.
 pub async fn auth_middleware(request: Request, next: Next) -> Response {
     // Extract request data FIRST, before any async calls
     // This ensures the future is Send because RequestData is Send + Sync
@@ -277,21 +277,6 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
                     .unwrap_or_else(|_| header::HeaderValue::from_static("")),
             );
 
-            // Policy enforcement sits after authentication, not before it: a flagged user is
-            // still who they say they are, they just may not reach resources until they set a
-            // compliant password.
-            let rotation_warning = match password_policy::check_request(
-                &result.user_email,
-                &req_data.uri,
-                &req_data.method,
-            )
-            .await
-            {
-                password_policy::RequestOutcome::Proceed => None,
-                password_policy::RequestOutcome::Warn { days_remaining } => Some(days_remaining),
-                password_policy::RequestOutcome::Block(blocked) => return *blocked,
-            };
-
             // Handle Prometheus POST hack - add content-type if missing
             if parts.method.eq(&Method::POST) && !parts.headers.contains_key(header::CONTENT_TYPE) {
                 parts.headers.insert(
@@ -300,13 +285,7 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
                 );
             }
 
-            let mut response = next.run(Request::from_parts(parts, body)).await;
-            // The rotation deadline is advisory until it passes, so it rides on whatever response
-            // the request produced rather than interrupting it.
-            if let Some(days_remaining) = rotation_warning {
-                password_policy::attach_rotation_warning(&mut response, days_remaining);
-            }
-            response
+            next.run(Request::from_parts(parts, body)).await
         }
         Err(e) => maybe_add_mcp_www_authenticate(&uri, e.into_response()),
     }
@@ -652,6 +631,8 @@ pub fn basic_routes() -> Router {
         .route("/consistent_hash", post(status::consistent_hash))
         .route("/refresh_nodes_list", get(status::refresh_nodes_list))
         .route("/refresh_user_sessions", get(status::refresh_user_sessions))
+        // Listed first, so it wraps closer to the route and runs after authentication.
+        .layer(middleware::from_fn(password_policy_middleware))
         .layer(middleware::from_fn(auth_middleware));
 
     router = router.nest("/node", node_routes);
@@ -663,6 +644,7 @@ pub fn basic_routes() -> Router {
             .route("/profile/memory", get(profiling::memory_profile))
             .route("/profile/stats", get(profiling::jemalloc_stats))
             .route("/profile/cpu", get(profiling::cpu_profile))
+            .layer(middleware::from_fn(password_policy_middleware))
             .layer(middleware::from_fn(auth_middleware));
 
         router = router.nest("/debug", debug_routes);
@@ -710,7 +692,9 @@ pub fn basic_routes() -> Router {
 pub fn config_routes() -> Router {
     Router::new()
         .route("/reload", get(status::config_reload))
+        .route_layer(middleware::from_fn(password_policy_middleware))
         .route_layer(middleware::from_fn(auth_middleware))
+        // Registered after the layers, so the unauthenticated routes stay unauthenticated.
         .route("/", get(status::zo_config))
         .route("/logout", get(status::logout))
 }
@@ -719,7 +703,9 @@ pub fn config_routes() -> Router {
 pub fn config_routes() -> Router {
     Router::new()
         .route("/reload", get(status::config_reload))
+        .route_layer(middleware::from_fn(password_policy_middleware))
         .route_layer(middleware::from_fn(auth_middleware))
+        // Registered after the layers, so the unauthenticated routes stay unauthenticated.
         .route("/", get(status::zo_config))
         .route("/logout", get(status::logout))
         .route("/redirect", get(status::redirect))
@@ -1471,13 +1457,17 @@ pub fn service_routes() -> Router {
     }
 
     // Apply middlewares in order: preprocessing -> decompression -> cors -> server header -> auth
-    // -> audit -> blocked orgs NOTE: Preprocessing middleware removes Content-Encoding: snappy
+    // -> password policy -> audit -> blocked orgs
+    // NOTE: Preprocessing middleware removes Content-Encoding: snappy
     // header before tower_http sees it. This prevents 415 errors while allowing handlers to
     // manually decompress snappy data. tower_http's RequestDecompressionLayer handles gzip,
     // deflate, brotli, and zstd.
     router
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
+        // Between auth and audit: it needs the email authentication resolves, and a request it
+        // refuses never reached a handler, so there is nothing for the audit trail to record.
+        .layer(middleware::from_fn(password_policy_middleware))
         .layer(middleware::from_fn(auth_middleware))
         .layer(RequestDecompressionLayer::new())
         .layer(middleware::from_fn(

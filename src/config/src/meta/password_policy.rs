@@ -23,6 +23,13 @@ use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+/// Response header carrying the days left before the caller's password expires.
+///
+/// Advisory: it rides along with the response the caller actually asked for, so a client that
+/// ignores it is never broken by one. Lowercase because `HeaderName::from_static` rejects anything
+/// else.
+pub const ROTATION_WARNING_HEADER: &str = "x-password-rotation-warning";
+
 /// How lockout duration grows with each successive lockout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "lowercase")]
