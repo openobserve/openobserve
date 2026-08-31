@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>Status</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2016%2016'%3E%3Ccircle%20cx='8'%20cy='8'%20r='7'%20fill='%233f7994'/%3E%3C/svg%3E">
 <style>
   :root {
     --bg:#f4f6f8; --card:#ffffff; --ink:#1b2b33; --ink2:#5b6e77; --line:#dde4e8;
@@ -811,6 +812,37 @@
     });
   }
 
+  // logo_img is stored as bare base64 with no MIME type, so sniff it from the magic bytes.
+  function imageMediaType(b64) {
+    if (b64.indexOf("iVBORw0KGgo") === 0) return "image/png";
+    if (b64.indexOf("/9j/") === 0) return "image/jpeg";
+    if (b64.indexOf("R0lGOD") === 0) return "image/gif";
+    if (b64.indexOf("UklGR") === 0) return "image/webp";
+    if (b64.indexOf("PHN2Zy") === 0 || b64.indexOf("PD94bW") === 0) return "image/svg+xml";
+    return "image/png";
+  }
+
+  function imageDataUrl(b64) {
+    return "data:" + imageMediaType(b64) + ";base64," + b64;
+  }
+
+  // CSP is `img-src 'self' data:`, so the no-logo fallback must be inline, never fetched.
+  function faviconFrom(data) {
+    if (data.logo_img) return imageDataUrl(data.logo_img);
+    var accent = /^#[0-9a-fA-F]{3,8}$/.test(data.accent_color || "") ? data.accent_color : "#3f7994";
+    return "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="' + accent + '"/></svg>');
+  }
+
+  function setFavicon(href) {
+    var link = document.querySelector('link[rel="icon"]');
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    link.href = href;
+  }
+
   function render(data) {
     last.data = data;
     var cur = data.current || {}, hist = data.history || {};
@@ -823,7 +855,7 @@
     document.title = name + " — Status";
     var logo = document.getElementById("page-logo");
     if (data.logo_img) {
-      logo.src = "data:image;base64," + data.logo_img;
+      logo.src = imageDataUrl(data.logo_img);
       logo.alt = name;
       logo.hidden = false;
     } else {
@@ -833,6 +865,7 @@
       document.documentElement.style.setProperty("--accent", data.accent_color);
       document.documentElement.style.setProperty("--accent-ink", data.accent_color);
     }
+    setFavicon(faviconFrom(data));
     renderBanner(cur);
     renderNotices(cur.notices || []);
     renderComponents(cur.components || [], hist.components || []);

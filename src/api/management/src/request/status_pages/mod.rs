@@ -49,4 +49,18 @@ mod shell_tests {
         let inline_handler = regex::Regex::new(r"\son[a-z]+=").unwrap();
         assert!(inline_handler.find(SHELL).is_none());
     }
+
+    // `logo_img` is stored as a bare base64 payload with no MIME type (the uploader strips it), so
+    // the shell must sniff a real type rather than emit the invalid type-less `data:image;base64,`.
+    #[test]
+    fn shell_never_emits_a_type_less_image_data_uri() {
+        assert!(!SHELL.contains("data:image;base64,"));
+    }
+
+    #[test]
+    fn shell_sets_the_favicon_from_the_brand_image() {
+        assert!(SHELL.contains(r#"rel="icon""#));
+        assert!(SHELL.contains("faviconFrom"));
+        assert!(SHELL.contains("data:image/svg+xml"));
+    }
 }
