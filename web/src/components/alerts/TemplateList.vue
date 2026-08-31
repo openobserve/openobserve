@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2 max-md:flex-wrap max-md:gap-y-1">
+            <div class="flex w-full items-center gap-2 max-md:contents">
               <OToggleGroup
                 :model-value="activeTab"
                 @update:model-value="
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroup>
               <OSearchInput
                 v-model="filterQuery"
-                class="flex-1"
+                class="min-w-0 flex-1 max-md:min-w-40"
                 :placeholder="t('template.search')"
                 data-test="template-list-search-input"
               />

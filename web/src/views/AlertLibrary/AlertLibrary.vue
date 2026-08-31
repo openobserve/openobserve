@@ -59,7 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div class="flex min-h-0 flex-1">
-        <div class="w-rail border-border-default h-full shrink-0 border-r">
+        <!-- < md the facet rail moves into a drawer (Filters button by the
+             search); side by side it left the card grid ~270px. -->
+        <div class="w-rail border-border-default h-full shrink-0 border-r max-md:hidden">
           <LibraryRail
             :categories="categoryFacets"
             :selected-categories="selectedCategories"
@@ -71,6 +73,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:severity="severity = $event"
           />
         </div>
+        <ODrawer
+          v-if="isMobile"
+          v-model:open="mobileFiltersOpen"
+          side="left"
+          :width="80"
+          bleed
+          :title="t('common.filters')"
+          data-test="alert-library-mobile-filters-drawer"
+        >
+          <LibraryRail
+            :categories="categoryFacets"
+            :selected-categories="selectedCategories"
+            :severities="severityFacets"
+            :severity="severity"
+            :search="railSearch"
+            @update:search="railSearch = $event"
+            @update:selected-categories="selectedCategories = $event"
+            @update:severity="severity = $event"
+          />
+        </ODrawer>
 
         <div class="flex h-full min-w-0 flex-1 flex-col">
           <!-- Load failure replaces the whole body: a toolbar over an empty grid
@@ -90,10 +112,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <template v-else>
-            <div class="border-border-default px-page-edge shrink-0 border-b py-2">
+            <div
+              class="border-border-default px-page-edge flex shrink-0 items-center gap-2 border-b py-2"
+            >
+              <OButton
+                variant="outline"
+                size="icon-toolbar"
+                icon-left="filter-list"
+                class="md:hidden"
+                data-test="alert-library-mobile-filters-btn"
+                @click="mobileFiltersOpen = true"
+              >
+                <OTooltip :content="t('common.filters')" />
+              </OButton>
               <OSearchInput
                 v-model="search"
                 size="sm"
+                class="min-w-0 flex-1"
                 :debounce="200"
                 :placeholder="t('alert_library.searchPlaceholder')"
                 data-test="alert-library-search"
@@ -239,6 +274,9 @@ import {
 import type { AlertLibraryErrorCode } from "@/composables/alerts/useAlertLibrary";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -263,6 +301,8 @@ const { getStreams } = useStreams(t);
 const selectedCategories = ref<string[]>([]);
 /** The rail's own list filter, held here so clearFilters can reset it too. */
 const railSearch = ref("");
+const { isMobile } = useBreakpoint();
+const mobileFiltersOpen = ref(false);
 const severity = ref("all");
 /** Stat-strip facet. `null` = no availability filter; "all" never sticks. */
 const facet = ref<"ready" | "missing" | null>(null);
