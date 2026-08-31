@@ -443,7 +443,8 @@ const useHttpStreaming = () => {
       activeStreamId.value = traceId;
     } catch (error) {
       if ((error as any).name === "AbortError") {
-        // console.error('Stream was canceled');
+        // An aborted stream reaches no completion handler, so release it here.
+        cleanUpListeners(traceId);
       } else if ((error as any).status === 401) {
         // A refresh was already attempted in Path 1 (initial fetch 401 handler).
         // Reaching here means the refresh didn't help or json() parsing failed
