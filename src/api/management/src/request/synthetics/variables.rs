@@ -783,3 +783,71 @@ pub async fn get_synthetic_replay_secrets(
             .collect::<std::collections::HashMap<_, _>>(),
     )
 }
+
+/// Body of a duplicate request.
+#[derive(Debug, Default, serde::Deserialize, utoipa::ToSchema)]
+pub struct DuplicateEnvironmentBody {
+    pub name: String,
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/synthetics/environments/{env}/duplicate",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "DuplicateSyntheticsEnvironment",
+    summary = "Copy an environment's variables into a new environment",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("env" = String, Path, description = "Source environment name"),
+    ),
+    request_body(content = Object, description = "New environment name", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Duplicated", content_type = "application/json", body = Object),
+        (status = 400, description = "Invalid",    content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn duplicate_synthetics_environment(
+    Path((org_id, env)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<DuplicateEnvironmentBody>,
+) -> Response {
+    // OSS has no per-request identity to attribute a write to.
+    #[cfg(feature = "enterprise")]
+    let created_by = user_email.user_id.clone();
+    #[cfg(not(feature = "enterprise"))]
+    let created_by = String::new();
+
+    // The route authorizes the environment being READ. Creating one is the
+    // module's call, so it is checked here — otherwise write on a single
+    // environment would be enough to mint new ones.
+    #[cfg(feature = "enterprise")]
+    if !openobserve_core::auth::check_permissions(
+        &org_id,
+        &org_id,
+        &user_email.user_id,
+        "synthetics_module",
+        "POST",
+        None,
+        true,
+        false,
+        true,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Forbidden: no permission to create environments");
+    }
+
+    match openobserve_synthetics::service::duplicate_environment(
+        &org_id,
+        &env,
+        &body.name,
+        &created_by,
+    )
+    .await
+    {
+        Ok(view) => MetaHttpResponse::json(view),
+        Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}

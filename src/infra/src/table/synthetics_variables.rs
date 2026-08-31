@@ -26,7 +26,7 @@ use std::{
 
 use config::{
     RwHashMap,
-    meta::synthetics_variables::{SyntheticsVariableKind, SyntheticsVariableView},
+    meta::synthetics_variables::{SyntheticsVariableView, VariableValueView},
 };
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set, SqlErr};
 
@@ -96,21 +96,27 @@ impl SyntheticsVariableRecord {
         self.kind == KIND_SECRET
     }
 
-    /// The read projection. Every field the API returns comes from here, and
-    /// `value` is not one of them — see [`SyntheticsVariableView`].
-    pub fn to_view(&self) -> SyntheticsVariableView {
+    /// The read projection, given the plaintext for a plain variable.
+    ///
+    /// `plain_value` is `None` for a secret, and for a plain row whose
+    /// ciphertext would not decrypt. Decryption happens in the service, which
+    /// owns the org DEK; this layer holds no key and must not grow one.
+    pub fn to_view(&self, plain_value: Option<String>) -> SyntheticsVariableView {
         SyntheticsVariableView {
             id: self.id.clone(),
             name: self.name.clone(),
-            kind: if self.is_secret() {
-                SyntheticsVariableKind::Secret
+            value: if self.is_secret() {
+                VariableValueView::Secret {
+                    has_value: !self.value.is_empty(),
+                }
             } else {
-                SyntheticsVariableKind::Plain
+                VariableValueView::Plain {
+                    value: plain_value.unwrap_or_default(),
+                }
             },
             description: self.description.clone(),
             example: self.example.clone(),
             tags: self.tags.clone(),
-            has_value: !self.value.is_empty(),
             // Stamped by the service, which is the only layer that can see
             // checks. Zero here means "not counted yet", never "unused".
             used_by_checks: 0,
@@ -351,17 +357,44 @@ mod tests {
     }
 
     #[test]
-    fn the_view_carries_presence_not_the_value() {
-        let view = record(KIND_SECRET, "AESenc:abc").to_view();
-        assert!(view.has_value);
-        assert_eq!(view.kind, SyntheticsVariableKind::Secret);
+    fn a_secret_view_carries_presence_not_the_value() {
+        // Even handed a plaintext, the secret variant has nowhere to put it.
+        let view = record(KIND_SECRET, "AESenc:abc").to_view(Some("hunter2".into()));
+        assert_eq!(view.value, VariableValueView::Secret { has_value: true });
         let json = serde_json::to_string(&view).unwrap();
         assert!(!json.contains("AESenc"), "{json}");
+        assert!(!json.contains("hunter2"), "{json}");
         assert!(!json.contains("\"value\""), "{json}");
     }
 
     #[test]
-    fn an_empty_stored_value_reads_as_absent() {
-        assert!(!record(KIND_PLAIN, "").to_view().has_value);
+    fn an_empty_stored_secret_reads_as_absent() {
+        assert_eq!(
+            record(KIND_SECRET, "").to_view(None).value,
+            VariableValueView::Secret { has_value: false }
+        );
+    }
+
+    #[test]
+    fn a_plain_view_carries_the_decrypted_value() {
+        assert_eq!(
+            record(KIND_PLAIN, "AESenc:abc")
+                .to_view(Some("https://shop.test".into()))
+                .value,
+            VariableValueView::Plain {
+                value: "https://shop.test".into()
+            }
+        );
+    }
+
+    #[test]
+    fn a_plain_row_that_will_not_decrypt_reads_as_empty() {
+        // One corrupt row must not fail the whole list.
+        assert_eq!(
+            record(KIND_PLAIN, "AESenc:corrupt").to_view(None).value,
+            VariableValueView::Plain {
+                value: String::new()
+            }
+        );
     }
 }
