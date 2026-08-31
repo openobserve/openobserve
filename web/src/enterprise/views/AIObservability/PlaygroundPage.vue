@@ -84,6 +84,7 @@
         :scoring="scoring"
         @update:selected-ids="(ids: string[]) => (draft.scorerIds = ids)"
         @update:auto-score="(value: boolean) => (draft.autoScore = value)"
+        @focus-expected="focusExpected"
         @score="scoreAll"
       />
       <OButton
@@ -173,11 +174,9 @@
         class="shrink-0"
         :var-names="varNames"
         :vars="draft.vars"
-        :expected="draft.expectedSingle"
         :provenance="draft.provenance"
         :sample="draft.sample"
         :stepping="sampleStepping"
-        @set-expected="(value) => (draft.expectedSingle = value)"
         @sample="sampleOpen = true"
         @step-sample="stepSample"
         @clear-sample="clearSample"
@@ -242,6 +241,17 @@
           />
         </div>
       </div>
+
+      <!-- Below the bench, not inside it: one golden answer serves every column,
+           so it must not scroll away with them. Shown only once something reads
+           it — a value, or a selected scorer that needs one. -->
+      <PlaygroundExpectedBar
+        v-if="draft.expectedSingle || expectedRequired"
+        ref="expectedBarRef"
+        :expected="draft.expectedSingle"
+        :required="expectedRequired"
+        @set-expected="(value) => (draft.expectedSingle = value)"
+      />
     </div>
 
     <PlaygroundSampleDialog
@@ -271,12 +281,14 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import PlaygroundExpectedBar from "@/enterprise/components/AIObservability/PlaygroundExpectedBar.vue";
 import PlaygroundSampleDialog from "@/enterprise/components/AIObservability/PlaygroundSampleDialog.vue";
 import PlaygroundScorersMenu from "@/enterprise/components/AIObservability/PlaygroundScorersMenu.vue";
 import PlaygroundShareDialog from "@/enterprise/components/AIObservability/PlaygroundShareDialog.vue";
 import PlaygroundVariableBar from "@/enterprise/components/AIObservability/PlaygroundVariableBar.vue";
 import PlaygroundVariantColumn from "@/enterprise/components/AIObservability/PlaygroundVariantColumn.vue";
 import onlineEvalsService, { type Provider, type Scorer } from "@/services/online-evals.service";
+import { entityId } from "@/enterprise/components/onlineEvals/utils/evalEntity";
 import llmDatasetsService, {
   type LlmDataset,
   type LlmDatasetItem,
@@ -302,6 +314,7 @@ import {
   playgroundId,
   renderedMessages,
   renderTemplate,
+  scorerEvidence,
   settledResults,
   snapshotPayload,
   starterDraft,
@@ -624,6 +637,25 @@ function onKeydown(event: KeyboardEvent) {
 // ── scoring ───────────────────────────────────────────────────────
 
 const hasReference = computed(() => benchHasReference(draft.expectedSingle));
+
+const expectedBarRef = ref<{ focus: () => void } | null>(null);
+
+/** A selected scorer reads `{{expected_output}}` and the bench has none, so the
+ *  field has to be on screen for the Score panel's notice to point at. */
+const expectedRequired = computed<boolean>(() => {
+  if (hasReference.value) return false;
+  return scorers.value.some((scorer) => {
+    if (!draft.scorerIds.includes(entityId(scorer))) return false;
+    const evidence = scorerEvidence(scorer.template ?? "");
+    // A trace-reading scorer is skipped for a reason no expected output fixes.
+    if (evidence.trace) return false;
+    return evidence.expectedOutput || Boolean(scorer.referenceBased ?? scorer.reference_based);
+  });
+});
+
+function focusExpected() {
+  expectedBarRef.value?.focus();
+}
 
 /** Outputs worth judging. A tool call is not text a scorer can read, and an
  *  empty answer would only ever be judged as one. */

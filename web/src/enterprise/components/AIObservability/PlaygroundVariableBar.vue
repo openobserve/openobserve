@@ -1,63 +1,19 @@
 <!-- Copyright 2026 OpenObserve Inc.
 
-  Editor-bench input strip: one field per `{{variable}}` the messages reference,
-  an optional expected output, and the two controls that switch the bench into
-  table mode.
+  Editor-bench INPUT strip: one field per `{{variable}}` the messages reference,
+  plus the dataset-sampling controls.
 
-  `{{expected_output}}` never gets a field here. It is not an input to the
-  prompt — it is the answer the prompt is supposed to reach without seeing it.
+  The expected output is deliberately NOT here. It is not an input — the model
+  never sees it — so it lives with the outputs it is compared against, in
+  PlaygroundExpectedBar. What stays is the warning for a message that references
+  `{{expected_output}}`, which is a prompt mistake and so belongs beside the
+  prompt's own variables.
 -->
 <template>
   <div
     class="border-border-default flex flex-wrap items-start gap-2.5 border-b px-4 py-2.5"
     data-test="ai-playground-variable-bar"
   >
-    <!-- ONE grower, the expected field. A bare spacer beside it would split the
-         free space between the two and stall the field at half the width it
-         could have used. -->
-    <div class="flex min-w-0 flex-1 items-start gap-1.5">
-      <OButton
-        v-if="!showExpected"
-        variant="ghost-primary"
-        size="xs"
-        class="self-center"
-        :title="t('aiObservability.playground.expectedPlaceholder')"
-        data-test="ai-playground-add-expected"
-        @click="showExpected = true"
-      >
-        {{ t("aiObservability.playground.addExpected") }}
-      </OButton>
-
-      <!-- A golden answer is prose, not a value: it is routinely a paragraph,
-           and a one-line field showed forty characters of it with no way to
-           read the rest. It grows to three lines and scrolls past them. -->
-      <template v-else>
-        <span class="text-text-secondary text-2xs mt-1.5 shrink-0 font-mono font-semibold">
-          {{ t("aiObservability.playground.expectedLabel") }}
-        </span>
-        <OTextarea
-          class="min-w-0 flex-1"
-          :model-value="expected ?? ''"
-          :placeholder="t('aiObservability.playground.expectedPlaceholder')"
-          :rows="1"
-          :max-rows="3"
-          size="sm"
-          autogrow
-          data-test="ai-playground-expected-input"
-          @update:model-value="(value: string) => emit('set-expected', value)"
-        />
-        <OButton
-          variant="ghost-muted"
-          size="icon-xs"
-          icon-left="close"
-          class="mt-0.5"
-          :title="t('aiObservability.playground.removeExpected')"
-          data-test="ai-playground-remove-expected"
-          @click="clearExpected"
-        />
-      </template>
-    </div>
-
     <OTag
       v-if="provenance"
       variant="default"
@@ -140,10 +96,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import {
   EXPECTED_OUTPUT_TOKEN,
@@ -154,14 +109,12 @@ import {
 const props = defineProps<{
   varNames: string[];
   vars: Record<string, string>;
-  expected: string | null;
   provenance: PlaygroundProvenance | null;
   sample: PlaygroundSample | null;
   stepping?: boolean;
 }>();
 
 const emit = defineEmits<{
-  "set-expected": [value: string | null];
   sample: [];
   "step-sample": [delta: number];
   "clear-sample": [];
@@ -172,20 +125,4 @@ const { t } = useI18nTyped();
 const expectedToken = `{{${EXPECTED_OUTPUT_TOKEN}}}`;
 
 const usesExpectedToken = computed(() => props.varNames.includes(EXPECTED_OUTPUT_TOKEN));
-
-const showExpected = ref(false);
-
-// An expected value arriving from an entry param opens the field on its own.
-watch(
-  () => props.expected,
-  (value) => {
-    if (value) showExpected.value = true;
-  },
-  { immediate: true },
-);
-
-function clearExpected() {
-  emit("set-expected", null);
-  showExpected.value = false;
-}
 </script>
