@@ -596,7 +596,7 @@ tokio-rustls = { version = "0.26", default-features = false, features = [
     "tls12",
 ] }
 tokio-util = { version = "0.7", features = ["compat"] }
-tokio-stream = "0.1"
+tokio-stream = { version = "0.1", features = ["net"] }
 tonic = { version = "0.14", features = [
     "gzip",
     "zstd",
