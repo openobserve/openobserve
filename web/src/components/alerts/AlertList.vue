@@ -1463,6 +1463,12 @@ export default defineComponent({
       // column needs has to be listed here as well or the row renders as
       // unbound whatever the API sent.
       oncall_team: anomaly.oncall_team ?? null,
+      // Feature 2 carries these on anomaly configs too, and the API sends them
+      // — `anomaly_priority_tag_tests` pins that. This branch returns before
+      // the mapping that reads them for scheduled alerts, so an anomaly row
+      // showed no priority and no tags however the config was set.
+      priority: anomaly.priority ?? null,
+      tags: anomaly.tags ?? [],
       selected: false,
       type: "anomaly",
       folder_name: {
