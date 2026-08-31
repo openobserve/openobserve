@@ -14,6 +14,7 @@ import {
 } from "@tanstack/vue-table";
 import { computed, ref, watch, type Ref } from "vue";
 import { raw } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { TABLE_INDEX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
 
 // Register the custom "avg" fn (provided via table options below) so
@@ -66,8 +67,30 @@ export function useTableCore<TData>(
   // value is derived from the row's position so pages need not hand-roll a
   // `"#"` field in their data. Under server pagination we add the page offset
   // so numbering stays continuous across pages.
+  // < md: drop columns flagged hideBelowMd, and the auto index column — on a
+  // phone they only force the table into a horizontal scroll.
+  // Desktop column sizes (e.g. a 320px Name) also cap at 10rem there, so the
+  // surviving identity + actions columns fit a phone without a scroll.
+  const MOBILE_MAX_COL_SIZE = 160;
+  const { isMobile } = useBreakpoint();
+  const responsiveColumns = computed<OTableColumnDef<TData>[]>(() => {
+    if (!isMobile.value) return props.columns;
+    return props.columns
+      .filter((c) => !c.hideBelowMd)
+      .map((c) => {
+        if (c.isAction || c.id === "actions") return c;
+        if ((c.size ?? 0) <= MOBILE_MAX_COL_SIZE && (c.minSize ?? 0) <= MOBILE_MAX_COL_SIZE)
+          return c;
+        return {
+          ...c,
+          size: Math.min(c.size ?? MOBILE_MAX_COL_SIZE, MOBILE_MAX_COL_SIZE),
+          minSize: c.minSize != null ? Math.min(c.minSize, MOBILE_MAX_COL_SIZE) : c.minSize,
+        };
+      });
+  });
+
   const indexColumn = computed<OTableColumnDef<TData> | null>(() => {
-    if (!props.showIndex) return null;
+    if (!props.showIndex || isMobile.value) return null;
     if (props.columns.some((c) => c.id === "#")) return null;
     const isServer = props.pagination === "server";
     const offset = isServer
@@ -103,7 +126,9 @@ export function useTableCore<TData>(
   // keeps px-2; when false the actions column is last and gets the 1rem right
   // edge inset. `actionColumnWidth` reads this to budget the right padding.
   const hasTrailingSpacer = computed<boolean>(() => {
-    const base = indexColumn.value ? [indexColumn.value, ...props.columns] : props.columns;
+    const base = indexColumn.value
+      ? [indexColumn.value, ...responsiveColumns.value]
+      : responsiveColumns.value;
     const hasAutoWidth = base.some((c) => c.meta?.autoWidth);
     return (
       (props.enableColumnResize ?? false) &&
@@ -114,7 +139,9 @@ export function useTableCore<TData>(
   });
 
   const effectiveColumns = computed<OTableColumnDef<TData>[]>(() => {
-    const base = indexColumn.value ? [indexColumn.value, ...props.columns] : props.columns;
+    const base = indexColumn.value
+      ? [indexColumn.value, ...responsiveColumns.value]
+      : responsiveColumns.value;
     // An `autoWidth` column flexes permanently and absorbs leftover on its own,
     // so those tables need no spacer. Every other resizable table gets an
     // invisible trailing spacer: it sits before the pinned actions column and
@@ -170,7 +197,11 @@ export function useTableCore<TData>(
   const userReorderedColumns = ref(false);
 
   // Track column sizing — seeded with persisted values when provided
-  const columnSizing = ref<Record<string, number>>(props.initialColumnSizes ?? {});
+  // Persisted sizes were dragged on a desktop; honouring them < md would undo
+  // the mobile column cap and reintroduce the horizontal scroll.
+  const columnSizing = ref<Record<string, number>>(
+    isMobile.value ? {} : (props.initialColumnSizes ?? {}),
+  );
   const columnResizeMode = "onChange";
 
   // Track sorting state for client-side

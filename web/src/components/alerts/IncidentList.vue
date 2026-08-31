@@ -345,6 +345,7 @@ export default defineComponent({
       },
       {
         id: "status",
+        hideBelowMd: true,
         header: t("alerts.incidents.status"),
         accessorKey: "status",
         resizable: true,
@@ -354,6 +355,7 @@ export default defineComponent({
       },
       {
         id: "dimensions",
+        hideBelowMd: true,
         header: t("alerts.incidents.stableDimensions"),
         accessorKey: "group_values",
         resizable: true,
@@ -363,6 +365,7 @@ export default defineComponent({
       },
       {
         id: "alert_count",
+        hideBelowMd: true,
         header: t("alerts.incidents.alertCount"),
         accessorKey: "alert_count",
         resizable: true,
@@ -372,6 +375,7 @@ export default defineComponent({
       },
       {
         id: "last_alert_at",
+        hideBelowMd: true,
         header: t("alerts.incidents.lastAlertAt"),
         accessorKey: "last_alert_at",
         sortable: true,

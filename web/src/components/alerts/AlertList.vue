@@ -1459,6 +1459,7 @@ export default defineComponent({
         // model trained?). Backed by the alert_states rollup row.
         {
           id: "last_outcome",
+          hideBelowMd: true,
           accessorKey: "last_outcome",
           header: t("alerts.lastOutcome"),
           cell: " ",
@@ -1474,6 +1475,7 @@ export default defineComponent({
         // normal is perfectly ordinary.
         {
           id: "priority",
+          hideBelowMd: true,
           accessorKey: "priority",
           header: t("alerts.priority"),
           cell: " ",
@@ -1489,6 +1491,7 @@ export default defineComponent({
         // exactness, so a single sort order would misrepresent it.
         {
           id: "groups",
+          hideBelowMd: true,
           accessorKey: "groups_observed",
           header: t("alerts.groups.tab"),
           cell: " ",
@@ -1502,6 +1505,7 @@ export default defineComponent({
         // no meaningful order and sorting by it would imply one.
         {
           id: "tags",
+          hideBelowMd: true,
           accessorKey: "tags",
           header: t("alerts.tags"),
           cell: " ",
@@ -1513,6 +1517,7 @@ export default defineComponent({
         },
         {
           id: "owner",
+          hideBelowMd: true,
           accessorKey: "owner",
           header: t("alerts.owner"),
           cell: " ",
@@ -1524,6 +1529,7 @@ export default defineComponent({
         },
         {
           id: "last_triggered_at",
+          hideBelowMd: true,
           accessorKey: "last_triggered_at",
           header: t("alerts.lastTriggered"),
           cell: " ",
@@ -1535,6 +1541,7 @@ export default defineComponent({
         },
         {
           id: "last_satisfied_at",
+          hideBelowMd: true,
           accessorKey: "last_satisfied_at",
           header: t("alerts.lastSatisfied"),
           cell: " ",
@@ -1549,6 +1556,7 @@ export default defineComponent({
           ? [
               {
                 id: "status",
+                hideBelowMd: true,
                 accessorKey: "status",
                 header: t("alerts.status"),
                 cell: " ",

@@ -383,6 +383,7 @@ export default defineComponent({
       },
       {
         id: "type",
+        hideBelowMd: true,
         header: t("common.type"),
         accessorKey: "type",
         sortable: true,
@@ -393,6 +394,7 @@ export default defineComponent({
       },
       {
         id: "url",
+        hideBelowMd: true,
         header: t("alert_destinations.url"),
         accessorKey: "url",
         resizable: true,
@@ -402,6 +404,7 @@ export default defineComponent({
       },
       {
         id: "template",
+        hideBelowMd: true,
         header: t("alert_destinations.template"),
         accessorKey: "template",
         sortable: true,
@@ -412,6 +415,7 @@ export default defineComponent({
       },
       {
         id: "method",
+        hideBelowMd: true,
         header: t("alert_destinations.method"),
         accessorKey: "method",
         sortable: true,
@@ -422,6 +426,7 @@ export default defineComponent({
       },
       {
         id: "used_by",
+        hideBelowMd: true,
         header: t("alert_dependencies.usedByColumn"),
         cell: " ",
         sortable: false,

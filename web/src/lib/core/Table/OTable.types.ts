@@ -155,6 +155,8 @@ export interface OTableColumnDef<TData = any> {
   pinned?: "left" | "right" | false;
   /** Can the user hide/close this column? */
   hideable?: boolean;
+  /** Drop this column below md — secondary data that only forces the mobile table to h-scroll. */
+  hideBelowMd?: boolean;
   /** Action columns (no data, just buttons/icons) get compact styling */
   isAction?: boolean;
   /** Footer display text or aggregate */

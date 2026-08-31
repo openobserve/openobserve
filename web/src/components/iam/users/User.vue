@@ -429,6 +429,7 @@ export default defineComponent({
         },
         {
           id: "first_name",
+          hideBelowMd: true,
           header: t("user.firstName"),
           accessorKey: "first_name",
           sortable: true,
@@ -439,6 +440,7 @@ export default defineComponent({
         },
         {
           id: "last_name",
+          hideBelowMd: true,
           header: t("user.lastName"),
           accessorKey: "last_name",
           sortable: true,
@@ -453,6 +455,7 @@ export default defineComponent({
       if (isEnterpriseOrCloud) {
         cols.push({
           id: "auth",
+          hideBelowMd: true,
           header: t("user.authType"),
           accessorKey: "auth_type",
           sortable: true,
@@ -466,6 +469,7 @@ export default defineComponent({
       // Roles column — array of role chips in enterprise/cloud, single role string otherwise
       cols.push({
         id: isEnterpriseOrCloud ? "roles" : "role",
+        hideBelowMd: true,
         header: isEnterpriseOrCloud ? t("user.roles") : t("user.role"),
         accessorKey: isEnterpriseOrCloud ? "roles" : "role",
         sortable: true,

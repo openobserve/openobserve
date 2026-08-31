@@ -503,6 +503,7 @@ export default defineComponent({
       },
       {
         id: "type",
+        hideBelowMd: true,
         header: t("common.type"),
         accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0 ? "Url" : "File"),
         sortable: true,
@@ -513,6 +514,7 @@ export default defineComponent({
       },
       {
         id: "doc_num",
+        hideBelowMd: true,
         header: t("logStream.docNum"),
         accessorKey: "doc_num",
         sortable: true,
@@ -523,6 +525,7 @@ export default defineComponent({
       },
       {
         id: "storage_size",
+        hideBelowMd: true,
         header: t("logStream.storageSize"),
         accessorKey: "original_storage_size",
         sortable: true,
@@ -533,6 +536,7 @@ export default defineComponent({
       },
       {
         id: "compressed_size",
+        hideBelowMd: true,
         header: t("logStream.compressedSize"),
         accessorKey: "original_compressed_size",
         sortable: true,
