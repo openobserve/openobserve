@@ -55,6 +55,16 @@ export class SloAlertsPage {
   presetCard(key) { return `[data-test="slos-sloalertcondition-preset-${key}"]`; }
   kindOption(value) { return `[data-test="slos-sloalertcondition-kind-${value}"]`; }
 
+  // ------------------------------------------------------------- element getters
+
+  getListItemByName(name) {
+    return this.page.locator(this.locators.list).getByText(name, { exact: false });
+  }
+
+  getListRowsByName(name) {
+    return this.page.locator(`${this.locators.list} li`).filter({ hasText: name });
+  }
+
   // ------------------------------------------------------------------- actions
 
   async clickAdd() {
@@ -177,10 +187,7 @@ export class SloAlertsPage {
    * row is located by text and its own Edit button clicked.
    */
   async openEditForListedAlert(name) {
-    const row = this.page
-      .locator(`${this.locators.list} li`)
-      .filter({ hasText: name })
-      .first();
+    const row = this.getListRowsByName(name).first();
     await row.waitFor({ state: 'visible', timeout: 20000 });
     await row.locator('[data-test^="slo-alerts-edit-"]').first().click();
     await expect(this.page.locator(this.locators.form)).toBeVisible({ timeout: 20000 });
@@ -284,9 +291,7 @@ export class SloAlertsPage {
   }
 
   async expectAlertListed(name) {
-    await expect(
-      this.page.locator(this.locators.list).getByText(name, { exact: false }),
-    ).toBeVisible({ timeout: 30000 });
+    await expect(this.getListItemByName(name)).toBeVisible({ timeout: 30000 });
   }
 
   /**
