@@ -1518,7 +1518,7 @@ export default defineComponent({
           size: COL.owner,
           meta: { align: "left" },
         },
-        // "frequency" (Check every) — all tabs except realTime
+        // "frequency" — the "Check every" cadence, meaningless for real-time alerts
         ...(activeTab.value !== "realTime"
           ? [
               {

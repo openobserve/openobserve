@@ -506,9 +506,6 @@ describe("AlertList - data fetching and columns", () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    wrapper.vm.viewMode = "alerts";
-    await flushPromises();
-
     for (const tab of ["all", "scheduled", "anomalyDetection"]) {
       wrapper.vm.activeTab = tab;
       await flushPromises();
