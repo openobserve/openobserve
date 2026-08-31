@@ -1,0 +1,27 @@
+[
+  {
+    "title": "should render the Powered by OpenObserve brand link twice (header + footer) on the public page",
+    "action": "new",
+    "verifies": "a published status page serves exactly two brand links, each anchored to https://openobserve.ai/ with target=_blank, rel=noopener noreferrer, the OpenObserve SVG mark, and the wordmark"
+  },
+  {
+    "title": "should render the brand link twice (header + footer) in the editor live preview",
+    "action": "new",
+    "verifies": "the editor live preview renders exactly two brand links with safe new-tab attributes"
+  },
+  {
+    "title": "should distinguish header and footer brand links by scope on the public page",
+    "action": "new",
+    "verifies": "the public shell has one brand link in the header region and one in the footer region"
+  },
+  {
+    "title": "should return 404 for a draft status page (no public shell, no brand link)",
+    "action": "new",
+    "verifies": "an unpublished (draft) status page returns 404 so the brand link is absent until publication"
+  },
+  {
+    "title": "should render the brand link on a just-published page before the first snapshot builds",
+    "action": "new",
+    "verifies": "a just-published (unbuilt) page still renders the static brand link without waiting for the snapshot"
+  }
+]
