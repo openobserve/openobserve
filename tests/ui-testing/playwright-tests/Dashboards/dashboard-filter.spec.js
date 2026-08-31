@@ -4,26 +4,22 @@ const {
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
 const testLogger = require('../utils/test-logger.js');
-import logData from "../../fixtures/log.json";
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/dashboard-time";
-import { waitForDashboardPage } from "./utils/dashCreation.js";
-const randomDashboardName =
-  "Dashboard_" + Math.random().toString(36).substr(2, 9);
+import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
+import { generateDashboardName } from "./utils/configPanelHelpers.js";
+import { waitForValuesStreamComplete } from "../utils/streaming-helpers.js";
 
 test.describe.configure({ mode: "parallel" });
 
 // Refactored test cases using Page Object Model
 
 test.describe("dashboard filter testcases", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     await ingestion(page);
-
-    await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
-    );
   });
 
   test("should successfully apply filter conditions using both AND and OR operators", async ({
@@ -31,6 +27,7 @@ test.describe("dashboard filter testcases", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -110,6 +107,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify query inspector for AND operator
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
     await expect(
       pm.dashboardPanelEdit.getExecutedQuery(0)
@@ -128,9 +126,8 @@ test.describe("dashboard filter testcases", () => {
 
     await pm.dashboardPanelActions.waitForChartToRender();
 
-    await page.waitForTimeout(2000);
-
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
     await expect(
       pm.dashboardPanelEdit.getExecutedQuery(0)
@@ -145,14 +142,14 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("should correctly apply the filter conditions with different operators, and successfully apply them to the query", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
@@ -212,13 +209,11 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify query inspector
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
-    await page.waitForTimeout(2000);
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
-    await expect(
-      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+    await expect(pm.dashboardPanelEdit.getExecutedQuery(0)).toContainText(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'ziox\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+    );
 
     await pm.logsVisualise.closeQueryInspector();
 
@@ -227,12 +222,12 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test.skip("Should apply the filter group inside group", async ({ page }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -252,7 +247,6 @@ test.describe("dashboard filter testcases", () => {
       "kubernetes_container_name"
     );
 
-    await page.waitForTimeout(1000);
     // Add a panel to the dashboard
     await pm.dashboardCreate.addPanel();
 
@@ -275,7 +269,6 @@ test.describe("dashboard filter testcases", () => {
       "variablename",
       "ziox"
     );
-    // await page.waitForTimeout(3000);
 
     await pm.dashboardFilter.clickAddConditionBtn();
 
@@ -304,12 +297,11 @@ test.describe("dashboard filter testcases", () => {
     await expect(pm.dashboardPanelActions.getVisibleText("'$variablename'").first()).toBeVisible();
 
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
-    await expect(
-      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1"'
-      }).last()
-    ).toBeVisible();
+    await expect(pm.dashboardPanelEdit.getExecutedQuery(0)).toContainText(
+      'SELECT histogram(_timestamp) as "x_axis_1"'
+    );
 
     await pm.logsVisualise.closeQueryInspector();
     // Save the dashboard panel
@@ -317,14 +309,14 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("Should apply the add group filter with apply the list of value successfully", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -342,8 +334,6 @@ test.describe("dashboard filter testcases", () => {
       "e2e_automate",
       "kubernetes_container_name"
     );
-
-    await page.waitForTimeout(3000);
 
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -380,16 +370,10 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
-    // Verify the query is displayed in the Query Inspector
-    const queryEditor = pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
-      hasText:  `SELECT kubernetes_container_name as "x_axis_1", count(kubernetes_container_image) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_namespace_name IN ('ingress-nginx', 'kube-system') GROUP BY x_axis_1`
-    }).last();
-
-    await expect(queryEditor).toBeVisible();
-
-    // Verify the exact query text matches
-    await expect(queryEditor).toHaveText(
+    // Verify the exact query text in the Query Inspector
+    await expect(pm.dashboardPanelEdit.getExecutedQuery(0)).toHaveText(
       'SELECT kubernetes_container_name as "x_axis_1", count(kubernetes_container_image) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_namespace_name IN (\'ingress-nginx\', \'kube-system\') GROUP BY x_axis_1'
     );
 
@@ -399,12 +383,12 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("Should  apply the  filter using the field button", async ({ page }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -456,14 +440,14 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("Should display an error message if added the invalid operator", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     // Go to dashboards
     await pm.dashboardList.menuItem("dashboards-item");
@@ -471,9 +455,9 @@ test.describe("dashboard filter testcases", () => {
 
     // Create dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open settings and add variable
-    await page.waitForTimeout(3000);
     await pm.dashboardSetting.openSetting();
     await pm.dashboardVariables.addDashboardVariable(
       "variablename",
@@ -538,14 +522,14 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("Should Filter work correctly if Added the breakdown field", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
 
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
@@ -556,7 +540,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Create a new dashboard
     await pm.dashboardCreate.createDashboard(randomDashboardName);
-    await page.waitForTimeout(3000);
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
 
     // Open settings and add variable
     await pm.dashboardSetting.openSetting();
@@ -582,9 +566,7 @@ test.describe("dashboard filter testcases", () => {
     await pm.dashboardPanelActions.applyDashboardBtn();
 
     // Set date range
-    await page.waitForSelector('[data-test="date-time-btn"]:not([disabled])', {
-      timeout: 5000,
-    });
+    await waitForDateTimeButtonToBeEnabled(page);
     await pm.dashboardTimeRefresh.setRelative("30", "m");
     await pm.dashboardPanelActions.waitForChartToRender();
 
@@ -612,11 +594,10 @@ test.describe("dashboard filter testcases", () => {
 
     // Open query inspector and verify
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
-    await expect(
-      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'$variablename\' GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+    await pm.dashboardPanelEdit.waitForQueryInspector();
+    await expect(pm.dashboardPanelEdit.getOriginalQuery(0)).toContainText(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1", kubernetes_container_name as "breakdown_1" FROM "e2e_automate" WHERE kubernetes_container_name = \'$variablename\' GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1 ASC'
+    );
     await pm.logsVisualise.closeQueryInspector();
 
     // Save the dashboard panel
@@ -624,8 +605,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("should verify the custom value search from variable dropdown", async ({
     page,
@@ -645,6 +625,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -665,8 +646,6 @@ test.describe("dashboard filter testcases", () => {
       null, // filterConfig
       true  // showMultipleValues
     );
-
-    // await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     await pm.dashboardCreate.addPanel();
     await pm.dashboardPanelActions.addPanelName(panelName);
@@ -697,20 +676,21 @@ test.describe("dashboard filter testcases", () => {
     // Type partial search terms to trigger multiple _values API calls
     const searchTerms = ["zi", "zio", "ziox"];
     for (const term of searchTerms) {
+      const valuesStreamPromise = waitForValuesStreamComplete(page, 10000);
       await variableSearch.fill(term);
-      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {}); // Allow API calls to complete
+      await valuesStreamPromise;
     }
 
     // Select the final value using OSelect option convention
     const option = pm.dashboardVariables.variableOptionByValue("variablename", "ziox");
-    await option.waitFor({ state: "visible", timeout: 10000 });
+    await option.waitFor({ state: "visible", timeout: 15000 });
     await option.click();
 
-    // Wait for any remaining network activity to settle
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    // Assert that we captured at least one _values API call
-    expect(valuesResponses.length).toBeGreaterThan(0);
+    // The response handler above appends asynchronously, so poll rather than
+    // read the array once.
+    await expect
+      .poll(() => valuesResponses.length, { timeout: 15000 })
+      .toBeGreaterThan(0);
 
     // Assert all collected responses have 200 status
     for (const res of valuesResponses) {
@@ -736,12 +716,12 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("Should apply the filter group inside group - robust version", async ({ page }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -761,7 +741,6 @@ test.describe("dashboard filter testcases", () => {
       "kubernetes_container_name"
     );
 
-    await page.waitForTimeout(1000);
     // Add a panel to the dashboard
     await pm.dashboardCreate.addPanel();
 
@@ -800,7 +779,6 @@ test.describe("dashboard filter testcases", () => {
     );
 
     // Wait for condition to be applied
-    await page.waitForTimeout(500);
 
     // Add nested group inside group 1
     await pm.dashboardFilter.clickAddConditionInGroup(1);
@@ -828,12 +806,11 @@ test.describe("dashboard filter testcases", () => {
 
     // Verify the generated query
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
-    await expect(
-      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE (kubernetes_container_name = \'ziox\' AND (kubernetes_container_image <> \'ziox\')) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+    await expect(pm.dashboardPanelEdit.getExecutedQuery(0)).toContainText(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE (kubernetes_container_name = \'ziox\' AND (kubernetes_container_image <> \'ziox\')) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+    );
 
     await pm.logsVisualise.closeQueryInspector();
 
@@ -842,8 +819,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
 
   test("Should apply Contains operator and verify SQL query", async ({
@@ -851,6 +827,7 @@ test.describe("dashboard filter testcases", () => {
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -913,16 +890,12 @@ test.describe("dashboard filter testcases", () => {
 
     // Open query inspector to verify SQL query
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
-
-    // Wait for query inspector to be visible
-    await page.waitForTimeout(2000);
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
     // Verify that the SQL query contains the str_match() function for Contains operator
-    await expect(
-      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE str_match(kubernetes_container_name, \'ziox\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+    await expect(pm.dashboardPanelEdit.getExecutedQuery(0)).toContainText(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE str_match(kubernetes_container_name, \'ziox\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+    );
 
     await pm.logsVisualise.closeQueryInspector();
 
@@ -931,14 +904,14 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("Should apply NOT In operator and verify SQL query", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -1008,16 +981,12 @@ test.describe("dashboard filter testcases", () => {
 
     // Open query inspector to verify SQL query
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
-
-    // Wait for query inspector to be visible
-    await page.waitForTimeout(2000);
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
     // Verify that the SQL query contains the NOT IN clause
-    await expect(
-      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name NOT IN (${variablename}) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+    await expect(pm.dashboardPanelEdit.getOriginalQuery(0)).toContainText(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name NOT IN (${variablename}) GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+    );
 
     await pm.logsVisualise.closeQueryInspector();
 
@@ -1026,14 +995,14 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("Should apply str_match operator and verify SQL query", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -1096,16 +1065,12 @@ test.describe("dashboard filter testcases", () => {
 
     // Open query inspector to verify SQL query
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
-
-    // Wait for query inspector to be visible
-    await page.waitForTimeout(2000);
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
     // Verify that the SQL query contains the str_match() function for Contains operator
-    await expect(
-      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE str_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+    await expect(pm.dashboardPanelEdit.getOriginalQuery(0)).toContainText(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "e2e_automate" WHERE str_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+    );
 
     await pm.logsVisualise.closeQueryInspector();
 
@@ -1114,14 +1079,14 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("Should apply re_match operator and verify SQL query", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -1188,16 +1153,12 @@ test.describe("dashboard filter testcases", () => {
 
     // Open query inspector to verify SQL query
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
-
-    // Wait for query inspector to be visible
-    await page.waitForTimeout(2000);
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
     // Verify that the SQL query contains the NOT IN clause
-    await expect(
-      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE re_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+    await expect(pm.dashboardPanelEdit.getOriginalQuery(0)).toContainText(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE re_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+    );
 
     await pm.logsVisualise.closeQueryInspector();
 
@@ -1206,14 +1167,14 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("Should apply match_all operator and verify SQL query", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -1280,9 +1241,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Open query inspector to verify SQL query
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
-
-    // Wait for query inspector to be visible
-    await page.waitForTimeout(2000);
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
     // Verify that the SQL query contains the match_all clause
     await expect(
@@ -1296,14 +1255,14 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("Should apply str_match_ignore_case operator and verify SQL query", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -1370,9 +1329,7 @@ test.describe("dashboard filter testcases", () => {
 
     // Open query inspector to verify SQL query
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
-
-    // Wait for query inspector to be visible
-    await page.waitForTimeout(2000);
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
     // Verify that the SQL query contains the str_match_ignore_case clause
     await expect(
@@ -1386,14 +1343,14 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("Should apply re_not_match operator and verify SQL query", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -1460,16 +1417,12 @@ test.describe("dashboard filter testcases", () => {
 
     // Open query inspector to verify SQL query
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
-
-    // Wait for query inspector to be visible
-    await page.waitForTimeout(2000);
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
     // Verify that the SQL query contains the NOT IN clause
-    await expect(
-      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE re_not_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+    await expect(pm.dashboardPanelEdit.getOriginalQuery(0)).toContainText(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE re_not_match(kubernetes_container_name, \'$variablename\') GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+    );
 
     await pm.logsVisualise.closeQueryInspector();
 
@@ -1478,14 +1431,14 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("Should apply Starts With operator and verify SQL query", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -1552,16 +1505,12 @@ test.describe("dashboard filter testcases", () => {
 
     // Open query inspector to verify SQL query
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
-
-    // Wait for query inspector to be visible
-    // await page.waitForTimeout(2000);
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
     // Verify that the SQL query contains the NOT IN clause
-    await expect(
-      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name LIKE \'$variablename%\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+    await expect(pm.dashboardPanelEdit.getOriginalQuery(0)).toContainText(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name LIKE \'$variablename%\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+    );
 
     await pm.logsVisualise.closeQueryInspector();
 
@@ -1570,14 +1519,14 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("Should apply Ends With operator and verify SQL query", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -1644,16 +1593,12 @@ test.describe("dashboard filter testcases", () => {
 
     // Open query inspector to verify SQL query
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
-
-    // Wait for query inspector to be visible
-    // await page.waitForTimeout(2000);
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
     // Verify that the SQL query contains the NOT IN clause
-    await expect(
-      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name LIKE \'%$variablename\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+    await expect(pm.dashboardPanelEdit.getOriginalQuery(0)).toContainText(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name LIKE \'%$variablename\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+    );
 
     await pm.logsVisualise.closeQueryInspector();
 
@@ -1662,14 +1607,14 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
   test("Should apply Not Contains operator and verify SQL query", async ({
     page,
   }) => {
     // Instantiate PageManager with the current page
     const pm = new PageManager(page);
+    const randomDashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -1736,16 +1681,12 @@ test.describe("dashboard filter testcases", () => {
 
     // Open query inspector to verify SQL query
     await pm.dashboardPanelEdit.clickDataViewQueryInspector();
-
-    // Wait for query inspector to be visible
-    // await page.waitForTimeout(2000);
+    await pm.dashboardPanelEdit.waitForQueryInspector();
 
     // Verify that the SQL query contains the NOT IN clause
-    await expect(
-      pm.dashboardPanelEdit.getInspectorQueryEditor().filter({
-        hasText: 'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name NOT LIKE \'%$variablename%\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
-      }).last()
-    ).toBeVisible();
+    await expect(pm.dashboardPanelEdit.getOriginalQuery(0)).toContainText(
+      'SELECT histogram(_timestamp) as "x_axis_1", count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate" WHERE kubernetes_container_name NOT LIKE \'%$variablename%\' GROUP BY x_axis_1 ORDER BY x_axis_1 ASC'
+    );
 
     await pm.logsVisualise.closeQueryInspector();
 
@@ -1754,7 +1695,6 @@ test.describe("dashboard filter testcases", () => {
 
     // Delete the dashboard
     await pm.dashboardCreate.backToDashboardList();
-    await pm.dashboardCreate.searchDashboard(randomDashboardName);
-    await pm.dashboardCreate.deleteDashboard(randomDashboardName);
+    await deleteDashboard(page, randomDashboardName);
   });
 });

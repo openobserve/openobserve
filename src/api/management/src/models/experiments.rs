@@ -46,6 +46,7 @@ pub enum DatasetItemSourceBody {
     Trace,
     Annotation,
     Manual,
+    Playground,
 }
 
 impl From<DatasetItemSourceBody> for DatasetItemSource {
@@ -54,6 +55,7 @@ impl From<DatasetItemSourceBody> for DatasetItemSource {
             DatasetItemSourceBody::Trace => Self::Trace,
             DatasetItemSourceBody::Annotation => Self::Annotation,
             DatasetItemSourceBody::Manual => Self::Manual,
+            DatasetItemSourceBody::Playground => Self::Playground,
         }
     }
 }
@@ -93,6 +95,7 @@ impl From<DatasetSnapshotFilter> for DatasetSnapshotFilterBody {
                     DatasetItemSource::Trace => DatasetItemSourceBody::Trace,
                     DatasetItemSource::Annotation => DatasetItemSourceBody::Annotation,
                     DatasetItemSource::Manual => DatasetItemSourceBody::Manual,
+                    DatasetItemSource::Playground => DatasetItemSourceBody::Playground,
                 })
                 .collect(),
             tags: value.tags,

@@ -58,6 +58,7 @@ pub struct WorkflowTestInput {
 pub struct WorkflowTestResult {
     errors: HashMap<String, NodeErrors>,
     inputs: HashMap<String, Vec<Value>>,
+    outputs: HashMap<String, Vec<Value>>,
 }
 
 #[derive(Serialize)]
@@ -557,6 +558,7 @@ pub async fn test_workflow(
         Ok(v) => MetaHttpResponse::json(WorkflowTestResult {
             errors: v.errors,
             inputs: v.inputs,
+            outputs: v.outputs,
         }),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -701,6 +703,7 @@ pub async fn retry_workflow(
         Ok(v) => MetaHttpResponse::json(WorkflowTestResult {
             errors: v.errors,
             inputs: v.inputs,
+            outputs: v.outputs,
         }),
         Err(e) => MetaHttpResponse::bad_request(e),
     }

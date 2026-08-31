@@ -139,6 +139,9 @@
   --color-surface-overlay: var(--d-overlay); /* dropdowns, dialogs, selects, popovers */
   --color-surface-subtle: var(--d-well); /* recessed fills, segmented track */
   --color-surface-subtle-hover: var(--d-panel); /* hover on a recessed fill (one step up) */
+  /* Floating chip on a dark panel — a lighter grey so it lifts off the surface. */
+  --color-surface-chip: var(--color-grey-700);
+  --color-surface-chip-hover: var(--color-grey-600);
   /* Accent-tinted interaction surfaces — dark accent hover/active values. */
   --color-surface-accent-hover: var(--color-primary-900);
   --color-surface-accent-active: var(--color-primary-800);

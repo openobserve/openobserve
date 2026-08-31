@@ -54,9 +54,9 @@ use {
         config::get_config as get_o2_config,
     },
     openobserve_api_management::request::{
-        actions, ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
-        domain_management, eval_jobs, experiments, gen_ai, keys, license, providers, remote_tasks,
-        score_configs, scorers, service_streams, workflows,
+        ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
+        domain_management, eval_jobs, experiments, gen_ai, keys, license, playground, providers,
+        remote_tasks, score_configs, scorers, service_streams, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1277,6 +1277,12 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/scorers/{entity_id}/versions", get(scorers::list_scorer_versions))
                 .route("/{org_id}/scorers/{entity_id}", get(scorers::get_scorer).put(scorers::update_scorer).delete(scorers::delete_scorer))
 
+                // Playground (Phase 3.1)
+                .route("/{org_id}/playground/run", post(playground::run_playground_cell))
+                .route("/{org_id}/playground/score", post(playground::score_playground_cell))
+                .route("/{org_id}/playground/snapshots", post(playground::share_playground_snapshot))
+                .route("/{org_id}/playground/snapshots/{snapshot_id}", get(playground::get_playground_snapshot))
+
                 // Online Eval Jobs (Online Eval Phase 2)
                 // NOTE: /activate, /pause, /resume, /archive must precede /{job_id}
                 .route("/{org_id}/eval_jobs", get(eval_jobs::list_eval_jobs).post(eval_jobs::create_eval_job))
@@ -1312,16 +1318,6 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/cipher_keys", get(keys::list).post(keys::save))
             .route("/{org_id}/cipher_keys/bulk", delete(keys::delete_bulk))
             .route("/{org_id}/cipher_keys/{key_name}", get(keys::get).put(keys::update).delete(keys::delete))
-
-            // Actions
-            .route("/{org_id}/actions", get(actions::action::list_actions))
-            .route("/{org_id}/actions/upload", post(actions::action::upload_zipped_action))
-            .route("/{org_id}/actions/bulk", delete(actions::action::delete_action_bulk))
-            .route("/{org_id}/actions/{action_id}", get(actions::action::get_action_from_id).put(actions::action::update_action_details).delete(actions::action::delete_action))
-            .route("/{org_id}/actions/download/{action_id}", get(actions::action::serve_action_zip))
-            .route("/{org_id}/actions/pause/{action_id}", get(actions::operations::pause_action))
-            .route("/{org_id}/actions/resume/{action_id}", get(actions::operations::resume_action))
-            .route("/{org_id}/actions/test/{action_id}", post(actions::operations::test_action))
 
             // Rate limits
             .route("/{org_id}/ratelimit/api_modules", get(ratelimit::api_modules))
@@ -1471,6 +1467,15 @@ pub fn service_routes() -> Router {
     #[cfg(feature = "cloud")]
     {
         router = router
+            // Authorized by ROUTE_PERMISSIONS in o2-enterprise; without those rows enterprise auth 403s these for non-root users.
+            .route(
+                "/{org_id}/alerts/destinations/slack/oauth/start",
+                post(alerts::slack_oauth::start),
+            )
+            .route(
+                "/{org_id}/alerts/destinations/slack/oauth/exchange",
+                post(alerts::slack_oauth::exchange),
+            )
             .route(
                 "/{org_id}/invites",
                 get(organization::org::get_org_invites)
@@ -1509,9 +1514,12 @@ pub fn service_routes() -> Router {
                 get(cloud::billings::create_billing_portal_session),
             )
             .route("/{org_id}/ai/usage", get(cloud::billings::get_ai_usage))
+            // Pool-generic limit route. Replaced `/ai/usage_limit`, which was
+            // removed with it: one route, one ROUTE_PERMISSIONS entry, and no
+            // endpoint left that resolve_permission cannot authorize.
             .route(
-                "/{org_id}/ai/usage_limit",
-                put(organization::org::set_ai_usage_limit),
+                "/{org_id}/quota/{pool}/usage_limit",
+                put(organization::org::set_quota_usage_limit),
             )
             .route(
                 "/{org_id}/billings/data_usage/{usage_date}",

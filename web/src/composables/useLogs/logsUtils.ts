@@ -13,10 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import config from "@/aws-exports";
 import { b64EncodeUnicode, useLocalLogFilterField } from "@/utils/zincutils";
 import { canvasFont } from "@/utils/fonts";
 
@@ -33,6 +31,7 @@ import { TimestampRange, ParsedSQLResult, TimePeriodUnit } from "@/ts/interfaces
 import { TIME_MULTIPLIERS } from "@/utils/logs/constants";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn } from "@/types/i18n";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 
 interface SQLColumn {
   expr?: {
@@ -134,6 +133,10 @@ export const logsUtils = () => {
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
+
+      if (maxParenDepth(filteredQuery) > SQL_PARSE_MAX_DEPTH) {
+        return DEFAULT_PARSED_RESULT;
+      }
 
       const parsedQuery: ExtendedParsedSQLResult | null = parser?.astify(
         filteredQuery,
@@ -330,29 +333,14 @@ export const logsUtils = () => {
   };
 
   const shouldAddFunctionToSearch = () => {
-    if (!isActionsEnabled.value)
-      return searchObj.data.tempFunctionContent != "" && searchObj.meta.showTransformEditor;
-
-    return searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent != "";
+    return searchObj.data.tempFunctionContent != "" && searchObj.meta.showTransformEditor;
   };
 
   const addTransformToQuery = (queryReq: any) => {
     if (shouldAddFunctionToSearch()) {
       queryReq.query["query_fn"] = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
     }
-
-    // Add action ID if it exists
-    if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
-      queryReq.query["action_id"] = searchObj.data.selectedTransform.id;
-    }
   };
-
-  const isActionsEnabled = computed(() => {
-    return (
-      (config.isEnterprise == "true" || config.isCloud == "true") &&
-      store.state.zoConfig.actions_enabled
-    );
-  });
 
   /**
    * Helper function to calculate width of the column based on its content(from first 5 rows)
@@ -608,7 +596,6 @@ export const logsUtils = () => {
     removeTraceId,
     shouldAddFunctionToSearch,
     addTransformToQuery,
-    isActionsEnabled,
     getColumnWidth,
     showCancelSearchNotification,
     generateURLQuery,

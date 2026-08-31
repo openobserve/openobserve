@@ -527,6 +527,10 @@ pub struct UsageData {
     pub work_group: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub node_name: Option<String>,
+    /// Region the usage was produced in. Absent on rows written before this
+    /// field existed, and on deployments that never set it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dashboard_info: Option<DashboardInfo>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -576,6 +580,7 @@ impl UsageData {
             is_partial: false,
             work_group: Some(String::new()),
             node_name: Some(String::new()),
+            region: Some(String::new()),
             dashboard_info: Some(DashboardInfo {
                 run_id: String::new(),
                 panel_id: String::new(),
@@ -588,6 +593,21 @@ impl UsageData {
     }
 }
 
+/// The bucket key `ingest_usages` (openobserve-core `self_reporting::ingestion`)
+/// aggregates `UsageData` rows by, per org/hour/event.
+///
+/// On a bucket collision only three fields are touched, and only two truly sum:
+///
+/// | field | behaviour |
+/// |---|---|
+/// | `size` | **sums** — the only reliable summation channel |
+/// | `num_records` | **sums** |
+/// | `response_time` | summed then divided by `count` ⇒ an AVERAGE, not a sum |
+///
+/// Every other field — `request_body` included — is taken from the FIRST row
+/// inserted into the bucket and the rest are discarded. `dropped_records` is
+/// likewise not summed: it keeps the first row's value and so under-counts
+/// (pre-existing behaviour, left alone deliberately).
 #[derive(Hash, PartialEq, Eq)]
 pub struct GroupKey {
     pub stream_name: String,
@@ -631,6 +651,38 @@ pub enum UsageEvent {
     AiChat,
     AiCredits,
     AiFreeCredits,
+    /// Browser-check steps EXECUTED across every attempt, excluding skipped.
+    /// `size` carries the step count. **Billed, at the browser rate** — SPEC §4.2.
+    SyntheticsBrowserSteps,
+    /// Protocol-check steps EXECUTED across every attempt, excluding skipped.
+    /// `size` carries the step count. **Billed, at the protocol rate** — SPEC §4.2.
+    /// Separate from the browser event because only `event` is part of
+    /// [`GroupKey`]: a shared event with a type field would be first-row-wins.
+    SyntheticsProtocolSteps,
+    /// Browser-check steps executed against the free pool. `size` carries the
+    /// same executed-step count as `SyntheticsBrowserSteps`; never billed.
+    SyntheticsFreeBrowserSteps,
+    /// Protocol-check steps executed against the free pool. `size` carries the
+    /// same executed-step count as `SyntheticsProtocolSteps`; never billed.
+    SyntheticsFreeProtocolSteps,
+    /// Steps the journey DEFINES (`configured × combos`). `size` carries that
+    /// product. Reported, never billed — the leading `_` is the non-billable
+    /// marker, matching `MeteringEventName::_AiChat` and friends. Separate event
+    /// because only `size` survives bucket summation — see [`GroupKey`].
+    _SyntheticsStepsDefined,
+    /// Browser run duration in milliseconds — the v2 duration hedge. `size`
+    /// carries `browser_ms`. Reported, never billed.
+    _SyntheticsBrowserMs,
+    /// Also the landing place for an `event` string this binary does not know.
+    ///
+    /// A node reads `_meta."usage"` rows written by every other node, including
+    /// newer ones. Without this, a variant added in a later release makes
+    /// `UsageResult` fail to deserialize, and the metering loop's
+    /// `collect::<Result<_, _>>` turns that one row into a `return Err` that
+    /// abandons the cycle for EVERY org, not just the one that wrote it.
+    /// `Other` is not billable, so an unknown event is skipped rather than
+    /// charged.
+    #[serde(other)]
     Other,
 }
 
@@ -647,6 +699,12 @@ impl std::fmt::Display for UsageEvent {
             UsageEvent::AiChat => write!(f, "AiChat"),
             UsageEvent::AiCredits => write!(f, "AiCredits"),
             UsageEvent::AiFreeCredits => write!(f, "AiFreeCredits"),
+            UsageEvent::SyntheticsBrowserSteps => write!(f, "SyntheticsBrowserSteps"),
+            UsageEvent::SyntheticsProtocolSteps => write!(f, "SyntheticsProtocolSteps"),
+            UsageEvent::SyntheticsFreeBrowserSteps => write!(f, "SyntheticsFreeBrowserSteps"),
+            UsageEvent::SyntheticsFreeProtocolSteps => write!(f, "SyntheticsFreeProtocolSteps"),
+            UsageEvent::_SyntheticsStepsDefined => write!(f, "_SyntheticsStepsDefined"),
+            UsageEvent::_SyntheticsBrowserMs => write!(f, "_SyntheticsBrowserMs"),
             UsageEvent::Other => write!(f, "Other"),
         }
     }
@@ -1748,6 +1806,7 @@ mod tests {
                 tab_name: "test_tab_name".to_string(),
             }),
             peak_memory_usage: Some(1024000.0),
+            region: None,
         };
 
         let json = serde_json::to_string(&usage_data).unwrap();
@@ -1792,6 +1851,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
 
         let json = serde_json::to_string(&usage_data).unwrap();
@@ -2064,6 +2124,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
 
         let aggregated = AggregatedData {
@@ -2196,6 +2257,7 @@ mod tests {
         assert!(obj.contains_key("function"));
         assert!(obj.contains_key("work_group"));
         assert!(obj.contains_key("node_name"));
+        assert!(obj.contains_key("region"));
         assert!(obj.contains_key("dashboard_info"));
         assert!(obj.contains_key("peak_memory_usage"));
     }
@@ -2236,6 +2298,7 @@ mod tests {
             node_name: None,
             dashboard_info: None,
             peak_memory_usage: None,
+            region: None,
         };
         let json = serde_json::to_value(&data).unwrap();
         let obj = json.as_object().unwrap();
@@ -2251,6 +2314,7 @@ mod tests {
         assert!(!obj.contains_key("function"));
         assert!(!obj.contains_key("work_group"));
         assert!(!obj.contains_key("node_name"));
+        assert!(!obj.contains_key("region"));
         assert!(!obj.contains_key("dashboard_info"));
         assert!(!obj.contains_key("peak_memory_usage"));
     }
@@ -2351,6 +2415,270 @@ mod tests {
         assert!(obj.contains_key("work_group"));
         assert!(obj.contains_key("node_name"));
         assert!(obj.contains_key("peak_memory_usage"));
+    }
+
+    /// Absent `region` must serialize to nothing, not a JSON `null`: the `_usage`
+    /// stream's schema is inferred by reflection over the rows written to it, so
+    /// a null would put an untyped column into the schema.
+    #[test]
+    fn test_usage_data_region_round_trip() {
+        let mut data = UsageData::init_for_reflection();
+
+        data.region = Some("us-west-2".to_string());
+        let json = serde_json::to_value(&data).unwrap();
+        assert_eq!(
+            json.as_object().unwrap().get("region"),
+            Some(&serde_json::Value::String("us-west-2".to_string()))
+        );
+        let back: UsageData = serde_json::from_value(json).unwrap();
+        assert_eq!(back.region.as_deref(), Some("us-west-2"));
+        assert_eq!(back, data);
+
+        data.region = None;
+        let json = serde_json::to_value(&data).unwrap();
+        assert!(
+            !json.as_object().unwrap().contains_key("region"),
+            "absent region must be omitted, not written as null"
+        );
+        assert!(!json.to_string().contains("region"));
+        let back: UsageData = serde_json::from_value(json).unwrap();
+        assert_eq!(back.region, None);
+        assert_eq!(back, data);
+
+        // A row written before `region` existed still decodes as `None`.
+        let mut legacy = serde_json::to_value(UsageData::init_for_reflection()).unwrap();
+        assert!(legacy.as_object_mut().unwrap().remove("region").is_some());
+        let decoded: UsageData = serde_json::from_value(legacy).unwrap();
+        assert_eq!(decoded.region, None);
+    }
+
+    #[test]
+    fn test_usage_event_display_synthetics() {
+        assert_eq!(
+            UsageEvent::SyntheticsBrowserSteps.to_string(),
+            "SyntheticsBrowserSteps"
+        );
+        assert_eq!(
+            UsageEvent::SyntheticsProtocolSteps.to_string(),
+            "SyntheticsProtocolSteps"
+        );
+        assert_eq!(
+            UsageEvent::SyntheticsFreeBrowserSteps.to_string(),
+            "SyntheticsFreeBrowserSteps"
+        );
+        assert_eq!(
+            UsageEvent::SyntheticsFreeProtocolSteps.to_string(),
+            "SyntheticsFreeProtocolSteps"
+        );
+        assert_eq!(
+            UsageEvent::_SyntheticsStepsDefined.to_string(),
+            "_SyntheticsStepsDefined"
+        );
+        assert_eq!(
+            UsageEvent::_SyntheticsBrowserMs.to_string(),
+            "_SyntheticsBrowserMs"
+        );
+    }
+
+    #[test]
+    fn test_usage_event_synthetics_serde_roundtrip() {
+        for (event, wire) in [
+            (
+                UsageEvent::SyntheticsBrowserSteps,
+                "\"SyntheticsBrowserSteps\"",
+            ),
+            (
+                UsageEvent::SyntheticsProtocolSteps,
+                "\"SyntheticsProtocolSteps\"",
+            ),
+            (
+                UsageEvent::SyntheticsFreeBrowserSteps,
+                "\"SyntheticsFreeBrowserSteps\"",
+            ),
+            (
+                UsageEvent::SyntheticsFreeProtocolSteps,
+                "\"SyntheticsFreeProtocolSteps\"",
+            ),
+            (
+                UsageEvent::_SyntheticsStepsDefined,
+                "\"_SyntheticsStepsDefined\"",
+            ),
+            (UsageEvent::_SyntheticsBrowserMs, "\"_SyntheticsBrowserMs\""),
+        ] {
+            assert_eq!(serde_json::to_string(&event).unwrap(), wire);
+            assert_eq!(serde_json::from_str::<UsageEvent>(wire).unwrap(), event);
+        }
+    }
+
+    /// The `Display` string and the serde string are the same wire format, for
+    /// every variant. A rename on one side without the other silently splits
+    /// what is written into `_usage` from what the metering loop can read back.
+    #[test]
+    fn test_usage_event_display_matches_serde_wire_string() {
+        for event in [
+            UsageEvent::Ingestion,
+            UsageEvent::Search,
+            UsageEvent::Functions,
+            UsageEvent::Pipeline,
+            UsageEvent::RemotePipeline,
+            UsageEvent::NewIncident,
+            UsageEvent::IncidentReAnalysis,
+            UsageEvent::AiChat,
+            UsageEvent::AiCredits,
+            UsageEvent::AiFreeCredits,
+            UsageEvent::SyntheticsBrowserSteps,
+            UsageEvent::SyntheticsProtocolSteps,
+            UsageEvent::SyntheticsFreeBrowserSteps,
+            UsageEvent::SyntheticsFreeProtocolSteps,
+            UsageEvent::_SyntheticsStepsDefined,
+            UsageEvent::_SyntheticsBrowserMs,
+            UsageEvent::Other,
+        ] {
+            let serialized = serde_json::to_string(&event).unwrap();
+            assert_eq!(
+                serialized,
+                format!("\"{event}\""),
+                "Display/serde drift for {event:?}"
+            );
+            assert_eq!(
+                serde_json::from_str::<UsageEvent>(&serialized).unwrap(),
+                event
+            );
+        }
+    }
+
+    /// o2-enterprise (`MeteringEventName::is_billable`) keys off the naming
+    /// convention this side owns: a leading `_` marks reported-but-never-billed,
+    /// `Free` marks free-pool consumption. Exactly two synthetics events — the
+    /// browser and protocol billable pair — carry neither.
+    #[test]
+    fn test_synthetics_event_naming_convention_marks_non_billable() {
+        for event in [
+            UsageEvent::SyntheticsBrowserSteps,
+            UsageEvent::SyntheticsProtocolSteps,
+        ] {
+            let billable = event.to_string();
+            assert!(
+                !billable.starts_with('_'),
+                "billable `{billable}` must not carry the `_` non-billable marker"
+            );
+            assert!(
+                !billable.contains("Free"),
+                "billable `{billable}` must not carry the `Free` marker"
+            );
+        }
+
+        for event in [
+            UsageEvent::SyntheticsFreeBrowserSteps,
+            UsageEvent::SyntheticsFreeProtocolSteps,
+            UsageEvent::_SyntheticsStepsDefined,
+            UsageEvent::_SyntheticsBrowserMs,
+        ] {
+            let name = event.to_string();
+            assert!(
+                name.starts_with('_') || name.contains("Free"),
+                "non-billable `{name}` must carry the `_` or `Free` marker"
+            );
+        }
+    }
+
+    /// Each synthetics count is its OWN event rather than a field on one event:
+    /// `GroupKey` buckets by `event`, and only `size` survives summation (see
+    /// [`GroupKey`]), so four events key four distinct buckets that never merge.
+    #[test]
+    fn test_synthetics_events_bucket_separately_in_group_key() {
+        use std::collections::HashSet;
+
+        let key_for = |event: UsageEvent| GroupKey {
+            stream_name: "synthetics".to_string(),
+            org_id: "org_a".to_string(),
+            stream_type: StreamType::Logs,
+            day: 25,
+            hour: 13,
+            event,
+            email: "u@example.com".to_string(),
+            node: "node-1".to_string(),
+        };
+
+        let keys: HashSet<GroupKey> = [
+            UsageEvent::SyntheticsBrowserSteps,
+            UsageEvent::SyntheticsProtocolSteps,
+            UsageEvent::SyntheticsFreeBrowserSteps,
+            UsageEvent::SyntheticsFreeProtocolSteps,
+            UsageEvent::_SyntheticsStepsDefined,
+            UsageEvent::_SyntheticsBrowserMs,
+        ]
+        .into_iter()
+        .map(key_for)
+        .collect();
+
+        assert_eq!(
+            keys.len(),
+            6,
+            "each synthetics event must aggregate into its own bucket"
+        );
+        // Same event => one bucket. (`GroupKey` has no `Debug`, so `assert!`
+        // rather than `assert_eq!`.)
+        assert!(
+            key_for(UsageEvent::SyntheticsBrowserSteps)
+                == key_for(UsageEvent::SyntheticsBrowserSteps),
+            "repeated browser-step acks must share one bucket"
+        );
+    }
+
+    /// SPEC §11 F2, now mitigated — this test is the regression guard.
+    ///
+    /// A node reads `_meta."usage"` rows written by every other node, newer ones
+    /// included. The metering loop decodes each org's rows with a strict collect:
+    ///
+    /// ```text
+    /// let usages = usage_data.into_iter()
+    ///     .map(json::from_value::<UsageResult>)
+    ///     .collect::<Result<Vec<_>, _>>();
+    /// // on Err: return Err(..) — out of handle_metering_event entirely
+    /// ```
+    ///
+    /// That `return` leaves the whole function, so before `#[serde(other)]` ONE
+    /// row naming a variant this binary lacked aborted the metering cycle for
+    /// every remaining org — which a rolling upgrade produces by construction.
+    /// The unknown event now decodes as `Other`, which is not billable, so it is
+    /// skipped rather than charged.
+    #[test]
+    fn test_unknown_usage_event_decodes_as_other_and_does_not_poison_the_batch() {
+        /// Mirror of o2-enterprise `metering::common::UsageResult`.
+        #[derive(Debug, Deserialize)]
+        #[allow(dead_code)]
+        struct UsageResult {
+            org_id: String,
+            event: UsageEvent,
+            value: f64,
+        }
+
+        const UNKNOWN_TO_THIS_BUILD: &str = "SyntheticsFutureEventFromANewerNode";
+
+        let decoded: UsageResult = serde_json::from_value(
+            serde_json::json!({"org_id": "org_b", "event": UNKNOWN_TO_THIS_BUILD, "value": 7.0}),
+        )
+        .expect("an unknown event string must decode, not error");
+        assert_eq!(
+            decoded.event,
+            UsageEvent::Other,
+            "unknown events must land on the non-billable Other"
+        );
+
+        // The metering loop's exact collect: the batch survives intact.
+        let rows = vec![
+            serde_json::json!({"org_id": "org_a", "event": "Ingestion", "value": 10.0}),
+            serde_json::json!({"org_id": "org_a", "event": "SyntheticsBrowserSteps", "value": 84.0}),
+            serde_json::json!({"org_id": "org_b", "event": UNKNOWN_TO_THIS_BUILD, "value": 7.0}),
+            serde_json::json!({"org_id": "org_c", "event": "Pipeline", "value": 3.0}),
+        ];
+        let collected = rows
+            .into_iter()
+            .map(serde_json::from_value::<UsageResult>)
+            .collect::<Result<Vec<_>, _>>()
+            .expect("one unknown row must not abort the cycle for every other org");
+        assert_eq!(collected.len(), 4);
     }
 }
 

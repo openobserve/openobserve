@@ -82,6 +82,7 @@ const comparison: ExperimentComparison = {
   rows: [
     {
       logicalId: "case-1",
+      input: { question: "What changed?", context: ["release", "api"] },
       baselineRowId: "old-row",
       candidateRowId: "new-row",
       bucket: "regressed",
@@ -89,6 +90,7 @@ const comparison: ExperimentComparison = {
     },
     {
       logicalId: "case-2",
+      input: "A newly added row",
       baselineRowId: null,
       candidateRowId: "fresh-row",
       bucket: "new",
@@ -131,6 +133,7 @@ const stubs = {
         emits: ["row-click"],
         template: `<div><slot name="subheader" />
             <div v-for="row in data" :key="row.logicalId" data-test="row" @click="$emit('row-click', row, $event)">
+              <slot name="cell-input" :row="row" />
               <slot name="cell-bucket" :row="row" />
             </div></div>`,
       },
@@ -264,9 +267,57 @@ describe("ExperimentComparisonPanel", () => {
     const wrapper = mountPanel();
     const latency = wrapper.get('[data-test="ai-experiment-tile-latency"]');
 
-    // A mean of per-row means over trials, in ms — not a p50.
-    expect(latency.text()).toContain("Latency (ms)");
+    // A mean of per-row means over trials — not a p50. The unit sits beside the
+    // numbers rather than in the label, because it is not always ms.
+    expect(latency.text()).toContain("Latency");
+    expect(wrapper.get('[data-test="ai-experiment-tile-latency-unit"]').text()).toBe("ms");
     expect(latency.text()).toContain("Mean per row, over trials");
+  });
+
+  it("rounds sub-second latency to whole milliseconds", () => {
+    const wrapper = mountPanel({
+      dimensions: [
+        {
+          ...comparison.dimensions[1],
+          kind: "latency",
+          name: "latency",
+          baseline: 303.4821,
+          candidate: 334.9,
+          delta: 31.4179,
+          orientedDelta: -31.4179,
+        },
+      ],
+    });
+
+    const latency = wrapper.get('[data-test="ai-experiment-tile-latency"]');
+    expect(latency.text()).toContain("303");
+    expect(latency.text()).toContain("335");
+    expect(latency.text()).not.toContain("303.4821");
+    expect(wrapper.get('[data-test="ai-experiment-tile-latency-delta"]').text()).toBe("+31");
+  });
+
+  // A tile is 14rem wide; "10449.4821 → 7031.625 ms -3417.8571" is not.
+  it("switches the whole pair to seconds once either side passes a second", () => {
+    const wrapper = mountPanel({
+      dimensions: [
+        {
+          ...comparison.dimensions[1],
+          kind: "latency",
+          name: "latency",
+          baseline: 10449.4821,
+          candidate: 7031.625,
+          delta: -3417.8571,
+          orientedDelta: 3417.8571,
+        },
+      ],
+    });
+
+    const latency = wrapper.get('[data-test="ai-experiment-tile-latency"]');
+    expect(wrapper.get('[data-test="ai-experiment-tile-latency-unit"]').text()).toBe("s");
+    expect(latency.text()).toContain("10.4");
+    // Both sides in one unit: 7031ms is 7.03 s here, never "7,032 ms".
+    expect(latency.text()).toContain("7.03");
+    expect(wrapper.get('[data-test="ai-experiment-tile-latency-delta"]').text()).toBe("-3.42");
   });
 
   it("summarises every score dimension in a fixed number of tiles", () => {
@@ -411,5 +462,14 @@ describe("ExperimentComparisonPanel", () => {
     // The second argument is the FILTERED order, so the drawer pages through
     // what the user is actually looking at.
     expect(wrapper.emitted("inspect")?.[0]).toEqual([comparison.rows[0], comparison.rows]);
+  });
+
+  it("shows the dataset input instead of the logical row ID", () => {
+    const wrapper = mountPanel();
+    const rows = wrapper.findAll('[data-test="row"]');
+
+    expect(rows[0].text()).toContain('{"question":"What changed?","context":["release","api"]}');
+    expect(rows[0].text()).not.toContain("case-1");
+    expect(rows[1].text()).toContain("A newly added row");
   });
 });

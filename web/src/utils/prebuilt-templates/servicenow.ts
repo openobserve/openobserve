@@ -128,6 +128,7 @@ export const servicenowConfig: PrebuiltConfig = {
       type: "text",
       required: false,
       hintKey: "alerts.prebuiltDestinations.servicenowAssignmentGroupHelp",
+      persistInMetadata: true,
     },
   ],
 };

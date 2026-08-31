@@ -102,7 +102,7 @@ pub fn validate_nodes_edges(
     edges: &[Edge],
     is_draft: bool,
 ) -> Result<(), anyhow::Error> {
-    if nodes.len() < 2 || (!is_draft && edges.is_empty()) {
+    if !is_draft && (nodes.len() < 2 || edges.is_empty()) {
         return Err(anyhow!(
             "there must be more than 1 node and at least 1 edge"
         ));
@@ -1020,6 +1020,7 @@ mod tests {
                         name: "test_function".to_string(),
                         after_flatten: false,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     200.0,
                     100.0,
@@ -1031,6 +1032,7 @@ mod tests {
                         name: "test_function2".to_string(),
                         after_flatten: true,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     300.0,
                     100.0,
@@ -1065,6 +1067,7 @@ mod tests {
                         name: "test_function".to_string(),
                         after_flatten: false,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     100.0,
                     100.0,
@@ -1325,6 +1328,7 @@ mod tests {
                         name: "test_function".to_string(),
                         after_flatten: false,
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     300.0,
                     100.0,
@@ -1435,6 +1439,7 @@ mod tests {
                         name: "test_function1".to_string(),
                         after_flatten: true, // Checked
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     200.0,
                     100.0,
@@ -1446,6 +1451,7 @@ mod tests {
                         name: "test_function2".to_string(),
                         after_flatten: false, // Unchecked after checked
                         num_args: 0,
+                        raw_fn: None,
                     }),
                     300.0,
                     100.0,
@@ -1523,6 +1529,7 @@ mod tests {
                 name: "fn1".to_string(),
                 after_flatten: false,
                 num_args: 0,
+                raw_fn: None,
             }),
         );
         node_map.insert(
@@ -1587,6 +1594,7 @@ mod tests {
                 name: "fn1".to_string(),
                 after_flatten: false,
                 num_args: 0,
+                raw_fn: None,
             }),
             0.0,
             0.0,
@@ -1680,10 +1688,13 @@ mod tests {
         // partial-graph scenario - still fails validation today.
         let nodes = vec![trigger_node("t1")];
 
-        let err = validate_nodes_edges(&nodes, &[], true).unwrap_err();
-        assert!(
-            err.to_string()
+        let res = validate_nodes_edges(&nodes, &[], true);
+        assert!(res.is_ok());
+
+        let res = validate_nodes_edges(&nodes, &[], false);
+        assert!(res.is_err_and(|v| {
+            v.to_string()
                 .contains("more than 1 node and at least 1 edge")
-        );
+        }));
     }
 }

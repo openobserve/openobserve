@@ -913,6 +913,18 @@ pub enum Operator {
     #[serde(rename = "not_contains")]
     #[serde(alias = "NotContains")]
     NotContains,
+    #[serde(rename = "is_null")]
+    #[serde(alias = "IsNull")]
+    IsNull,
+    #[serde(rename = "is_not_null")]
+    #[serde(alias = "IsNotNull")]
+    IsNotNull,
+    #[serde(rename = "is_empty")]
+    #[serde(alias = "IsEmpty")]
+    IsEmpty,
+    #[serde(rename = "is_not_empty")]
+    #[serde(alias = "IsNotEmpty")]
+    IsNotEmpty,
 }
 
 impl std::fmt::Display for Operator {
@@ -926,6 +938,10 @@ impl std::fmt::Display for Operator {
             Operator::LessThanEquals => write!(f, "<="),
             Operator::Contains => write!(f, "contains"),
             Operator::NotContains => write!(f, "not contains"),
+            Operator::IsNull => write!(f, "is null"),
+            Operator::IsNotNull => write!(f, "is not null"),
+            Operator::IsEmpty => write!(f, "is empty"),
+            Operator::IsNotEmpty => write!(f, "is not empty"),
         }
     }
 }

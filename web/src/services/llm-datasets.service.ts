@@ -136,8 +136,16 @@ export interface ListDatasetItemsParams {
   includeDeleted?: boolean;
 }
 
+export interface LlmDatasetImportResult {
+  filename: string;
+  importedCount: number;
+  skippedCount: number;
+}
+
 /** The items API's page-size ceiling (`size` is validated to 1..100). */
 export const DATASET_ITEMS_MAX_PAGE_SIZE = 100;
+/** The CSV import endpoint rejects uploads larger than 10 MiB. */
+export const DATASET_IMPORT_MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 const base = (org: string) => `/api/${org}/datasets`;
 const itemsBase = (org: string, datasetId: string) => `${base(org)}/${datasetId}/items`;
@@ -345,6 +353,20 @@ const llmDatasetsService = {
   /** Soft delete — appends a tombstone, so the response is the tombstone row. */
   async removeItem(orgId: string, datasetId: string, itemId: string): Promise<void> {
     await http().delete(`${itemsBase(orgId, datasetId)}/${itemId}`);
+  },
+
+  async importItems(orgId: string, datasetId: string, file: File): Promise<LlmDatasetImportResult> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await http().post(`${itemsBase(orgId, datasetId)}/import`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    const data = res.data ?? {};
+    return {
+      filename: data.filename ?? file.name,
+      importedCount: Number(data.importedCount ?? data.imported_count ?? 0),
+      skippedCount: Number(data.skippedCount ?? data.skipped_count ?? 0),
+    };
   },
 
   async create(orgId: string, payload: LlmDatasetPayload): Promise<LlmDataset> {
