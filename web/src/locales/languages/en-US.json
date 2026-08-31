@@ -11431,6 +11431,7 @@
         "republishedSuccess": "Description updated. Version {version} is unchanged.",
         "draftSuccess": "Draft saved. Test the connection to publish it.",
         "draftError": "Could not save the draft",
+        "testFailed": "Connection test failed",
         "publishFailed": "The test connection failed, so nothing was published. Your draft is saved.",
         "createError": "Could not publish the remote task",
         "validation": {
