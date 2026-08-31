@@ -54,6 +54,26 @@ fn may_skip_permission_check(
     is_list_invite_call || is_reject_invite_call || is_member_subscription || is_org_list_call
 }
 
+/// The identity to hand `process_token` when provisioning a first-time SSO user
+/// who arrived over MCP.
+///
+/// `verify_decode_token` stamps `user_role: Some(ServiceAccount)` on every
+/// response whose audience check was relaxed — which is precisely the MCP case,
+/// since MCP clients register dynamically with Dex and so never carry our static
+/// `client_id` as `aud`. `process_token` treats that field as the role to create
+/// the user with, so passing it through would provision a human SSO login as a
+/// service account and skip the OpenFGA user-creation tuple. Clear it so the
+/// user lands on `O2_DEX_DEFAULT_ROLE`, exactly as a web SSO login would.
+#[cfg(any(feature = "enterprise", test))]
+fn sso_identity_for_provisioning(
+    token_res: &common::meta::user::TokenValidationResponse,
+) -> common::meta::user::TokenValidationResponse {
+    common::meta::user::TokenValidationResponse {
+        user_role: None,
+        ..token_res.clone()
+    }
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn token_validator(
     req_data: &RequestData,
@@ -61,7 +81,7 @@ pub async fn token_validator(
 ) -> Result<AuthValidationResult, AuthError> {
     use openobserve_core::{auth::V2_API_PREFIX, authz::check_permissions};
 
-    let user;
+    let mut user;
     let keys = get_dex_jwks().await;
     let path = match req_data
         .uri
@@ -87,16 +107,18 @@ pub async fn token_validator(
     // For MCP requests with dynamic clients, skip audience validation
     let login_flow = !is_mcp_request;
 
+    // The decoded claims are only needed to provision a first-time SSO identity
+    // arriving on the MCP endpoint (see below); every other path discards them.
     match jwt::verify_decode_token(
         auth_info.auth.strip_prefix("Bearer").unwrap().trim(),
         &keys,
         &get_dex_config().client_id,
-        false,
+        is_mcp_endpoint,
         login_flow,
     ) {
-        Ok(res) => {
-            let user_id = &res.0.user_email;
-            if res.0.is_valid {
+        Ok((token_res, token_data)) => {
+            let user_id = token_res.user_email.as_str();
+            if token_res.is_valid {
                 // System-wide blocklist. This path validates Dex-issued session tokens (the UI
                 // `access_token: "session …"` cookie flow), which are EXTERNAL SSO identities by
                 // construction — so a blocked email must be denied on EVERY request, not only at
@@ -203,6 +225,28 @@ pub async fn token_validator(
                         }
                     }
                 };
+
+                // An MCP client registers dynamically with Dex and receives the code at
+                // its OWN callback, so `/config/redirect` — the only place external
+                // identities are provisioned — never runs for it. Without provisioning
+                // here an SSO user who has never opened the web UI authenticates fine but
+                // has no membership, and the resulting 401 sends the client back through
+                // authorization forever. Gated on the real `/{org}/mcp` path, never the
+                // caller-settable `x-o2-mcp` header, and only for an identity with no user
+                // record at all — so this cannot be driven repeatedly on other routes.
+                if user.is_none()
+                    && is_mcp_endpoint
+                    && let Some(token_data) = token_data
+                    && let Some(org_id) = path_columns.first()
+                    && db::user::get_user_by_email(user_id).await.is_none()
+                {
+                    let sso_identity = sso_identity_for_provisioning(&token_res);
+                    match super::jwt::process_token((sso_identity, Some(token_data))).await {
+                        Ok(_) => user = users::get_user(Some(org_id), user_id).await,
+                        Err(e) => log::warn!("MCP SSO provisioning failed for {user_id}: {e}"),
+                    }
+                }
+
                 match user {
                     // specifically for list invite call, even if the user is not present
                     // in db, which can be the case when a new user is joining o2 cloud for first
@@ -221,7 +265,7 @@ pub async fn token_validator(
                     {
                         // Allow these special cases without requiring user in DB
                         Ok(AuthValidationResult {
-                            user_email: res.0.user_email.clone(),
+                            user_email: token_res.user_email.clone(),
                             user_role: None,
                             is_internal_user: false,
                         })
@@ -326,5 +370,37 @@ mod tests {
              (allow_nonexistent_user) was a cross-org authorization bypass and \
              must not return."
         );
+    }
+
+    /// SECURITY REGRESSION GUARD: MCP tokens reach `verify_decode_token` with the
+    /// audience check relaxed, which stamps `user_role: Some(ServiceAccount)`.
+    /// Provisioning must not inherit it — a human SSO login created as a service
+    /// account gets the wrong role and is skipped by the OpenFGA user-creation
+    /// tuple, and service accounts are barred from interactive login elsewhere.
+    #[test]
+    fn mcp_provisioning_never_inherits_the_service_account_stamp() {
+        let stamped = common::meta::user::TokenValidationResponse {
+            is_valid: true,
+            user_email: "sso.user@example.com".to_string(),
+            user_name: "SSO User".to_string(),
+            family_name: "User".to_string(),
+            given_name: "SSO".to_string(),
+            is_internal_user: false,
+            user_role: Some(config::meta::user::UserRole::ServiceAccount),
+        };
+
+        let provisioned = sso_identity_for_provisioning(&stamped);
+
+        assert_eq!(
+            provisioned.user_role, None,
+            "SECURITY: the ServiceAccount role stamped by the relaxed-audience \
+             decode must be cleared before provisioning, so the identity falls \
+             back to O2_DEX_DEFAULT_ROLE like a web SSO login."
+        );
+        assert_eq!(
+            provisioned.user_email, stamped.user_email,
+            "the identity itself must be carried through unchanged"
+        );
+        assert_eq!(provisioned.user_name, stamped.user_name);
     }
 }
