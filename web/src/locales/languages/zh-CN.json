@@ -14239,8 +14239,6 @@
       "passwordSetHelp": "密码已设置。留空以保持不变，或输入新密码进行替换。",
       "showUptimePercent": "显示正常运行时间百分比",
       "showTimelineBars": "显示时间线条",
-      "showResponseTime": "显示响应时间",
-      "showResponseTimeHelp": "关闭此选项，以免页面泄露性能数据。",
       "noindex": "阻止搜索引擎索引",
       "noindexHelp": "添加 noindex 标签，以便搜索引擎跳过该公开页面。",
       "confirmFailures": "确认故障数",
@@ -14299,6 +14297,9 @@
       "deleting": "正在删除更新...",
       "deleted": "更新已删除",
       "deleteFailed": "删除更新失败",
+      "affects": "影响",
+      "allComponents": "所有组件",
+      "componentsUnavailable": "不再显示在此页面上的组件",
       "state": {
         "scheduled": "已计划",
         "active": "进行中",

@@ -14239,8 +14239,6 @@
       "passwordSetHelp": "Mật khẩu đã được đặt. Để trống để giữ nguyên, hoặc nhập mật khẩu mới để thay thế.",
       "showUptimePercent": "Hiển thị phần trăm uptime",
       "showTimelineBars": "Hiển thị các thanh thời gian",
-      "showResponseTime": "Hiển thị thời gian phản hồi",
-      "showResponseTimeHelp": "Tắt để trang không tiết lộ số liệu hiệu suất.",
       "noindex": "Hạn chế lập chỉ mục tìm kiếm",
       "noindexHelp": "Thêm thẻ noindex để công cụ tìm kiếm bỏ qua trang công khai.",
       "confirmFailures": "Xác nhận lỗi",
@@ -14299,6 +14297,9 @@
       "deleting": "Đang xóa bản cập nhật...",
       "deleted": "Đã xóa bản cập nhật",
       "deleteFailed": "Không thể xóa bản cập nhật",
+      "affects": "Ảnh hưởng",
+      "allComponents": "Tất cả các thành phần",
+      "componentsUnavailable": "Các thành phần không còn trên trang này",
       "state": {
         "scheduled": "Đã lên lịch",
         "active": "Đang hoạt động",

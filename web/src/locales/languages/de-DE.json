@@ -14239,8 +14239,6 @@
       "passwordSetHelp": "Ein Passwort ist bereits festgelegt. Lassen Sie das Feld leer, um es beizubehalten, oder geben Sie ein neues ein, um es zu ersetzen.",
       "showUptimePercent": "Uptime-Prozentsatz anzeigen",
       "showTimelineBars": "Zeitleistenbalken anzeigen",
-      "showResponseTime": "Antwortzeit anzeigen",
-      "showResponseTimeHelp": "Deaktivieren, damit die Seite keine Leistungsdaten preisgibt.",
       "noindex": "Suchindizierung erschweren",
       "noindexHelp": "Fügt ein noindex-Tag hinzu, damit Suchmaschinen die öffentliche Seite überspringen.",
       "confirmFailures": "Fehlversuche bestätigen",
@@ -14299,6 +14297,9 @@
       "deleting": "Update wird entfernt...",
       "deleted": "Update entfernt",
       "deleteFailed": "Update konnte nicht entfernt werden",
+      "affects": "Betrifft",
+      "allComponents": "Alle Komponenten",
+      "componentsUnavailable": "Komponenten nicht mehr auf dieser Seite",
       "state": {
         "scheduled": "Geplant",
         "active": "Aktiv",

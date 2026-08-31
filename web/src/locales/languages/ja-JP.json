@@ -14239,8 +14239,6 @@
       "passwordSetHelp": "パスワードは既に設定されています。維持するには空白のままにし、置き換えるには新しいものを入力してください。",
       "showUptimePercent": "稼働率を表示",
       "showTimelineBars": "タイムラインバーを表示",
-      "showResponseTime": "応答時間を表示",
-      "showResponseTimeHelp": "オフにすると、ページにパフォーマンス数値が漏れません。",
       "noindex": "検索インデックスを抑制",
       "noindexHelp": "noindex タグを追加して、検索エンジンが公開ページをスキップするようにします。",
       "confirmFailures": "障害確認",
@@ -14299,6 +14297,9 @@
       "deleting": "更新を削除中...",
       "deleted": "更新を削除しました",
       "deleteFailed": "更新の削除に失敗しました",
+      "affects": "影響を受ける",
+      "allComponents": "すべてのコンポーネント",
+      "componentsUnavailable": "このページに表示されなくなったコンポーネント",
       "state": {
         "scheduled": "予定",
         "active": "発生中",

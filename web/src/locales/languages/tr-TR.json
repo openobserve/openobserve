@@ -14239,8 +14239,6 @@
       "passwordSetHelp": "Bir parola zaten ayarlanmış. Korumak için boş bırakın veya değiştirmek için yeni bir tane yazın.",
       "showUptimePercent": "Çalışma süresi yüzdesini göster",
       "showTimelineBars": "Zaman çizelgesi çubuklarını göster",
-      "showResponseTime": "Yanıt süresini göster",
-      "showResponseTimeHelp": "Kapatın ki sayfa performans rakamlarını sızdırmasın.",
       "noindex": "Arama dizinlemeyi engelle",
       "noindexHelp": "Arama motorlarının herkese açık sayfayı atlaması için noindex etiketi ekler.",
       "confirmFailures": "Arızaları doğrula",
@@ -14299,6 +14297,9 @@
       "deleting": "Güncelleme kaldırılıyor...",
       "deleted": "Güncelleme kaldırıldı",
       "deleteFailed": "Güncelleme kaldırılamadı",
+      "affects": "Etkilenenler",
+      "allComponents": "Tüm bileşenler",
+      "componentsUnavailable": "Bu sayfada artık yer almayan bileşenler",
       "state": {
         "scheduled": "Zamanlanmış",
         "active": "Aktif",

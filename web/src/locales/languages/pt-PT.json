@@ -14239,8 +14239,6 @@
       "passwordSetHelp": "Uma senha já está definida. Deixe em branco para mantê-la ou digite uma nova para substituí-la.",
       "showUptimePercent": "Mostrar porcentagem de tempo de atividade",
       "showTimelineBars": "Mostrar barras de linha do tempo",
-      "showResponseTime": "Mostrar tempo de resposta",
-      "showResponseTimeHelp": "Desative para que a página não exponha números de desempenho.",
       "noindex": "Desencorajar a indexação de busca",
       "noindexHelp": "Adiciona uma tag noindex para que os mecanismos de busca ignorem a página pública.",
       "confirmFailures": "Confirmar falhas",
@@ -14299,6 +14297,9 @@
       "deleting": "Removendo atualização...",
       "deleted": "Atualização removida",
       "deleteFailed": "Falha ao remover atualização",
+      "affects": "Afeta",
+      "allComponents": "Todos os componentes",
+      "componentsUnavailable": "Componentes que não estão mais nesta página",
       "state": {
         "scheduled": "Agendado",
         "active": "Ativo",

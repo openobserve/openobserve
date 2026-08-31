@@ -14239,8 +14239,6 @@
       "passwordSetHelp": "Hasło jest już ustawione. Pozostaw puste, aby je zachować, lub wpisz nowe, aby je zastąpić.",
       "showUptimePercent": "Pokaż procent dostępności",
       "showTimelineBars": "Pokaż paski osi czasu",
-      "showResponseTime": "Pokaż czas odpowiedzi",
-      "showResponseTimeHelp": "Wyłącz, aby strona nie ujawniała danych o wydajności.",
       "noindex": "Ogranicz indeksowanie przez wyszukiwarki",
       "noindexHelp": "Dodaje tag noindex, aby wyszukiwarki pomijały publiczną stronę.",
       "confirmFailures": "Potwierdzanie awarii",
@@ -14299,6 +14297,9 @@
       "deleting": "Usuwanie aktualizacji...",
       "deleted": "Aktualizacja usunięta",
       "deleteFailed": "Nie udało się usunąć aktualizacji",
+      "affects": "Dotyczy",
+      "allComponents": "Wszystkie komponenty",
+      "componentsUnavailable": "Komponenty, których nie ma już na tej stronie",
       "state": {
         "scheduled": "Zaplanowana",
         "active": "Aktywna",

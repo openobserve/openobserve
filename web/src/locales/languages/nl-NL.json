@@ -14239,8 +14239,6 @@
       "passwordSetHelp": "Er is al een wachtwoord ingesteld. Laat dit veld leeg om het te behouden, of typ een nieuw wachtwoord om het te vervangen.",
       "showUptimePercent": "Toon uptimepercentage",
       "showTimelineBars": "Toon tijdlijnbalken",
-      "showResponseTime": "Toon responstijd",
-      "showResponseTimeHelp": "Schakel dit uit, zodat de pagina geen prestatiecijfers prijsgeeft.",
       "noindex": "Zoekindexering ontmoedigen",
       "noindexHelp": "Voegt een noindex-tag toe, zodat zoekmachines de openbare pagina overslaan.",
       "confirmFailures": "Bevestigen van fouten",
@@ -14299,6 +14297,9 @@
       "deleting": "Update verwijderen...",
       "deleted": "Update verwijderd",
       "deleteFailed": "Update verwijderen mislukt",
+      "affects": "Beïnvloedt",
+      "allComponents": "Alle componenten",
+      "componentsUnavailable": "Componenten niet meer op deze pagina",
       "state": {
         "scheduled": "Gepland",
         "active": "Actief",

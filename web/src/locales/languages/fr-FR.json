@@ -14239,8 +14239,6 @@
       "passwordSetHelp": "Un mot de passe est déjà défini. Laissez vide pour le conserver, ou saisissez un nouveau pour le remplacer.",
       "showUptimePercent": "Afficher le pourcentage de disponibilité",
       "showTimelineBars": "Afficher les barres de chronologie",
-      "showResponseTime": "Afficher le temps de réponse",
-      "showResponseTimeHelp": "Désactivez pour que la page ne divulgue pas les chiffres de performance.",
       "noindex": "Décourager l'indexation",
       "noindexHelp": "Ajoute une balise noindex pour que les moteurs de recherche ignorent la page publique.",
       "confirmFailures": "Confirmation des échecs",
@@ -14299,6 +14297,9 @@
       "deleting": "Suppression de la mise à jour...",
       "deleted": "Mise à jour supprimée",
       "deleteFailed": "Échec de la suppression de la mise à jour",
+      "affects": "Concerne",
+      "allComponents": "Tous les composants",
+      "componentsUnavailable": "Composants ne figurant plus sur cette page",
       "state": {
         "scheduled": "Planifiée",
         "active": "Active",
