@@ -107,7 +107,14 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-trace-id"),
             header::HeaderName::from_static("x-openobserve-sampled"),
             X_O2_ASSISTANT_SESSION_ID,
+            header::HeaderName::from_static("mcp-protocol-version"),
+            header::HeaderName::from_static("mcp-method"),
+            header::HeaderName::from_static("mcp-name"),
         ])
+        // A browser MCP client starts discovery by reading `WWW-Authenticate` off
+        // the 401; without this the fetch response hides the header and the flow
+        // never begins. Desktop clients are unaffected — they see it regardless.
+        .expose_headers([header::WWW_AUTHENTICATE])
         // Restrict CORS to the configured web_url origin, plus any extra origins in
         // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
         // allows any origin to make credentialed requests — effectively disabling same-origin
@@ -2353,5 +2360,71 @@ mod tests {
 
         let response = app.oneshot(req).await.unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+    /// A browser MCP client cannot begin OAuth discovery unless the preflight
+    /// admits the MCP request headers and `WWW-Authenticate` is readable off the
+    /// 401. Both halves are invisible to desktop clients, so nothing else fails
+    /// if they regress.
+    #[tokio::test]
+    async fn preflight_admits_mcp_headers_and_exposes_the_auth_challenge() {
+        let app = Router::new()
+            .route("/{org_id}/mcp", post(|| async { StatusCode::OK }))
+            .layer(cors_layer());
+
+        let preflight = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::OPTIONS)
+                    .uri("/default/mcp")
+                    // web_url is empty under test, so any origin is reflected.
+                    .header(header::ORIGIN, "https://claude.ai")
+                    .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
+                    .header(
+                        header::ACCESS_CONTROL_REQUEST_HEADERS,
+                        "authorization,content-type,mcp-protocol-version,mcp-method,mcp-name",
+                    )
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let allowed = preflight
+            .headers()
+            .get(header::ACCESS_CONTROL_ALLOW_HEADERS)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        for h in ["mcp-protocol-version", "mcp-method", "mcp-name"] {
+            assert!(
+                allowed.contains(h),
+                "preflight must admit {h}; got {allowed:?}"
+            );
+        }
+
+        // Expose-Headers rides the actual response, never the preflight.
+        let actual = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/default/mcp")
+                    .header(header::ORIGIN, "https://claude.ai")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        let exposed = actual
+            .headers()
+            .get(header::ACCESS_CONTROL_EXPOSE_HEADERS)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        assert!(
+            exposed.contains("www-authenticate"),
+            "WWW-Authenticate must be exposed or discovery cannot start; got {exposed:?}"
+        );
     }
 }
