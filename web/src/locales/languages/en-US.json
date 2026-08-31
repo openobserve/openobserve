@@ -11091,7 +11091,9 @@
           "trial": "Trial {index}",
           "noContent": "Not provided",
           "noOutput": "No output",
-          "absentSide": "Not present in this run"
+          "absentSide": "Not present in this run",
+          "enterFullscreen": "Enter Fullscreen",
+          "exitFullscreen": "Exit Fullscreen"
         }
       },
       "selectionCount": "{count} of 2 selected",
