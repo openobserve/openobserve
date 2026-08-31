@@ -2310,4 +2310,48 @@ mod tests {
             );
         }
     }
+
+    // Pins the half of the a36fcfc537 layer ordering that custom domains must not break.
+    #[tokio::test]
+    async fn root_still_redirects_to_web_on_an_unclaimed_host() {
+        let app = create_app_router(|_| Router::new());
+
+        let req = Request::builder()
+            .uri("/")
+            .header(header::HOST, "localhost")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(
+            response
+                .headers()
+                .get(header::LOCATION)
+                .and_then(|v| v.to_str().ok()),
+            Some("/web/")
+        );
+    }
+
+    // The a36fcfc537 ordering is what lets a claimed Host serve `/` instead of 308ing to /web/.
+    #[tokio::test]
+    async fn the_outermost_layer_intercepts_root_ahead_of_the_web_redirect() {
+        let app = create_app_router(|_| Router::new()).layer(middleware::from_fn(
+            |req: axum::extract::Request, next: middleware::Next| async move {
+                if req.uri().path() == "/" {
+                    return (StatusCode::OK, "intercepted").into_response();
+                }
+                next.run(req).await
+            },
+        ));
+
+        let req = Request::builder()
+            .uri("/")
+            .header(header::HOST, "claimed.example.com")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
 }
