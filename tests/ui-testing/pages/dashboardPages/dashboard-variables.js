@@ -18,6 +18,8 @@ export default class DashboardVariables {
     this.variableOptionByValue = (name, value) => page.locator(`[data-test="variable-selector-${name}-inner-option"][data-test-value="${value}"]`);
     this.variablePopover = (name) => page.locator(`[data-test="variable-selector-${name}-inner-popover"]`);
     this.variableWrapper = (name) => page.locator(`[data-test="variable-selector-${name}-inner"]`);
+    // OSpinner (role="status") shown inside a selector while its options load.
+    this.variableLoadingSpinner = (name) => page.locator(`[data-test="variable-selector-${name}"] [role="status"]`);
     // HTML panel editor (Monaco) locators
     this.htmlEditor = page.locator('[data-test="dashboard-html-editor"]');
     // Ad-hoc (dynamic) filter variable selector controls
