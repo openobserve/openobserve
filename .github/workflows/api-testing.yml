@@ -106,9 +106,8 @@ jobs:
           # 42 workspace crates while increasing the archive from ~1.1 to 3.1 GiB.
           shared-key: backend-debug0-mimalloc-deps-v1
           add-job-id-key: false
-          # PR #14030 primes this isolated debug=0 cache for a cold/warm A/B.
-          # Remove the temporary clause after the experiment.
-          save-if: ${{ github.event.pull_request.number == 14030 }}
+          # The DB workflow's successful push:main build is the only writer.
+          save-if: false
 
       - name: Install Protoc
         run: bash ./.github/protoc.sh
