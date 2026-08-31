@@ -127,18 +127,52 @@ identical before and after every fix above. Six opens: 56.4 → 84.9 MB.
 - The `traceMap` streaming layer — `TraceRecord: 1 → 0`.
 - Portal/teleport accumulation — in-document count is flat.
 
+### Bisection: the leak has two independent halves
+
+Same dashboard, 4 iterations each, production build:
+
+| Variant | Nodes/open | Listeners/open |
+|---|---|---|
+| **A.** open + settle (panels mount, data renders) | 2,697 | 901 |
+| **B.** open + leave after 400 ms (no data) | **1,175** | 120 |
+| **C.** panels mount, search requests aborted | **1,230** | 100 |
+
+B ≈ C, and both are ~45% of A. So:
+
+- **~1,200 nodes/open leak from the dashboard view shell alone**, with no panel
+  data and no charts rendered. This is `ViewDashboard` / `RenderDashboardCharts`
+  / variables / GridStack territory.
+- **~1,470 nodes and ~800 listeners/open** are added by rendering query results
+  — chart and table content.
+
+These are separate bugs and can be fixed independently.
+
+### Why the heap analysis did not name the retainer
+
+Three approaches were tried and all failed; recording them so the next person
+does not repeat them:
+
+1. **Shortest-path BFS to a GC root** — terminates at V8-internal roots
+   (`Traced handles`, `Internalized strings`) that reference nearly everything.
+   Reports "no path" or a meaningless path.
+2. **Incoming-edge histogram of detached nodes** — surfaces the dead subtree's
+   own Vue internals (`Object.el`, `system / Context .instance`, `Object.ctx`,
+   `native_bind .i`) because excluding "dead component instances" does not
+   exclude the contexts and closures belonging to them.
+3. **Forward closure from detached DOM, then cross-edges into it** — the closure
+   absorbs 3.86 M of ~4 M nodes, because detached DOM reaches shared prototypes,
+   maps and code objects. Over-approximates to uselessness.
+
+A correct version needs dominator-tree computation (what Chrome DevTools'
+"Retained Size" column actually uses), not ad-hoc graph walks.
+
 ### Recommended next step
 
-Heap-retainer analysis stalled: the retainer histogram keeps surfacing Vue's own
-internals (`system / Context .instance`, `Object .ctx`, `native_bind .i`) that
-belong to the dead subtree rather than an external anchor. Correctly separating
-"dead tree internals" from "live anchor" needs a full reachability pass from GC
-roots excluding the dead set, which the current scripts do not do.
-
-A faster route is **empirical bisection**: open a dashboard with panel content
-progressively stubbed (no ECharts, no panel data loader, no variables) and find
-which layer's removal makes the 2,697 nodes/open disappear. That converges in a
-handful of runs, where heap archaeology has not converged in many.
+Either compute a proper dominator tree over the snapshot, or continue the
+empirical bisection into the shell: stub `GridStack.init`, then the variables
+manager, then the panel container, and see which removal collapses the
+~1,200 nodes/open. The listener/observer/timer avenues are already exhausted —
+`dash-listener-origins.mjs` reports **zero** growth in all three on this path.
 
 ---
 
