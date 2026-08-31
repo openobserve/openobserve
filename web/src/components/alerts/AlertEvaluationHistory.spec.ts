@@ -43,6 +43,7 @@ function makeEvaluation(overrides: Record<string, any> = {}) {
     evaluation_took_in_secs: 0.412,
     query_took: 231,
     error: null,
+    retries: 0,
     ...overrides,
   };
 }
@@ -99,6 +100,27 @@ describe("AlertEvaluationHistory", () => {
     // Evaluation and query durations.
     expect(wrapper.text()).toContain("0.412s");
     expect(wrapper.text()).toContain("231ms");
+  });
+
+  it("renders the retries count so retried deliveries are distinguishable from separate evaluations", async () => {
+    wrapper = await mountComp({
+      hits: [
+        makeEvaluation({ timestamp: 1700000000000000, status: "notify_failed", retries: 0 }),
+        makeEvaluation({ timestamp: 1700000010000000, status: "notify_failed", retries: 1 }),
+        makeEvaluation({ timestamp: 1700000020000000, status: "notify_failed", retries: 2 }),
+      ],
+    });
+    const retryCells = wrapper.findAll('[data-test="alerts-alertevaluationhistory-retries"]');
+    expect(retryCells).toHaveLength(3);
+    // Rows are sorted newest-first by timestamp, so highest retries value comes first.
+    expect(retryCells.map((c) => c.text())).toEqual(["2", "1", "0"]);
+  });
+
+  it("shows an em dash for retries on rows written before the field existed", async () => {
+    wrapper = await mountComp({
+      hits: [makeEvaluation({ retries: null })],
+    });
+    expect(wrapper.find('[data-test="alerts-alertevaluationhistory-retries"]').text()).toBe("—");
   });
 
   it("queries the history endpoint scoped to this alert", async () => {
