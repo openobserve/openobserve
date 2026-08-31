@@ -725,9 +725,10 @@ async fn prepare_alert(
         {
             // FE has a gate, this is mostly API check
             if agg.having.column.is_empty() {
-                return Err(AlertError::MultiAlertGroupingError(format!(
+                return Err(AlertError::MultiAlertGroupingError(
                     "group by column must not be empty for sql multi alert having field"
-                )));
+                        .to_string(),
+                ));
             }
             let query = SearchQuery {
                 sql: sql.to_owned(),
@@ -749,9 +750,9 @@ async fn prepare_alert(
             }
 
             if schema.group_by.is_empty() {
-                return Err(AlertError::MultiAlertGroupingError(format!(
-                    "SQL Multi alert query Must have at least one group by field",
-                )));
+                return Err(AlertError::MultiAlertGroupingError(
+                    "SQL Multi alert query Must have at least one group by field".to_string(),
+                ));
             }
 
             for group in &schema.group_by {
