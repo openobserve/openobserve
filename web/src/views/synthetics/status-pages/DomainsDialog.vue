@@ -91,27 +91,108 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div v-if="d.verification_state !== 1" class="flex flex-col gap-1">
-          <p class="text-text-secondary text-xs">
-            {{ t("statusPages.domains.recordInstructions") }}
-          </p>
-          <code
-            v-if="pendingRecords[d.id]"
-            class="bg-bg-subtle rounded-default border-border-subtle border p-2 text-xs break-all"
+        <OBanner
+          v-if="d.verification_state === 2 && d.verification_failure_reason !== null"
+          variant="error"
+          icon="warning"
+          dense
+          :data-test="`status-page-domain-failure-${d.id}`"
+        >
+          {{ t(`statusPages.domains.failureReason.${d.verification_failure_reason}` as any) }}
+        </OBanner>
+
+        <OBanner
+          v-if="d.verification_state === 1"
+          variant="success"
+          icon="check"
+          dense
+          :data-test="`status-page-domain-serving-${d.id}`"
+        >
+          {{ t("statusPages.domains.serving") }}
+        </OBanner>
+
+        <div
+          v-if="d.verification_state !== 1 && pendingRecords[d.id]"
+          class="flex flex-col gap-3"
+          :data-test="`status-page-domain-next-steps-${d.id}`"
+        >
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center gap-2">
+              <OTag variant="primary-soft" size="sm" shape="pill">{{ raw("1") }}</OTag>
+              <span class="text-text-heading text-sm font-medium">
+                {{ t("statusPages.domains.recordInstructions") }}
+              </span>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <span class="text-text-label text-2xs font-medium">
+                {{ t("statusPages.domains.txtNameLabel") }}
+              </span>
+              <div class="flex items-center gap-1">
+                <OCode truncate class="min-w-0 flex-1">{{ raw(pendingRecords[d.id].name) }}</OCode>
+                <OButton
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="content-copy"
+                  :data-test="`status-page-domain-copy-txt-name-${d.id}`"
+                  @click="copyTxtName(d.id)"
+                >
+                  <OTooltip side="bottom" :content="t('statusPages.domains.copyTxtName')" />
+                </OButton>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <span class="text-text-label text-2xs font-medium">
+                {{ t("statusPages.domains.txtValueLabel") }}
+              </span>
+              <div class="flex items-center gap-1">
+                <OCode truncate class="min-w-0 flex-1">{{ raw(pendingRecords[d.id].value) }}</OCode>
+                <OButton
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="content-copy"
+                  :data-test="`status-page-domain-copy-txt-value-${d.id}`"
+                  @click="copyTxtValue(d.id)"
+                >
+                  <OTooltip side="bottom" :content="t('statusPages.domains.copyTxtValue')" />
+                </OButton>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <OTag variant="primary-soft" size="sm" shape="pill">{{ raw("2") }}</OTag>
+            <span class="text-text-secondary text-sm">
+              {{ t("statusPages.domains.nextStepVerify", { seconds: verifyIntervalSeconds }) }}
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <OTag variant="primary-soft" size="sm" shape="pill">{{ raw("3") }}</OTag>
+            <span class="text-text-secondary text-sm">
+              {{ t("statusPages.domains.nextStepCname", { domain: d.domain }) }}
+            </span>
+          </div>
+
+          <OBanner
+            variant="warning"
+            icon="warning"
+            dense
+            :data-test="`status-page-domain-write-once-warning-${d.id}`"
           >
-            {{
-              t("statusPages.domains.recordValue", {
-                domain: d.domain,
-                value: pendingRecords[d.id],
-              })
-            }}
-          </code>
-          <p
-            v-if="d.verification_state === 2 && d.verification_failure_reason !== null"
-            class="text-text-error text-xs"
-          >
-            {{ t(`statusPages.domains.failureReason.${d.verification_failure_reason}` as any) }}
-          </p>
+            {{ t("statusPages.domains.writeOnceWarning") }}
+          </OBanner>
+        </div>
+
+        <!-- The token is unrecoverable once the dialog closes, so a domain left
+             unverified from an earlier session can only be re-claimed. -->
+        <div
+          v-else-if="d.verification_state !== 1"
+          class="text-text-secondary text-xs"
+          :data-test="`status-page-domain-record-lost-${d.id}`"
+        >
+          {{ t("statusPages.domains.recordLost") }}
         </div>
       </div>
     </div>
@@ -125,15 +206,24 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OCode from "@/lib/core/Code/OCode.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import statusPagesService, {
   type StatusPageDomain,
   type CreateDomainResponse,
 } from "@/services/status_pages";
 import { domainStateBadge } from "./statusPageBadges";
+
+interface PendingRecord {
+  name: string;
+  value: string;
+}
 
 const props = defineProps<{
   open: boolean;
@@ -154,10 +244,14 @@ const loading = ref(false);
 const adding = ref(false);
 const verifyingId = ref<string | null>(null);
 const newDomain = ref("");
-// TXT value shown right after claiming a domain — the create response is the
-// only place the token is ever returned; a later list refresh cannot show it
-// again (it's write-once by design), so it's kept client-side per session.
-const pendingRecords = ref<Record<string, string>>({});
+// The TXT record shown right after claiming a domain — the create response is
+// the only place txt_value is ever returned; DomainAdminView omits it, so a
+// later list refresh cannot show it again and it is kept client-side per session.
+const pendingRecords = ref<Record<string, PendingRecord>>({});
+
+// Mirrors ZO_STATUS_PAGE_DOMAIN_VERIFY_INTERVAL's server-side default; the
+// backend exposes no endpoint for it, so an operator override drifts from this.
+const verifyIntervalSeconds = 30;
 
 async function load() {
   if (!props.pageId) return;
@@ -189,7 +283,7 @@ async function addDomain() {
     const res = await statusPagesService.createDomain(props.orgIdentifier, props.pageId, domain);
     const created = res.data as CreateDomainResponse;
     newDomain.value = "";
-    pendingRecords.value[created.id] = created.txt_value;
+    pendingRecords.value[created.id] = { name: created.txt_name, value: created.txt_value };
     await load();
   } catch (err: any) {
     toast({
@@ -203,6 +297,22 @@ async function addDomain() {
   } finally {
     adding.value = false;
   }
+}
+
+function copyTxtName(domainId: string) {
+  const record = pendingRecords.value[domainId];
+  if (!record) return;
+  copyToClipboard(record.name, t, {
+    successMessage: t("statusPages.domains.txtNameCopied"),
+  });
+}
+
+function copyTxtValue(domainId: string) {
+  const record = pendingRecords.value[domainId];
+  if (!record) return;
+  copyToClipboard(record.value, t, {
+    successMessage: t("statusPages.domains.txtValueCopied"),
+  });
 }
 
 async function verifyDomain(d: StatusPageDomain) {
