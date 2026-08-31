@@ -11,11 +11,14 @@
   variants across. Sampling switches modes; removing the last row switches back.
 -->
 <template>
-  <OPageLayout bleed title-overflow="visible">
-    <template #title>
-      <span data-test="ai-playground-title">{{ t("aiObservability.playground.title") }}</span>
-    </template>
-
+  <OPageLayout
+    data-test="ai-playground-page"
+    :title="t('aiObservability.nav.playground')"
+    :subtitle="t('aiObservability.subtitle.playground')"
+    icon="play-circle"
+    title-data-test="ai-playground-title"
+    bleed
+  >
     <template #actions>
       <ODropdown v-if="recentDrafts.length" align="end" content-class="w-100">
         <template #trigger>
@@ -81,6 +84,7 @@
         :scoring="scoring"
         @update:selected-ids="(ids: string[]) => (draft.scorerIds = ids)"
         @update:auto-score="(value: boolean) => (draft.autoScore = value)"
+        @focus-expected="focusExpected"
         @score="scoreAll"
       />
       <OButton
@@ -170,11 +174,14 @@
         class="shrink-0"
         :var-names="varNames"
         :vars="draft.vars"
-        :expected="draft.expectedSingle"
+        :used-var-names="usedVarNames"
+        :tools="draft.variants[0]?.tools ?? []"
         :provenance="draft.provenance"
         :sample="draft.sample"
         :stepping="sampleStepping"
-        @set-expected="(value) => (draft.expectedSingle = value)"
+        @set-tools="setTools"
+        @set-var="setVar"
+        @remove-var="removeVar"
         @sample="sampleOpen = true"
         @step-sample="stepSample"
         @clear-sample="clearSample"
@@ -227,8 +234,6 @@
             :can-remove="draft.variants.length > 1"
             :can-duplicate="draft.variants.length < MAX_VARIANTS"
             @change="updateVariant"
-            @set-var="setVar"
-            @remove-var="removeVar"
             @run="runVariant(variant.id)"
             @duplicate="duplicate(variant.id)"
             @remove="removeVariant(variant.id)"
@@ -238,6 +243,17 @@
           />
         </div>
       </div>
+
+      <!-- Below the bench, not inside it: one golden answer serves every column,
+           so it must not scroll away with them. Shown only once something reads
+           it — a value, or a selected scorer that needs one. -->
+      <PlaygroundExpectedBar
+        v-if="draft.expectedSingle || expectedRequired"
+        ref="expectedBarRef"
+        :expected="draft.expectedSingle"
+        :required="expectedRequired"
+        @set-expected="(value) => (draft.expectedSingle = value)"
+      />
     </div>
 
     <PlaygroundSampleDialog
@@ -267,12 +283,14 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import PlaygroundExpectedBar from "@/enterprise/components/AIObservability/PlaygroundExpectedBar.vue";
 import PlaygroundSampleDialog from "@/enterprise/components/AIObservability/PlaygroundSampleDialog.vue";
 import PlaygroundScorersMenu from "@/enterprise/components/AIObservability/PlaygroundScorersMenu.vue";
 import PlaygroundShareDialog from "@/enterprise/components/AIObservability/PlaygroundShareDialog.vue";
 import PlaygroundVariableBar from "@/enterprise/components/AIObservability/PlaygroundVariableBar.vue";
 import PlaygroundVariantColumn from "@/enterprise/components/AIObservability/PlaygroundVariantColumn.vue";
 import onlineEvalsService, { type Provider, type Scorer } from "@/services/online-evals.service";
+import { entityId } from "@/enterprise/components/onlineEvals/utils/evalEntity";
 import llmDatasetsService, {
   type LlmDataset,
   type LlmDatasetItem,
@@ -298,6 +316,7 @@ import {
   playgroundId,
   renderedMessages,
   renderTemplate,
+  scorerEvidence,
   settledResults,
   snapshotPayload,
   starterDraft,
@@ -305,6 +324,7 @@ import {
   type PlaygroundCell,
   type PlaygroundDraft,
   type PlaygroundResults,
+  type PlaygroundTool,
   type PlaygroundVariant,
 } from "./playgroundDraft";
 import { aiExperimentCreateRoute } from "./experimentRoutes";
@@ -357,6 +377,10 @@ const varNames = computed(() => {
   for (const name of Object.keys(draft.vars)) if (!names.includes(name)) names.push(name);
   return names;
 });
+
+/** Referenced by a message somewhere; the rest are declared and never read. */
+const usedVarNames = computed(() => extractVars(draft.variants));
+
 const totalCells = computed(() => draft.variants.length);
 
 const streamingVariants = computed(() =>
@@ -620,6 +644,25 @@ function onKeydown(event: KeyboardEvent) {
 
 const hasReference = computed(() => benchHasReference(draft.expectedSingle));
 
+const expectedBarRef = ref<{ focus: () => void } | null>(null);
+
+/** A selected scorer reads `{{expected_output}}` and the bench has none, so the
+ *  field has to be on screen for the Score panel's notice to point at. */
+const expectedRequired = computed<boolean>(() => {
+  if (hasReference.value) return false;
+  return scorers.value.some((scorer) => {
+    if (!draft.scorerIds.includes(entityId(scorer))) return false;
+    const evidence = scorerEvidence(scorer.template ?? "");
+    // A trace-reading scorer is skipped for a reason no expected output fixes.
+    if (evidence.trace) return false;
+    return evidence.expectedOutput || Boolean(scorer.referenceBased ?? scorer.reference_based);
+  });
+});
+
+function focusExpected() {
+  expectedBarRef.value?.focus();
+}
+
 /** Outputs worth judging. A tool call is not text a scorer can read, and an
  *  empty answer would only ever be judged as one. */
 const scorableVariants = computed(() =>
@@ -714,6 +757,14 @@ function updateVariant(next: PlaygroundVariant) {
   const index = draft.variants.findIndex((variant) => variant.id === next.id);
   if (index === -1) return;
   draft.variants[index] = next;
+}
+
+// Tools are the harness every bench shares: a comparison only says something
+// when the prompt or the model is the ONE thing that differs between columns.
+function setTools(tools: PlaygroundTool[]) {
+  for (const variant of draft.variants) {
+    variant.tools = tools.map((tool) => ({ ...tool }));
+  }
 }
 
 function duplicate(variantId: string) {

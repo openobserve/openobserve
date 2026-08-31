@@ -419,7 +419,7 @@
           :state="testState"
           :report="testReport"
           :error-message="testError"
-          @run="submitFromPanel"
+          @run="runCandidateTest"
         />
       </div>
 
@@ -696,9 +696,36 @@ function goBack() {
   void router.push(aiRemoteTasksRoute(orgId.value));
 }
 
-function submitFromPanel() {
-  submitIntent.value = "publish";
-  void form.handleSubmit();
+/**
+ * Test the form exactly as it stands. `POST /tasks/test` takes the whole
+ * candidate, so nothing is registered, no secret row is written and no version
+ * is published — which is what a button called "Test Connection" should do.
+ *
+ * Publishing still requires a passing test; that check moved to the Publish
+ * button, which runs its own against the saved draft.
+ */
+async function runCandidateTest() {
+  if (!orgId.value) return;
+  testState.value = "running";
+  testError.value = null;
+  testReport.value = null;
+
+  try {
+    const values = form.state.values as RemoteTaskFormValues;
+    const result = await remoteTasksService.testCandidate(orgId.value, {
+      ...toCreatePayload(values),
+      ...currentSample(),
+    });
+    testReport.value = result.report ?? null;
+    testState.value = result.verified ? "passed" : "failed";
+    if (!result.verified) {
+      testError.value = raw(result.error) || t("aiObservability.remoteTasks.form.testFailed");
+    }
+  } catch (error: any) {
+    testState.value = "failed";
+    testError.value =
+      raw(error?.response?.data?.message) || t("aiObservability.remoteTasks.form.testFailed");
+  }
 }
 
 function currentSample() {
