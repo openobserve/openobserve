@@ -48,7 +48,7 @@
                 ? 'bg-status-positive! border-status-positive! ring-status-positive/40 text-white! ring-3'
                 : ''
             "
-            tabindex="1"
+            tabindex="0"
             @click="handleAlwaysConfirm"
             @focus="handleAlwaysFocus"
             @blur="handleAlwaysBlur"
@@ -64,7 +64,7 @@
                 ? 'bg-status-negative! border-status-negative! ring-status-negative/40 text-white! ring-3'
                 : ''
             "
-            tabindex="2"
+            tabindex="0"
             @click="handleCancel"
             @focus="handleNoFocus"
             @blur="handleNoBlur"
@@ -100,7 +100,7 @@
                 ? 'bg-status-negative! border-status-negative! ring-status-negative/40 text-white! ring-3'
                 : ''
             "
-            tabindex="1"
+            tabindex="0"
             @click="handleCancel"
             @focus="handleNoFocus"
             @blur="handleNoBlur"

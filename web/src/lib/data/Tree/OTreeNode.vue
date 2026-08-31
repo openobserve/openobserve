@@ -98,6 +98,7 @@ function onTickChange(newVal: CheckboxModelValue) {
   <li
     v-if="visible"
     role="treeitem"
+    aria-selected="false"
     :aria-expanded="!isLeaf ? isExpanded : undefined"
     :data-test="`o-tree-node-${String(key)}`"
     :data-test-checked="
