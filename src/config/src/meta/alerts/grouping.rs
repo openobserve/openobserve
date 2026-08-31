@@ -1002,7 +1002,7 @@ pub fn plan_group_updates(
 
         let outcome = if pending_period_sec > 0 {
             match prev_out {
-                None => RunOutcome::Pending,
+                None if is_firing => RunOutcome::Pending,
                 Some(state) => match (state.last_outcome.as_ref(), state.since.as_ref()) {
                     (None, _) | (Some(RunOutcome::Normal), _) if is_firing => RunOutcome::Pending,
                     (Some(RunOutcome::Pending), Some(last)) => {
@@ -1014,6 +1014,7 @@ pub fn plan_group_updates(
                     }
                     _ => base_outcome,
                 },
+                _ => base_outcome,
             }
         } else {
             base_outcome

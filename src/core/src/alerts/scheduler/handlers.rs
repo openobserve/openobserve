@@ -1448,6 +1448,7 @@ pub(crate) fn merge_ledger(prior: &[String], succeeded: &[String]) -> Vec<String
     out
 }
 
+#[allow(clippy::cognitive_complexity)]
 async fn handle_alert_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
@@ -1814,9 +1815,15 @@ async fn handle_alert_triggers(
                 .num_microseconds()
                 .unwrap();
 
-    let last_states = load_tracked_group_states(&alert.get_unique_key()).await.inspect_err(|e|{
-        log::error!("[SCHEDULER trace_id {scheduler_trace_id}] alert {} error in getting alert state: {e}",trigger.module_key);
-    })?;
+    let last_states = if !alert.query_condition.multi_alert_enabled()
+        && alert.pending_period_sec > 0
+    {
+        load_tracked_group_states(&alert.get_unique_key()).await.inspect_err(|e|{
+            log::error!("[SCHEDULER trace_id {scheduler_trace_id}] alert {} error in getting alert state: {e}",trigger.module_key);
+        })?
+    } else {
+        Default::default()
+    };
 
     let mut should_store_last_end_time =
         alert.trigger_condition.frequency == (alert.trigger_condition.period * 60);

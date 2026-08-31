@@ -162,6 +162,7 @@ async fn migration_creates_only_v1_tables_indexes_and_claim_epoch() {
         "last_edited_by",
         "updated_at",
         "evaluation_generation",
+        "pending_period_sec",
     ]
     .into_iter()
     .map(str::to_string)

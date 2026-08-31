@@ -642,7 +642,7 @@ describe("AddAlert (OForm owner)", () => {
           "trigger_condition",
           "updatedAt",
           "workflows",
-          "pending_period_sec"
+          "pending_period_sec",
         ].sort(),
       );
 

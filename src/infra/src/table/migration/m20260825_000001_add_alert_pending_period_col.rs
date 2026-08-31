@@ -47,7 +47,7 @@ impl MigrationTrait for Migration {
     }
 }
 
-fn get_update_stmt_alerts() -> TableAlterStatement {
+pub fn get_update_stmt_alerts() -> TableAlterStatement {
     Table::alter()
         .table(Alerts::Table)
         .add_column_if_not_exists(
@@ -59,7 +59,7 @@ fn get_update_stmt_alerts() -> TableAlterStatement {
         .to_owned()
 }
 
-fn get_update_stmt_composites() -> TableAlterStatement {
+pub fn get_update_stmt_composites() -> TableAlterStatement {
     Table::alter()
         .table(AlertComposites::Table)
         .add_column_if_not_exists(
