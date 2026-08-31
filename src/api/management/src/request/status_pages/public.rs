@@ -53,6 +53,9 @@ const UNLOCK_COOKIE_TTL_SECS: i64 = 24 * 3600;
 /// Fixed name: the value already binds the slug, and echoing it would leak the slug on a custom
 /// domain.
 const UNLOCK_COOKIE_NAME: &str = "o2_sp_unlock";
+/// A password JSON body is a few hundred bytes; the by-host route bypasses the router's own limit.
+#[cfg(feature = "enterprise")]
+const AUTH_BODY_LIMIT: usize = 4096;
 const AUTH_MAX_ATTEMPTS: u32 = 5;
 const AUTH_WINDOW: Duration = Duration::from_secs(60);
 const READ_WINDOW: Duration = Duration::from_secs(60);
@@ -209,12 +212,7 @@ pub async fn auth(
             Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CACHE_CONTROL, "no-store, private")
-                .header(
-                    header::SET_COOKIE,
-                    format!(
-                        "{UNLOCK_COOKIE_NAME}={cookie}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={UNLOCK_COOKIE_TTL_SECS}"
-                    ),
-                )
+                .header(header::SET_COOKIE, unlock_set_cookie(&cookie))
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from("{\"ok\":true}"))
                 .unwrap_or_else(|_| unauthorized())
@@ -338,7 +336,7 @@ pub async fn host_route_middleware(
     next: axum::middleware::Next,
 ) -> Response {
     use o2_enterprise::enterprise::status_pages::host_routing::{
-        HostRouteDecision, resolve_host_route,
+        HostRouteDecision, PageRoute, resolve_host_route,
     };
 
     if !config::get_config().synthetics.enabled {
@@ -347,21 +345,23 @@ pub async fn host_route_middleware(
     let Some(host) = host_header(request.headers()) else {
         return next.run(request).await;
     };
-    match resolve_host_route(&host, request.uri().path()).await {
+    let method = request.method().as_str().to_owned();
+    match resolve_host_route(&host, &method, request.uri().path()).await {
         HostRouteDecision::Fallthrough => next.run(request).await,
         HostRouteDecision::NotConnected => domain_not_connected(),
-        HostRouteDecision::Page {
-            slug,
-            is_snapshot_path,
-        } => {
-            let (parts, _) = request.into_parts();
+        HostRouteDecision::Page { slug, route } => {
             // The RealIp layer sits outside this one, so the resolved visitor IP is already on the
             // request.
-            let ip = parts.extensions.get::<RealIp>().copied().map(Extension);
-            if is_snapshot_path {
-                snapshot(Path(slug), ip, parts.headers).await
-            } else {
-                page(Path(slug), ip).await
+            let ip = request.extensions().get::<RealIp>().copied().map(Extension);
+            match route {
+                PageRoute::Snapshot => {
+                    snapshot(Path(slug), ip, request.into_parts().0.headers).await
+                }
+                PageRoute::Auth => match auth_body(request).await {
+                    Some(body) => auth(Path(slug), ip, Json(body)).await,
+                    None => unauthorized(),
+                },
+                PageRoute::Shell => page(Path(slug), ip).await,
             }
         }
     }
@@ -486,6 +486,14 @@ async fn serve_password_page(slug: &str, headers: &HeaderMap) -> Response {
         .header("X-Robots-Tag", "noindex")
         .body(Body::from(body))
         .unwrap_or_else(|_| not_found())
+}
+
+/// No `Domain=` attribute, deliberately: a host-only cookie is scoped to whichever host issued it,
+/// so the same code works on the app host and on a custom domain, and neither can set the other's.
+fn unlock_set_cookie(cookie: &str) -> String {
+    format!(
+        "{UNLOCK_COOKIE_NAME}={cookie}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={UNLOCK_COOKIE_TTL_SECS}"
+    )
 }
 
 fn unlock_cookie(headers: &HeaderMap) -> Option<&str> {
@@ -626,6 +634,16 @@ fn not_found() -> Response {
             "This page doesn't exist or is no longer available.",
         ))
         .unwrap_or_default()
+}
+
+/// Reads the by-host unlock body under an explicit cap: this layer answers before the router's
+/// `DefaultBodyLimit`, so without one it would be the only unbounded read on the public plane.
+#[cfg(feature = "enterprise")]
+async fn auth_body(request: axum::extract::Request) -> Option<AuthBody> {
+    let bytes = axum::body::to_bytes(request.into_body(), AUTH_BODY_LIMIT)
+        .await
+        .ok()?;
+    serde_json::from_slice(&bytes).ok()
 }
 
 #[cfg(feature = "enterprise")]
@@ -809,6 +827,19 @@ mod tests {
         }
         assert!(over_budget(&counters, "k".into(), AUTH_WINDOW, 3));
         assert!(!over_budget(&counters, "other".into(), AUTH_WINDOW, 3));
+    }
+
+    // A custom domain gets the same Set-Cookie as the slug host, so it must carry no Domain= or the
+    // cookie would be scoped to a host the visitor isn't on.
+    #[test]
+    fn the_unlock_cookie_is_host_only_and_path_wide() {
+        let set = unlock_set_cookie("tok");
+        assert!(set.starts_with("o2_sp_unlock=tok; "));
+        assert!(set.contains("; Path=/;"));
+        assert!(!set.to_ascii_lowercase().contains("domain="));
+        assert!(set.contains("HttpOnly"));
+        assert!(set.contains("Secure"));
+        assert!(set.contains("SameSite=Lax"));
     }
 
     #[test]
