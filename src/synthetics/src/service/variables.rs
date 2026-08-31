@@ -200,7 +200,7 @@ pub async fn duplicate_environment(
             created_at: now,
             updated_at: now,
         };
-        synthetics_variables::add(&txn, &copy)
+        synthetics_variables::insert_row(&txn, &copy)
             .await
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     }
@@ -878,11 +878,11 @@ pub async fn split_to_environments(
     // which resolves non-deterministically until someone notices.
     let txn = conn.begin().await?;
     for record in &created {
-        synthetics_variables::add(&txn, record)
+        synthetics_variables::insert_row(&txn, record)
             .await
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     }
-    synthetics_variables::delete(&txn, org_id, id)
+    synthetics_variables::delete_row(&txn, org_id, id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     txn.commit().await?;
