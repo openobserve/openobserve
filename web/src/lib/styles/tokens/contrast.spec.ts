@@ -64,7 +64,7 @@ const LARGE_TEXT_MIN = 3;
 const NON_TEXT_MIN = 3;
 
 /** Ratchets. Both only ever go down; see the module docstring. */
-const MAX_PENDING = 98;
+const MAX_PENDING = 92;
 const MAX_EXEMPT = 37;
 
 /** Inverted ratchet on the completeness gate: a rename must fail, not shrink it. */
