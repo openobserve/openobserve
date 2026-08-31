@@ -135,7 +135,8 @@ pub async fn snapshot(
     match resolve(&slug).await {
         Cached::Public(e) => json_ok(&e.body, e.noindex),
         Cached::Password => serve_password_page(&slug, &headers).await,
-        Cached::Unbuilt | Cached::Missing => not_found(),
+        Cached::Unbuilt => building(),
+        Cached::Missing => not_found(),
     }
 }
 
@@ -602,6 +603,19 @@ fn too_many() -> Response {
         .unwrap_or_default()
 }
 
+/// A published page whose first rebuilder tick hasn't run yet; distinct from 404 so the shell
+/// doesn't show the unlock form.
+fn building() -> Response {
+    Response::builder()
+        .status(StatusCode::ACCEPTED)
+        .header(header::CONTENT_TYPE, "application/json")
+        // A 202 is transient; a shared cache must never pin it for the 30 s the 200 gets.
+        .header(header::CACHE_CONTROL, "no-store")
+        .header("X-Content-Type-Options", "nosniff")
+        .body(Body::from("{\"building\":true}"))
+        .unwrap_or_else(|_| not_found())
+}
+
 /// One uniform 404 for unknown/draft/locked/disabled — existence is not distinguishable from the
 /// outside.
 fn not_found() -> Response {
@@ -688,13 +702,29 @@ mod tests {
         assert_eq!(cache_control(&resp), Some("no-store, private"));
     }
 
+    // A 202 (not the uniform 404) keeps the shell from mistaking a fresh public page for a locked
+    // one.
     #[tokio::test]
-    async fn unbuilt_public_page_gets_the_shell_but_no_snapshot() {
+    async fn unbuilt_public_page_gets_the_shell_and_a_building_202() {
         prime("t-unbuilt", Cached::Unbuilt, Instant::now());
         let shell = page(Path("t-unbuilt".into()), None).await;
         assert_eq!(shell.status(), StatusCode::OK);
         let snap = snapshot(Path("t-unbuilt".into()), None, HeaderMap::new()).await;
-        assert_eq!(snap.status(), StatusCode::NOT_FOUND);
+        assert_eq!(snap.status(), StatusCode::ACCEPTED);
+        assert_eq!(cache_control(&snap), Some("no-store"));
+        assert_eq!(
+            snap.headers()
+                .get(header::CONTENT_TYPE)
+                .map(|v| v.as_bytes()),
+            Some(b"application/json".as_slice())
+        );
+        assert_eq!(
+            snap.headers()
+                .get("X-Content-Type-Options")
+                .map(|v| v.as_bytes()),
+            Some(b"nosniff".as_slice())
+        );
+        assert_eq!(body_text(snap).await, "{\"building\":true}");
     }
 
     #[tokio::test]
@@ -717,10 +747,12 @@ mod tests {
     #[tokio::test]
     async fn locked_password_page_is_the_same_404_as_an_unknown_slug() {
         prime("t-snap-pw", Cached::Password, Instant::now());
+        prime("t-nope", Cached::Missing, Instant::now());
         let locked = snapshot(Path("t-snap-pw".into()), None, HeaderMap::new()).await;
         let unknown = snapshot(Path("t-nope".into()), None, HeaderMap::new()).await;
         assert_eq!(locked.status(), StatusCode::NOT_FOUND);
         assert_eq!(unknown.status(), StatusCode::NOT_FOUND);
+        assert_eq!(locked.headers(), unknown.headers());
         assert_eq!(body_text(locked).await, body_text(unknown).await);
     }
 

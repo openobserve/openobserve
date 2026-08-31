@@ -32,6 +32,14 @@ mod shell_tests {
         assert!(SHELL.contains("credentials: \"same-origin\""));
     }
 
+    // A published page answers 202 until its first snapshot lands; the shell must not read that as
+    // locked.
+    #[test]
+    fn shell_treats_a_202_as_building_not_locked() {
+        assert!(SHELL.contains("r.status === 202"));
+        assert!(SHELL.contains("Collecting first data"));
+    }
+
     // CSP allows 'unsafe-inline', so nothing enforces this at runtime; this test is the XSS guard.
     #[test]
     fn shell_builds_dom_without_innerhtml_or_inline_handlers() {

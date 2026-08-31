@@ -296,6 +296,8 @@
     ? pathParts[pathParts.length - 1]
     : null;
   var POLL_MS = 60000, STALE_MS = 150000;
+  // A page answers 202 until its first rebuilder tick (up to a minute); poll faster only until then.
+  var BUILDING_POLL_MS = 15000;
 
   var STATUS = {
     operational:    { label: "Operational",    tone: "ok",    head: "All systems operational" },
@@ -332,8 +334,9 @@
 
   var ui = { table: {}, day: {}, pastOpen: false };
   var last = { data: null, curGen: 0, histGen: 0, failed: false, fetchedAt: 0,
-               locked: false, unlocked: false };
+               locked: false, unlocked: false, building: false };
   var unlockTimer = null;
+  var pollTimer = null;
   var cardEls = {};
   var browserTz = "UTC";
   try { browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch (e) { /* keep UTC */ }
@@ -429,6 +432,18 @@
     txt.appendChild(el("h2", null, "Status temporarily unavailable"));
     txt.appendChild(el("p", null,
       "We could not load status data. This page retries automatically every minute."));
+    banner.appendChild(txt);
+    document.getElementById("banner-host").replaceChildren(banner);
+    document.getElementById("page-name").textContent = "Status";
+  }
+
+  function renderBuilding() {
+    var banner = el("div", "banner t-na");
+    banner.appendChild(el("span", "dot")).setAttribute("aria-hidden", "true");
+    var txt = el("div");
+    txt.appendChild(el("h2", null, "Collecting first data"));
+    txt.appendChild(el("p", null,
+      "This page was just published. Status appears once the first checks are recorded — usually within a minute."));
     banner.appendChild(txt);
     document.getElementById("banner-host").replaceChildren(banner);
     document.getElementById("page-name").textContent = "Status";
@@ -737,9 +752,11 @@
     if (!last.data) {
       s.textContent = last.locked
         ? "Password required."
-        : (last.failed
-          ? "Could not load status data — retrying every minute."
-          : "Fetching current status…");
+        : (last.building
+          ? "Collecting first data… checking again every 15 seconds."
+          : (last.failed
+            ? "Could not load status data — retrying every minute."
+            : "Fetching current status…"));
       s.classList.toggle("stale", last.failed);
       return;
     }
@@ -908,6 +925,8 @@
   function load() {
     fetch(dataUrl(), { credentials: "same-origin" })
       .then(function (r) {
+        // 202 = published but the first snapshot isn't built yet: not an error and not locked.
+        if (r.status === 202) return null;
         if (!r.ok) {
           var err = new Error(String(r.status));
           err.status = r.status;
@@ -919,6 +938,15 @@
         last.failed = false;
         last.fetchedAt = Date.now();
         if (last.locked) hideUnlock();
+        if (data === null) {
+          last.building = !last.data;
+          if (last.building) renderBuilding();
+          updateStamp();
+          schedulePoll();
+          return;
+        }
+        last.building = false;
+        schedulePoll();
         var cg = (data.current || {}).generated_at || 0;
         var hg = (data.history || {}).generated_at || 0;
         if (last.data && cg === last.curGen && hg === last.histGen) { updateStamp(); return; }
@@ -927,12 +955,21 @@
         render(data);
       })
       .catch(function (err) {
-        // The shell is only served for existing pages, so a 404 before any data means locked (or unbuilt).
-        if (err && err.status === 404 && !last.data && !last.unlocked) { showUnlock(); return; }
+        // The shell is only served for existing pages and unbuilt ones answer 202, so a 404 before any data means locked.
+        if (err && err.status === 404 && !last.data && !last.unlocked) { showUnlock(); schedulePoll(); return; }
         last.failed = true;
+        last.building = false;
         if (!last.data) renderUnavailable();
         updateStamp();
+        schedulePoll();
       });
+  }
+
+  function schedulePoll() {
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(function () {
+      if (document.hidden) schedulePoll(); else load();
+    }, last.building ? BUILDING_POLL_MS : POLL_MS);
   }
 
   document.getElementById("explain-btn").addEventListener("click", function () {
@@ -946,7 +983,6 @@
 
   initTzPicker();
   load();
-  setInterval(function () { if (!document.hidden) load(); }, POLL_MS);
   setInterval(updateStamp, 1000);
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden && Date.now() - last.fetchedAt > POLL_MS - 5000) load();
