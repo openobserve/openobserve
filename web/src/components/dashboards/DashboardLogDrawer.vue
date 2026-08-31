@@ -1051,7 +1051,7 @@ function openInLogs() {
                         :class="[
                           'dld-ctx-dot rounded-full',
                           String(ev._timestamp) === String(selectedEvent!._timestamp) &&
-                            'dld-ctx-dot--current ring-accent/25 ring-2',
+                            'dld-ctx-dot--current ring-focus-ring-accent ring-2',
                         ]"
                       />
                       <div

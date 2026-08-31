@@ -90,6 +90,9 @@
   --color-text-code: var(--color-grey-300); /* inline code, monospace */
   --color-text-inverse: var(--color-grey-900); /* text on light/colored bg */
   --color-accent: var(--color-primary-400); /* brand accent — lighter shade for dark surfaces */
+  /* Only accent + warning need a dark step; danger/success hold their light value. */
+  --color-focus-ring-accent: var(--color-primary-400);
+  --color-focus-ring-warning: var(--color-warning-500);
   --color-sql-accent: #a78bfa; /* SQL/query violet — lighter for dark surfaces */
   --color-function-accent: var(
     --color-blue-400
@@ -214,9 +217,6 @@
   /* ghost-subtle */
   --color-button-ghost-subtle-hover-bg: var(--color-surface-accent-hover);
   --color-button-ghost-subtle-active-bg: var(--color-surface-accent-active);
-
-  /* destructive */
-  --color-button-destructive-focus-ring: var(--color-error-300);
 
   /* Dropdown */
   --color-dropdown-item-hover-bg: var(--color-surface-accent-hover);

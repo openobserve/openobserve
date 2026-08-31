@@ -55,7 +55,20 @@ const { getOrSetServiceColor } = useTraces();
 
 const rootColor = computed(() => getOrSetServiceColor(props.item.service_name) ?? "#9e9e9e");
 
-const serviceIconUrl = computed(() =>
-  getServiceIconDataUrl(props.item.service_name, isDark.value, rootColor.value),
-);
+const serviceIconUrl = computed(() => {
+  if (props.item.infer_service_system) {
+    return getServiceIconDataUrl(props.item.infer_service_system, isDark.value, rootColor.value);
+  }
+
+  if (props.item.infer_service_type) {
+    return getServiceIconDataUrl(
+      props.item.service_name,
+      isDark.value,
+      rootColor.value,
+      props.item.infer_service_type,
+    );
+  }
+
+  return getServiceIconDataUrl(props.item.service_name, isDark.value, rootColor.value);
+});
 </script>

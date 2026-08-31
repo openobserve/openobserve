@@ -23,6 +23,7 @@ import { escapeSingleQuotes } from "@/utils/zincutils";
 export interface ViewTracesPayload {
   serviceName?: string;
   serviceType?: string;
+  serviceSystem?: string | null;
   operationName?: string;
   nodeName?: string;
   podName?: string;
@@ -52,6 +53,15 @@ export function buildViewTracesFilter(data: ViewTracesPayload): string {
   const escapedServiceName = escapeSingleQuotes(data.serviceName);
   const serviceField = data.serviceType ? "infer_service_name" : "service_name";
   let filterQuery = `${serviceField} = '${escapedServiceName}'`;
+
+  if (data.serviceType && Object.prototype.hasOwnProperty.call(data, "serviceSystem")) {
+    filterQuery += ` AND infer_service_type = '${escapeSingleQuotes(data.serviceType)}'`;
+    if (data.serviceSystem) {
+      filterQuery += ` AND infer_service_system = '${escapeSingleQuotes(data.serviceSystem)}'`;
+    } else {
+      filterQuery += " AND (infer_service_system IS NULL OR infer_service_system = '')";
+    }
+  }
 
   if (data.operationName) {
     filterQuery += ` AND operation_name = '${escapeSingleQuotes(data.operationName)}'`;

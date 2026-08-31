@@ -132,7 +132,7 @@ const hasLabel = computed(
             : 'border-switch-border-off bg-transparent',
         props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         'outline-none',
-        'focus-visible:ring-accent/25 focus-visible:ring-4',
+        'focus-visible:ring-focus-ring-accent focus-visible:ring-4',
         'transition-[color,background-color,border-color,box-shadow] duration-200',
       ]"
     >
