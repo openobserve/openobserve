@@ -1,0 +1,6 @@
+{
+  "group": "AIObservability",
+  "spec_filename": "aiObservabilityExperiments.spec.js",
+  "create_group": true,
+  "browser": "chrome"
+}

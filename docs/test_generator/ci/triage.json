@@ -1,0 +1,34 @@
+{
+  "feature_slug": "ai-observability-experiments",
+  "feature_title": "AI Observability Experiments",
+  "area": "AIObservability",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "aiObservabilityExperiments.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/AIObservability/aiObservabilityExperiments.spec.js",
+  "playwright_group": "AIObservability",
+  "source_files": [
+    "web/src/enterprise/views/AIObservability/Index.vue",
+    "web/src/enterprise/views/AIObservability/PlaygroundPage.vue",
+    "web/src/enterprise/views/AIObservability/ExperimentDetailPage.vue",
+    "web/src/enterprise/views/AIObservability/ExperimentComparePage.vue",
+    "web/src/enterprise/components/AIObservability/ExperimentBrowser.vue",
+    "web/src/enterprise/components/AIObservability/ExperimentComparisonPanel.vue",
+    "web/src/enterprise/components/AIObservability/ExperimentForm.vue",
+    "web/src/enterprise/views/AIObservability/experimentRoutes.ts",
+    "web/src/services/llm-experiments.service.ts",
+    "web/src/plugins/traces/LLMInsightsDashboard.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The changed-file list (authoritative) spans both OSS and enterprise locations: OSS files under web/src/services/ (llm-experiments.service.ts), web/src/plugins/traces/ (LLMInsightsDashboard.vue, LLMInsightsSkeleton.vue) and web/src/components/common/ (SectionRail.vue), plus a large enterprise layer under web/src/enterprise/components/AIObservability/ and web/src/enterprise/views/AIObservability/. This is a linked OSS implementation + enterprise layer pair, so edition is 'both'.",
+    "skip": "Not skipped. No tests-added label or skip request was passed, and the trigger comment is empty. The change is not docs/CI-only: it alters real user-facing UI in web/src/** (new experiment clone flow, comparison panel enrichment, playground expected/variable bars), so it is user-facing and must proceed.",
+    "e2e": "E2E is warranted. The diff adds/alters user-facing UI flows: an experiment clone flow (cloneOf route option + cloneLoadError/cloneSuccess i18n), richer ExperimentComparisonPanel output (dataType, baseline/candidate labels, dispersion, within-noise), Playground expected/variable bars, and multiple AIObservability views (Index, PlaygroundPage, ExperimentDetailPage, ExperimentComparePage). These are interactive flows a user exercises and need Playwright verification.",
+    "area": "AIObservability is the area: the bulk of the UI changes live under web/src/enterprise/views/AIObservability/ and web/src/enterprise/components/AIObservability/, which is a dedicated AI Observability rail (llmInsights, sessions, playground, experiments, remoteTasks, etc.) rather than one of the existing Logs/Metrics/Traces areas. No existing tests/ui-testing/playwright-tests/AIObservability/ folder exists yet, so the Engineer must create it.",
+    "group": "No existing matrix testfolder fits AI Observability (the manifests have no AIObservability shard). A new 'AIObservability' shard is required; because this is an enterprise feature, the Engineer must add it to tests/ui-testing/ci-matrix/ci_matrix.ent.json (shards), and the spec should join that new group.",
+    "existing_tests": "No E2E specs in the diff. The changed list contains only Vitest unit specs under web/src/** (*.spec.ts) and no tests/ui-testing/playwright-tests/**/*.spec.js files, so existing_tests_in_diff is false and there is no existing Playwright coverage to extend or complement."
+  }
+}

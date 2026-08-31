@@ -1,0 +1,26 @@
+{
+  "feature_slug": "ai-observability-experiments",
+  "feature_title": "AI Observability Experiments",
+  "area": "AIObservability",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "aiObservabilityExperiments.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/AIObservability/aiObservabilityExperiments.spec.js",
+  "playwright_group": "AIObservability",
+  "source_files": [
+    "web/src/enterprise/views/AIObservability/Index.vue",
+    "web/src/enterprise/views/AIObservability/PlaygroundPage.vue",
+    "web/src/enterprise/views/AIObservability/ExperimentDetailPage.vue",
+    "web/src/enterprise/views/AIObservability/ExperimentComparePage.vue",
+    "web/src/enterprise/components/AIObservability/ExperimentBrowser.vue",
+    "web/src/enterprise/components/AIObservability/ExperimentComparisonPanel.vue",
+    "web/src/enterprise/components/AIObservability/ExperimentForm.vue",
+    "web/src/enterprise/views/AIObservability/experimentRoutes.ts",
+    "web/src/services/llm-experiments.service.ts",
+    "web/src/plugins/traces/LLMInsightsDashboard.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

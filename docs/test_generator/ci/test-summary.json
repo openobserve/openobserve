@@ -1,0 +1,11 @@
+[
+  { "title": "should render the experiments page shell with the new experiment button", "action": "new", "verifies": "the experiments list page mounts with its header and New button" },
+  { "title": "should load the create experiment form with identity, task and scorers sections", "action": "new", "verifies": "the create form mounts its identity, task and scorers sections and submit button" },
+  { "title": "should surface validation errors when the create form is submitted empty", "action": "new", "verifies": "an empty submit surfaces the required-name error and stays on the form" },
+  { "title": "should render the playground bench with the run-all control and variable bar", "action": "new", "verifies": "the playground bench renders its title, run-all control, variable bar and window count" },
+  { "title": "should ask for confirmation before resetting the playground", "action": "new", "verifies": "reset opens a confirmation dialog that dismisses without clearing on cancel" },
+  { "title": "should render the experiments list grouped by dataset", "action": "new", "verifies": "the experiments browser renders dataset groups (seeded data required)" },
+  { "title": "should render the experiment detail page with meta and results table", "action": "new", "verifies": "the detail page renders meta and the results table (seeded experiment required)" },
+  { "title": "should render the compare page for a baseline and candidate pair", "action": "new", "verifies": "the compare page renders a comparison panel or empty state (two seeded experiments required)" },
+  { "title": "should lock the dataset and show the clone title when cloning an experiment", "action": "new", "verifies": "the clone form shows the clone title and locks the dataset (seeded cloneable experiment required)" }
+]
