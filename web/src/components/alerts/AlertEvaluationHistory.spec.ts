@@ -116,7 +116,7 @@ describe("AlertEvaluationHistory", () => {
     expect(retryCells.map((c) => c.text())).toEqual(["2", "1", "0"]);
   });
 
-  it("shows an em dash for retries on rows written before the field existed", async () => {
+  it("renders an em dash when retries is absent", async () => {
     wrapper = await mountComp({
       hits: [makeEvaluation({ retries: null })],
     });
