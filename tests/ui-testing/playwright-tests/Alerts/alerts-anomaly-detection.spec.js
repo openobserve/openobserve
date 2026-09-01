@@ -516,10 +516,10 @@ test.describe("Anomaly Detection Alerts", () => {
 
   test.describe("Sensitivity and Preview", () => {
 
-    test("Load sensitivity preview chart", {
+    test("Load data preview chart", {
       tag: ['@functional', '@anomaly', '@P1', '@all']
     }, async ({ page }) => {
-      testLogger.info('Testing sensitivity preview');
+      testLogger.info('Testing data preview');
 
       const anomalyName = testAnomalyName('Preview');
 
@@ -536,14 +536,14 @@ test.describe("Anomaly Detection Alerts", () => {
       await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
       await pm.anomalyDetectionPage.setTrainingWindow(1);
 
-      // Scroll to sensitivity section
-      await pm.anomalyDetectionPage.scrollToSensitivitySection();
+      // Scroll to data preview section
+      await pm.anomalyDetectionPage.scrollToDataPreviewSection();
 
       // Verify empty state initially
-      await pm.anomalyDetectionPage.expectSensitivityEmptyState();
+      await pm.anomalyDetectionPage.expectDataPreviewEmptyState();
 
       // Load preview
-      await pm.anomalyDetectionPage.loadSensitivityPreview();
+      await pm.anomalyDetectionPage.loadDataPreview();
 
       // Verify chart appears
       await pm.anomalyDetectionPage.expectChartVisible();
@@ -554,41 +554,43 @@ test.describe("Anomaly Detection Alerts", () => {
       testLogger.info('Preview chart loaded successfully');
     });
 
-    // TODO: Slider adjustment method is a placeholder - needs proper implementation
-    test.skip("Adjust sensitivity slider", {
+    test("Adjust sensitivity tier and percentile", {
       tag: ['@functional', '@anomaly', '@P1', '@all']
     }, async ({ page }) => {
-      testLogger.info('Testing sensitivity slider adjustment');
+      testLogger.info('Testing sensitivity adjustment');
 
-      const anomalyName = testAnomalyName('Slider');
+      const anomalyName = testAnomalyName('Sensitivity');
 
       await pm.anomalyDetectionPage.clickAddAnomaly();
 
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
 
       await pm.anomalyDetectionPage.clickTab('Detection Config');
+
+      // Resolution feeds the hint below the control
       await pm.anomalyDetectionPage.setDetectionResolution(5, 'm');
-      await pm.anomalyDetectionPage.setCheckEvery(10, 'm');
-      await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
-      await pm.anomalyDetectionPage.setTrainingWindow(1);
 
       await pm.anomalyDetectionPage.scrollToSensitivitySection();
-      await pm.anomalyDetectionPage.loadSensitivityPreview();
 
-      // Adjust slider
-      await pm.anomalyDetectionPage.adjustSensitivitySlider(20, 80);
+      // Picking a tier sets the percentile it stands for
+      await pm.anomalyDetectionPage.selectSensitivityTier(95);
+      await pm.anomalyDetectionPage.expectSensitivityTierActive(95);
 
-      // Verify range label updates
-      const label = await pm.anomalyDetectionPage.getThresholdRangeLabel();
-      testLogger.info('Sensitivity range updated', { label });
+      const tierPercentile = await pm.anomalyDetectionPage.getSensitivityPercentile();
+      expect(tierPercentile).toBe('95');
 
-      // Label should contain the range values
-      expect(label).toContain('20');
-      expect(label).toContain('80');
+      // Typing a percentile re-highlights the tier that matches it
+      await pm.anomalyDetectionPage.setSensitivityPercentile(99);
+      await pm.anomalyDetectionPage.expectSensitivityTierActive(99);
+
+      // Hint restates the percentile as an anomaly rate
+      const hint = await pm.anomalyDetectionPage.getSensitivityHint();
+      testLogger.info('Sensitivity updated', { hint });
+      expect(hint).toContain('1%');
 
       await pm.anomalyDetectionPage.clickBack();
 
-      testLogger.info('Slider adjustment works');
+      testLogger.info('Sensitivity adjustment works');
     });
   });
 

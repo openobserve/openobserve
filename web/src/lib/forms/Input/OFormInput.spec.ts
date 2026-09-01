@@ -112,4 +112,25 @@ describe("OFormInput", () => {
     expect(wrapper.find('[role="alert"]').exists()).toBe(false);
     expect(wrapper.find(".external-error").text()).toBe("custom error");
   });
+
+  it("forwards model-modifiers to OInput so a number field stores a number", async () => {
+    wrapper = mount(OForm, {
+      props: { defaultValues: { threshold: 97 } },
+      slots: {
+        default: () =>
+          h(OFormInput, {
+            name: "threshold",
+            type: "number",
+            modelModifiers: { number: true },
+          }),
+      },
+      global: { components: { OFormInput } },
+    });
+    await wrapper.find("input").setValue("95");
+    await flushPromises();
+    const form = (
+      wrapper.vm as unknown as { form: { state: { values: Record<string, unknown> } } }
+    ).form;
+    expect(form.state.values.threshold).toBe(95);
+  });
 });

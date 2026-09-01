@@ -35,19 +35,21 @@ class AnomalyDetectionPage {
             // Detection config
             detectionFunctionSelect: '[data-test="anomaly-detection-function"]',
             detectionFunctionField: '[data-test="anomaly-detection-function-field"]',
-            histogramIntervalValue: '[data-test="anomaly-histogram-interval-value"]',
+            histogramIntervalValue: '[data-test="anomaly-histogram-interval-value-field"]',
             histogramIntervalUnit: '[data-test="anomaly-histogram-interval-unit"]',
-            scheduleIntervalValue: '[data-test="anomaly-schedule-interval-value"]',
+            scheduleIntervalValue: '[data-test="anomaly-schedule-interval-value-field"]',
             scheduleIntervalUnit: '[data-test="anomaly-schedule-interval-unit"]',
-            detectionWindowValue: '[data-test="anomaly-detection-window-value"]',
+            detectionWindowValue: '[data-test="anomaly-detection-window-value-field"]',
             detectionWindowUnit: '[data-test="anomaly-detection-window-unit"]',
-            trainingWindow: '[data-test="anomaly-training-window"]',
+            trainingWindow: '[data-test="anomaly-training-window-field"]',
             retrainInterval: '[data-test="anomaly-retrain-interval"]',
-            sensitivityLoadBtn: '[data-test="anomaly-sensitivity-load-btn"]',
-            sensitivityChart: '[data-test="anomaly-sensitivity-chart"]',
-            sensitivityEmpty: '[data-test="anomaly-sensitivity-empty"]',
-            thresholdRange: '[data-test="anomaly-threshold-range"]',
-            thresholdRangeLabel: '[data-test="anomaly-threshold-range-label"]',
+            dataPreviewLoadBtn: '[data-test="anomaly-data-preview-load-btn"]',
+            dataPreviewChart: '[data-test="anomaly-data-preview-chart"]',
+            dataPreviewEmpty: '[data-test="anomaly-data-preview-empty"]',
+            sensitivityTier: '[data-test="anomaly-sensitivity-tier"]',
+            sensitivityPercentile: '[data-test="anomaly-sensitivity-percentile"] input',
+            sensitivityHint: '[data-test="anomaly-sensitivity-hint"]',
+            sensitivityError: '[data-test="anomaly-sensitivity-error"]',
             customSql: '[data-test="anomaly-custom-sql"]',
             customSqlTimestampError: '[data-test="anomaly-sql-timestamp-error"]',
             filterRow: '[data-test="anomaly-filter-row"]',
@@ -80,6 +82,7 @@ class AnomalyDetectionPage {
             cloneButton: (name) => `[data-test="alert-list-${name}-clone-alert"]`,
             moreOptionsButton: (name) => `[data-test="alert-list-${name}-more-options"]`,
             triggerDetectionButton: (name) => `[data-test="alert-list-${name}-trigger-detection"]`,
+            sensitivityTierButton: (percentile) => `[data-test="anomaly-sensitivity-tier-${percentile}"]`,
         };
 
         // Also keep direct references for backward compatibility
@@ -100,9 +103,8 @@ class AnomalyDetectionPage {
         this.detectionWindowUnit = this.selectors.detectionWindowUnit;
         this.trainingWindow = this.selectors.trainingWindow;
         this.retrainInterval = this.selectors.retrainInterval;
-        this.sensitivityLoadBtn = this.selectors.sensitivityLoadBtn;
-        this.sensitivityChart = this.selectors.sensitivityChart;
-        this.thresholdRange = this.selectors.thresholdRange;
+        this.dataPreviewLoadBtn = this.selectors.dataPreviewLoadBtn;
+        this.dataPreviewChart = this.selectors.dataPreviewChart;
         this.alertEnabledToggle = this.selectors.alertEnabled;
         this.destinationSelect = this.selectors.destination;
         this.backButton = this.selectors.backButton;
@@ -523,14 +525,14 @@ class AnomalyDetectionPage {
     }
 
     /**
-     * Load sensitivity preview
+     * Load data preview
      */
-    async loadSensitivityPreview() {
-        const loadBtn = this.page.locator(this.selectors.sensitivityLoadBtn);
+    async loadDataPreview() {
+        const loadBtn = this.page.locator(this.selectors.dataPreviewLoadBtn);
         if (await loadBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
             await loadBtn.click();
             await this.page.waitForTimeout(5000); // Wait for chart to load
-            testLogger.info('Loaded sensitivity preview');
+            testLogger.info('Loaded data preview');
         }
     }
 
@@ -538,18 +540,39 @@ class AnomalyDetectionPage {
      * Expect chart to be visible
      */
     async expectChartVisible() {
-        const chart = this.page.locator(this.selectors.sensitivityChart);
+        const chart = this.page.locator(this.selectors.dataPreviewChart);
         await expect(chart).toBeVisible({ timeout: 10000 });
     }
 
     /**
-     * Adjust sensitivity slider
-     * @param {number} min - Min threshold
-     * @param {number} max - Max threshold
+     * Select a sensitivity tier
+     * @param {number} percentile - Tier percentile (99, 97 or 95)
      */
-    async adjustSensitivitySlider(min, max) {
-        // This is a placeholder - actual implementation depends on slider UI
-        testLogger.info('Adjusted sensitivity slider', { min, max });
+    async selectSensitivityTier(percentile) {
+        const tier = this.page.locator(this.selectors.sensitivityTierButton(percentile));
+        await tier.click();
+        await this.page.waitForTimeout(300);
+        testLogger.info('Selected sensitivity tier', { percentile });
+    }
+
+    /**
+     * Set the exact sensitivity percentile
+     * @param {number} percentile - Percentile between 50 and 99
+     */
+    async setSensitivityPercentile(percentile) {
+        const input = this.page.locator(this.selectors.sensitivityPercentile);
+        await input.fill(String(percentile));
+        await this.page.waitForTimeout(300);
+        testLogger.info('Set sensitivity percentile', { percentile });
+    }
+
+    /**
+     * Expect a sensitivity tier to be the selected one
+     * @param {number} percentile - Tier percentile (99, 97 or 95)
+     */
+    async expectSensitivityTierActive(percentile) {
+        const tier = this.page.locator(this.selectors.sensitivityTierButton(percentile));
+        await expect(tier).toHaveAttribute('data-state', 'on', { timeout: 5000 });
     }
 
     /**
@@ -664,10 +687,10 @@ class AnomalyDetectionPage {
     }
 
     /**
-     * Expect sensitivity empty state to be visible
+     * Expect data preview empty state to be visible
      */
-    async expectSensitivityEmptyState() {
-        const emptyState = this.page.locator(this.selectors.sensitivityEmpty);
+    async expectDataPreviewEmptyState() {
+        const emptyState = this.page.locator(this.selectors.dataPreviewEmpty);
         await expect(emptyState).toBeVisible({ timeout: 5000 });
     }
 
@@ -683,17 +706,34 @@ class AnomalyDetectionPage {
      * Scroll to sensitivity section
      */
     async scrollToSensitivitySection() {
-        const loadBtn = this.page.locator(this.selectors.sensitivityLoadBtn);
+        const tierGroup = this.page.locator(this.selectors.sensitivityTier);
+        await tierGroup.scrollIntoViewIfNeeded();
+    }
+
+    /**
+     * Scroll to data preview section
+     */
+    async scrollToDataPreviewSection() {
+        const loadBtn = this.page.locator(this.selectors.dataPreviewLoadBtn);
         await loadBtn.scrollIntoViewIfNeeded();
     }
 
     /**
-     * Get threshold range label text
+     * Get the exact sensitivity percentile
      * @returns {Promise<string>}
      */
-    async getThresholdRangeLabel() {
-        const label = this.page.locator(this.selectors.thresholdRangeLabel);
-        return await label.textContent();
+    async getSensitivityPercentile() {
+        const input = this.page.locator(this.selectors.sensitivityPercentile);
+        return await input.inputValue();
+    }
+
+    /**
+     * Get sensitivity hint text
+     * @returns {Promise<string>}
+     */
+    async getSensitivityHint() {
+        const hint = this.page.locator(this.selectors.sensitivityHint);
+        return await hint.textContent();
     }
 
     /**
@@ -1086,18 +1126,18 @@ class AnomalyDetectionPage {
     }
 
     /**
-     * Load sensitivity data and configure threshold
+     * Load data preview and wait for the chart
      */
-    async loadAndConfigureSensitivity() {
-        const loadBtn = this.page.locator(this.sensitivityLoadBtn);
+    async loadAndVerifyDataPreview() {
+        const loadBtn = this.page.locator(this.dataPreviewLoadBtn);
         if (await loadBtn.isVisible({ timeout: 3000 })) {
             await loadBtn.click();
             await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
             await this.page.waitForTimeout(2000);
 
             // Wait for chart to load
-            await expect(this.page.locator(this.sensitivityChart)).toBeVisible({ timeout: 10000 });
-            testLogger.info('Loaded sensitivity data');
+            await expect(this.page.locator(this.dataPreviewChart)).toBeVisible({ timeout: 10000 });
+            testLogger.info('Loaded data preview');
         }
     }
 
@@ -1191,9 +1231,9 @@ class AnomalyDetectionPage {
         await this.setScheduleInterval(1, 'minutes');   // Run detection every 1 minute (faster tests)
         await this.setDetectionWindow(1, 'hours');      // Look back 1 hour for anomalies
 
-        // Note: Skip sensitivity loading as it's optional and not required for anomaly creation
-        // The sensitivity preview can be loaded separately if needed
-        // await this.loadAndConfigureSensitivity();
+        // Note: Skip data preview loading as it's optional and not required for anomaly creation
+        // The data preview can be loaded separately if needed
+        // await this.loadAndVerifyDataPreview();
 
         // Enable alerting if destination provided, otherwise disable alerting
         if (destinationName) {

@@ -483,10 +483,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Threshold / Sensitivity -->
-        <div class="mb-4! flex items-start pb-0!">
-          <div class="flex items-center pt-1 font-semibold" style="width: 11.875rem">
+        <!-- Sensitivity -->
+        <div class="mb-4! flex flex-row items-start gap-2 pb-0!">
+          <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
             {{ t("alerts.sensitivity") }}
+            <span class="text-status-error-text ml-1">*</span>
             <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
               <OTooltip
                 side="right"
@@ -496,93 +497,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </OIcon>
           </div>
-          <div style="width: calc(100% - 11.875rem)">
-            <!-- Chart + Slider container -->
-            <div class="w-full">
-              <!-- Header row: range labels + load button -->
-              <div class="mb-2 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <span class="text-text-secondary text-xs">{{
-                    t("alerts.anomaly.anomalyScoreRange")
-                  }}</span>
-                  <span class="text-xs font-semibold" data-test="anomaly-threshold-range-label"
-                    >{{ thresholdRange.min ?? 0 }} – {{ thresholdRange.max }}</span
-                  >
-                </div>
-                <OButton
-                  variant="outline"
-                  size="sm-action"
-                  :disabled="!config.stream_name || (queryMode === 'custom_sql' && !customSql)"
-                  data-test="anomaly-sensitivity-load-btn"
-                  @click="loadPreview"
+          <div class="flex flex-1 flex-col gap-1">
+            <div class="flex items-start gap-3">
+              <OFormToggleGroup
+                name="threshold"
+                :aria-label="t('alerts.sensitivity')"
+                data-test="anomaly-sensitivity-tier"
+              >
+                <!-- Both controls share one field, so the message is rendered once below. -->
+                <template #error />
+                <OToggleGroupItem
+                  v-for="tier in sensitivityTiers"
+                  :key="tier.value"
+                  :value="tier.value"
+                  size="sm"
+                  :data-test="`anomaly-sensitivity-tier-${tier.value}`"
                 >
-                  {{ t("alerts.anomaly.loadData") }}
-                  <OTooltip
-                    v-if="!config.stream_name"
-                    :content="t('alerts.anomaly.selectStreamFirstTooltip')"
-                  />
-                  <OTooltip
-                    v-else-if="queryMode === 'custom_sql' && !customSql"
-                    :content="t('alerts.anomaly.enterSqlFirst')"
-                  />
-                </OButton>
-              </div>
+                  {{ tier.label }}
+                </OToggleGroupItem>
+              </OFormToggleGroup>
+              <OFormInput
+                name="threshold"
+                type="number"
+                :model-modifiers="{ number: true }"
+                :label="t('alerts.anomaly.percentile')"
+                class="max-w-21.75 min-w-21.75"
+                data-test="anomaly-sensitivity-percentile"
+              >
+                <template #error />
+              </OFormInput>
+            </div>
+            <div
+              v-if="thresholdError"
+              class="text-input-error-text pt-1 text-xs"
+              data-test="anomaly-sensitivity-error"
+              role="alert"
+            >
+              {{ thresholdError }}
+            </div>
+            <span
+              v-if="sensitivityHint"
+              class="text-text-secondary text-xs"
+              data-test="anomaly-sensitivity-hint"
+            >
+              {{ sensitivityHint }}
+            </span>
+          </div>
+        </div>
 
-              <!-- Chart + Vertical Slider row -->
-              <div class="flex gap-3">
-                <!-- Time series chart -->
-                <div class="relative min-h-45 flex-1">
-                  <div
-                    v-if="!previewActive"
-                    class="rounded-default border-border-default flex h-45 w-full flex-col items-center justify-center border border-dashed"
-                    :class="'text-text-secondary'"
-                    data-test="anomaly-sensitivity-empty"
-                  >
-                    <OIcon name="bar-chart" size="lg" class="mb-2 opacity-40" />
-                    <span class="text-xs">{{
-                      !config.stream_name
-                        ? t("alerts.anomaly.selectStreamFirst")
-                        : t("alerts.anomaly.clickLoadDataHint")
-                    }}</span>
-                  </div>
-                  <PanelSchemaRenderer
-                    v-else
-                    :key="previewKey"
-                    :panelSchema="previewPanelSchema"
-                    :selectedTimeObj="previewTimeObj"
-                    :variablesData="{}"
-                    :forceLoad="true"
-                    searchType="ui"
-                    class="w-full"
-                    style="height: 11.25rem"
-                    data-test="anomaly-sensitivity-chart"
-                    @series-data-update="onSeriesDataUpdate"
-                  />
-                </div>
-
-                <!-- Vertical dual-handle range slider -->
-                <div class="flex w-15 shrink-0 flex-col items-center">
-                  <OFormRange
-                    name="threshold_range"
-                    :min="0"
-                    :max="100"
-                    :step="1"
-                    vertical
-                    reverse
-                    label-always
-                    markers
-                    :marker-labels="[
-                      { value: 0, label: raw('0') },
-                      { value: 25, label: raw('25') },
-                      { value: 50, label: raw('50') },
-                      { value: 75, label: raw('75') },
-                      { value: 100, label: raw('100') },
-                    ]"
-                    class="sensitivity-range-slider mt-3.5 h-36.25! [--color-slider-thumb-border:white] [--color-slider-thumb:var(--color-accent)] [--color-slider-track-fill:var(--color-accent)] [--color-slider-value:var(--color-text-secondary)]"
-                    data-test="anomaly-threshold-range"
-                  />
-                </div>
+        <!-- Data preview -->
+        <div class="mb-4! flex flex-row items-start gap-2 pb-0!">
+          <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
+            {{ t("alerts.anomaly.dataPreview") }}
+          </div>
+          <div class="flex flex-1 flex-col gap-2">
+            <div class="flex justify-end">
+              <OButton
+                variant="outline"
+                size="sm-action"
+                :disabled="!config.stream_name || (queryMode === 'custom_sql' && !customSql)"
+                data-test="anomaly-data-preview-load-btn"
+                @click="loadPreview"
+              >
+                {{ t("alerts.anomaly.loadData") }}
+                <OTooltip
+                  v-if="!config.stream_name"
+                  :content="t('alerts.anomaly.selectStreamFirstTooltip')"
+                />
+                <OTooltip
+                  v-else-if="queryMode === 'custom_sql' && !customSql"
+                  :content="t('alerts.anomaly.enterSqlFirst')"
+                />
+              </OButton>
+            </div>
+            <div class="relative min-h-45">
+              <div
+                v-if="!previewActive"
+                class="rounded-default border-border-default flex h-45 w-full flex-col items-center justify-center border border-dashed"
+                :class="'text-text-secondary'"
+                data-test="anomaly-data-preview-empty"
+              >
+                <OIcon name="bar-chart" size="lg" class="mb-2 opacity-40" />
+                <span class="text-xs">{{
+                  !config.stream_name
+                    ? t("alerts.anomaly.selectStreamFirst")
+                    : t("alerts.anomaly.clickLoadDataHint")
+                }}</span>
               </div>
+              <PanelSchemaRenderer
+                v-else
+                :key="previewKey"
+                :panelSchema="previewPanelSchema"
+                :selectedTimeObj="previewTimeObj"
+                :variablesData="{}"
+                :forceLoad="true"
+                searchType="ui"
+                class="w-full"
+                style="height: 11.25rem"
+                data-test="anomaly-data-preview-chart"
+              />
             </div>
           </div>
         </div>
@@ -613,7 +626,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import OFormRange from "@/lib/forms/Range/OFormRange.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import {
@@ -639,7 +651,6 @@ export default defineComponent({
     OForm,
     OFormInput,
     OFormSelect,
-    OFormRange,
   },
 
   props: {
@@ -692,6 +703,12 @@ export default defineComponent({
       { label: t("alerts.anomaly.retrainSevenDays"), value: 7 },
       { label: t("alerts.anomaly.retrainFourteenDays"), value: 14 },
     ]);
+    // Values stay numbers — reka-ui matches the active item with ohash.isEqual.
+    const sensitivityTiers = computed(() => [
+      { value: 99, label: t("alerts.anomaly.sensitivityConservative") },
+      { value: 97, label: t("alerts.anomaly.sensitivityBalanced") },
+      { value: 95, label: t("alerts.anomaly.sensitivityAggressive") },
+    ]);
 
     const getTimestampColumn = () => store.state.zoConfig.timestamp_column || "_timestamp";
 
@@ -716,9 +733,7 @@ export default defineComponent({
     const histogramIntervalUnit = form.useStore((s: any) => s.values.histogram_interval_unit);
     const detectionWindowValue = form.useStore((s: any) => s.values.detection_window_value);
     const trainingWindowDays = form.useStore((s: any) => s.values.training_window_days);
-    const thresholdRange = form.useStore(
-      (s: any) => s.values.threshold_range ?? { min: 0, max: 100 },
-    );
+    const threshold = form.useStore((s: any) => s.values.threshold);
     // Bare-widget errors (Monaco custom_sql + the data-test div) render only
     // after the first submit attempt, same timing as the wrappers.
     const showSqlErrors = form.useStore((s: any) => s.submissionAttempts > 0);
@@ -734,6 +749,33 @@ export default defineComponent({
     const histogramIntervalError = fieldError("histogram_interval_value");
     const scheduleIntervalError = fieldError("schedule_interval_value");
     const detectionWindowError = fieldError("detection_window_value");
+    const thresholdError = fieldError("threshold");
+
+    // Suppressed on bad input: the error message is the feedback there, not a rate quoting it.
+    const sensitivityHint = computed(() => {
+      const pct = Number(threshold.value);
+      const resValue = Number(histogramIntervalValue.value);
+      if (!Number.isInteger(pct) || pct < 50 || pct > 99) return raw("");
+      if (!Number.isFinite(resValue) || resValue <= 0) return raw("");
+      const resSeconds = resValue * (histogramIntervalUnit.value === "h" ? 3600 : 60);
+      const perDay = (86400 / resSeconds) * ((100 - pct) / 100);
+      if (!Number.isFinite(perDay) || perDay <= 0) return raw("");
+      const resolution = raw(`${resValue}${histogramIntervalUnit.value}`);
+      const perDayRounded = Math.round(perDay);
+      if (perDayRounded >= 1) {
+        return t(
+          "alerts.anomaly.sensitivityHintPerDay",
+          { rate: 100 - pct, count: perDayRounded, resolution },
+          perDayRounded,
+        );
+      }
+      const days = Math.round(1 / perDay);
+      return t(
+        "alerts.anomaly.sensitivityHintEveryNDays",
+        { rate: 100 - pct, count: days, resolution },
+        days,
+      );
+    });
 
     // Write-back watch (form → props.config): the parent reads props.config
     // directly (live anomalyPreviewSql computed + saveAnomalyDetection payload),
@@ -768,8 +810,7 @@ export default defineComponent({
         cfg.detection_window_unit = v.detection_window_unit;
         cfg.training_window_days = toModelNumber(v.training_window_days);
         cfg.retrain_interval_days = toModelNumber(v.retrain_interval_days);
-        cfg.threshold_min = v.threshold_range?.min ?? 0;
-        cfg.threshold = v.threshold_range?.max ?? 100;
+        cfg.threshold = toModelNumber(v.threshold);
       },
       { deep: true },
     );
@@ -1082,18 +1123,7 @@ export default defineComponent({
           custom_chart_options: {
             tooltip: { appendToBody: true, confine: false },
           },
-          mark_line: [
-            {
-              name: t("alerts.anomaly.maxThresholdMarkLine"),
-              type: "yAxis",
-              value: String(thresholdRange.value.max),
-            },
-            {
-              name: t("alerts.anomaly.minThresholdMarkLine"),
-              type: "yAxis",
-              value: String(thresholdRange.value.min),
-            },
-          ],
+          mark_line: [],
         },
         queryType: "sql",
         queries: [
@@ -1146,8 +1176,6 @@ export default defineComponent({
       };
       previewKey.value++;
       previewActive.value = true;
-      previewHasData.value = false; // reset until new data arrives
-      seriesDataMax.value = null;
     };
 
     // Auto-refresh when Look Back Window, Detection Resolution, filters, or
@@ -1174,53 +1202,6 @@ export default defineComponent({
       },
       { deep: true },
     );
-
-    const previewHasData = ref(false);
-    const seriesDataMax = ref<number | null>(null);
-
-    const onSeriesDataUpdate = (data: any) => {
-      const series = data?.options?.series ?? data?.series ?? [];
-      previewHasData.value = series.some((s: any) => Array.isArray(s.data) && s.data.length > 0);
-
-      // Find the max y value across all series so we can convert the 0-100
-      // slider percentages into actual y-axis values for the mark lines.
-      let max = -Infinity;
-      for (const s of series) {
-        if (!Array.isArray(s.data)) continue;
-        for (const point of s.data) {
-          // Points can be [x, y], plain number, or { value: [x, y] / y }
-          let raw: any = point;
-          if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) raw = raw.value;
-          const v: any = Array.isArray(raw) ? raw[1] : raw;
-          if (typeof v === "number" && isFinite(v) && v > max) max = v;
-        }
-      }
-      if (isFinite(max) && max !== seriesDataMax.value) {
-        seriesDataMax.value = max;
-      }
-    };
-
-    const updateMarkLines = (maxPct: number, minPct: number) => {
-      if (!previewPanelSchema.value) return;
-      const yMax = seriesDataMax.value;
-      // If data is loaded, map 0-100% → actual y values; otherwise fall back to raw %
-      const toValue = (pct: number) => (yMax !== null ? (pct / 100) * yMax : pct);
-      previewPanelSchema.value.config.mark_line = [
-        { name: "", type: "yAxis", value: String(toValue(maxPct)) },
-        { name: "", type: "yAxis", value: String(toValue(minPct)) },
-      ];
-    };
-
-    // Keep mark_line in sync with slider — update the schema config in-place
-    // so PanelSchemaRenderer re-renders the lines without a full chart reload.
-    watch(thresholdRange, ({ max, min }) => updateMarkLines(max, min), {
-      deep: true,
-    });
-
-    // Re-apply mark lines once data max is known after chart loads.
-    watch(seriesDataMax, () => {
-      updateMarkLines(thresholdRange.value.max, thresholdRange.value.min);
-    });
 
     return {
       raw,
@@ -1257,15 +1238,15 @@ export default defineComponent({
       histogramIntervalError,
       scheduleIntervalError,
       detectionWindowError,
+      thresholdError,
+      sensitivityTiers,
+      sensitivityHint,
       onCustomSqlChange,
-      thresholdRange,
       previewActive,
       previewKey,
       previewPanelSchema,
       previewTimeObj,
       loadPreview,
-      previewHasData,
-      onSeriesDataUpdate,
     };
   },
 });

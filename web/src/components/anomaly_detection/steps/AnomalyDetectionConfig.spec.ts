@@ -67,6 +67,8 @@ vi.mock("@/components/QueryEditor.vue", () => ({
 }));
 
 import AnomalyDetectionConfig from "./AnomalyDetectionConfig.vue";
+import { anomalyDetectionConfigDefaults } from "./AnomalyDetectionConfig.schema";
+import { defaultAnomalyConfig } from "@/composables/useAlertForm";
 
 // ---------------------------------------------------------------------------
 // Mount factory — keeps stubs and global plugins in one place
@@ -86,7 +88,6 @@ function buildConfig(configOverrides: Record<string, unknown> = {}) {
     detection_window_unit: "m",
     training_window_days: 7,
     threshold: 97,
-    threshold_min: 0,
     ...configOverrides,
   };
 }
@@ -132,6 +133,30 @@ const renderedFilterFields = (w: VueWrapper): unknown[] =>
     .findAllComponents(OFormSelect)
     .filter((c: any) => /^filters\[\d+\]\.field$/.test(c.props("name") || ""))
     .map((c: any) => c.findComponent(OSelect).props("modelValue"));
+
+// The sensitivity tiers, in render order (decreasing percentile).
+const SENSITIVITY_TIERS = [99, 97, 95];
+
+// data-state of each tier button. A missing button reads as undefined so a
+// "no tier is active" assertion cannot pass just because nothing rendered.
+const tierStates = (w: VueWrapper): Array<string | undefined> =>
+  SENSITIVITY_TIERS.map((value) => {
+    const button = w.find(`[data-test="anomaly-sensitivity-tier-${value}"]`);
+    return button.exists() ? button.attributes("data-state") : undefined;
+  });
+
+// The exact-percentile <input> (data-test lands on the OInput wrapper div).
+const percentileInput = (w: VueWrapper) =>
+  w.find('[data-test="anomaly-sensitivity-percentile"] input');
+
+// The one copy string the tests pin: it is the only anchor proving the range
+// message is the translated one rather than zod's raw English default.
+const RANGE_MESSAGE = "Enter a whole number between 50 and 99";
+
+const sensitivityHintText = (w: VueWrapper): string | undefined => {
+  const hint = w.find('[data-test="anomaly-sensitivity-hint"]');
+  return hint.exists() ? hint.text() : undefined;
+};
 
 // ---------------------------------------------------------------------------
 // Helper: call loadPreview() and return the normalised SQL string
@@ -800,18 +825,23 @@ describe("AnomalyDetectionConfig", () => {
       expect(typeof config.histogram_interval_value).toBe("number");
     });
 
-    it("threshold range max/min are written back to threshold / threshold_min", async () => {
-      const { wrapper: w, config } = mountReturning();
-      wrapper = w;
+    // The threshold_min absence is asserted against a config built by
+    // defaultAnomalyConfig() — the object the real app hands this step. A local
+    // fixture that never had the key could not prove the write-back stopped
+    // adding it.
+    it("threshold is written back as a number", async () => {
+      const config = defaultAnomalyConfig();
+      wrapper = mount(AnomalyDetectionConfig, { ...mountOptions, props: { config } });
       await flushPromises();
       const form = getForm(wrapper);
 
-      form.setFieldValue("threshold_range", { min: 10, max: 80 });
+      form.setFieldValue("threshold", 95);
       await flushPromises();
       await nextTick();
 
-      expect(config.threshold).toBe(80);
-      expect(config.threshold_min).toBe(10);
+      expect(config.threshold).toBe(95);
+      expect(typeof config.threshold).toBe("number");
+      expect("threshold_min" in config).toBe(false);
     });
 
     it("query_mode is mirrored to props.config (egress, not into-form mirror)", async () => {
@@ -825,6 +855,358 @@ describe("AnomalyDetectionConfig", () => {
       await nextTick();
 
       expect(config.query_mode).toBe("custom_sql");
+    });
+  });
+
+  // =========================================================================
+  // Sensitivity — ONE form field (`threshold`, always a number) behind two
+  // controls: the three-tier toggle group and the exact percentile input.
+  // Picking a tier sets the number; typing a number re-highlights the matching
+  // tier, or none. The derived hint line states what the setting costs in
+  // flagged buckets, and the single error message is rendered by the step (both
+  // wrappers suppress their own).
+  //
+  // The sliding pill is NOT asserted here: jsdom lays nothing out, so
+  // OToggleGroup's measure() always bails on offsetParent === null and
+  // indicatorVisible is false from mount forever. data-state on the buttons is
+  // the assertable selection state; the indicator case lives in
+  // OToggleGroup.spec.ts, which has the geometry harness for it.
+  // =========================================================================
+  describe("sensitivity — tier toggle + exact percentile on one field", () => {
+    it("clicking a tier sets threshold and writes it back to props.config", async () => {
+      const { wrapper: w, config } = mountReturning();
+      wrapper = w;
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await wrapper.find('[data-test="anomaly-sensitivity-tier-95"]').trigger("click");
+      await flushPromises();
+      await nextTick();
+
+      expect(form.state.values.threshold).toBe(95);
+      expect(config.threshold).toBe(95);
+    });
+
+    it("a seeded tier value renders that tier active", async () => {
+      wrapper = mountConfig({ threshold: 99 });
+      await flushPromises();
+
+      expect(tierStates(wrapper)).toEqual(["on", "off", "off"]);
+    });
+
+    it("a seeded non-tier value renders no tier active and shows the exact percentile", async () => {
+      wrapper = mountConfig({ threshold: 88 });
+      await flushPromises();
+
+      expect(tierStates(wrapper)).toEqual(["off", "off", "off"]);
+      expect((percentileInput(wrapper).element as HTMLInputElement).value).toBe("88");
+      expect(sensitivityHintText(wrapper)).toContain("12%");
+    });
+
+    it("typing a tier value lights that tier up", async () => {
+      wrapper = mountConfig({ threshold: 99 });
+      await flushPromises();
+      expect(tierStates(wrapper)).toEqual(["on", "off", "off"]);
+
+      await percentileInput(wrapper).setValue("95");
+      await flushPromises();
+      await nextTick();
+
+      expect(tierStates(wrapper)).toEqual(["off", "off", "on"]);
+    });
+
+    it("moving to a non-tier value after picking a tier leaves no tier active", async () => {
+      wrapper = mountConfig({ threshold: 97 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await wrapper.find('[data-test="anomaly-sensitivity-tier-99"]').trigger("click");
+      await flushPromises();
+      await nextTick();
+      expect(tierStates(wrapper)).toEqual(["on", "off", "off"]);
+
+      form.setFieldValue("threshold", 88);
+      await flushPromises();
+      await nextTick();
+
+      expect(tierStates(wrapper)).toEqual(["off", "off", "off"]);
+    });
+
+    it("the percentile input emits a number, not a string", async () => {
+      wrapper = mountConfig({ threshold: 97 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await percentileInput(wrapper).setValue("95");
+      await flushPromises();
+      await nextTick();
+
+      expect(form.state.values.threshold).toBe(95);
+      expect(typeof form.state.values.threshold).toBe("number");
+    });
+
+    it("hint states the anomaly rate and the flagged buckets per day", async () => {
+      wrapper = mountConfig({
+        threshold: 97,
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+      });
+      await flushPromises();
+
+      const hint = sensitivityHintText(wrapper);
+      expect(hint).toBeDefined();
+      expect(hint).toContain("3%");
+      expect(hint).toContain("9 per day");
+      // Without this an implementation that drops `resolution` from the named
+      // params renders "... at  resolution." and still passes.
+      expect(hint).toContain("5m");
+    });
+
+    it("hint rounds before branching — 0.96/day is 'per day', not 'one every 1 days'", async () => {
+      wrapper = mountConfig({
+        threshold: 99,
+        histogram_interval_value: 15,
+        histogram_interval_unit: "m",
+      });
+      await flushPromises();
+
+      const hint = sensitivityHintText(wrapper);
+      expect(hint).toBeDefined();
+      expect(hint).toContain("1 per day");
+      expect(hint).not.toContain("every");
+      expect(hint).toContain("15m");
+    });
+
+    it("hint switches to 'one every N days' below one flagged bucket a day", async () => {
+      wrapper = mountConfig({
+        threshold: 99,
+        histogram_interval_value: 1,
+        histogram_interval_unit: "h",
+      });
+      await flushPromises();
+
+      const hint = sensitivityHintText(wrapper);
+      expect(hint).toBeDefined();
+      expect(hint).toContain("every 4");
+      expect(hint).toContain("1h");
+    });
+
+    it("hint is suppressed when the detection resolution is empty", async () => {
+      wrapper = mountConfig({
+        threshold: 97,
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+      });
+      await flushPromises();
+      // Sanity first: without it, "absent" would also be satisfied by the whole
+      // row failing to render.
+      expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(true);
+
+      for (const bad of ["", 0, -5]) {
+        getForm(wrapper).setFieldValue("histogram_interval_value", bad);
+        await flushPromises();
+        await nextTick();
+        expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(false);
+      }
+    });
+
+    // toModelNumber passes "" through unchanged, so the parent's config briefly
+    // holds a non-number. Submit must stay blocked for as long as it does.
+    it("blocks submit while the percentile is cleared", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await percentileInput(wrapper).setValue("");
+      await flushPromises();
+      await nextTick();
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(false);
+      await expect((wrapper.vm as any).validate()).resolves.toBe(false);
+    });
+
+    it("a percentile below the accepted range blocks submit with exactly one message", async () => {
+      wrapper = mountConfig({ threshold: 40 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await form.handleSubmit();
+      await nextTick();
+
+      expect(form.state.isValid).toBe(false);
+      expect(fieldError(wrapper, "threshold")).toBe(RANGE_MESSAGE);
+      // Two OForm* wrappers on one field, but only the step's own message renders.
+      // Counting the step's own node cannot detect a duplicate — OFormInput's
+      // built-in message has a different data-test and OFormToggleGroup's has
+      // none — so count occurrences of the message TEXT.
+      const occurrences = wrapper.text().split(RANGE_MESSAGE).length - 1;
+      expect(occurrences).toBe(1);
+      expect(wrapper.find('[data-test="anomaly-sensitivity-error"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile-error"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="anomaly-sensitivity-error"]').attributes("role")).toBe(
+        "alert",
+      );
+      await expect((wrapper.vm as any).validate()).resolves.toBe(false);
+    });
+
+    it("a non-integer percentile is rejected with the translated message", async () => {
+      // A bare .int() would emit zod's untranslated "expected int, received
+      // number" here; the spinner and paste both produce decimals.
+      wrapper = mountConfig({ threshold: 95.5 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(false);
+      expect(fieldError(wrapper, "threshold")).toBe(RANGE_MESSAGE);
+    });
+
+    it("a percentile above 99 blocks submit (99 is the real server ceiling)", async () => {
+      wrapper = mountConfig({ threshold: 100 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await form.handleSubmit();
+      await nextTick();
+
+      expect(form.state.isValid).toBe(false);
+      expect(fieldError(wrapper, "threshold")).toBe(RANGE_MESSAGE);
+    });
+
+    it("hint is suppressed for a percentile outside the accepted range", async () => {
+      wrapper = mountConfig({
+        threshold: 97,
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(true);
+
+      getForm(wrapper).setFieldValue("threshold", 40);
+      await flushPromises();
+      await nextTick();
+
+      // An invalid percentile gets the error message, not a hint quoting a
+      // "60% anomaly rate" as though it were a real setting.
+      expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(false);
+    });
+
+    it("tier labels re-resolve when the locale changes", async () => {
+      wrapper = mountConfig({ threshold: 99 });
+      await flushPromises();
+      const before = wrapper.find('[data-test="anomaly-sensitivity-tier-99"]').text();
+
+      const previous = i18n.global.locale.value;
+      try {
+        i18n.global.locale.value = "de-DE";
+        await nextTick();
+        // A module-level const array would still read the English label captured
+        // at import time; a computed over t() re-resolves.
+        expect(wrapper.find('[data-test="anomaly-sensitivity-tier-99"]').text()).toBe(
+          i18n.global.t("alerts.anomaly.sensitivityConservative"),
+        );
+      } finally {
+        i18n.global.locale.value = previous;
+        await nextTick();
+      }
+
+      expect(wrapper.find('[data-test="anomaly-sensitivity-tier-99"]').text()).toBe(before);
+    });
+
+    it("hint is suppressed for a fractional percentile", async () => {
+      wrapper = mountConfig({
+        threshold: 97,
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(true);
+
+      // 100 - 97.3 is 2.700000000000003 in binary floating point; a fractional
+      // percentile is as invalid as an out-of-range one, so it gets the error.
+      getForm(wrapper).setFieldValue("threshold", 97.3);
+      await flushPromises();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(false);
+    });
+
+    it("the schema default threshold is 97 when the config carries none", () => {
+      expect(anomalyDetectionConfigDefaults(undefined).threshold).toBe(97);
+    });
+  });
+
+  // =========================================================================
+  // The dual-handle slider and its mark lines are GONE, not merely bypassed.
+  // Without these an additive implementation that leaves the old control in
+  // place would pass every test above.
+  // =========================================================================
+  describe("sensitivity — the removed slider and mark lines", () => {
+    it("no longer declares a threshold_range form field or renders the slider", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect(getForm(wrapper).state.values).not.toHaveProperty("threshold_range");
+      expect(wrapper.find('[data-test="anomaly-threshold-range"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-threshold-range-label"]').exists()).toBe(false);
+    });
+
+    it("builds the preview panel with no mark lines", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      await getSqlFromPreview(wrapper);
+
+      // The old lines were drawn at (percentile/100) * max(y) — a percentile
+      // multiplied by a bucket count, which nothing in the system computes.
+      expect((wrapper.vm as any).previewPanelSchema?.config?.mark_line).toEqual([]);
+    });
+
+    // The chart moves OUT of the sensitivity row into its own labelled row; it
+    // is not deleted. The 34 SQL tests call loadPreview() directly, so they
+    // would all stay green even if the markup vanished.
+    it("still renders the load-data button and the chart placeholder", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-data-preview-load-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-data-preview-empty"]').exists()).toBe(true);
+    });
+
+    it("labels the preview row and drops the score-range framing", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("Data preview");
+      expect(wrapper.text()).not.toContain("Anomaly Score Range");
+    });
+
+    it("gives the tier group an accessible name", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      // The row's "Sensitivity" text is a plain div bound to neither control,
+      // so aria-label is the group's only accessible name.
+      const group = wrapper.find('[data-test="anomaly-sensitivity-tier"]');
+      expect(group.exists()).toBe(true);
+      expect(group.attributes("aria-label")).toBe("Sensitivity");
+    });
+
+    it("exposes no mark-line or series-max machinery", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      // Only symbols actually exposed today are asserted — `updateMarkLines` was
+      // never in the setup() return, so asserting it would pass either way.
+      expect((wrapper.vm as any).onSeriesDataUpdate).toBeUndefined();
+      expect((wrapper.vm as any).previewHasData).toBeUndefined();
     });
   });
 
