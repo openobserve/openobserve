@@ -128,9 +128,8 @@ describe("OFormInput", () => {
     });
     await wrapper.find("input").setValue("95");
     await flushPromises();
-    const form = (
-      wrapper.vm as unknown as { form: { state: { values: Record<string, unknown> } } }
-    ).form;
+    const form = (wrapper.vm as unknown as { form: { state: { values: Record<string, unknown> } } })
+      .form;
     expect(form.state.values.threshold).toBe(95);
   });
 });

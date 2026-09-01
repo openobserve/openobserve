@@ -60,13 +60,15 @@ describe("generateAnomalySummary — anomaly rate", () => {
   // The percentile input can be emptied, and the write-back passes "" through
   // unchanged. `100 - ""` is 100, which announced "flag every bucket" — the most
   // alarming value in the range — for a field the user had merely cleared.
-  it.each([["", "empty string"], [null, "null"], [undefined, "undefined"], ["abc", "non-numeric"]])(
-    "omits the rate entirely for %s (%s) rather than claiming 100%%",
-    (threshold) => {
-      const summary = generateAnomalySummary(config({ threshold }), [], t);
-      expect(summary).not.toContain("anomaly rate");
-      // The rest of the summary still renders.
-      expect(summary).toContain("14 days");
-    },
-  );
+  it.each([
+    ["", "empty string"],
+    [null, "null"],
+    [undefined, "undefined"],
+    ["abc", "non-numeric"],
+  ])("omits the rate entirely for %s (%s) rather than claiming 100%%", (threshold) => {
+    const summary = generateAnomalySummary(config({ threshold }), [], t);
+    expect(summary).not.toContain("anomaly rate");
+    // The rest of the summary still renders.
+    expect(summary).toContain("14 days");
+  });
 });
