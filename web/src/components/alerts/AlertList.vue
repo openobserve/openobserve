@@ -128,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :loading="loading"
                     selectable
                     :selected-key="stateFilter"
+                    default-key="total"
                     @select="onStatSelect"
                   />
                 </div>
