@@ -1489,4 +1489,101 @@ describe("AlertList - ODialog/ODrawer migration", () => {
       ).toBe(true);
     });
   }, 15000);
+
+  /**
+   * The anomaly row is built field by field by `normalizeAnomalyToAlertRow`,
+   * so anything it does not list is invisible to the table however faithfully
+   * the list API sends it — the same trap the generic mapper warns about.
+   */
+  describe("anomaly detection list rows", () => {
+    /** One merged list item, in the shape `anomaly_config_to_list_item` emits. */
+    const anomalyItem = (extra: Record<string, any> = {}) => ({
+      ...makeAlert(1),
+      alert_id: "anomaly-1",
+      alert_type: "anomaly_detection",
+      name: "checkout-latency-anomaly",
+      is_real_time: false,
+      condition: null,
+      stream_name: "default",
+      stream_type: "logs",
+      enabled: true,
+      status: "ready",
+      priority: 2,
+      tags: ["prod", "team:checkout"],
+      last_outcome: "firing",
+      last_outcome_at: 1_700_000_000_000_000,
+      last_triggered_at: 1_700_000_000_000_000,
+      trigger_condition: { period: 60, frequency: 60, frequency_type: "minutes" },
+      ...extra,
+    });
+
+    const anomalyRow = async (extra: Record<string, any> = {}) => {
+      alertsDB = [anomalyItem(extra) as any];
+      const wrapper: any = await mountAlertList();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      await flushPromises();
+      return { wrapper, row: wrapper.vm.filteredResults[0] };
+    };
+
+    it("carries the run state the Last Outcome column reads", async () => {
+      const { wrapper, row } = await anomalyRow();
+
+      expect(row.alert_type).toBe("anomaly_detection");
+      expect(row.last_outcome).toBe("firing");
+      // The badge is only rendered when the outcome is present AND the row is
+      // running, so carrying the field is what actually lights the column.
+      expect(wrapper.vm.showRunOutcome(row)).toBe(true);
+      // The outcome is never presented as live state — always "as of <time>".
+      expect(row.last_outcome_at).toBe(1_700_000_000_000_000);
+      expect(String(wrapper.vm.runOutcomeTooltip(row))).toContain(
+        i18n.global.t("alerts.asOf") as string,
+      );
+    });
+
+    it("carries the priority and tags the API already sends", async () => {
+      const { row } = await anomalyRow();
+
+      expect(row.priority).toBe(2);
+      expect(row.tags).toEqual(["prod", "team:checkout"]);
+    });
+
+    it("leaves the badge off an anomaly that has never run", async () => {
+      const { wrapper, row } = await anomalyRow({ last_outcome: null, last_outcome_at: null });
+
+      expect(row.last_outcome).toBeNull();
+      expect(wrapper.vm.showRunOutcome(row)).toBe(false);
+    });
+
+    // A disabled config freezes whatever it last recorded; showing it would
+    // advertise "Firing" on something that is not running.
+    it("leaves the badge off a disabled anomaly that last fired", async () => {
+      const { wrapper, row } = await anomalyRow({ enabled: false });
+
+      expect(row.last_outcome).toBe("firing");
+      expect(wrapper.vm.showRunOutcome(row)).toBe(false);
+    });
+
+    // The columns that were already correct — pinned so the normalizer cannot
+    // lose them while gaining the ones above.
+    it("keeps the columns that already worked", async () => {
+      const { row } = await anomalyRow({ owner: "sre@example.com" });
+
+      expect(row.name).toBe("checkout-latency-anomaly");
+      expect(row.owner).toBe("sre@example.com");
+      expect(row.status).toBe("ready");
+      expect(row.enabled).toBe(true);
+      expect(row.last_triggered_at_raw).toBe(1_700_000_000_000_000);
+      expect(row.is_real_time).toBe("anomaly");
+    });
+
+    // Anomaly detection has no per-group fan-out, so the Groups cell must stay
+    // an em dash rather than claiming it observed zero groups.
+    it("claims no group fan-out", async () => {
+      const { row } = await anomalyRow();
+
+      expect(row.multi_alert).toBeUndefined();
+      expect(row.groups_observed).toBeUndefined();
+    });
+  }, 15000);
 });

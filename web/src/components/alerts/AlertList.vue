@@ -1688,6 +1688,11 @@ export default defineComponent({
       firing_count: anomaly.firing_count ?? "--",
       status: anomaly.status || "--",
       last_error: anomaly.last_error || null,
+      // Built field by field: anything unlisted is invisible to the table.
+      last_outcome: anomaly.last_outcome ?? null,
+      last_outcome_at: anomaly.last_outcome_at ?? null,
+      priority: anomaly.priority ?? null,
+      tags: anomaly.tags ?? [],
       selected: false,
       type: "anomaly",
       folder_name: {
