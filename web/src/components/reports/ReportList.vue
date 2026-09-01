@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- Left: folder list (< md: stacks above the table, bounded height) -->
         <div
-          class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:max-h-52 max-md:w-full max-md:border-b"
+          class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:w-full max-md:border-b"
         >
           <div class="h-full">
             <FolderList type="reports" @update:activeFolderId="updateActiveFolderId" />

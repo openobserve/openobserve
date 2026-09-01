@@ -51,7 +51,11 @@
          so `type="alerts"` is not a copy-paste slip — it is what makes a
          "payments" folder hold that team's alerts and its SLOs together. -->
     <template #sidebar>
-      <FolderList type="alerts" @update:activeFolderId="onFolderChange" />
+      <FolderList
+        type="alerts"
+        :drawer-on-mobile="false"
+        @update:activeFolderId="onFolderChange"
+      />
     </template>
 
     <OTable
