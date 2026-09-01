@@ -288,9 +288,7 @@ describe("LibraryCard", () => {
     // `hover:border-border-strong` outranks a plain `border-accent`, so leaving
     // the resting rules in place makes a selected card lose its accent on hover.
     const classes = (selected: boolean) =>
-      mountCard({ selected })
-        .find('[data-test="alert-library-card-k8s/pod-oom-killed"]')
-        .classes();
+      mountCard({ selected }).find('[data-test="alert-library-card-k8s/pod-oom-killed"]').classes();
 
     expect(classes(true)).toContain("border-accent");
     expect(classes(true)).not.toContain("border-border-default");

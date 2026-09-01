@@ -1249,7 +1249,9 @@ describe("LibraryInstallDialog", () => {
       wrapper
         .findAll('[data-test^="alert-library-install-alert-"]')
         .filter((box: any) => box.element.checked)
-        .map((box: any) => box.attributes("data-test")!.replace("alert-library-install-alert-", ""));
+        .map((box: any) =>
+          box.attributes("data-test")!.replace("alert-library-install-alert-", ""),
+        );
 
     it("ticks exactly the alerts the gallery handed over", async () => {
       const wrapper = await mountDialog({
@@ -1260,7 +1262,9 @@ describe("LibraryInstallDialog", () => {
       await click(wrapper, "alert-library-install-next");
 
       expect(ticked(wrapper).sort()).toEqual(["k8s/cert-expiring", "k8s/pod-oom-killed"]);
-      expect(wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected")).toBe("2");
+      expect(
+        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected"),
+      ).toBe("2");
     });
 
     it("offers a preselected alert the current filters exclude", async () => {
@@ -1277,9 +1281,13 @@ describe("LibraryInstallDialog", () => {
       await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
       await click(wrapper, "alert-library-install-next");
 
-      expect(wrapper.find('[data-test="alert-library-install-alert-kafka/consumer-lag"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="alert-library-install-alert-kafka/consumer-lag"]').exists(),
+      ).toBe(true);
       expect(ticked(wrapper)).toEqual(["kafka/consumer-lag"]);
-      expect(wrapper.find('[data-test="alert-library-install-count"]').attributes("data-total")).toBe("4");
+      expect(
+        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-total"),
+      ).toBe("4");
     });
 
     it("creates the off-view alert, not just lists it", async () => {
@@ -1359,8 +1367,9 @@ describe("LibraryInstallDialog", () => {
       await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
       await click(wrapper, "alert-library-install-next");
 
-      const rows = wrapper
-        .findAll('[data-test="alert-library-install-alert-k8s/node-disk-pressure"]');
+      const rows = wrapper.findAll(
+        '[data-test="alert-library-install-alert-k8s/node-disk-pressure"]',
+      );
       expect(rows).toHaveLength(1);
     });
   });
@@ -1401,7 +1410,9 @@ describe("LibraryInstallDialog", () => {
       const wrapper = await mountDialog({ seed: null, entries: many(50), preselect: many(50) });
       await advanceToInstall(wrapper);
 
-      expect(wrapper.find('[data-test="alert-library-install-confirm-large"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-library-install-confirm-large"]').exists()).toBe(
+        false,
+      );
       expect(runButton(wrapper).attributes("disabled")).toBeUndefined();
     });
 
@@ -1430,7 +1441,9 @@ describe("LibraryInstallDialog", () => {
       await wrapper.find(row).setValue(false);
       await flushPromises();
       await forwardToRun();
-      expect(wrapper.find('[data-test="alert-library-install-confirm-large"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-library-install-confirm-large"]').exists()).toBe(
+        false,
+      );
 
       await backToAlerts();
       await wrapper.find(row).setValue(true);
@@ -1486,7 +1499,9 @@ describe("LibraryInstallDialog", () => {
       expect(runButton(wrapper).attributes("disabled")).toBeUndefined();
 
       for (let back = 0; back < 4; back += 1) await click(wrapper, "alert-library-install-back");
-      await wrapper.get('[data-test="alert-library-install-destination"]').setValue("oncall-pagerduty");
+      await wrapper
+        .get('[data-test="alert-library-install-destination"]')
+        .setValue("oncall-pagerduty");
       await flushPromises();
       for (let next = 0; next < 4; next += 1) await click(wrapper, "alert-library-install-next");
 

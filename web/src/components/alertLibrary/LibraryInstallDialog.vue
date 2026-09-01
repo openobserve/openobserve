@@ -594,9 +594,7 @@ const reset = () => {
   hasRun.value = false;
   isInstalling.value = false;
 
-  selectedIds.value = props.seed
-    ? [props.seed.entry.id]
-    : props.preselect.map((entry) => entry.id);
+  selectedIds.value = props.seed ? [props.seed.entry.id] : props.preselect.map((entry) => entry.id);
   largeBatchConfirmed.value = false;
   // Seed the bulk pair from the alert the user was just looking at, so the
   // fields open on values that mean something rather than on a global default.

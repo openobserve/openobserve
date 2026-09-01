@@ -139,7 +139,9 @@ describe("alert_library locale parity", () => {
 
   it.each(LOCALES)("%s stops saying install where the meaning changed", (name, locale) => {
     const stems = INSTALL_STEMS[name] ?? [];
-    const stale = RENAMED.filter((path) => stems.some((stem) => stem.test(prose(at(locale, path)))));
+    const stale = RENAMED.filter((path) =>
+      stems.some((stem) => stem.test(prose(at(locale, path)))),
+    );
     expect(stale).toEqual([]);
   });
 

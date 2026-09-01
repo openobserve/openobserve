@@ -688,7 +688,8 @@ describe("AlertLibrary", () => {
 
     it("reads none, some and all as the selection grows", async () => {
       const wrapper = await mountView();
-      const state = () => wrapper.find(`[data-test="${ALL}"]`).find('[role="checkbox"]').attributes("aria-checked");
+      const state = () =>
+        wrapper.find(`[data-test="${ALL}"]`).find('[role="checkbox"]').attributes("aria-checked");
       expect(state()).toBe("false");
       await tick(wrapper, BOX);
       expect(state()).toBe("mixed");
@@ -925,9 +926,9 @@ describe("AlertLibrary", () => {
 
       expect(bar(wrapper).attributes("data-selected")).toBe("1");
       expect(
-        wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').attributes(
-          "data-selected",
-        ),
+        wrapper
+          .find('[data-test="alert-library-card-k8s/cert-expiring"]')
+          .attributes("data-selected"),
       ).toBe("true");
     });
 
@@ -937,9 +938,9 @@ describe("AlertLibrary", () => {
       const wrapper = await mountView();
       await tick(wrapper, ALL);
       expect(
-        wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').attributes(
-          "data-selected",
-        ),
+        wrapper
+          .find('[data-test="alert-library-card-k8s/cert-expiring"]')
+          .attributes("data-selected"),
       ).toBe("true");
       expect(bar(wrapper).attributes("data-selected")).toBe("4");
     });
@@ -947,8 +948,7 @@ describe("AlertLibrary", () => {
     it("counts one alert and many alerts differently on the button", async () => {
       const wrapper = await mountView();
       await tick(wrapper, BOX);
-      const label = (count: number) =>
-        i18n.global.t("alert_library.addSelected", { count }, count);
+      const label = (count: number) => i18n.global.t("alert_library.addSelected", { count }, count);
       const button = () => wrapper.get('[data-test="alert-library-add-selected"]').text();
 
       expect(label(1)).not.toContain("alert_library.");
@@ -992,7 +992,7 @@ describe("AlertLibrary", () => {
       await press(wrapper, "alert-library-add-selected");
       await tickRail(wrapper, "alert-library-rail-category-node");
 
-      expect((dialog(wrapper).props("preselect") as AlertLibraryEntry[])).toHaveLength(4);
+      expect(dialog(wrapper).props("preselect") as AlertLibraryEntry[]).toHaveLength(4);
     });
 
     it("ignores the gallery selection when the drawer starts the add", async () => {
@@ -1063,14 +1063,16 @@ describe("AlertLibrary", () => {
 
       expect(bar(wrapper).attributes("data-selected")).toBe("2");
       // The open wizard keeps the batch it started with.
-      expect((dialog(wrapper).props("preselect") as AlertLibraryEntry[])).toHaveLength(4);
+      expect(dialog(wrapper).props("preselect") as AlertLibraryEntry[]).toHaveLength(4);
     });
 
     it("opens the drawer from the card title, which is now the control", async () => {
       const wrapper = await mountView();
       const drawer = wrapper.findComponent({ name: "LibraryDrawer" });
 
-      await wrapper.find('[data-test="alert-library-card-title-k8s/cert-expiring"]').trigger("click");
+      await wrapper
+        .find('[data-test="alert-library-card-title-k8s/cert-expiring"]')
+        .trigger("click");
       expect(drawer.props("open")).toBe(true);
       expect((drawer.props("entry") as AlertLibraryEntry).id).toBe("k8s/cert-expiring");
     });
