@@ -1278,24 +1278,51 @@ exists"*. For bulk seeding use **scheduled** pipelines (`source.source_type: "sc
 
 ### 9.2 Pipeline destinations
 
-**UI path:** Left sidebar → **Pipelines** → **Destinations** (also **Settings → Pipeline Destinations**)
+**UI path:** **Left sidebar → Settings → Pipeline Destinations** (`/web/settings/pipeline_destinations`).
+⚠️ There is no `/web/pipeline/destinations` route — that URL 404s. The route is registered in
+`useManagementRoutes.ts` under Settings, not under Pipelines.
 
-**Scope:** the two check tables below, then this page's own rows.
+**Seeding data:** `POST /api/{org}/alerts/destinations?module=pipeline`. ⚠️ The URL passes
+through an **SSRF guard** — a host that does not resolve (e.g. `example.invalid`) is rejected
+with HTTP 400. Use a resolvable host such as `https://example.com/...`.
 
-#### What to run on this page
+> 🔴 **Issue #23 was found here and is now FIXED.** Deleting a destination left the row on
+> screen, and it survived navigating away and back — the exact failure C7 exists to catch. Both
+> the single-row and bulk delete paths now force a refetch. If a deleted destination reappears,
+> that regression is back.
 
-**Cache checks** — the point of this PR:
+**Browser-verified with 10 seeded destinations:**
 
-| # | Do this | Expect |
+| # | Check | Result |
 | --- | --- | --- |
-| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **2 (destinations + templates)** request(s) |
-| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
-| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
-| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
-| C6 | Create or edit a destination, save | Back on the list, the destination is **already there** — no manual refresh |
-| C7 | Delete a destination → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
-| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+| C1 | Cold read | ✅ **2 requests** — `alerts/destinations?…&module=pipeline` + `alerts/templates` |
+| C2 | Warm revisit < 5 min | ✅ **0** (measured with the entry 10 s old) |
+| C3 | Stale revisit > 5 min | ✅ **1** request at an entry age of **337 s**, and the table **never blanked** — 20 samples, rows held at 9, zero skeletons |
+| C4 | Refresh button | ✅ **1** request, rows stay on screen, no skeleton |
+| C5 | `r` shortcut | ✅ **1** request — real keypress |
+| C6 | Create → back on the list | ✅ 1 `POST` + **1 automatic refetch**; new row present, 10 → 11. Works because the editor saves through `saveDestinationMutation`, whose `meta.invalidates` is applied by the global `MutationCache.onSuccess` handler |
+| C7 | Delete → away → straight back | ✅ **after fixing #23.** 1 `DELETE` + 1 refetch, gone immediately (10 → 9), **still gone on return with 0 requests**. Before the fix: 0 refetches and the row stayed |
+| C8 | Search then Refresh | ✅ Term **preserved**, filtered rows preserved. Typing fires **0** requests (client-side) |
+| S4 | Search with no matches | ✅ Proper empty state: *"No destinations found"* |
+| S5 | Clear the search | ✅ Full list returns, **0** requests |
+
+**The create/delete asymmetry is worth understanding before testing other modules.** Writes that
+go through a `mutationOptions` with `meta: { invalidates: [...] }` refresh their list
+automatically — the global handler in `queryClient.ts:86` applies them. Writes that call the
+service directly do **not**, and must pass `force` to their own reader. On this page the create
+took the first path and the delete took the second, which is exactly why C6 passed and C7 failed.
+
+> ⚠️ **The create form is a two-step wizard**, not a single form: *Choose Type* (OpenObserve /
+> Splunk / Elasticsearch / Datadog / Dynatrace / Newrelic / Custom) → **Continue** → *Connection*
+> (name, URL, and a pre-filled endpoint + Authorization header). Step 1 has no text inputs at
+> all, so a script that looks for the name field before clicking Continue finds nothing.
+
+
+---
+
+> ⚠️ **The two checklists below are the originals, restored.** They were dropped when this
+> section was rewritten with measured results. Where a row is already covered by the results
+> table above, that measurement wins; everything else here still needs running.
 
 **Smoke checks** — did the data-fetching rewrite break anything ordinary:
 
@@ -1318,14 +1345,37 @@ exists"*. For bulk seeding use **scheduled** pipelines (`source.source_type: "sc
 
 **Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
-**UI path:** Pipelines → open a pipeline → **History**
+**UI path:** ⚠️ **Not "open a pipeline → History".** History is a **page-level** view reached from
+the **Pipeline History** button in the Pipelines page header — it is not per-pipeline; the
+pipeline is chosen from a dropdown once you are there. Route:
+`/web/pipeline/pipelines/history`.
 
-| Check | Expected |
+> ⚠️ **The header button may not render.** `#o2-page-actions` (the shell teleport target the
+> header buttons portal into) is sometimes absent, which hides *Pipeline History*, *Backfill*,
+> *Import* and *New pipeline* entirely. Reproduced on this build. When that happens, reach the
+> page by URL. Same root cause as the pipeline editor's missing Save button.
+
+**Browser-verified:**
+
+| Check | Result |
 | --- | --- |
-| Paginate | Table keeps its rows between pages; no blank flash |
-| Refresh button | One request; rows stay |
+| Paginate | ⚠️ **The table DOES blank.** Page 1 → 2 fires 1 request and the rows are replaced by **114 skeleton placeholders** mid-flight; same going back to page 1. The expectation *"keeps its rows between pages; no blank flash"* is **not met**. **Pre-existing — identical on `main`**: `loading` is a plain `ref(false)` flipped around every fetch (`:loading` at lines 67/100, set at 702, cleared at 760; `main` has the same at 482/701/756), so it cannot tell a cached read from a network one. Not filed as a branch bug |
+| Paginate — request count | **1 per page change**, both directions. Returning to page 1 refetches rather than serving from cache, because the key carries the **quantized time range** and the minute bucket moves — see §17/#17 |
+| Refresh button | ✅ **1 request** — `GET /{org}/pipelines/history?start_time=…`. ⚠️ Rows do **not** stay: the same `loading` flag blanks the table to 114 skeletons for the duration. Judge this row by the **request count**, which is correct |
 
----
+**Cold load fires 3 requests:** `pipelines` **twice** plus `pipelines/history` once. The two
+identical `pipelines` reads are the parent list's cached query **and** `PipelineHistory`'s own
+raw `pipelinesService.getPipelines(org)` call (line 666) that populates the pipeline dropdown.
+**Pre-existing — `main` makes the same raw call at the same line**; this branch migrated only
+the *history* read (`http().get` → `pipelineHistoryQuery`). It is a missed caching opportunity
+rather than a regression: `pipelinesQuery` already exists and the parent has the data cached, so
+`queryClient.fetchQuery(pipelinesQuery(org))` would make the second request free. Same shape as
+issue #19.
+
+✅ **The quantization fix (#17) is confirmed working here** — the request carries bucketed
+timestamps (`start_time=…160000000&end_time=…060000000`, a clean 15-minute span on minute
+boundaries) rather than a raw `Date.now()`, so revisits inside the same bucket can hit cache.
+
 
 ## 10. Functions and Enrichment Tables
 
@@ -1333,24 +1383,65 @@ exists"*. For bulk seeding use **scheduled** pipelines (`source.source_type: "sc
 
 ### 10.1 Functions
 
-**UI path:** Left sidebar → **Pipelines** → **Functions**
+**UI path:** **Left sidebar → hover Data → Functions** (`/web/pipeline/functions`).
+⚠️ `/web/functions` 404s — the route lives under `/web/pipeline/`.
 
-**Scope:** the two check tables below, then this page's own rows.
+**Data:** the org already had 35 functions, so no seeding was needed. Page size is 20.
 
-#### What to run on this page
+**Browser-verified — all eight checks pass, no bugs:**
 
-**Cache checks** — the point of this PR:
-
-| # | Do this | Expect |
+| # | Check | Result |
 | --- | --- | --- |
-| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
-| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
-| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
-| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
-| C6 | Create or edit a function, save | Back on the list, the function is **already there** — no manual refresh |
-| C7 | Delete a function → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
-| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+| C1 | Cold read | ✅ **1** request — `GET /{org}/functions?page_num=1&page_size=100000&…` |
+| C2 | Warm revisit < 5 min | ✅ **0** (entry verified 7 s old) |
+| C3 | Stale revisit > 5 min | ✅ **1** request at an entry age of **328 s**, and the table **never blanked** — 20 samples, rows held at 20, zero skeletons |
+| C4 | Refresh button (`functions-list-refresh-btn`) | ✅ **1** request, **rows stay on screen**, no skeleton |
+| C5 | `r` shortcut | ✅ **1** request — real keypress, rows stay |
+| C6 | Create → back on the list | ✅ 1 `POST` + **1 automatic refetch**; total 34 → 35 and the new row is on the list |
+| C7 | Delete → away → straight back | ✅ Confirm dialog, 1 `DELETE` + 1 refetch, gone immediately (35 → 34), **still gone on return with 0 requests** |
+| C8 | Search then Refresh | ✅ Term **preserved**, filtered rows preserved. Typing fires **0** requests (client-side) |
+| — | Paging 1 → 2 → 1 | ✅ **0 requests** each way |
+| — | Search with no matches | ✅ Proper empty state: *"No functions found"* |
+| — | Clear the search | ✅ Full list returns, **0** requests |
+
+**Why C6 and C7 both pass here** — Functions is wired through the mutation layer, so the
+invalidation is declarative rather than hand-rolled:
+
+```ts
+saveFunctionMutation        meta: { invalidates: [functionKeys.all(org)] }
+deleteFunctionMutation      meta: { invalidates: [functionKeys.all(org)] }
+bulkDeleteFunctionsMutation meta: { invalidates: [functionKeys.all(org)] }
+```
+
+The global `MutationCache.onSuccess` handler applies them, so no caller has to remember
+`force`. **This is the pattern to compare against** when a create/delete elsewhere fails to
+refresh — see §9.2, where the create used a mutation (passed) and the delete used a raw service
+call (failed, issue #23).
+
+> ⚠️ **The function name field is an inline-edit, not a plain input.** Until you click
+> `add-function-name-input-trigger` there is **no `<input>` in the DOM at all** — a script that
+> looks for the name field on arriving at the form finds nothing and looks broken. The body is a
+> Monaco editor (4 models on the page), not a textarea.
+
+
+---
+
+> ⚠️ **The two checklists below are the originals, restored.** They were dropped when this
+> section was rewritten with measured results. Where a row is already covered by the results
+> table above, that measurement wins; everything else here still needs running.
+
+**Smoke checks — measured on this page (all pass):**
+
+| # | Check | Result |
+| --- | --- | --- |
+| S1 | Sort a column | ✅ **0 requests** across 3 clicks, no blank, no skeleton, **no double-fire**. Only **Name** sorts, cycling asc → desc → neutral with three distinct header icons |
+| S2 | Page forward, then back | ✅ **0 requests** each way, no blank flash |
+| S3 | Bulk action | ✅ Row checkboxes → **Delete** (`function-list-delete-functions-btn`). Selected 2, confirmed: **1 bulk call + 1 refetch**, both rows gone, selection cleared, total 36 → 34 |
+| S4 | Search with no matches | ✅ Proper empty state: *"No functions found"* |
+| S5 | Clear the search | ✅ Full list returns, **0 requests** |
+| S6 | Export / download | ❌ **N/A — this page has no export at all.** Verified exhaustively: no export text anywhere on the page, no row overflow menu, and the only per-row actions are `function-list-edit-function-<name>` and `function-list-delete-function-<name>`. Skip this row here |
+
+The original checklist follows for reference.
 
 **Smoke checks** — did the data-fetching rewrite break anything ordinary:
 
@@ -1362,6 +1453,30 @@ exists"*. For bulk seeding use **scheduled** pipelines (`source.source_type: "sc
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
 | S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
+
+**This page's own checks — measured (all 7 pass):**
+
+| Check | Result |
+| --- | --- |
+| **Second visit paints rows** | ✅ Functions → Streams → back to Functions: **20 rows rendered, 0 requests**, no empty state. The shipped bug this row guards against does not reproduce |
+| **`r` shortcut** | ✅ **1** request — real keypress. Not a no-op |
+| Create a function → back to list | ✅ 1 `POST` (200) + 1 automatic refetch; row present without a manual refresh |
+| Delete a function → navigate away → return | ✅ 1 `DELETE` + 1 refetch, gone immediately, **still gone on return with 0 requests** |
+| Bulk-delete several functions | ✅ Selected 2 → **1 bulk call + 1 refetch**, both gone, selection cleared, count 36 → 34, **still gone after navigating away** |
+| Function appears in Logs | ✅ Created through the UI, then **Logs → pick a stream → More → Function Editor → the ƒx dropdown**: the new function is offered, with **0 extra function requests** — the dropdown reads the same cached list |
+| Deep link (`?action=add`) | ✅ **Opens once.** Sampled the DOM 24× over 6 s: never more than **1** `add-function-save-btn` and **1** name trigger. No double-mount from a cached paint followed by a fresh one |
+
+> ⚠️ **Reaching the Logs function dropdown takes four steps** and it does not exist until you
+> get there: **Logs → select a stream → More → Function Editor** → then the **ƒx** dropdown
+> (`logs-search-bar-function-dropdown`) appears. With no stream selected there is no function
+> control on the page at all.
+
+> ⚠️ **The create form can fail silently.** A save whose name field never registered still
+> fires a `POST`, so a script that counts requests reads it as success while nothing is created.
+> Confirm the name shows in `add-function-name-input-value` **before** saving, and check the
+> response status — not just that a request went out.
+
+The original checklist follows for reference.
 
 **This page's own checks** — specific to this module:
 
@@ -1375,23 +1490,39 @@ exists"*. For bulk seeding use **scheduled** pipelines (`source.source_type: "sc
 | Function appears in Logs | After creating one, open Logs → Functions dropdown | The new function is offered |
 | Deep link | Open Functions via the "add"/"update" deep link | The dialog opens **once**, not twice (a cached paint followed by a fresh one must not re-trigger it) |
 
-### 10.2 Enrichment tables — ⚠️ **needs an org that actually has enrichment tables**
+### 10.2 Enrichment tables
 
 **Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
-**UI path:** Left sidebar → **Pipelines** → **Enrichment Tables**
+**UI path:** **Left sidebar → hover Data → Enrichment Tables** (`/web/pipeline/enrichment-tables`).
 
-> The author flagged this one as **not verified live** because the test backend had no
-> enrichment tables. Please exercise it on an org that has some.
+**Seeding data:** `POST /api/{org}/enrichment_tables/{name}?append=false` with a
+`multipart/form-data` `file` field (a small CSV is enough). The org had **none**, which is why
+the author could not verify this section — 10 were seeded to run it.
 
-| Check | Steps | Expected |
-| --- | --- | --- |
-| Refresh keeps rows | With tables listed, click Refresh | Rows **stay on screen**; only the button spins. No skeleton, no page remount |
-| Refresh reaches the server | Watch Network while clicking Refresh | One request |
-| Page does not remount | Click Refresh and watch the page state | The page must **not** navigate to itself or reset its scroll and filters |
-| Upload a new enrichment table | — | It appears in the list without a manual refresh |
+**✅ Now verified live with 11 tables. All four checks pass.**
 
----
+| Check | Result |
+| --- | --- |
+| Refresh keeps rows | ✅ **Rows stay** — 16 samples during the refresh, never blanked, **zero skeletons**. Verified both with a full list (10 rows) and with an active filter (1 row) |
+| Refresh reaches the server | ⚠️ **2 requests, not 1** — `GET /{org}/enrichment_tables/status` **and** `GET /{org}/streams?type=enrichment_tables`. **Not a double-fire**: two different endpoints, one for the table list and one for the per-table ingest status. Expect 2 |
+| Page does not remount | ✅ URL unchanged, **scroll position unchanged**, and an active search filter is **preserved** (term still in the box, still filtering) across the refresh |
+| Upload a new enrichment table | ✅ `POST …/enrichment_tables/{name}?append=false` → 200, then **both reads re-fire automatically** and the new table appears in the list, 10 → 11, **with no manual refresh** |
+
+> ⚠️ **The cold load does NOT fetch the table list** — only `enrichment_tables/status`. The list
+> itself comes from the cached `["org","<org>","streams","nameList","enrichment_tables"]` entry.
+> Consequence when seeding via the API: the browser never saw those uploads, so the page shows
+> **0 rows** until you press Refresh. That is the cache behaving correctly on an out-of-band
+> change, **not** a bug — but it looks alarming. Seed first, then Refresh once.
+
+> ⚠️ **The upload form's file input does not hold the file.** The component tracks the attachment
+> in its own state, so `fileInput.files.length` reads **0** even when the file is attached and the
+> form shows its name and size. Judge attachment by the filename appearing in the form, not by
+> the input.
+
+**Related known finding:** issue #12 — `enrichment_tables/status` fires on **every** visit while
+the paired stream list is served from cache. Confirmed again here: the cold load's only request
+was `/status`.
 
 ## 11. Synthetics
 

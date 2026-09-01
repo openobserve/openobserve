@@ -1238,6 +1238,71 @@ pass with a rationale**; the rationale is what stops anyone re-checking it.
 
 ---
 
+### 23. Pipeline destinations: a deleted row stays on the list — the delete never invalidates — ✅ FIXED
+
+```
+Module:            Settings -> Pipeline Destinations (§9.2, check C7)
+UI path:           Left sidebar -> Settings -> Pipeline Destinations
+What to check:     delete a destination, then navigate away and come straight back
+What to expect:    "Gone immediately and still gone on return"
+What you got:      the deleted row stayed on screen, and survived the round trip
+```
+
+**Severity: High.** This is the exact check the plan flags as *"most likely regression"*, and it
+fails: the server deletes the destination, the UI keeps showing it, and navigating away and back
+does not correct it. Destinations sit in the **5-minute** `CONFIG_STALE_TIME` tier, so the stale
+row persists for a long time.
+
+**Measured before the fix:**
+
+```
+DELETE fired                    1
+list refetches                  0        <--
+row gone from the table         no
+after navigate away + back      still listed  (11 rows; server had 10)
+```
+
+**Cause.** The delete goes straight through the service rather than the mutation layer, so
+nothing invalidates the scope:
+
+```ts
+destinationService.delete({ ... }).then(() => { toast(...); getDestinations(); });
+```
+
+and `getDestinations()` **without force** ends in `queryClient.fetchQuery(options)`, which
+answers from cache while the entry is fresh — returning the list that still contains the deleted
+row. `deleteDestinationMutation` exists and carries
+`meta: { invalidates: [destinationKeys.all(org)] }`, but this component does not use it.
+
+Both delete paths were affected — the single-row delete **and** the bulk delete.
+
+**Why create (C6) passed but delete did not.** The editor saves through
+`saveDestinationMutation`, whose `meta.invalidates` is applied by the global
+`MutationCache.onSuccess` handler in `queryClient.ts`. Creates therefore refresh the list for
+free; deletes bypass that path entirely.
+
+**Caused by this branch.** On `main`, `getDestinations()` issued a real
+`destinationService.list(...)` call every time, so a delete always refetched.
+
+**Fix.** Force both delete paths, matching what the sibling `AlertsDestinationList.vue` already
+does — that file even documents the trap: *"Forced: this branch exists to hear it from the
+server, and an unforced read inside staleTime answers from cache without asking."*
+
+```ts
+getDestinations(true);   // single delete (:455) and bulk delete (:639)
+```
+
+**Verified after the fix:** 1 `DELETE` + **1 list refetch**, row gone immediately (10 -> 9), and
+**still gone after navigating away and back with 0 requests**. `vue-tsc --noEmit` clean;
+`PipelinesDestinationList.spec.ts` 36 passed / 4 skipped.
+
+**Worth a follow-up:** the idiomatic fix is to route these writes through
+`deleteDestinationMutation` / `bulkDeleteDestinationsMutation` so the declarative
+`meta.invalidates` applies, rather than relying on each caller remembering `force`. The same
+question applies to the pipeline writers in #22.
+
+---
+
 ### Verified fixed — not filed
 
 - **AI -> Evaluations force-refetching on every visit** (originally #2 in the parallel run)

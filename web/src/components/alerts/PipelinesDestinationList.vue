@@ -449,7 +449,8 @@ export default defineComponent({
                 name: confirmDelete.value.data.name,
               }),
             });
-            getDestinations();
+            // Forced: nothing invalidates this scope, and an unforced read inside staleTime keeps the deleted row.
+            getDestinations(true);
           })
           .catch((err) => {
             if (err.response.data.code === 409) {
@@ -632,7 +633,8 @@ export default defineComponent({
         }
 
         selectedDestinations.value = [];
-        getDestinations();
+        // Forced, same reason as the single delete above.
+        getDestinations(true);
       } catch (error: any) {
         dismiss();
         console.error("Error deleting destinations:", error);

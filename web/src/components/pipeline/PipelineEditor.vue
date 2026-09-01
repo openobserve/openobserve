@@ -918,8 +918,7 @@ const onSubmitPipeline = async () => {
 
   saveOperation
     .then(() => {
-      // The list renders straight from this scope, so without dropping it the
-      // router.push below lands on rows that predate the save.
+      // Drop the scope the list renders from, or the router.push below lands on pre-save rows.
       void queryClient.invalidateQueries({
         queryKey: pipelineKeys.all(store.state.selectedOrganization.identifier),
       });

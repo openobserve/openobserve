@@ -692,9 +692,7 @@ export default defineComponent({
         else allPipelinesCreated = false;
       }
 
-      // Once for the whole batch, not per item: the list stays mounted behind
-      // this child route, so an invalidation per pipeline would refetch it N times.
-      // Runs on partial success too — those pipelines still exist.
+      // Once per batch, not per item: the list stays mounted here, so N invalidations refetch it N times.
       if (anyPipelineCreated) {
         void queryClient.invalidateQueries({
           queryKey: pipelineKeys.all(store.state.selectedOrganization.identifier),
