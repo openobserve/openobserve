@@ -1,0 +1,110 @@
+diff --git a/node_modules/vue-draggable-next/dist/vue-draggable-next.cjs.js b/node_modules/vue-draggable-next/dist/vue-draggable-next.cjs.js
+index 28130c5..e3c8911 100644
+--- a/node_modules/vue-draggable-next/dist/vue-draggable-next.cjs.js
++++ b/node_modules/vue-draggable-next/dist/vue-draggable-next.cjs.js
+@@ -3374,6 +3374,18 @@ const VueDraggableNext = vue.defineComponent({
+             // Call setup's mounted method
+             mounted();
+         });
++        vue.onUnmounted(() => {
++            // __o2DestroySortable: Sortable holds every live instance's element in a
++            // module-level array, and __draggable_component__ points back at this
++            // component, so skipping destroy() retains the whole tree.
++            const inst = sortableInstance.value;
++            if (inst) {
++                const el = inst.el;
++                inst.destroy();
++                sortableInstance.value = null;
++                if (el && el.__draggable_component__) delete el.__draggable_component__;
++            }
++        });
+         // created lifecycle equivalent (run synchronously)
+         if (props.list !== null && props.modelValue !== null) {
+             console.error('list props are mutually exclusive! Please set one.');
+diff --git a/node_modules/vue-draggable-next/dist/vue-draggable-next.cjs.prod.js b/node_modules/vue-draggable-next/dist/vue-draggable-next.cjs.prod.js
+index 28130c5..e3c8911 100644
+--- a/node_modules/vue-draggable-next/dist/vue-draggable-next.cjs.prod.js
++++ b/node_modules/vue-draggable-next/dist/vue-draggable-next.cjs.prod.js
+@@ -3374,6 +3374,18 @@ const VueDraggableNext = vue.defineComponent({
+             // Call setup's mounted method
+             mounted();
+         });
++        vue.onUnmounted(() => {
++            // __o2DestroySortable: Sortable holds every live instance's element in a
++            // module-level array, and __draggable_component__ points back at this
++            // component, so skipping destroy() retains the whole tree.
++            const inst = sortableInstance.value;
++            if (inst) {
++                const el = inst.el;
++                inst.destroy();
++                sortableInstance.value = null;
++                if (el && el.__draggable_component__) delete el.__draggable_component__;
++            }
++        });
+         // created lifecycle equivalent (run synchronously)
+         if (props.list !== null && props.modelValue !== null) {
+             console.error('list props are mutually exclusive! Please set one.');
+diff --git a/node_modules/vue-draggable-next/dist/vue-draggable-next.esm-browser.js b/node_modules/vue-draggable-next/dist/vue-draggable-next.esm-browser.js
+index 8f63d72..1cfbad1 100644
+--- a/node_modules/vue-draggable-next/dist/vue-draggable-next.esm-browser.js
++++ b/node_modules/vue-draggable-next/dist/vue-draggable-next.esm-browser.js
+@@ -3,7 +3,7 @@
+   * (c) 2025 Anish George
+   * @license MIT
+   */
+-import { defineComponent, ref, computed, getCurrentInstance, onMounted, h, resolveComponent, nextTick } from 'vue';
++import { defineComponent, ref, computed, getCurrentInstance, onMounted, h, resolveComponent, nextTick , onUnmounted } from 'vue';
+ 
+ function getConsole() {
+     if (typeof window !== 'undefined') {
+@@ -3370,6 +3370,18 @@ const VueDraggableNext = defineComponent({
+             // Call setup's mounted method
+             mounted();
+         });
++        onUnmounted(() => {
++            // __o2DestroySortable: Sortable holds every live instance's element in a
++            // module-level array, and __draggable_component__ points back at this
++            // component, so skipping destroy() retains the whole tree.
++            const inst = sortableInstance.value;
++            if (inst) {
++                const el = inst.el;
++                inst.destroy();
++                sortableInstance.value = null;
++                if (el && el.__draggable_component__) delete el.__draggable_component__;
++            }
++        });
+         // created lifecycle equivalent (run synchronously)
+         if (props.list !== null && props.modelValue !== null) {
+             console.error('list props are mutually exclusive! Please set one.');
+diff --git a/node_modules/vue-draggable-next/dist/vue-draggable-next.esm-bundler.js b/node_modules/vue-draggable-next/dist/vue-draggable-next.esm-bundler.js
+index 8f63d72..1cfbad1 100644
+--- a/node_modules/vue-draggable-next/dist/vue-draggable-next.esm-bundler.js
++++ b/node_modules/vue-draggable-next/dist/vue-draggable-next.esm-bundler.js
+@@ -3,7 +3,7 @@
+   * (c) 2025 Anish George
+   * @license MIT
+   */
+-import { defineComponent, ref, computed, getCurrentInstance, onMounted, h, resolveComponent, nextTick } from 'vue';
++import { defineComponent, ref, computed, getCurrentInstance, onMounted, h, resolveComponent, nextTick , onUnmounted } from 'vue';
+ 
+ function getConsole() {
+     if (typeof window !== 'undefined') {
+@@ -3370,6 +3370,18 @@ const VueDraggableNext = defineComponent({
+             // Call setup's mounted method
+             mounted();
+         });
++        onUnmounted(() => {
++            // __o2DestroySortable: Sortable holds every live instance's element in a
++            // module-level array, and __draggable_component__ points back at this
++            // component, so skipping destroy() retains the whole tree.
++            const inst = sortableInstance.value;
++            if (inst) {
++                const el = inst.el;
++                inst.destroy();
++                sortableInstance.value = null;
++                if (el && el.__draggable_component__) delete el.__draggable_component__;
++            }
++        });
+         // created lifecycle equivalent (run synchronously)
+         if (props.list !== null && props.modelValue !== null) {
+             console.error('list props are mutually exclusive! Please set one.');
