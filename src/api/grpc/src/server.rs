@@ -31,11 +31,10 @@ use proto::cluster_rpc::{
 };
 use search_service::SEARCH_SERVER;
 use tokio::{net::TcpListener, sync::oneshot};
-use tokio_stream::wrappers::TcpListenerStream;
 use tonic::{
     codec::CompressionEncoding,
     service::interceptor::InterceptedService,
-    transport::{Identity, ServerTlsConfig},
+    transport::{Identity, ServerTlsConfig, server::TcpIncoming},
 };
 
 use crate::{
@@ -164,7 +163,7 @@ async fn run_common(
         if cfg.grpc.tls_enabled { "with TLS" } else { "" },
         gaddr
     );
-    let listener = bind_listener(gaddr, init_tx).await?;
+    let incoming = TcpIncoming::from(bind_listener(gaddr, init_tx).await?).with_nodelay(Some(true));
 
     let mut builder = server_builder()?;
     let ret = builder
@@ -180,7 +179,7 @@ async fn run_common(
         .add_service(flight_svc)
         .add_service(node_svc)
         .add_service(cluster_info_svc)
-        .serve_with_incoming_shutdown(TcpListenerStream::new(listener), async {
+        .serve_with_incoming_shutdown(incoming, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
         })
@@ -228,14 +227,14 @@ async fn run_router(
         if cfg.grpc.tls_enabled { "with TLS" } else { "" },
         gaddr
     );
-    let listener = bind_listener(gaddr, init_tx).await?;
+    let incoming = TcpIncoming::from(bind_listener(gaddr, init_tx).await?).with_nodelay(Some(true));
 
     let mut builder = server_builder()?;
     let ret = builder
         .add_service(logs_svc)
         .add_service(metrics_svc)
         .add_service(traces_svc)
-        .serve_with_incoming_shutdown(TcpListenerStream::new(listener), async {
+        .serve_with_incoming_shutdown(incoming, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
         })
@@ -288,6 +287,7 @@ fn server_builder() -> Result<tonic::transport::Server, anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
+    use futures::StreamExt;
     use tokio::net::TcpStream;
 
     use super::*;
@@ -318,5 +318,17 @@ mod tests {
                 .is_err()
         );
         assert!(init_rx.await.is_err());
+    }
+
+    #[tokio::test]
+    async fn incoming_stream_enables_tcp_nodelay() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let mut incoming = TcpIncoming::from(listener).with_nodelay(Some(true));
+
+        let _client = TcpStream::connect(addr).await.unwrap();
+        let accepted = incoming.next().await.unwrap().unwrap();
+
+        assert!(accepted.nodelay().unwrap());
     }
 }
