@@ -429,7 +429,9 @@ describe("rumReactNativeCard builder", () => {
       const card = rumReactNativeCard(subs, gt);
       const replay = card.steps.find((s) => s.id === "session-replay")!;
 
-      expect(replay.code!.raw).toContain("customEndpoint: 'https://other.example.com/rum/v1/other-org'");
+      expect(replay.code!.raw).toContain(
+        "customEndpoint: 'https://other.example.com/rum/v1/other-org'",
+      );
     });
 
     it("code.lang is 'tsx' with filename 'App.tsx'", () => {
