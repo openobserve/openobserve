@@ -3128,7 +3128,7 @@
       "installReactNativeSdkDesc": "Add the core SDK plus the optional session-replay and navigation packages. On iOS, run `npx pod-install` afterwards so the native modules are linked.",
       "initRumLogsDesc": "Wrap your app in `OpenObserveProvider`. The endpoints below are this org's — the SDK appends `/rum` and `/logs` to them. Adjust `applicationId`, `service` and `env` to describe your app. The `clientToken` ships inside your app bundle by design; it can only write RUM events and you can rotate it from this page's header.",
       "enableSessionReplayTitle": "Enable Session Replay",
-      "enableSessionReplayDesc": "Session Replay is configured **separately** from RUM and does **not** inherit `rumConfiguration.customEndpoint`. It also does not append a path, so it needs the full `/replay` URL below. Getting this wrong is the usual reason RUM events arrive but replays never do.",
+      "enableSessionReplayDesc": "Session Replay is configured **separately** from RUM and does **not** inherit `rumConfiguration.customEndpoint`. Give it its own base URL below — same shape as the RUM/Logs one. The bridge appends `/replay` itself, so do **not** add it yourself: a manually appended `/replay` double-appends the path and every upload is rejected with 401, which is the usual reason RUM events arrive but replays never do.",
       "trackScreensTitle": "Track Screens Automatically (Optional)",
       "trackScreensDesc": "If you use React Navigation, hand the SDK your navigation ref and every route change is recorded as a RUM view — no per-screen code.",
       "verifyReactNativeRumDesc": "Run the app on a simulator, emulator or device, move between a few screens, then hit Test — React Native events land in the `_rumdata` stream.",
