@@ -1,0 +1,433 @@
+diff --git a/tests/ui-testing/playwright-tests/Dashboards/crossLinkMultiStream.spec.js b/tests/ui-testing/playwright-tests/Dashboards/crossLinkMultiStream.spec.js
+index fdb59b43c53..d8f16c376b0 100644
+--- a/tests/ui-testing/playwright-tests/Dashboards/crossLinkMultiStream.spec.js
++++ b/tests/ui-testing/playwright-tests/Dashboards/crossLinkMultiStream.spec.js
+@@ -247,8 +247,8 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
+         testLogger.info('PASSED: Both streams cross-links visible in UNION ALL SQL query');
+     });
+ 
+-    // P1: Network verification — multiple result_schema calls for multi-stream
+-    test("should fire separate result_schema calls for each stream in multi-stream mode", {
++    // P1: Network verification — one result_schema call covering every selected stream
++    test("should fire one result_schema call covering both streams in multi-stream mode", {
+         tag: ['@crossLinking', '@multiStream', '@functional', '@P1', '@all']
+     }, async ({ page }) => {
+         testLogger.info('Testing network calls for multi-stream cross-links');
+@@ -262,7 +262,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
+         page.on('request', (request) => {
+             const url = request.url();
+             if (url.includes('result_schema') && url.includes('cross_linking=true')) {
+-                resultSchemaRequests.push(url);
++                resultSchemaRequests.push({ url, payload: request.postData() || '' });
+             }
+         });
+ 
+@@ -270,17 +270,24 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
+         await pm.logsPage.runQueryAndWaitForResults();
+         await page.waitForTimeout(3000);
+ 
+-        // Step 4: Verify multiple result_schema calls were fired
++        // Step 4: Verify the cross-linking call fired for the union query
+         testLogger.info('result_schema calls captured', {
+             count: resultSchemaRequests.length,
+-            urls: resultSchemaRequests
++            urls: resultSchemaRequests.map((r) => r.url)
+         });
+ 
++        // Multi-stream search is one UNION ALL BY NAME query, so cross-linking needs a
++        // single result_schema call — the backend resolves every table in the query and
++        // merges their links (see resolve_stream_names in the cross_linking branch).
+         expect(resultSchemaRequests.length,
+-            'Should fire at least 2 result_schema calls for 2 streams'
+-        ).toBeGreaterThanOrEqual(2);
++            'Should fire exactly one result_schema call for the union query'
++        ).toBe(1);
+ 
+-        testLogger.info('PASSED: Multiple result_schema calls verified for multi-stream');
++        const payload = resultSchemaRequests[0]?.payload || '';
++        expect(payload, `result_schema payload should query ${STREAM_A}`).toContain(STREAM_A);
++        expect(payload, `result_schema payload should query ${STREAM_B}`).toContain(STREAM_B);
++
++        testLogger.info('PASSED: single result_schema call covers both streams');
+     });
+ 
+     // P1: Dashboard table panel — single stream cross-link in drilldown menu
+diff --git a/web/src/composables/useLogs/useHistogram.spec.ts b/web/src/composables/useLogs/useHistogram.spec.ts
+index 8405afc21b9..3c73bf12032 100644
+--- a/web/src/composables/useLogs/useHistogram.spec.ts
++++ b/web/src/composables/useLogs/useHistogram.spec.ts
+@@ -82,10 +82,6 @@ describe("useHistogram Composable", () => {
+       expect(typeof wrapper.vm.resetHistogramWithError).toBe("function");
+     });
+ 
+-    it("should have setMultiStreamHistogramQuery function", () => {
+-      expect(typeof wrapper.vm.setMultiStreamHistogramQuery).toBe("function");
+-    });
+-
+     it("should have isHistogramEnabled function", () => {
+       expect(typeof wrapper.vm.isHistogramEnabled).toBe("function");
+     });
+diff --git a/web/src/composables/useLogs/useHistogram.ts b/web/src/composables/useLogs/useHistogram.ts
+index b735868ff69..036c10a5ad4 100644
+--- a/web/src/composables/useLogs/useHistogram.ts
++++ b/web/src/composables/useLogs/useHistogram.ts
+@@ -268,33 +268,6 @@ export const useHistogram = () => {
+     }
+   };
+ 
+-  const setMultiStreamHistogramQuery = (queryReq: any) => {
+-    let histogramQuery = `select histogram(${store.state.zoConfig.timestamp_column}, '${searchObj.meta.resultGrid.chartInterval}') AS zo_sql_key, count(*) AS zo_sql_num from "[INDEX_NAME]" [WHERE_CLAUSE] GROUP BY zo_sql_key`;
+-    let multiSql = [];
+-
+-    for (const stream of searchObj.data.stream.selectedStream) {
+-      // one or more filter fields are missing in this stream so no need to include in histogram query
+-      // this is to avoid the issue of missing fields in multi stream histogram query
+-      if (
+-        searchObj.data.stream.missingStreamMultiStreamFilter.includes(stream)
+-      ) {
+-        continue;
+-      }
+-      // Replace the index name and where clause in the histogram query for each stream
+-      multiSql.push(
+-        histogramQuery
+-          .replace("[INDEX_NAME]", stream)
+-          .replace(
+-            "[WHERE_CLAUSE]",
+-            searchObj.data.query ? "WHERE " + searchObj.data.query : "",
+-          ),
+-      );
+-    }
+-
+-    return multiSql.join(" UNION ALL ");
+-  };
+-
+-  // Bhargav Todo: duplicate function in index.vue
+   const isHistogramEnabled = (searchObj: any) => {
+     return (
+       searchObj.meta.refreshHistogram &&
+@@ -585,7 +558,6 @@ export const useHistogram = () => {
+     generateHistogramData,
+     resetHistogramWithError,
+     generateHistogramSkeleton,
+-    setMultiStreamHistogramQuery,
+     isHistogramEnabled,
+   };
+ };
+diff --git a/web/src/composables/useLogs/useSearchHistogramManager.spec.ts b/web/src/composables/useLogs/useSearchHistogramManager.spec.ts
+index 7f429339d92..d3b5d884405 100644
+--- a/web/src/composables/useLogs/useSearchHistogramManager.spec.ts
++++ b/web/src/composables/useLogs/useSearchHistogramManager.spec.ts
+@@ -50,7 +50,6 @@ let mockState: ReturnType<typeof createMockState>;
+ const mockHistogramFunctions = {
+   resetHistogramWithError: vi.fn(),
+   generateHistogramSkeleton: vi.fn(),
+-  setMultiStreamHistogramQuery: vi.fn(() => "mocked SQL"),
+   isHistogramEnabled: vi.fn(() => true),
+ };
+ 
+@@ -94,7 +93,6 @@ describe("useSearchHistogramManager", () => {
+     // Reset mock functions
+     mockHistogramFunctions.resetHistogramWithError.mockClear();
+     mockHistogramFunctions.generateHistogramSkeleton.mockClear();
+-    mockHistogramFunctions.setMultiStreamHistogramQuery.mockClear();
+     mockHistogramFunctions.isHistogramEnabled.mockReturnValue(true);
+     histogramManager = useSearchHistogramManager();
+   });
+@@ -139,14 +137,14 @@ describe("useSearchHistogramManager", () => {
+       expect(result).toBe(true);
+     });
+ 
+-    it("should return true for multi-stream non-SQL mode", () => {
++    it("should return false for multi-stream, which has no histogram", () => {
+       // Use mockState directly
+       mockState.searchObj.data.stream.selectedStream = ["stream1", "stream2"];
+       mockState.searchObj.meta.sqlMode = false;
+ 
+       const parsedSQL = {};
+       const result = histogramManager.shouldShowHistogram(parsedSQL);
+-      expect(result).toBe(true);
++      expect(result).toBe(false);
+     });
+   });
+ 
+@@ -329,7 +327,7 @@ describe("useSearchHistogramManager", () => {
+       expect(initializeSearchConnection).not.toHaveBeenCalled();
+     });
+ 
+-    it("should show error for multi-stream SQL mode", async () => {
++    it("should show the unavailable notice for any multi-stream search", async () => {
+       // Use mockState directly
+       mockState.searchObj.data.stream.selectedStream = ["stream1", "stream2"];
+       mockState.searchObj.meta.sqlMode = true;
+@@ -350,8 +348,8 @@ describe("useSearchHistogramManager", () => {
+       );
+ 
+       expect(mockHistogramFunctions.resetHistogramWithError).toHaveBeenCalledWith(
+-        "Histogram is not available for multi-stream SQL mode search.",
+-        0
++        "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
++        -1
+       );
+     });
+ 
+diff --git a/web/src/composables/useLogs/useSearchHistogramManager.ts b/web/src/composables/useLogs/useSearchHistogramManager.ts
+index 29af48d1666..f97367b4781 100644
+--- a/web/src/composables/useLogs/useSearchHistogramManager.ts
++++ b/web/src/composables/useLogs/useSearchHistogramManager.ts
+@@ -36,7 +36,6 @@ export const useSearchHistogramManager = () => {
+   const {
+     resetHistogramWithError,
+     generateHistogramSkeleton,
+-    setMultiStreamHistogramQuery,
+     isHistogramEnabled,
+   } = useHistogram();
+ 
+@@ -49,9 +48,7 @@ export const useSearchHistogramManager = () => {
+         (!searchObj.meta.sqlMode ||
+           isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
+         (isHistogramEnabled(searchObj) && !searchObj.meta.sqlMode)) &&
+-      (searchObj.data.stream.selectedStream.length === 1 ||
+-        (searchObj.data.stream.selectedStream.length > 1 &&
+-          !searchObj.meta.sqlMode))
++      searchObj.data.stream.selectedStream.length === 1
+     );
+   };
+ 
+@@ -71,13 +68,11 @@ export const useSearchHistogramManager = () => {
+   ) => {
+     const parsedSQL: any = fnParsedSQL();
+ 
+-    if (
+-      searchObj.data.stream.selectedStream.length > 1 &&
+-      searchObj.meta.sqlMode == true
+-    ) {
+-      const errMsg =
+-        "Histogram is not available for multi-stream SQL mode search.";
+-      resetHistogramWithError(errMsg, 0);
++    if (searchObj.data.stream.selectedStream.length > 1) {
++      resetHistogramWithError(
++        "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
++        -1,
++      );
+     }
+ 
+     if (!searchObj.data.queryResults?.hits?.length) {
+@@ -119,20 +114,11 @@ export const useSearchHistogramManager = () => {
+           payload.onReset = callbacks.onReset;
+         }
+ 
+-        if (
+-          searchObj.data.stream.selectedStream.length > 1 &&
+-          searchObj.meta.sqlMode == false
+-        ) {
+-          payload.queryReq.query.sql = setMultiStreamHistogramQuery(
+-            searchObj.data.histogramQuery.query,
+-          );
+-        } else {
+-          payload.queryReq.query.sql =
++        payload.queryReq.query.sql =
+             searchObj.data.histogramQuery.query.sql.replace(
+               "[INTERVAL]",
+               searchObj.meta.resultGrid.chartInterval,
+             );
+-        }
+ 
+         payload.meta = {
+           isHistogramOnly: searchObj.meta.histogramDirtyFlag,
+diff --git a/web/src/composables/useLogs/useSearchQuery.ts b/web/src/composables/useLogs/useSearchQuery.ts
+index 523216cede9..7e8bb5243fd 100644
+--- a/web/src/composables/useLogs/useSearchQuery.ts
++++ b/web/src/composables/useLogs/useSearchQuery.ts
+@@ -295,7 +295,7 @@ export const useSearchQuery = () => {
+               .join(","),
+           );
+         }
+-      } else {
++      } else if (searchObj.data.stream.selectedStream.length <= 1) {
+         req.query.sql = req.query.sql.replace("[FIELD_LIST]", "*");
+       }
+ 
+@@ -349,7 +349,7 @@ export const useSearchQuery = () => {
+       if (searchObj.meta.sqlMode == true) {
+         return handleSqlMode(query, req, readOnly);
+       } else {
+-        return handleNonSqlMode(query, req);
++        return handleNonSqlMode(query, req, ignoreQuickMode);
+       }
+     } catch (e: any) {
+       notificationMsg.value =
+@@ -446,7 +446,11 @@ export const useSearchQuery = () => {
+     return buildSearch(true);
+   };
+ 
+-  const handleNonSqlMode = (query: string, req: any): SearchRequestPayload => {
++  const handleNonSqlMode = (
++    query: string,
++    req: any,
++    ignoreQuickMode: boolean = false,
++  ): SearchRequestPayload => {
+     const parseQuery = [query];
+     let queryFunctions = "";
+     let whereClause = "";
+@@ -493,7 +497,7 @@ export const useSearchQuery = () => {
+     );
+ 
+     if (searchObj.data.stream.selectedStream.length > 1) {
+-      return handleMultiStream(req, whereClause);
++      return handleMultiStream(req, whereClause, ignoreQuickMode);
+     } else {
+       req.query.sql = req.query.sql.replace(
+         "[INDEX_NAME]",
+@@ -504,10 +508,36 @@ export const useSearchQuery = () => {
+     return finalizeRequest(req);
+   };
+ 
++  const armProjection = (stream: string, ignoreQuickMode: boolean): string => {
++    if (!searchObj.meta.quickMode || ignoreQuickMode) {
++      return "*";
++    }
++
++    const timestampCol = store.state.zoConfig.timestamp_column || "_timestamp";
++    const fields = searchObj.data.stream.interestingFieldList.filter(
++      (field: string) =>
++        searchObj.data.stream.selectedStreamFields.some(
++          (streamField: any) =>
++            streamField?.name === field &&
++            streamField?.streams?.includes(stream),
++        ),
++    );
++
++    if (fields.length === 0) {
++      return "*";
++    }
++
++    // A set operation is never rewritten by AddTimestampVisitor, so the arm must ask for _timestamp.
++    return [timestampCol, ...fields.filter((f: string) => f !== timestampCol)]
++      .map((field: string) => quoteSqlIdentifierIfNeeded(field))
++      .join(",");
++  };
++
+   const handleMultiStream = (
+     req: any,
+     whereClause: string,
+-  ): SearchRequestPayload => {
++    ignoreQuickMode: boolean = false,
++  ): SearchRequestPayload | null => {
+     let streams: any = searchObj.data.stream.selectedStream;
+ 
+     if (whereClause.trim() != "") {
+@@ -527,41 +557,31 @@ export const useSearchQuery = () => {
+     }
+ 
+     const preSQLQuery = req.query.sql;
+-    req.query.sql = [];
+-
+-    streams
+-      .join(",")
+-      .split(",")
+-      .forEach((item: any) => {
+-        let finalQuery: string = preSQLQuery.replace("[INDEX_NAME]", item);
+-
+-        const listOfFields: any = [];
+-        let streamField: any = {};
+-
+-        for (const field of searchObj.data.stream.interestingFieldList) {
+-          for (streamField of searchObj.data.stream.selectedStreamFields) {
+-            if (
+-              streamField?.name == field &&
+-              streamField?.streams.indexOf(item) > -1 &&
+-              listOfFields.indexOf(field) == -1
+-            ) {
+-              listOfFields.push(field);
+-            }
+-          }
+-        }
+ 
+-        let queryFieldList: string = "";
+-        if (listOfFields.length > 0) {
+-          queryFieldList = "," + listOfFields.join(",");
+-        }
++    // A stream listed twice would emit two identical arms and duplicate every row.
++    const uniqueStreams: string[] = [
++      ...new Set<string>(streams.join(",").split(",")),
++    ].filter((stream: string) => stream.trim() !== "");
+ 
+-        finalQuery = finalQuery.replace(
+-          "[FIELD_LIST]",
+-          `'${item}' as _stream_name` + queryFieldList,
+-        );
++    const arms: string[] = uniqueStreams.map((item: string) => {
++      const finalQuery: string = preSQLQuery.replace("[INDEX_NAME]", item);
++      return finalQuery.replace(
++        "[FIELD_LIST]",
++        `${armProjection(item, ignoreQuickMode)}, '${item}' as _stream_name`,
++      );
++    });
++
++    if (arms.length === 0) {
++      return null;
++    }
+ 
+-        req.query.sql.push(finalQuery);
+-      });
++    // BY NAME merges differing columns, ALL keeps duplicate events, and a set operation gets no implicit ORDER BY.
++    req.query.sql =
++      arms.length > 1
++        ? `${arms.join(" UNION ALL BY NAME ")} ORDER BY ${
++            store.state.zoConfig.timestamp_column || "_timestamp"
++          } DESC`
++        : arms[0];
+ 
+     return req;
+   };
+diff --git a/web/src/composables/useStreamingSearch.ts b/web/src/composables/useStreamingSearch.ts
+index 90c13d250e3..998d07b35ef 100644
+--- a/web/src/composables/useStreamingSearch.ts
++++ b/web/src/composables/useStreamingSearch.ts
+@@ -264,12 +264,6 @@ const useHttpStreaming = () => {
+       if (meta?.is_ui_histogram)
+         url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
+ 
+-      if (type === "histogram") {
+-        let is_multi_stream_search = false;
+-        if (queryReq.query?.sql.indexOf(" UNION ALL ") !== -1)
+-          is_multi_stream_search = true;
+-        url += `&is_multi_stream_search=${is_multi_stream_search}`;
+-      }
+     } else if (type === "values") {
+       url = `/_values_stream`;
+       if (meta?.keyword) url += `?keyword=${encodeURIComponent(meta.keyword)}`;
+diff --git a/web/src/plugins/logs/Index.vue b/web/src/plugins/logs/Index.vue
+index 08aa69d965f..2faebac6ce8 100644
+--- a/web/src/plugins/logs/Index.vue
++++ b/web/src/plugins/logs/Index.vue
+@@ -3161,7 +3161,7 @@ export default defineComponent({
+ 
+         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
+           this.resetHistogramWithError(
+-            "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
++            "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
+             -1,
+           );
+           this.searchObj.meta.histogramDirtyFlag = false;
+@@ -3170,16 +3170,14 @@ export default defineComponent({
+           (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
+         ) {
+           this.resetHistogramWithError(
+-            "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
++            "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
+             -1,
+           );
+           this.searchObj.meta.histogramDirtyFlag = false;
+-        } else if (
+-          this.searchObj.data.stream.selectedStream.length > 1 &&
+-          this.searchObj.meta.sqlMode == true
+-        ) {
++        } else if (this.searchObj.data.stream.selectedStream.length > 1) {
+           this.resetHistogramWithError(
+-            "Histogram is not available for multi stream search.",
++            "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
++            -1,
+           );
+         } else if (
+           this.searchObj.data.queryResults.is_histogram_eligible == false

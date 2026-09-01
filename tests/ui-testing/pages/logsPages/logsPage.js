@@ -6998,4 +6998,70 @@ export class LogsPage {
     getQueryEditorLocator() {
         return this.page.locator(this.logsSearchBarQueryEditor);
     }
+
+    // ============================================================================
+    // MULTI-STREAM SEARCH (UNION ALL BY NAME) METHODS
+    // ============================================================================
+
+    /**
+     * Assert the histogram is hidden (suppressed) for a multi-stream search.
+     * For multi-stream the histogram errorCode is -1 and SearchResult.vue does not
+     * render the histogram container, so the canvas must be absent while the
+     * results table remains visible.
+     */
+    async expectHistogramHidden() {
+        await expect(this.page.locator(this.barChartCanvas)).toHaveCount(0);
+        await expect(this.page.locator(this.logsSearchResultLogsTable)).toBeVisible();
+        testLogger.info('Histogram is hidden (multi-stream) and results table is visible');
+    }
+
+    /**
+     * Read the `_stream_name` value out of every `source` cell (full-row JSON) and
+     * return the distinct stream names. `_stream_name` is not a grid column, so
+     * stream attribution is verified via the source-cell JSON.
+     * @returns {Promise<string[]>} Distinct _stream_name values across result rows.
+     */
+    async getSourceColumnStreamNames() {
+        const sourceCells = this.page.locator(this.logTableColumnSource);
+        const count = await sourceCells.count();
+        const streamNames = new Set();
+        for (let i = 0; i < count; i++) {
+            const text = await sourceCells.nth(i).textContent();
+            if (!text) continue;
+            const match = text.match(/_stream_name"\s*:\s*"([^"]+)"/);
+            if (match) streamNames.add(match[1]);
+        }
+        testLogger.info(`Distinct _stream_name values from source cells: [${[...streamNames].join(', ')}]`);
+        return [...streamNames];
+    }
+
+    /**
+     * Assert that `_stream_name` is NOT rendered as a dedicated grid column.
+     * It is excluded from columns (useStreamFields.ts) and appears only inside
+     * the source-cell JSON.
+     */
+    async expectNoStreamNameColumn() {
+        const headerTexts = await this.page.locator(this.logsSearchResultLogsTable).locator(this.tableHeaders).allTextContents();
+        const hasStreamNameColumn = headerTexts.some((t) => t.trim() === '_stream_name');
+        expect(hasStreamNameColumn).toBe(false);
+        testLogger.info('No dedicated _stream_name column rendered');
+    }
+
+    /**
+     * Click the Visualize toggle on the logs search bar.
+     */
+    async clickVisualizeToggle() {
+        await this.page.locator(this.visualizeToggle).click();
+        testLogger.info('Clicked Visualize toggle');
+    }
+
+    /**
+     * Assert the Visualize-blocked notification is shown for a non-SQL
+     * multi-stream search.
+     */
+    async expectVisualizeBlockedNotification() {
+        const notification = this.page.locator(this.notificationMessage);
+        await expect(notification).toContainText('Please enable SQL mode or select a single stream to visualize');
+        testLogger.info('Visualize-blocked notification displayed');
+    }
 }

@@ -1,0 +1,13 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/logsmultistream.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/join.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/crossLinkMultiStream.spec.js",
+    "tests/ui-testing/playwright-tests/Streams/multiselect-stream.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_file": ".github/workflows/playwright.yml",
+  "registration_group": "Logs-Core",
+  "rationale": "No existing Logs-area spec covers the non-SQL multi-stream search behavior (UNION ALL BY NAME composition, _stream_name attribution, histogram suppression, visualize block). join.spec.js covers SQL-mode JOIN between two streams, not the non-SQL UNION ALL BY NAME path. crossLinkMultiStream.spec.js is a Dashboards cross-linking spec (different area). multiselect-stream.spec.js is Streams-area multi-select management. The feature is its own Logs area: create a new spec at the run-context spec_path and register it in the Logs-Core shard (run_files) of playwright.yml."
+}

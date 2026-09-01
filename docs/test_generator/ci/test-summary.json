@@ -1,0 +1,6 @@
+[
+  { "title": "should return merged results with stream attribution for two non-SQL streams", "action": "new", "verifies": "selecting two streams (SQL OFF) returns one results table whose rows are attributed to both source streams via the source-cell JSON, with no dedicated _stream_name column" },
+  { "title": "should suppress the histogram for a multi-stream search", "action": "new", "verifies": "running a multi-stream query hides the histogram canvas (errorCode -1) while the results table remains visible" },
+  { "title": "should block the Visualize toggle for a non-SQL multi-stream search", "action": "new", "verifies": "clicking Visualize with two streams and SQL OFF shows the guidance notification and does not enter the Visualize view" },
+  { "title": "should still return results for a multi-stream search in SQL mode", "action": "new", "verifies": "enabling SQL mode and running a two-stream query still renders the results table" }
+]

@@ -1,0 +1,21 @@
+{
+  "feature_slug": "multi-stream-search",
+  "feature_title": "Multi-Stream Log Search (UNION ALL BY NAME)",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logsmultistream.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/logsmultistream.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/composables/useLogs/useSearchQuery.ts",
+    "web/src/composables/useLogs/useSearchHistogramManager.ts",
+    "web/src/composables/useLogs/useHistogram.ts",
+    "web/src/composables/useStreamingSearch.ts",
+    "web/src/plugins/logs/Index.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

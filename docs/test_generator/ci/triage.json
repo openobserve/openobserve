@@ -1,0 +1,29 @@
+{
+  "feature_slug": "multi-stream-search",
+  "feature_title": "Multi-Stream Log Search (UNION ALL BY NAME)",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logsmultistream.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/logsmultistream.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/composables/useLogs/useSearchQuery.ts",
+    "web/src/composables/useLogs/useSearchHistogramManager.ts",
+    "web/src/composables/useLogs/useHistogram.ts",
+    "web/src/composables/useStreamingSearch.ts",
+    "web/src/plugins/logs/Index.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path lives under web/src/ (useLogs composables, useStreamingSearch, plugins/logs/Index.vue) and tests/ui-testing/playwright-tests/. None are under enterprise/ or o2_enterprise/-owned locations, and no enterprise keywords (cipher/SSO/SAML/RBAC/SDR/logo-management) appear in the paths or symbols, so this is an OSS change.",
+    "skip": "No explicit opt-out is present — feature_hint.txt and trigger_comment.txt are both empty and there is no tests-added label. The change alters user-facing Logs search behavior (multi-stream query building and histogram availability), so it is not skipped. The dev-authored Playwright spec in the diff does not auto-skip; it routes the change to enhance.",
+    "e2e": "E2E is warranted: multi-stream log search now emits a single UNION ALL BY NAME query (instead of multiple per-stream queries) and the histogram is disabled for any multi-stream search. Both are user-visible Logs UI behaviors that need browser-level verification.",
+    "area": "The bulk of the code changes live in web/src/composables/useLogs/* and web/src/plugins/logs/Index.vue (Logs search/histogram), so Logs is the natural area. Existing Logs specs live in tests/ui-testing/playwright-tests/Logs/.",
+    "group": "Logs-Core is the closest matrix shard — its run_files already include logshistogram.spec.js, logsquickmode.spec.js and logspage.spec.js, which exercise the histogram and quick-mode paths this change modifies.",
+    "existing_tests": "The diff modifies one Playwright E2E spec, Dashboards/crossLinkMultiStream.spec.js, which now asserts a single result_schema call for multi-stream cross-linking, but it does not cover the new Logs multi-stream UNION ALL BY NAME search / disabled-histogram UI behavior. The other spec changes are Vitest unit tests (web/src/**/*.spec.ts) and are not E2E coverage."
+  }
+}
