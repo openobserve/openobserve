@@ -383,6 +383,7 @@ const search = {
     const url = `/api/clusters`;
     return http().get(url);
   },
+  /** A null/empty stream_type defaults to "logs"; a falsy stream_name is omitted, scoping history to all streams of that type. */
   get_history: (
     org_identifier: string,
     startTime = null,

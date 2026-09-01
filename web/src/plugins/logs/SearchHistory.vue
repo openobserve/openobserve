@@ -149,7 +149,7 @@
                   @click.stop="goToLogs(row)"
                 >
                   <template #icon-left><OIcon name="search" size="xs" /></template>
-                  {{ t("logs.searchHistory.logs") }}
+                  {{ goToLogsLabel(row) }}
                 </OButton>
                 <OButton
                   v-if="
@@ -307,6 +307,7 @@ import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -371,13 +372,19 @@ export default defineComponent({
 
     const { extractTimestamps } = logsUtils();
 
+    const ALLOWED_HISTORY_STREAM_TYPES = ["logs", "metrics", "traces"];
+
     // The route query (set by the page the user navigated from, e.g. Data
     // Sources or the Logs page itself) is the source of truth for which
     // telemetry type/stream this history view is scoped to; searchObj is the
     // fallback for a same-session deep link that didn't carry the query.
-    const activeStreamType = computed(
-      () => (route.query.stream_type as string) || searchObj.data.stream.streamType || "logs",
-    );
+    // The query param is attacker-controlled (URL), so it's whitelisted here
+    // as defense in depth on top of the backend validation.
+    const activeStreamType = computed(() => {
+      const fromRoute = route.query.stream_type as string;
+      if (ALLOWED_HISTORY_STREAM_TYPES.includes(fromRoute)) return fromRoute;
+      return searchObj.data.stream.streamType || "logs";
+    });
     const activeStreamName = computed(
       () => (route.query.stream as string) || searchObj.data.stream.selectedStream[0] || "",
     );
@@ -639,6 +646,11 @@ export default defineComponent({
         colorizeRow(row);
       }
     };
+    // goToLogs re-opens the row's own stream_type (logs/metrics/traces), so the
+    // button label must match that destination rather than always saying "Logs".
+    const goToLogsLabel = (row: { stream_type?: string }) =>
+      resolveBadgeLabel("streamType", row.stream_type || "logs");
+
     const goToLogs = (row) => {
       // emit('closeSearchHistory');
       const stream: string = row.stream_name;
@@ -739,6 +751,7 @@ export default defineComponent({
       searchDateTimeRef,
       expandedIds,
       goToLogs,
+      goToLogsLabel,
       goToInspector,
       onExpandedIdsChange,
       colorizedSql,

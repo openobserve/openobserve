@@ -727,6 +727,11 @@ impl SearchHistoryRequest {
         if self.start_time >= self.end_time {
             return Err("start_time must be less than end_time".to_string());
         }
+        if let Some(stream_type) = self.stream_type.as_deref()
+            && !matches!(stream_type, "logs" | "metrics" | "traces")
+        {
+            return Err(format!("invalid stream_type: {stream_type}"));
+        }
         Ok(true)
     }
 
@@ -1653,23 +1658,38 @@ mod search_history_utils {
             let mut query = format!("SELECT * FROM {search_stream_name} WHERE event='Search'");
 
             if let Some(org_id) = self.org_id.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND org_id = '{org_id}'"));
+                query.push_str(&format!(" AND org_id = {}", quote_sql_literal(&org_id)));
             }
             if let Some(stream_type) = self.stream_type.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND stream_type = '{stream_type}'"));
+                query.push_str(&format!(
+                    " AND stream_type = {}",
+                    quote_sql_literal(&stream_type)
+                ));
             }
             if let Some(stream_name) = self.stream_name.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND stream_name = '{stream_name}'"));
+                query.push_str(&format!(
+                    " AND stream_name = {}",
+                    quote_sql_literal(&stream_name)
+                ));
             }
             if let Some(user_email) = self.user_email.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND user_email = '{user_email}'"));
+                query.push_str(&format!(
+                    " AND user_email = {}",
+                    quote_sql_literal(&user_email)
+                ));
             }
             if let Some(trace_id) = self.trace_id.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND trace_id = '{trace_id}'"));
+                query.push_str(&format!(" AND trace_id = {}", quote_sql_literal(&trace_id)));
             }
 
             query
         }
+    }
+
+    // Escapes single quotes so a value cannot break out of the SQL string literal it is
+    // interpolated into (these fields come from client-controlled request params).
+    fn quote_sql_literal(value: &str) -> String {
+        format!("'{}'", value.replace('\'', "''"))
     }
 
     #[cfg(test)]
@@ -1770,6 +1790,17 @@ mod search_history_utils {
             AND user_email = 'user123@gmail.com'";
 
             assert_eq!(query, expected_query);
+        }
+
+        #[test]
+        fn test_escapes_single_quotes_in_values() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_stream_name(&Some("x' OR '1'='1".to_string()))
+                .build(SEARCH_STREAM_NAME);
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE event='Search' AND stream_name = 'x'' OR ''1''=''1'"
+            );
         }
     }
 }
