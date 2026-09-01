@@ -26,10 +26,13 @@
 //   POST /rum/v1/{org}/replay   session replay segments
 //
 // The core SDK appends the feature segment (`/rum`, `/logs`) to its
-// customEndpoint, so it takes the BASE `/rum/v1/{org}`. Session Replay does
-// NOT — it is configured separately and takes the FULL `/replay` URL. That
-// asymmetry is the single most common reason RUM events arrive while session
-// replay silently does not, so it gets its own step and its own FAQ entry.
+// customEndpoint, so it takes the BASE `/rum/v1/{org}`. Session Replay is
+// configured separately and, as of SDK 0.1.2, the bridge appends its own
+// `/replay` segment too — same shape as RUM/Logs, so it also takes the BASE
+// URL. Appending `/replay` yourself double-appends it (`/replay/replay`),
+// which the backend 401s regardless of token validity — that's now the
+// single most common reason RUM events arrive while session replay
+// silently does not, so it still gets its own step and its own FAQ entry.
 
 import { gt, raw } from "@/types/i18n";
 
@@ -37,7 +40,7 @@ import { getImageURL } from "@/utils/zincutils";
 import type { RichCardContent, RichCardStepVariant } from "../types";
 
 /** Published React Native SDK release these snippets are written against. */
-export const RUM_RN_SDK_VERSION = "0.1.0-alpha.4";
+export const RUM_RN_SDK_VERSION = "0.1.2";
 
 const PKG_CORE = "@openobserve/mobile-react-native";
 const PKG_REPLAY = "@openobserve/mobile-react-native-session-replay";
@@ -60,8 +63,12 @@ export interface RumReactNativeCardSubs {
 /** Base URL the core SDK appends `/rum` and `/logs` to. */
 export const rumBaseUrl = (subs: RumReactNativeCardSubs) => `${subs.endpoint}/rum/v1/${subs.org}`;
 
-/** Full URL Session Replay posts to verbatim. */
-export const replayUrl = (subs: RumReactNativeCardSubs) => `${rumBaseUrl(subs)}/replay`;
+/**
+ * Base URL Session Replay's customEndpoint takes. Same value as rumBaseUrl —
+ * as of SDK 0.1.2 the bridge appends `/replay` itself, so this is just a
+ * clearer alias at the call site (and for the FAQ copy below).
+ */
+export const replayUrl = (subs: RumReactNativeCardSubs) => rumBaseUrl(subs);
 
 // ── install ──────────────────────────────────────────────────────────────────
 
@@ -136,9 +143,10 @@ import {
     SessionReplay.enable({
       replaySampleRate: 100, // record 100% of sampled sessions
       startRecordingImmediately: true,
-      // Session Replay does NOT inherit rumConfiguration.customEndpoint and
-      // does NOT append a path — give it the FULL /replay URL or segments
-      // never reach OpenObserve.
+      // Session Replay does NOT inherit rumConfiguration.customEndpoint —
+      // give it its own base URL, same shape as the RUM/Logs one above.
+      // The bridge appends /replay itself; appending it here too
+      // double-appends the path and every upload gets rejected with 401.
       customEndpoint: '${replayUrl(subs)}',
       // Privacy defaults are MASK_ALL. Relax only as far as your policy allows.
       textAndInputPrivacyLevel: TextAndInputPrivacyLevel.MASK_SENSITIVE_INPUTS,
@@ -249,9 +257,8 @@ export default function rumReactNativeCard(subs: RumReactNativeCardSubs): RichCa
         pills: [
           gt("ingestion.setupCard.pillWireframeCapture"),
           gt("ingestion.setupCard.pillPrivacyMasking"),
-          gt("ingestion.setupCard.pillAndroidVerified"),
         ],
-        note: "Session Replay on React Native is currently verified on Android. On iOS the SDK appends its own path to this URL, so replay uploads do not yet reach OpenObserve — RUM, logs and crashes are unaffected.",
+        note: "Session Replay is verified on both iOS and Android as of SDK 0.1.2. Segments are batched before upload, so expect a short delay before they show up.",
       },
       {
         id: "navigation",
@@ -307,13 +314,9 @@ http://192.168.1.10:5080/rum/v1/${subs.org}`,
       troubleshooting: [
         {
           q: "RUM events arrive but there is no session replay",
-          a: `Almost always the endpoint. Session Replay is configured separately and does **not** inherit \`rumConfiguration.customEndpoint\`; left unset it defaults to an empty string and uploads go nowhere you can see. Pass the full URL explicitly: \`customEndpoint: '${replayUrl(
+          a: `Almost always the endpoint. Session Replay is configured separately and does **not** inherit \`rumConfiguration.customEndpoint\`; left unset it defaults to an empty string and uploads go nowhere you can see. Pass the base URL explicitly: \`customEndpoint: '${replayUrl(
             subs,
-          )}'\` — note the trailing \`/replay\`, which the core SDK's base URL does not have.`,
-        },
-        {
-          q: "Session replay works on Android but not iOS",
-          a: "Known limitation of the current React Native SDK: on iOS it appends its own path to the session-replay `customEndpoint`, so uploads miss OpenObserve's `/replay` route. Android uses the URL verbatim and works. RUM events, logs and crash reporting are unaffected on both platforms.",
+          )}'\` — the bridge appends \`/replay\` itself (as of SDK 0.1.2), so do not add that suffix yourself or uploads get rejected with 401 instead.`,
         },
         {
           q: "Nothing arrives at all from an emulator or device",
@@ -333,7 +336,7 @@ http://192.168.1.10:5080/rum/v1/${subs.org}`,
         },
         {
           q: "Requests return 401 or 403",
-          a: "The `clientToken` is this org's **RUM token**, not the ingestion passcode. If it was rotated, regenerate it from this page's header and rebuild the app.",
+          a: "Two common causes. First, the `clientToken` — it must be this org's **RUM token**, not the ingestion passcode; if it was rotated, regenerate it from this page's header and rebuild the app. Second, for Session Replay specifically: appending `/replay` to `customEndpoint` yourself double-appends the path (the bridge already adds it), which the backend also rejects with 401 — pass the bare base URL instead.",
         },
         {
           q: "Sessions appear but screens are all named the same",
