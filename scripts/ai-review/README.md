@@ -9,11 +9,33 @@ only* — it does not change what the reviewer finds or decides.
 ## How it works (one paragraph)
 
 On each PR the workflow fetches the diff, filters noise, picks a risk tier (`trivial` / `lite` /
-`full`), runs up to five read-only specialist agents (security, code-quality, performance,
-documentation, release) in parallel, and a coordinator consolidates their findings into one
-comment with an approve/needs-work decision. The comment PATCHes itself in place on re-review.
-Full engine details live in the code; this README covers only **setup, activation, and rollback**
-of the branded identity.
+`full`), runs the tier's read-only specialist agents (security, code-quality, performance,
+documentation, release) in parallel — plus any *conditional* agent whose domain the diff touches —
+and a coordinator consolidates their findings into one comment with an approve/needs-work
+decision. The comment PATCHes itself in place on re-review. Full engine details live in the code;
+the rest of this README covers **setup, activation, and rollback** of the branded identity.
+
+## The Frontend UI Reviewer
+
+`frontend` is the one **conditional** agent: it is appended to whatever the tier selected whenever
+the diff touches `web/src` (excluding specs), so a 6-line UI change still gets reviewed even at the
+`trivial` tier. `requiresFocus: true` is the other half of that contract — the generic focus filter
+falls back to the *full* diff when an agent matches no files, which would otherwise have the
+frontend reviewer opining on Rust; with the flag set it skips the PR entirely instead.
+
+Its remit is deliberately narrow: **only the half of `.claude/skills/ui-architect/` that no lint
+rule or check script can see** — structure (`OPageHeader`/`OPageLayout`/`OTable` vs hand-rolled
+markup), cross-file consistency (a `sortable` column vs the Rust handler's sort keys; route ↔ nav
+entry ↔ rail gate agreement; a token in `:root` but not `dark.css`), values that are well-formed
+but wrong (`text-[0.8125rem]`, a `parseInt`-read px converted to rem), and i18n *semantics*
+(`raw()` on real copy, a catalogue key for `Kafka`). Everything `local/no-hardcoded-px`,
+`lint:design:strict`, stylelint or `type-check:app` already fails the build on is explicitly
+out of scope — see the "What NOT to Flag" table in `agents/frontend.md`.
+
+Adding another conditional agent: define it in `AGENTS` (with `requiresFocus` if it is
+domain-scoped), add a `{ agent, matches }` entry to `CONDITIONAL_AGENTS`, register
+`ai-review-<key>` in `opencode.jsonc` with the same read-only tool policy, and add its glyph to
+`CATEGORY_GLYPH` and to `agents/coordinator.md`.
 
 ## Identity: how the comment gets its author
 

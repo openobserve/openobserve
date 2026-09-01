@@ -100,6 +100,21 @@
           :fill-height="false"
           data-test="ai-experiment-comparison-scores"
         >
+          <!-- The type is what makes the two numbers beside it readable: without
+               it a boolean flip and a rank move both render as `0 → 1`. -->
+          <template #cell-dimension="{ row: score }">
+            <div class="flex items-center gap-1.5">
+              <span class="text-text-body">{{ score.dimension }}</span>
+              <OTag
+                v-if="score.dataType"
+                size="sm"
+                icon=""
+                variant="default-soft"
+                :label="score.dataType"
+              />
+            </div>
+          </template>
+
           <template #cell-delta="{ row: score }">
             <OTag
               v-if="score.delta !== null"
@@ -141,9 +156,10 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ContentBox from "./ExperimentRowContentBox.vue";
 import ExperimentRowNav from "./ExperimentRowNav.vue";
 import {
+  dataTypeLabel,
   dimensionIdentity,
   dimensionLabel,
-  formatNumber,
+  dimensionSideValue,
   signedNumber,
 } from "./experimentRowContent";
 import type {
@@ -229,17 +245,25 @@ const scoreColumns = computed<OTableColumnDef<(typeof scoreRows.value)[number]>[
     header: t("aiObservability.experiments.comparePage.candidate"),
     accessorKey: "candidate",
   },
-  { id: "delta", header: raw("Δ"), accessorKey: "delta" },
+  {
+    id: "delta",
+    header: t("aiObservability.experiments.comparePage.rowDrawer.change"),
+    accessorKey: "delta",
+  },
 ]);
 
 const scoreRows = computed(() =>
   (props.row?.dimensions ?? []).map((dimension) => ({
     key: dimensionIdentity(dimension),
     dimension: dimensionLabel(dimension),
-    baseline: dimension.baseline === null ? raw("—") : raw(formatNumber(dimension.baseline)),
-    candidate: dimension.candidate === null ? raw("—") : raw(formatNumber(dimension.candidate)),
+    dataType: dataTypeLabel(dimension),
+    baseline: dimensionSideValue(dimension, "baseline"),
+    candidate: dimensionSideValue(dimension, "candidate"),
     delta: dimension.delta,
-    deltaLabel: signedNumber(dimension.delta),
+    // A delta smaller than the trial noise on both sides is a `~`, not a claim.
+    deltaLabel: dimension.withinNoise
+      ? raw(`~${signedNumber(dimension.delta)}`)
+      : signedNumber(dimension.delta),
     // Colour follows orientedDelta: a latency rising by +31 is a positive
     // NUMBER but a worse RESULT.
     variant: (dimension.orientedDelta === null || dimension.orientedDelta === 0

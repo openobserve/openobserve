@@ -487,6 +487,13 @@ export class DashboardsFormValidationPage {
         return this.page.locator(this.conditionRemoveColumn);
     }
 
+    // Label chip for condition row 0; an empty column ends "…-label-0-undefined".
+    getConditionLabelLocator() {
+        return this.page
+            .locator('[data-test^="dashboard-add-condition-label-0-"]')
+            .first();
+    }
+
     // ── Dashboard list search (used to detect dashboards list is ready) ──────
 
     getDashboardSearchLocator() {

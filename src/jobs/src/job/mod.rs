@@ -1193,6 +1193,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
                                 "[service_streams_cleanup] org={} evicted={} duration={:.3}s",
                                 org_id, evicted, duration
                             );
+                            // Nothing else announces deletions: flush emits are gated on changed.
+                            if let Err(e) =
+                                infra::coordinator::service_streams::emit_reload_event(org_id).await
+                            {
+                                log::error!(
+                                    "[service_streams_cleanup] org={org_id} failed to emit reload event: {e}"
+                                );
+                            }
                         }
                     }
                     Err(e) => {

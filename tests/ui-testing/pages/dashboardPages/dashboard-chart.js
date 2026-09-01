@@ -102,6 +102,16 @@ export default class ChartTypeSelector {
     return this.page.locator('[data-test="dashboard-value-layout"]');
   }
 
+  // Returns the Y-axis remove button for a specific alias
+  getYAxisRemoveButton(alias) {
+    return this.page.locator(`[data-test="dashboard-y-item-${alias}-remove"]`);
+  }
+
+  // Returns all Y-axis remove buttons (any alias)
+  getAnyYAxisRemoveButton() {
+    return this.page.locator('[data-test^="dashboard-y-item-"][data-test$="-remove"]');
+  }
+
   // Returns the nth breakdown (pivot) field chip (1-based index in the data-test)
   getBreakdownItem(index) {
     return this.page.locator(`[data-test="dashboard-b-item-breakdown_${index}"]`);

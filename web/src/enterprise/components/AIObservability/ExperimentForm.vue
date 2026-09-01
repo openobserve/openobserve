@@ -25,7 +25,11 @@
     >
       <template #title>
         <span data-test="ai-experiment-form-title">
-          {{ t("aiObservability.experiments.form.pageTitle") }}
+          {{
+            cloning
+              ? t("aiObservability.experiments.form.cloneTitle")
+              : t("aiObservability.experiments.form.pageTitle")
+          }}
         </span>
       </template>
 
@@ -68,6 +72,8 @@
 
               <div class="flex flex-wrap items-start gap-4">
                 <div class="min-w-0 flex-1">
+                  <!-- A clone exists to be compared with its source, and the
+                       server only compares runs over the same dataset. -->
                   <OFormSelect
                     name="datasetId"
                     :label="t('aiObservability.experiments.dataset')"
@@ -75,6 +81,10 @@
                     :placeholder="t('aiObservability.experiments.form.datasetPlaceholder')"
                     searchable
                     required
+                    :disabled="cloning"
+                    :help-text="
+                      cloning ? t('aiObservability.experiments.form.cloneDatasetLocked') : undefined
+                    "
                     data-test="ai-experiment-form-dataset-select"
                   />
                 </div>
@@ -140,12 +150,12 @@
                   />
                 </div>
                 <div class="w-40 shrink-0">
+                  <!-- No min/max here: they never reach the native input, and a
+                       native `max` would not stop typing anyway. The schema is
+                       the enforcement and the help text is the statement of it. -->
                   <OFormInput
                     name="trialCount"
                     type="number"
-                    min="1"
-                    max="100"
-                    step="1"
                     :label="t('aiObservability.experiments.trials')"
                     :help-text="
                       taskType === 'inline_prompt' &&
@@ -437,7 +447,11 @@
           :loading="isSubmitting"
           data-test="ai-experiment-form-submit-btn"
         >
-          {{ t("aiObservability.experiments.form.submit") }}
+          {{
+            cloning
+              ? t("aiObservability.experiments.form.cloneSubmit")
+              : t("aiObservability.experiments.form.submit")
+          }}
         </OButton>
       </footer>
     </OPageLayout>
@@ -471,6 +485,7 @@ import remoteTasksService, { type RemoteTask } from "@/services/remote-tasks.ser
 import llmExperimentsService, {
   type ExperimentCreatePayload,
   type ExperimentPreview,
+  type LlmExperiment,
 } from "@/services/llm-experiments.service";
 import onlineEvalsService, { type Provider, type Scorer } from "@/services/online-evals.service";
 import {
@@ -488,6 +503,7 @@ import ExperimentPreviewPanel from "./ExperimentPreviewPanel.vue";
 import {
   EXPERIMENT_ROW_SOURCES,
   experimentFormDefaults,
+  experimentFormFromExperiment,
   makeExperimentSchema,
   type ExperimentForm,
 } from "./ExperimentForm.schema";
@@ -524,6 +540,11 @@ function queryParam(key: string): string | undefined {
 
 // Built once, not computed: useOForm hands the schema straight to TanStack,
 // which would receive an unwrapped-nothing Ref.
+/** Set when the form was opened as "clone this run" rather than "new run". */
+const cloneOfId = computed(() => String(route.query.clone_of ?? ""));
+const cloning = computed(() => Boolean(cloneOfId.value));
+const cloneSource = ref<LlmExperiment | null>(null);
+
 const schema = makeExperimentSchema(t);
 const form = useOForm<ExperimentForm>({
   defaultValues: experimentFormDefaults(String(route.query.dataset ?? ""), {
@@ -613,7 +634,13 @@ async function loadRemoteTasks() {
 const selectedDataset = computed(
   () => datasets.value.find((d) => d.id === datasetId.value) ?? null,
 );
-const selectedDatasetVersion = computed(() => selectedDataset.value?.globalVersion ?? 0);
+// A clone keeps the version its source pinned. Re-pinning to the dataset's head
+// would compare two runs over different rows and call the difference a result.
+const selectedDatasetVersion = computed(() =>
+  cloneSource.value
+    ? cloneSource.value.datasetVersion
+    : (selectedDataset.value?.globalVersion ?? 0),
+);
 
 // preview() validates the entire create body, so it can only run once the task
 // section is complete. Short of that the rail says what is missing rather than
@@ -765,19 +792,36 @@ function buildPayload(values: ExperimentForm): ExperimentCreatePayload {
   };
 }
 
+async function submitClone(payload: ExperimentCreatePayload): Promise<string> {
+  // datasetId and datasetVersion are deliberately absent: an omitted field keeps
+  // what the source pinned, which is the only pin a comparison stays valid over.
+  const { datasetId: _datasetId, datasetVersion: _datasetVersion, ...overrides } = payload;
+  return (
+    await llmExperimentsService.clone(orgId.value, cloneOfId.value, {
+      ...overrides,
+      idempotencyKey: overrides.idempotencyKey ?? undefined,
+    })
+  ).id;
+}
+
 async function onSubmit(values: ExperimentForm) {
   try {
     // The server pins scorer versions itself; reusing the preview's pins when
     // one is in hand just closes the gap if a version ships mid-edit.
     const payload = buildPayload(values);
-    const result = await llmExperimentsService.create(
-      orgId.value,
-      preview.value ? withPreviewScorers(payload, preview.value) : payload,
-    );
+    const body = preview.value ? withPreviewScorers(payload, preview.value) : payload;
+    const createdId = cloning.value
+      ? await submitClone(body)
+      : (await llmExperimentsService.create(orgId.value, body)).experiment.id;
     idempotencyKey.value = nextIdempotencyKey();
     allowLeave = true;
-    toast({ variant: "success", message: t("aiObservability.experiments.createSuccess") });
-    router.push(aiExperimentsRoute(orgId.value, { selectedId: result.experiment.id }));
+    toast({
+      variant: "success",
+      message: cloning.value
+        ? t("aiObservability.experiments.cloneSuccess")
+        : t("aiObservability.experiments.createSuccess"),
+    });
+    router.push(aiExperimentsRoute(orgId.value, { selectedId: createdId }));
   } catch (error: any) {
     // An AxiosError IS an Error, so error.message is only ever "Request failed
     // with status code 400" — the server's reason lives on the response body.
@@ -786,7 +830,9 @@ async function onSubmit(values: ExperimentForm) {
       message:
         raw(error?.response?.data?.message) ||
         raw(error?.response?.data?.error) ||
-        t("aiObservability.experiments.createError"),
+        (cloning.value
+          ? t("aiObservability.experiments.cloneError")
+          : t("aiObservability.experiments.createError")),
     });
   }
 }
@@ -859,8 +905,35 @@ onMounted(async () => {
   // Separate and best-effort: the registry is only needed if the operator picks
   // a remote task, so a registry that is unreachable must not block the form.
   void loadRemoteTasks();
+  if (cloning.value) await loadCloneSource();
   const preselected = providers.value.find((p) => p.isDefault ?? p.is_default);
   if (preselected && !providerId.value) form.setFieldValue("providerId", preselected.id);
   if (previewReady.value) runPreview();
 });
+
+// Seeded field by field rather than through defaultValues: the source is only
+// in hand after a request, and the form is already mounted by then.
+async function loadCloneSource() {
+  let source: LlmExperiment;
+  try {
+    // Smallest sample the server accepts, not none: only the definition is read
+    // here, but `sampleSize` is validated as 1..20 and 0 is a 400.
+    source = (await llmExperimentsService.get(orgId.value, cloneOfId.value, 1)).experiment;
+  } catch (error: any) {
+    toast({
+      variant: "error",
+      message:
+        raw(error?.response?.data?.message) || t("aiObservability.experiments.cloneLoadError"),
+    });
+    return;
+  }
+  cloneSource.value = source;
+  const values = experimentFormFromExperiment(
+    source,
+    t("aiObservability.experiments.form.cloneNameSuffix", { name: source.name }),
+  );
+  for (const [field, value] of Object.entries(values)) {
+    form.setFieldValue(field as keyof ExperimentForm, value as never);
+  }
+}
 </script>

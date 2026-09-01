@@ -232,7 +232,6 @@ const emit = defineEmits<{
   "set-role": [messageId: string, role: PlaygroundRole];
   move: [from: number, to: number];
   /** The caret moved into this message — the variable chips insert here. */
-  focus: [messageId: string, element: HTMLTextAreaElement];
 }>();
 
 const { t } = useI18nTyped();
@@ -411,11 +410,9 @@ function onKeydown(messageId: string, event: KeyboardEvent) {
   }
 }
 
+// Registers the textarea so the `{{` completion list can insert at its caret.
 function onFocus(messageId: string, event: FocusEvent) {
   const element = event.target;
-  if (element instanceof HTMLTextAreaElement) {
-    elements.set(messageId, element);
-    emit("focus", messageId, element);
-  }
+  if (element instanceof HTMLTextAreaElement) elements.set(messageId, element);
 }
 </script>

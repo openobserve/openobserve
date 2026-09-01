@@ -278,6 +278,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useQuery from "@/composables/useQuery";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
 import { getConsumableRelativeTime } from "@/utils/date";
@@ -554,6 +555,10 @@ watch(inputQuery, (value) => {
 // the SQL the user typed.
 const debouncedSyncStreamFromQuery = debounce(async (sql: string) => {
   if (!sql || !parser) return;
+  // parse() is exponential in paren nesting depth — skip a pathologically
+  // nested query rather than freeze the tab. Losing this convenience sync
+  // is fine; the user can still pick the stream from the dropdown.
+  if (maxParenDepth(sql) > SQL_PARSE_MAX_DEPTH) return;
   try {
     const parsed = parser.parse(sql);
     const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;

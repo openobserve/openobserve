@@ -359,11 +359,11 @@ o2_dex = { path = "src/enterprise/o2_dex" }
 o2_enterprise = { path = "src/enterprise/o2_enterprise", default-features = false }
 o2_openfga = { path = "src/enterprise/o2_openfga" }
 o2_ratelimit = { path = "src/enterprise/o2_ratelimit" }
-vortex = { git = "https://github.com/openobserve/vortex", rev = "1cb48912c14d9c7bd29832d9aff5666d730e1f0e", features = [
+vortex = { git = "https://github.com/openobserve/vortex", rev = "3c77193fa8fb90d055f95d8a3e1f6748a4d15f8c", features = [
     "tokio",
 ] }
-vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "1cb48912c14d9c7bd29832d9aff5666d730e1f0e" }
-vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "1cb48912c14d9c7bd29832d9aff5666d730e1f0e" }
+vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "3c77193fa8fb90d055f95d8a3e1f6748a4d15f8c" }
+vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "3c77193fa8fb90d055f95d8a3e1f6748a4d15f8c" }
 aes-siv = "0.7.0"
 ahash = { version = "0.8", features = ["serde"] }
 axum = { version = "0.8", features = ["macros", "multipart", "tracing"] }
@@ -478,6 +478,7 @@ local-ip-address = "0.6"
 hashlink = "0.11"
 hashbrown = { version = "0.16", features = ["serde"] }
 hex = "0.4"
+hickory-resolver = "0.25"
 hmac = "0.12"
 image = { version = "0.24", default-features = false, features = ["png"] }
 indexmap = { version = "2.8", features = ["serde"] }
