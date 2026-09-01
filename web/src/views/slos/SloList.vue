@@ -257,6 +257,7 @@
             variant="ghost"
             size="icon-sm"
             icon-left="edit"
+            class="max-md:hidden"
             :title="t('slos.edit')"
             :data-test="`slos-slolist-edit-${row.name}`"
             @click="goToEdit(row)"
@@ -265,6 +266,7 @@
             variant="ghost"
             size="icon-sm"
             icon-left="drive-file-move"
+            class="max-md:hidden"
             :title="t('slos.move')"
             :data-test="`slos-slolist-move-${row.name}`"
             @click="openMove([row])"
@@ -273,6 +275,7 @@
             variant="ghost"
             size="icon-sm"
             :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+            class="max-md:hidden"
             :title="row.enabled ? t('slos.pause') : t('slos.resume')"
             :data-test="`slos-slolist-toggle-${row.name}`"
             @click="toggleEnabled(row)"
@@ -281,6 +284,7 @@
             variant="ghost"
             size="icon-sm"
             icon-left="download"
+            class="max-md:hidden"
             :title="t('common.export')"
             :data-test="`slos-slolist-export-${row.name}`"
             @click="openExport([row])"
@@ -289,10 +293,64 @@
             variant="ghost"
             size="icon-sm"
             icon-left="delete"
+            class="max-md:hidden"
             :title="t('slos.delete')"
             :data-test="`slos-slolist-delete-${row.name}`"
             @click="confirmDelete(row)"
           />
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                icon-left="more-vert"
+                variant="ghost"
+                size="icon-xs-sq"
+                class="md:hidden"
+                data-test="slos-slolist-row-more-actions"
+                @click.stop
+              />
+            </template>
+            <ODropdownItem
+              icon-left="edit"
+              class="md:hidden"
+              :data-test="`slos-slolist-edit-${row.name}-menu`"
+              @select="goToEdit(row)"
+            >
+              <span>{{ t("slos.edit") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="drive-file-move"
+              class="md:hidden"
+              :data-test="`slos-slolist-move-${row.name}-menu`"
+              @select="openMove([row])"
+            >
+              <span>{{ t("slos.move") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+              class="md:hidden"
+              :data-test="`slos-slolist-toggle-${row.name}-menu`"
+              @select="toggleEnabled(row)"
+            >
+              <span>{{ row.enabled ? t("slos.pause") : t("slos.resume") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="download"
+              class="md:hidden"
+              :data-test="`slos-slolist-export-${row.name}-menu`"
+              @select="openExport([row])"
+            >
+              <span>{{ t("common.export") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="delete"
+              variant="destructive"
+              class="md:hidden"
+              :data-test="`slos-slolist-delete-${row.name}-menu`"
+              @select="confirmDelete(row)"
+            >
+              <span>{{ t("slos.delete") }}</span>
+            </ODropdownItem>
+          </ODropdown>
         </div>
       </template>
 
@@ -419,6 +477,8 @@ import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDo
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";

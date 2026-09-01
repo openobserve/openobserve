@@ -99,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="paid"
+                class="max-md:hidden"
                 :aria-label="t('settings.organizationManagementPage.setUsageLimits')"
                 data-test="org-management-set-usage-limits-btn"
                 @click.stop="toggleUsageLimitsDialog(row)"
@@ -109,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="event"
+                class="max-md:hidden"
                 data-test="otg-management-extend-trial-btn"
                 @click.stop="toggleExtendTrialDialog(row)"
               >
@@ -119,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="note-add"
+                class="max-md:hidden"
                 data-test="org-management-add-contract-btn"
                 @click.stop="toggleContractDialog(row, 'create')"
               >
@@ -129,6 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="event"
+                class="max-md:hidden"
                 data-test="org-management-extend-contract-btn"
                 @click.stop="toggleContractDialog(row, 'extend')"
               >
@@ -139,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost-destructive"
                 size="icon-xs-circle"
                 icon-left="block"
+                class="max-md:hidden"
                 data-test="org-management-revoke-contract-btn"
                 @click.stop="confirmRevokeContract(row)"
               >
@@ -149,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="cloud-upload"
+                class="max-md:hidden"
                 data-test="org-management-storage-enable-btn"
                 @click.stop="toggleOrgStorage(row)"
               >
@@ -165,6 +171,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <OTooltip :content="t('settings.organizationManagementPage.storageEnabled')" />
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="org-management-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="paid"
+                  class="md:hidden"
+                  data-test="org-management-set-usage-limits-btn-menu"
+                  @select="toggleUsageLimitsDialog(row)"
+                >
+                  <span>{{ t("settings.organizationManagementPage.setUsageLimits") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="event"
+                  class="md:hidden"
+                  data-test="otg-management-extend-trial-btn-menu"
+                  @select="toggleExtendTrialDialog(row)"
+                >
+                  <span>{{ t("settings.extendTrial") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.billing_provider === '-'"
+                  icon-left="note-add"
+                  class="md:hidden"
+                  data-test="org-management-add-contract-btn-menu"
+                  @select="toggleContractDialog(row, 'create')"
+                >
+                  <span>{{ t("settings.organizationManagementPage.addContract") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.billing_provider === 'no_op'"
+                  icon-left="event"
+                  class="md:hidden"
+                  data-test="org-management-extend-contract-btn-menu"
+                  @select="toggleContractDialog(row, 'extend')"
+                >
+                  <span>{{ t("settings.organizationManagementPage.extendContract") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.billing_provider === 'no_op'"
+                  icon-left="block"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="org-management-revoke-contract-btn-menu"
+                  @select="confirmRevokeContract(row)"
+                >
+                  <span>{{ t("settings.organizationManagementPage.revoke") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="!row.org_storage_enabled"
+                  icon-left="cloud-upload"
+                  class="md:hidden"
+                  data-test="org-management-storage-enable-btn-menu"
+                  @select="toggleOrgStorage(row)"
+                >
+                  <span>{{ t("settings.organizationManagementPage.enableStorage") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
         </OTable>
@@ -372,6 +443,8 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -408,6 +481,8 @@ export default defineComponent({
     OEmptyState,
     OButton,
     ODialog,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OForm,
     OFormInput,

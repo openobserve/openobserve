@@ -161,6 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                 size="icon-sm"
                 :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                class="max-md:hidden"
                 @click.stop="togglePipeline(row)"
               >
                 <OTooltip
@@ -169,11 +170,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :shortcut-id="row.enabled ? 'pipelinesRowPause' : undefined"
                 />
               </OButton>
+              <!-- Hover-only preview with no click action, so it has no menu counterpart below md. -->
               <OButton
                 :data-test="`pipeline-list-${row.name}-view-pipeline`"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('pipeline.view')"
+                class="max-md:hidden"
                 icon-left="visibility"
               >
                 <OTooltip max-width="none" side="left">
@@ -185,6 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click.stop="editPipeline(row)"
                 icon-left="edit"
               >
@@ -222,6 +226,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="more-vert"
                   />
                 </template>
+                <ODropdownItem
+                  :data-test="`pipeline-list-${row.name}-pause-start-action-menu`"
+                  class="md:hidden"
+                  @select="togglePipeline(row)"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" :name="row.enabled ? 'pause' : 'play-arrow'" />
+                  </template>
+                  {{ row.enabled ? t("alerts.pause") : t("alerts.start") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  :data-test="`pipeline-list-${row.name}-update-pipeline-menu`"
+                  class="md:hidden"
+                  @select="editPipeline(row)"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" name="edit" />
+                  </template>
+                  {{ t("alerts.edit") }}
+                </ODropdownItem>
+                <ODropdownSeparator class="md:hidden" />
                 <ODropdownItem
                   :data-test="`pipeline-list-${row.name}-export-action`"
                   shortcut-id="pipelinesRowExport"

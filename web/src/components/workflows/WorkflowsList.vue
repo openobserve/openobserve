@@ -145,6 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                   size="icon-sm"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                  class="max-md:hidden"
                   @click.stop="toggleWorkflow(row)"
                 >
                   <OTooltip
@@ -168,6 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   icon-left="edit"
+                  class="max-md:hidden"
                   @click.stop="editWorkflow(row)"
                 >
                   <OTooltip side="bottom" :content="t('workflow.edit')" />
@@ -182,6 +184,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop
                     />
                   </template>
+                  <ODropdownItem
+                    v-if="!row.is_draft"
+                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    class="md:hidden"
+                    :data-test="`workflow-list-${row.name}-pause-start-action-menu`"
+                    @select="toggleWorkflow(row)"
+                  >
+                    <span>{{ row.enabled ? t("alerts.pause") : t("alerts.start") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    :data-test="`workflow-list-${row.name}-edit-menu`"
+                    @select="editWorkflow(row)"
+                  >
+                    <span>{{ t("workflow.edit") }}</span>
+                  </ODropdownItem>
                   <ODropdownItem
                     :data-test="`workflow-list-${row.name}-delete`"
                     variant="destructive"

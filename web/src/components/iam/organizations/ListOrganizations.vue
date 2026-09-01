@@ -127,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="organization-name-edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :disabled="row.status !== 'active'"
                 :title="
                   row.status === 'deleting'
@@ -142,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="organization-delete"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('iam.listOrganizations.deleteOrganization')"
                 @click="deleteOrganization(row)"
               >
@@ -152,6 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="organization-cleanup-tasks"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('iam.listOrganizations.viewDeletionProgress')"
                 @click="viewCleanupTasks(row)"
               >
@@ -162,11 +165,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="organization-resurrect"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('organization.resurrect')"
                 @click="resurrectOrganization(row)"
               >
                 <OIcon name="undo" size="sm" />
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    :title="t('dashboard.moreActions')"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="organization-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="edit"
+                  :disabled="row.status !== 'active'"
+                  class="md:hidden"
+                  data-test="organization-name-edit-menu"
+                  @select="row.status === 'active' && renameOrganization(row)"
+                >
+                  <span>{{
+                    row.status === "deleting"
+                      ? t("iam.listOrganizations.cannotEditWhileDeleting")
+                      : t("iam.listOrganizations.edit")
+                  }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="canDeleteOrg(row)"
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="organization-delete-menu"
+                  @select="deleteOrganization(row)"
+                >
+                  <span>{{ t("iam.listOrganizations.deleteOrganization") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.status === 'deleting'"
+                  icon-left="history"
+                  class="md:hidden"
+                  data-test="organization-cleanup-tasks-menu"
+                  @select="viewCleanupTasks(row)"
+                >
+                  <span>{{ t("iam.listOrganizations.viewDeletionProgress") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.status === 'pending_deletion'"
+                  icon-left="undo"
+                  class="md:hidden"
+                  data-test="organization-resurrect-menu"
+                  @select="resurrectOrganization(row)"
+                >
+                  <span>{{ t("organization.resurrect") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
         </OTable>
@@ -202,6 +260,8 @@ import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrgan
 import OrgCleanupTasksDialog from "@/components/iam/organizations/OrgCleanupTasksDialog.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
@@ -227,6 +287,8 @@ export default defineComponent({
     OrgCleanupTasksDialog,
     OEmptyState,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OTag,
     OBadge,

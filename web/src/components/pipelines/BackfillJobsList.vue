@@ -173,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="canPauseJob(row)"
                 variant="ghost-destructive"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="confirmPauseJob(row)"
                 data-test="pause-job-btn"
                 icon-left="pause"
@@ -183,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="canResumeJob(row)"
                 variant="ghost-success"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="confirmResumeJob(row)"
                 data-test="resume-job-btn"
                 icon-left="play-arrow"
@@ -193,6 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="canEditJob(row.status)"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="editJob(row)"
                 data-test="edit-job-btn"
                 icon-left="edit"
@@ -202,6 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="viewJob(row)"
                 data-test="view-job-btn"
                 icon-left="visibility"
@@ -212,6 +216,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="canDeleteJob(row.status)"
                 variant="ghost-destructive"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="confirmDeleteJob(row)"
                 data-test="delete-job-btn"
                 icon-left="delete"
@@ -222,12 +227,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="row.error"
                 variant="ghost-destructive"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="showErrorDialog(row)"
                 data-test="error-indicator-btn"
                 icon-left="error"
               >
                 <OTooltip :content="t('common.errorPrefix', { message: row.error })" />
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="backfill-jobs-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  v-if="canPauseJob(row)"
+                  icon-left="pause"
+                  class="md:hidden"
+                  data-test="pause-job-btn-menu"
+                  @select="confirmPauseJob(row)"
+                >
+                  <span>{{ t("pipeline.jobTooltipLabel") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="canResumeJob(row)"
+                  icon-left="play-arrow"
+                  class="md:hidden"
+                  data-test="resume-job-btn-menu"
+                  @select="confirmResumeJob(row)"
+                >
+                  <span>{{ t("pipeline.resumeJob") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="canEditJob(row.status)"
+                  icon-left="edit"
+                  class="md:hidden"
+                  data-test="edit-job-btn-menu"
+                  @select="editJob(row)"
+                >
+                  <span>{{ t("pipeline.editJob") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="visibility"
+                  class="md:hidden"
+                  data-test="view-job-btn-menu"
+                  @select="viewJob(row)"
+                >
+                  <span>{{ t("pipeline.viewDetails") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="canDeleteJob(row.status)"
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="delete-job-btn-menu"
+                  @select="confirmDeleteJob(row)"
+                >
+                  <span>{{ t("pipeline.deleteJobTooltip") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="row.error"
+                  icon-left="error"
+                  class="md:hidden"
+                  data-test="error-indicator-btn-menu"
+                  @select="showErrorDialog(row)"
+                >
+                  <span>{{ t("common.errorPrefix", { message: row.error }) }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
         </OTable>
@@ -312,6 +384,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";

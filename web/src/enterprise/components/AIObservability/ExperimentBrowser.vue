@@ -246,7 +246,7 @@
                   variant="ghost"
                   size="icon-xs-sq"
                   class="md:hidden"
-                  data-test="ai-experiment-row-more-actions"
+                  data-test="ai-experiment-actions-menu-btn"
                   @click.stop
                 />
               </template>

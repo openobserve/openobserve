@@ -223,6 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-sm"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                  class="max-md:hidden"
                   @click="toggleReportState(row)"
                 />
 
@@ -234,6 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   :title="t('alerts.edit')"
+                  class="max-md:hidden"
                   @click="editReport(row)"
                 />
 
@@ -244,6 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   :title="t('reports.moveToFolder')"
+                  class="max-md:hidden"
                   @click="openMoveDialog(row)"
                 />
 
@@ -255,8 +258,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost-destructive"
                   size="icon-sm"
                   :title="t('alerts.delete')"
+                  class="max-md:hidden"
                   @click="confirmDeleteReport(row)"
                 />
+
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      :title="t('dashboard.moreActions')"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="report-list-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    v-if="!reportsStateLoadingMap[row.report_id]"
+                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    class="md:hidden"
+                    :data-test="`report-list-${row.name}-pause-start-report-menu`"
+                    @select="toggleReportState(row)"
+                  >
+                    <span>{{ row.enabled ? t("alerts.pause") : t("alerts.start") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    :data-test="`report-list-${row.name}-edit-report-menu`"
+                    @select="editReport(row)"
+                  >
+                    <span>{{ t("alerts.edit") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="drive-file-move"
+                    class="md:hidden"
+                    :data-test="`report-list-${row.name}-move-report-menu`"
+                    @select="openMoveDialog(row)"
+                  >
+                    <span>{{ t("reports.moveToFolder") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    :data-test="`report-list-${row.name}-delete-report-menu`"
+                    @select="confirmDeleteReport(row)"
+                  >
+                    <span>{{ t("alerts.delete") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </template>
 
               <!-- Table footer: pagination + bulk actions -->
@@ -357,6 +409,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";

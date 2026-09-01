@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="edit"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :title="t('alert_destinations.edit')"
               @click="editDestination(row)"
             >
@@ -119,11 +120,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="delete"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :title="t('alert_destinations.delete')"
               @click="conformDeleteDestination(row)"
             >
               <OIcon name="delete" size="sm" />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :title="t('dashboard.moreActions')"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="alert-destination-list-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`alert-destination-list-${row.name}-update-destination-menu`"
+                @select="editDestination(row)"
+              >
+                <span>{{ t("alert_destinations.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`alert-destination-list-${row.name}-delete-destination-menu`"
+                @select="conformDeleteDestination(row)"
+              >
+                <span>{{ t("alert_destinations.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
 
           <template v-if="selectedDestinations.length > 0" #bottom>
@@ -195,6 +227,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -224,6 +258,8 @@ export default defineComponent({
     OTag,
     OSearchInput,
     OTable,
+    ODropdown,
+    ODropdownItem,
   },
   setup() {
     const store = useStore();

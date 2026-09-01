@@ -192,6 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.status === 'open'"
               variant="ghost-warning"
               size="icon-sm"
+              class="max-md:hidden"
               @click.stop="acknowledgeIncident(row)"
               data-test="incident-ack-btn"
               ><OIcon name="visibility" size="sm" /><OTooltip
@@ -201,6 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.status !== 'resolved'"
               variant="ghost-primary"
               size="icon-sm"
+              class="max-md:hidden"
               @click.stop="resolveIncident(row)"
               data-test="incident-resolve-btn"
               ><OIcon name="task-alt" size="sm" /><OTooltip
@@ -210,11 +212,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.status === 'resolved'"
               variant="ghost-warning"
               size="icon-sm"
+              class="max-md:hidden"
               @click.stop="reopenIncident(row)"
               data-test="incident-reopen-btn"
               ><OIcon name="restart-alt" size="sm" /><OTooltip
                 :content="t('alerts.incidents.reopen')"
             /></OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :title="t('dashboard.moreActions')"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="incident-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                v-if="row.status === 'open'"
+                icon-left="visibility"
+                class="md:hidden"
+                data-test="incident-ack-btn-menu"
+                @select="acknowledgeIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.acknowledge") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.status !== 'resolved'"
+                icon-left="task-alt"
+                class="md:hidden"
+                data-test="incident-resolve-btn-menu"
+                @select="resolveIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.resolve") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.status === 'resolved'"
+                icon-left="restart-alt"
+                class="md:hidden"
+                data-test="incident-reopen-btn-menu"
+                @select="reopenIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.reopen") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
 
@@ -272,6 +315,8 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -292,6 +337,8 @@ export default defineComponent({
     OStatStrip,
     OToggleGroup,
     OToggleGroupItem,
+    ODropdown,
+    ODropdownItem,
   },
   setup() {
     const { t } = useI18nTyped();

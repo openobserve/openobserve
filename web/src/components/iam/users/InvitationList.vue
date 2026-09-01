@@ -95,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="primary"
                 size="sm"
+                class="max-md:hidden"
                 @click="acceptInvitation(row)"
                 :data-test="`accept-invitation-${row.token}`"
               >
@@ -103,11 +104,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="secondary"
                 size="sm"
+                class="max-md:hidden"
                 @click="rejectInvitation(row)"
                 :data-test="`reject-invitation-${row.token}`"
               >
                 {{ t("invitation.reject") }}
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="invitation-list-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  class="md:hidden"
+                  :data-test="`accept-invitation-${row.token}-menu`"
+                  @select="acceptInvitation(row)"
+                >
+                  <span>{{ t("invitation.accept") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  class="md:hidden"
+                  :data-test="`reject-invitation-${row.token}-menu`"
+                  @select="rejectInvitation(row)"
+                >
+                  <span>{{ t("invitation.reject") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
           <template #bottom>
@@ -150,6 +178,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, onMounted } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -188,6 +218,8 @@ export default defineComponent({
     OPageLayout,
     OEmptyState,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OTag,
     OTimeCell,

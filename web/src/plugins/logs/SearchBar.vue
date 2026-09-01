@@ -1789,7 +1789,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.edit')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover max-md:hidden"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-update-${row.view_id}-saved-view-btn`"
@@ -1799,7 +1799,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.delete')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover max-md:hidden"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-delete-${row.view_id}-saved-view-btn`"
@@ -1807,6 +1807,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OIcon name="delete" size="xs" />
                     </OButton>
+                    <ODropdown side="bottom" align="end">
+                      <template #trigger>
+                        <OButton
+                          icon-left="more-vert"
+                          variant="ghost"
+                          size="icon-xs-sq"
+                          class="md:hidden"
+                          data-test="logs-search-bar-saved-view-row-more-actions"
+                          @click.stop
+                        />
+                      </template>
+                      <ODropdownItem
+                        icon-left="edit"
+                        class="md:hidden"
+                        :data-test="`logs-search-bar-update-${row.view_id}-saved-view-btn-menu`"
+                        @select="handleUpdateSavedView(row)"
+                      >
+                        <span>{{ t("common.edit") }}</span>
+                      </ODropdownItem>
+                      <ODropdownItem
+                        icon-left="delete"
+                        variant="destructive"
+                        class="md:hidden"
+                        :data-test="`logs-search-bar-delete-${row.view_id}-saved-view-btn-menu`"
+                        @select="handleDeleteSavedView(row)"
+                      >
+                        <span>{{ t("common.delete") }}</span>
+                      </ODropdownItem>
+                    </ODropdown>
                   </div>
                 </template>
                 <template #empty>
@@ -1863,7 +1892,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.edit')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover max-md:hidden"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-update-${row.view_id}-favorite-saved-view-btn`"
@@ -1873,7 +1902,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.delete')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover max-md:hidden"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-delete-${row.view_id}-favorite-saved-view-btn`"
@@ -1881,6 +1910,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OIcon name="delete" size="xs" />
                     </OButton>
+                    <ODropdown side="bottom" align="end">
+                      <template #trigger>
+                        <OButton
+                          icon-left="more-vert"
+                          variant="ghost"
+                          size="icon-xs-sq"
+                          class="md:hidden"
+                          data-test="logs-search-bar-favorite-saved-view-row-more-actions"
+                          @click.stop
+                        />
+                      </template>
+                      <ODropdownItem
+                        icon-left="edit"
+                        class="md:hidden"
+                        :data-test="`logs-search-bar-update-${row.view_id}-favorite-saved-view-btn-menu`"
+                        @select="handleUpdateSavedView(row)"
+                      >
+                        <span>{{ t("common.edit") }}</span>
+                      </ODropdownItem>
+                      <ODropdownItem
+                        icon-left="delete"
+                        variant="destructive"
+                        class="md:hidden"
+                        :data-test="`logs-search-bar-delete-${row.view_id}-favorite-saved-view-btn-menu`"
+                        @select="handleDeleteSavedView(row)"
+                      >
+                        <span>{{ t("common.delete") }}</span>
+                      </ODropdownItem>
+                    </ODropdown>
                   </div>
                 </template>
               </OTable>
