@@ -212,6 +212,17 @@
               data-test="alerts-alertdetail-tab-groups-count"
             />
           </OTab>
+          <!-- An anomaly config has no query_condition, so the evaluation chart
+             above the tabs is excluded for this family. Its charts read the
+             _anomalies stream instead, and there are three of them — too tall
+             for the shared strip, so they get the tab region's full height. -->
+          <OTab
+            v-if="isAnomalyAlert"
+            name="charts"
+            :label="t('alerts.anomaly.chartsTab')"
+            icon="bar-chart"
+            data-test="alerts-alertdetail-tab-charts"
+          />
           <OTab name="history" :label="t('alerts.history')" icon="history" />
           <OTab name="configuration" :label="t('alerts.configuration')" icon="settings" />
         </OTabs>
@@ -236,6 +247,12 @@
              "Level changes" reads the rollup row's transitions
              (group_key ""), without the Group column/filter that would
              repeat the same non-answer on every line. -->
+          <OTabPanel v-if="isAnomalyAlert" name="charts" stretch>
+            <OContent class="h-full overflow-y-auto py-4">
+              <AnomalyDetectionChart v-if="alert" :alert="alert" :anomaly-id="alertId" />
+            </OContent>
+          </OTabPanel>
+
           <OTabPanel name="history" stretch>
             <AlertGroupHistory
               v-if="isMultiAlert"
@@ -309,6 +326,7 @@ import AlertEvaluationHistory from "@/components/alerts/AlertEvaluationHistory.v
 import AlertGroupChart from "@/components/alerts/AlertGroupChart.vue";
 import AlertGroupHistory from "@/components/alerts/AlertGroupHistory.vue";
 import AlertGroupsTable from "@/components/alerts/AlertGroupsTable.vue";
+import AnomalyDetectionChart from "@/components/alerts/AnomalyDetectionChart.vue";
 import CompositeAlertDetail from "@/components/alerts/composite/CompositeAlertDetail.vue";
 import CompositeReferencesDrawer from "@/components/alerts/composite/CompositeReferencesDrawer.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -566,6 +584,10 @@ const fetchAlert = async () => {
     const res = await alertsService.get_by_alert_id(orgId.value, alertId.value);
     alert.value = res.data;
     notFound.value = !res.data;
+    // Same tick as the assignment, not down in onMounted: setting alert.value
+    // queues the render, so any await before this one lets the default History
+    // tab mount and fire a fetch for a page that is about to switch away.
+    if (isAnomalyAlert.value) activeTab.value = "charts";
   } catch {
     alert.value = null;
     notFound.value = true;

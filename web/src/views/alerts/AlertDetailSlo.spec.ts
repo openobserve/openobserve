@@ -149,6 +149,13 @@ const openConfigTab = async (w: VueWrapper) => {
   await flushPromises();
 };
 
+/** An anomaly config opens on its charts tab, so a history assertion has to
+ *  switch to History first — everywhere else that is already the default. */
+const openHistoryTab = async (w: VueWrapper) => {
+  (w.vm as any).activeTab = "history";
+  await flushPromises();
+};
+
 describe("AlertDetail — SLO alerts", () => {
   let wrapper: VueWrapper;
 
@@ -393,6 +400,7 @@ describe("AlertDetail — anomaly detection configs", () => {
 
   it("reads history as an anomaly, which is the only parameter the endpoint accepts for one", async () => {
     wrapper = await mountView(anomalyAlert());
+    await openHistoryTab(wrapper);
 
     expect(wrapper.findComponent({ name: "AlertEvaluationHistory" }).props("isAnomaly")).toBe(true);
   });
@@ -408,6 +416,7 @@ describe("AlertDetail — anomaly detection configs", () => {
   // Anomaly configs never write a transitions row.
   it("does not offer the level-changes view, which cannot have rows", async () => {
     wrapper = await mountView(anomalyAlert());
+    await openHistoryTab(wrapper);
 
     expect(wrapper.find('[data-test="alerts-alertdetail-history-view"]').exists()).toBe(false);
     expect(alertsService.list_group_transitions).not.toHaveBeenCalled();
