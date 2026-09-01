@@ -20,8 +20,11 @@ import { syntheticsKeys } from "./synthetics.querykeys";
 export const syntheticsMonitorsQuery = (org: string, folderId?: string) =>
   queryOptions({
     queryKey: syntheticsKeys.monitors(org, folderId),
-    queryFn: async (): Promise<any[]> =>
-      ((await syntheticsService.listByFolderId(org, folderId)).data as any)?.monitors ?? [],
+    // The list endpoint returns `checks`; `monitors` is the older name kept as a fallback.
+    queryFn: async (): Promise<any[]> => {
+      const data = (await syntheticsService.listByFolderId(org, folderId)).data as any;
+      return data?.checks ?? data?.monitors ?? [];
+    },
     refetchOnWindowFocus: true,
   });
 
