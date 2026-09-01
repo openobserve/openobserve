@@ -16,11 +16,17 @@
 use std::collections::{HashMap, HashSet};
 
 use config::{
+    TIMESTAMP_COL_NAME,
     meta::{
         alerts::{alert, level::PAYLOAD_SAMPLE_ROWS},
-        promql::{METRICS_HASH_EXCLUDED_LABELS, Metadata},
+        promql::{
+            EXEMPLARS_LABEL, HASH_LABEL, METRICS_HASH_EXCLUDED_LABELS, Metadata, VALUE_LABEL,
+        },
     },
-    utils::hash::{Sum64, gxhash},
+    utils::{
+        hash::{Sum64, gxhash},
+        json::get_string_value,
+    },
 };
 use datafusion::arrow::datatypes::Schema;
 
@@ -34,6 +40,18 @@ pub mod prom;
 
 /// Distinct label sets one realtime notification carries, matching the scheduled path's sample.
 const TRIGGER_LABEL_LIMIT: usize = PAYLOAD_SAMPLE_ROWS as usize;
+
+/// Columns that move between samples of one series, so an alert dedup key ignores them.
+const TRIGGER_DEDUP_EXCLUDED_LABELS: &[&str] = &[
+    VALUE_LABEL,
+    HASH_LABEL,
+    EXEMPLARS_LABEL,
+    "is_monotonic",
+    "trace_id",
+    "span_id",
+    "start_time",
+    TIMESTAMP_COL_NAME,
+];
 
 /// An alert's pending notification for the request being ingested.
 struct TriggerSlot {
@@ -100,6 +118,24 @@ pub fn signature_without_labels(
 
 fn get_exclude_labels() -> &'static [&'static str] {
     METRICS_HASH_EXCLUDED_LABELS
+}
+
+/// Series identity for alert dedup, rendering every value so a numeric label still separates two
+/// series.
+fn series_signature(labels: &config::utils::json::Map<String, config::utils::json::Value>) -> u64 {
+    let mut labels: Vec<(&str, String)> = labels
+        .iter()
+        .filter(|(key, _value)| !TRIGGER_DEDUP_EXCLUDED_LABELS.contains(&key.as_str()))
+        .map(|(key, value)| (key.as_str(), get_string_value(value)))
+        .collect();
+    labels.sort_by(|a, b| a.0.cmp(b.0));
+
+    let key = labels
+        .iter()
+        .map(|(key, value)| format!("{key}:{value}"))
+        .collect::<Vec<String>>()
+        .join("|");
+    gxhash::new().sum64(&key)
 }
 
 /// Whether this label set would add anything to `key`'s pending notification.
@@ -433,5 +469,67 @@ mod tests {
             !trigger_wants_labels(&slots, "k", 9_999),
             "a full notification takes nothing new"
         );
+    }
+    fn labels(pairs: &[(&str, json::Value)]) -> json::Map<String, json::Value> {
+        let mut m = json::Map::new();
+        for (k, v) in pairs {
+            m.insert((*k).to_string(), v.clone());
+        }
+        m
+    }
+
+    #[test]
+    fn series_signature_separates_numeric_labels() {
+        // `signature_without_labels` renders every non-string as "", so these two collide there.
+        let a = labels(&[("code", json::json!(200))]);
+        let b = labels(&[("code", json::json!(500))]);
+        assert_ne!(series_signature(&a), series_signature(&b));
+        assert_eq!(
+            signature_without_labels(&a, &[]),
+            signature_without_labels(&b, &[])
+        );
+    }
+
+    #[test]
+    fn series_signature_separates_boolean_labels() {
+        let a = labels(&[("ok", json::json!(true))]);
+        let b = labels(&[("ok", json::json!(false))]);
+        assert_ne!(series_signature(&a), series_signature(&b));
+    }
+
+    #[test]
+    fn series_signature_keeps_the_concatenated_schema_column() {
+        // Under a user-defined schema every non-schema label folds into this column,
+        // so excluding it would collapse otherwise distinct series.
+        let a = labels(&[(config::INDEX_FIELD_NAME_FOR_ALL, json::json!("host=a"))]);
+        let b = labels(&[(config::INDEX_FIELD_NAME_FOR_ALL, json::json!("host=b"))]);
+        assert_ne!(series_signature(&a), series_signature(&b));
+    }
+
+    #[test]
+    fn series_signature_ignores_per_sample_columns() {
+        let base = [("host", json::json!("a"))];
+        let one = labels(&[
+            base[0].clone(),
+            (TIMESTAMP_COL_NAME, json::json!(1_000_i64)),
+            ("start_time", json::json!("111")),
+            (HASH_LABEL, json::json!(7_u64)),
+            (VALUE_LABEL, json::json!(1.5)),
+        ]);
+        let two = labels(&[
+            base[0].clone(),
+            (TIMESTAMP_COL_NAME, json::json!(2_000_i64)),
+            ("start_time", json::json!("222")),
+            (HASH_LABEL, json::json!(9_u64)),
+            (VALUE_LABEL, json::json!(9.9)),
+        ]);
+        assert_eq!(series_signature(&one), series_signature(&two));
+    }
+
+    #[test]
+    fn series_signature_separates_distinct_series() {
+        let a = labels(&[("host", json::json!("a")), ("region", json::json!("eu"))]);
+        let b = labels(&[("host", json::json!("b")), ("region", json::json!("eu"))]);
+        assert_ne!(series_signature(&a), series_signature(&b));
     }
 }

@@ -558,6 +558,7 @@ pub async fn ingest(
             // start check for alert trigger
             if let Some(alerts) = cur_stream_alerts {
                 let end_time = now_micros();
+                let dedup = super::series_signature(&record);
                 for alert in alerts {
                     let key = format!(
                         "{}/{}/{}/{}",
@@ -567,7 +568,7 @@ pub async fn ingest(
                         alert.get_unique_key()
                     );
                     // One row per label set: a series repeats its labels on every sample.
-                    if !super::trigger_wants_labels(&trigger_slots, &key, hash) {
+                    if !super::trigger_wants_labels(&trigger_slots, &key, dedup) {
                         continue;
                     }
                     match alert.evaluate(Some(&record), (None, end_time), None).await {
@@ -576,7 +577,7 @@ pub async fn ingest(
                                 &mut triggers,
                                 &mut trigger_slots,
                                 &key,
-                                hash,
+                                dedup,
                                 alert,
                                 trigger_results.data.unwrap(),
                             );

@@ -668,10 +668,11 @@ pub async fn remote_write(
             // start check for alert trigger
             if let Some(alerts) = cur_stream_alerts {
                 let end_time = now_micros();
+                let dedup = super::series_signature(&val_map);
                 for (alert, key) in alerts.iter().zip(alert_keys.iter()) {
                     // One row per label set: a series repeats its labels on
                     // every sample, and only distinct sets reach the template.
-                    if !super::trigger_wants_labels(&trigger_slots, key, hash) {
+                    if !super::trigger_wants_labels(&trigger_slots, key, dedup) {
                         continue;
                     }
                     match alert.evaluate(Some(&val_map), (None, end_time), None).await {
@@ -680,7 +681,7 @@ pub async fn remote_write(
                                 &mut triggers,
                                 &mut trigger_slots,
                                 key,
-                                hash,
+                                dedup,
                                 alert,
                                 trigger_results.data.unwrap(),
                             );

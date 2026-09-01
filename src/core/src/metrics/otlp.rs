@@ -601,7 +601,7 @@ pub async fn handle_otlp_request(
             // start check for alert trigger
             if let Some(alerts) = cur_stream_alerts {
                 let end_time = now_micros();
-                let hash = super::signature_without_labels(&val_map, super::get_exclude_labels());
+                let dedup = super::series_signature(&val_map);
                 for alert in alerts {
                     let key = format!(
                         "{}/{}/{}/{}",
@@ -611,7 +611,7 @@ pub async fn handle_otlp_request(
                         alert.get_unique_key()
                     );
                     // One row per label set: a series repeats its labels on every sample.
-                    if !super::trigger_wants_labels(&trigger_slots, &key, hash) {
+                    if !super::trigger_wants_labels(&trigger_slots, &key, dedup) {
                         continue;
                     }
                     match alert.evaluate(Some(&val_map), (None, end_time), None).await {
@@ -620,7 +620,7 @@ pub async fn handle_otlp_request(
                                 &mut triggers,
                                 &mut trigger_slots,
                                 &key,
-                                hash,
+                                dedup,
                                 alert,
                                 trigger_results.data.unwrap(),
                             );
