@@ -12942,7 +12942,6 @@
       "selectStarNotSupportedForVisualization": "可视化不支持 SELECT * 查询",
       "errorUpdatingVisualization": "更新可视化时出错",
       "queryEmptySelectFieldsToBuild": "查询为空，请选择字段构建查询",
-      "histogramUnavailableCtesDistinctJoinLimit": "对于 CTE、DISTINCT、UNION、JOIN 和 LIMIT 查询，直方图不可用。",
       "histogramUnavailableCtesDistinctLimit": "对于 CTE、DISTINCT 和 LIMIT 查询，直方图不可用。"
     },
     "searchSchedulersList": {

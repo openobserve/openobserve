@@ -12942,7 +12942,6 @@
       "selectStarNotSupportedForVisualization": "Запрос SELECT * не поддерживается для визуализации",
       "errorUpdatingVisualization": "Ошибка при обновлении визуализации",
       "queryEmptySelectFieldsToBuild": "Запрос пуст, пожалуйста, выберите поля для построения запроса",
-      "histogramUnavailableCtesDistinctJoinLimit": "Гистограмма недоступна для CTE, DISTINCT, UNION, JOIN и LIMIT запросов.",
       "histogramUnavailableCtesDistinctLimit": "Гистограмма недоступна для CTE, DISTINCT и LIMIT запросов."
     },
     "searchSchedulersList": {

@@ -12942,7 +12942,6 @@
       "selectStarNotSupportedForVisualization": "Zapytanie SELECT * nie jest obsługiwane dla wizualizacji",
       "errorUpdatingVisualization": "Błąd aktualizacji wizualizacji",
       "queryEmptySelectFieldsToBuild": "Zapytanie jest puste, wybierz pola, aby zbudować zapytanie",
-      "histogramUnavailableCtesDistinctJoinLimit": "Histogram niedostępny dla zapytań CTE, DISTINCT, UNION, JOIN i LIMIT.",
       "histogramUnavailableCtesDistinctLimit": "Histogram niedostępny dla zapytań CTE, DISTINCT i LIMIT."
     },
     "searchSchedulersList": {

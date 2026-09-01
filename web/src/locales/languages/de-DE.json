@@ -12942,7 +12942,6 @@
       "selectStarNotSupportedForVisualization": "SELECT * Abfrage wird für die Visualisierung nicht unterstützt",
       "errorUpdatingVisualization": "Fehler beim Aktualisieren der Visualisierung",
       "queryEmptySelectFieldsToBuild": "Abfrage ist leer, bitte wählen Sie Felder aus, um die Abfrage zu erstellen",
-      "histogramUnavailableCtesDistinctJoinLimit": "Histogramm nicht verfügbar für CTEs, DISTINCT, UNION, JOIN und LIMIT Abfragen.",
       "histogramUnavailableCtesDistinctLimit": "Histogramm nicht verfügbar für CTEs, DISTINCT und LIMIT Abfragen."
     },
     "searchSchedulersList": {

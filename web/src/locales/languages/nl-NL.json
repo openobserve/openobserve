@@ -12942,7 +12942,6 @@
       "selectStarNotSupportedForVisualization": "Select *-query wordt niet ondersteund voor visualisatie",
       "errorUpdatingVisualization": "Fout bij bijwerken van visualisatie",
       "queryEmptySelectFieldsToBuild": "Query is leeg, selecteer velden om query op te bouwen",
-      "histogramUnavailableCtesDistinctJoinLimit": "Histogram niet beschikbaar voor CTE's, DISTINCT, UNION, JOIN en LIMIT-query's.",
       "histogramUnavailableCtesDistinctLimit": "Histogram niet beschikbaar voor CTE's, DISTINCT en LIMIT-query's."
     },
     "searchSchedulersList": {

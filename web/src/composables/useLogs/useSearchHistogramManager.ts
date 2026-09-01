@@ -32,11 +32,7 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
     isNonAggregatedSQLMode,
   } = logsUtils();
 
-  const {
-    resetHistogramWithError,
-    generateHistogramSkeleton,
-    isHistogramEnabled,
-  } = useHistogram();
+  const { resetHistogramWithError, generateHistogramSkeleton, isHistogramEnabled } = useHistogram();
 
   const { searchObj, searchObjDebug, resetHistogramError } = searchState();
 

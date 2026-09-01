@@ -12942,7 +12942,6 @@
       "selectStarNotSupportedForVisualization": "La consulta SELECT * no es compatible con la visualización",
       "errorUpdatingVisualization": "Error al actualizar la visualización",
       "queryEmptySelectFieldsToBuild": "La consulta está vacía, seleccione campos para construir la consulta",
-      "histogramUnavailableCtesDistinctJoinLimit": "Histograma no disponible para consultas CTE, DISTINCT, UNION, JOIN y LIMIT.",
       "histogramUnavailableCtesDistinctLimit": "Histograma no disponible para consultas CTE, DISTINCT y LIMIT."
     },
     "searchSchedulersList": {

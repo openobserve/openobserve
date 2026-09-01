@@ -341,7 +341,7 @@ export const useSearchQuery = (t: TranslateFn) => {
             interestingFields.map((field: string) => quoteSqlIdentifierIfNeeded(field)).join(","),
           );
         }
-      } else if (searchObj.data.stream.selectedStream.length === 1) {
+      } else if (searchObj.data.stream.selectedStream.length <= 1) {
         req.query.sql = req.query.sql.replace("[FIELD_LIST]", "*");
       }
 
@@ -614,8 +614,7 @@ export const useSearchQuery = (t: TranslateFn) => {
         }
       }
 
-      // The arms must stay wildcard: _timestamp and _o2_id are injected by the backend
-      // only for non-complex statements, and a UNION never qualifies.
+      // Arms stay wildcard: the backend injects _timestamp/_o2_id only for non-complex statements.
       return finalQuery.replace("[FIELD_LIST]", `*, '${item}' as _stream_name`);
     });
 
@@ -623,9 +622,7 @@ export const useSearchQuery = (t: TranslateFn) => {
       return null;
     }
 
-    // UNION ALL BY NAME, never UNION: UNION deletes rows that are genuinely duplicated
-    // across streams, and BY NAME merges streams whose column sets differ instead of
-    // failing the plan. A set operation gets no implicit ORDER BY, so it must be explicit.
+    // BY NAME merges differing columns, ALL keeps duplicate events, and a set operation gets no implicit ORDER BY.
     req.query.sql =
       arms.length > 1
         ? `${arms.join(" UNION ALL BY NAME ")} ORDER BY ${

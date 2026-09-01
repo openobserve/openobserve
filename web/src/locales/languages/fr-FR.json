@@ -12942,7 +12942,6 @@
       "selectStarNotSupportedForVisualization": "La requête SELECT * n'est pas prise en charge pour la visualisation",
       "errorUpdatingVisualization": "Erreur lors de la mise à jour de la visualisation",
       "queryEmptySelectFieldsToBuild": "La requête est vide, veuillez sélectionner des champs pour construire la requête",
-      "histogramUnavailableCtesDistinctJoinLimit": "Histogramme indisponible pour les requêtes CTE, DISTINCT, UNION, JOIN et LIMIT.",
       "histogramUnavailableCtesDistinctLimit": "Histogramme indisponible pour les requêtes CTE, DISTINCT et LIMIT."
     },
     "searchSchedulersList": {

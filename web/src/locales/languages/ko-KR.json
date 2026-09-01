@@ -12942,7 +12942,6 @@
       "selectStarNotSupportedForVisualization": "SELECT * 쿼리는 시각화에서 지원되지 않습니다.",
       "errorUpdatingVisualization": "시각화 업데이트 중 오류",
       "queryEmptySelectFieldsToBuild": "쿼리가 비어 있습니다. 쿼리를 작성할 필드를 선택하세요.",
-      "histogramUnavailableCtesDistinctJoinLimit": "CTE, DISTINCT, UNION, JOIN 및 LIMIT 쿼리에는 히스토그램을 사용할 수 없습니다.",
       "histogramUnavailableCtesDistinctLimit": "CTE, DISTINCT 및 LIMIT 쿼리에는 히스토그램을 사용할 수 없습니다."
     },
     "searchSchedulersList": {

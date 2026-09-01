@@ -12942,7 +12942,6 @@
       "selectStarNotSupportedForVisualization": "Truy vấn Select * không được hỗ trợ cho trực quan hóa",
       "errorUpdatingVisualization": "Lỗi khi cập nhật trực quan hóa",
       "queryEmptySelectFieldsToBuild": "Truy vấn trống, vui lòng chọn các trường để xây dựng truy vấn",
-      "histogramUnavailableCtesDistinctJoinLimit": "Biểu đồ histogram không khả dụng cho các truy vấn CTE, DISTINCT, UNION, JOIN và LIMIT.",
       "histogramUnavailableCtesDistinctLimit": "Biểu đồ histogram không khả dụng cho các truy vấn CTE, DISTINCT và LIMIT."
     },
     "searchSchedulersList": {

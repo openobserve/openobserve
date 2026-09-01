@@ -12942,7 +12942,6 @@
       "selectStarNotSupportedForVisualization": "Görselleştirme için SELECT * sorgusu desteklenmiyor",
       "errorUpdatingVisualization": "Görselleştirme güncellenirken hata",
       "queryEmptySelectFieldsToBuild": "Sorgu boş, lütfen sorgu oluşturmak için alanlar seçin",
-      "histogramUnavailableCtesDistinctJoinLimit": "CTE'ler, DISTINCT, UNION, JOIN ve LIMIT sorguları için histogram mevcut değil.",
       "histogramUnavailableCtesDistinctLimit": "CTE'ler, DISTINCT ve LIMIT sorguları için histogram mevcut değil."
     },
     "searchSchedulersList": {

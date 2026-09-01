@@ -12937,7 +12937,6 @@
       "selectStarNotSupportedForVisualization": "視覺化不支援 SELECT * 查詢",
       "errorUpdatingVisualization": "更新視覺化時發生錯誤",
       "queryEmptySelectFieldsToBuild": "查詢為空，請選取欄位以建立查詢",
-      "histogramUnavailableCtesDistinctJoinLimit": "直方圖不適用於 CTE、DISTINCT、UNION、JOIN 和 LIMIT 查詢。",
       "histogramUnavailableCtesDistinctLimit": "直方圖不適用於 CTE、DISTINCT 和 LIMIT 查詢。"
     },
     "searchSchedulersList": {

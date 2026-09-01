@@ -12942,7 +12942,6 @@
       "selectStarNotSupportedForVisualization": "Select * query is not supported for visualization",
       "errorUpdatingVisualization": "Error in updating visualization",
       "queryEmptySelectFieldsToBuild": "Query is empty, please select fields to build query",
-      "histogramUnavailableCtesDistinctJoinLimit": "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
       "histogramUnavailableCtesDistinctLimit": "Histogram unavailable for CTEs, DISTINCT and LIMIT queries."
     },
     "searchSchedulersList": {

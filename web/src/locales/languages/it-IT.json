@@ -12942,7 +12942,6 @@
       "selectStarNotSupportedForVisualization": "La query SELECT * non è supportata per la visualizzazione",
       "errorUpdatingVisualization": "Errore nell'aggiornamento della visualizzazione",
       "queryEmptySelectFieldsToBuild": "La query è vuota, seleziona i campi per costruire la query",
-      "histogramUnavailableCtesDistinctJoinLimit": "Istogramma non disponibile per query CTE, DISTINCT, UNION, JOIN e LIMIT.",
       "histogramUnavailableCtesDistinctLimit": "Istogramma non disponibile per query CTE, DISTINCT e LIMIT."
     },
     "searchSchedulersList": {
