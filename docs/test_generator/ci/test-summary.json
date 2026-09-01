@@ -1,5 +1,0 @@
-[
-  { "title": "saves as draft, shows Draft tag, and promotes on publish", "action": "append", "verifies": "a new workflow saved as draft shows the Draft tag, then promotes to published and the tag disappears" },
-  { "title": "incident_event trigger publishes without the link-alerts prompt", "action": "append", "verifies": "the incident_event trigger publishes straight to the list with no link-to-alerts dialog" },
-  { "title": "pause and resume toggles a published workflow", "action": "append", "verifies": "the row pause/resume action flips a published workflow's enabled state" }
-]

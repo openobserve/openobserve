@@ -1,4 +1,0 @@
-tests/ui-testing/pages/workflowsPages/workflowsPage.js
-tests/ui-testing/playwright-tests/Workflows/workflows-crud.spec.js
-tests/ui-testing/playwright-tests/Workflows/workflows-negative.spec.js
-.github/workflows/api-testing.yml
