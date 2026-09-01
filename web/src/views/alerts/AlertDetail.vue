@@ -179,7 +179,8 @@
            family has neither. It bails safely without a stream, but what it
            renders then is an empty frame that reads as "no data" — a lie about
            an alert that is evaluating perfectly well. -->
-        <OContent v-if="alert && !isSloAlertView" class="shrink-0 py-3">
+        <!-- An anomaly config has no query_condition for generate_sql to build from. -->
+        <OContent v-if="alert && !isSloAlertView && !isAnomalyAlert" class="shrink-0 py-3">
           <AlertGroupChart :alert="alert" />
         </OContent>
 
@@ -248,6 +249,8 @@
                page cannot know which mode it is in, and mounting the
                evaluations view speculatively fires its fetch even for alerts
                that turn out to be multi. -->
+            <!-- An anomaly config writes no transitions row for the toggle to show. -->
+            <AlertEvaluationHistory v-else-if="isAnomalyAlert" :alert-id="alertId" is-anomaly />
             <div v-else-if="alert" class="flex h-full min-h-0 flex-col">
               <OContent class="shrink-0 py-2">
                 <OToggleGroup
@@ -387,6 +390,8 @@ const isMultiAlert = computed(() => {
   return qc?.type === "promql" ? !!qc?.promql_multi_alert : !!qc?.aggregation?.multi_alert;
 });
 const isCompositeAlert = computed(() => alert.value?.alert_type === "composite");
+// The GET falls back to the flat anomaly config row and stamps this on it.
+const isAnomalyAlert = computed(() => alert.value?.alert_type === "anomaly_detection");
 
 const handleReferenceOpen = async (open: boolean) => {
   referenceDrawerOpen.value = open;
@@ -678,6 +683,8 @@ onMounted(async () => {
     activeTab.value = "groups";
     await fetchGroups();
   }
+  // Anomaly configs never write to the transitions table.
+  if (isAnomalyAlert.value) return;
   await fetchTransitions();
 });
 </script>
