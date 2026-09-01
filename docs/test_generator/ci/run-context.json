@@ -1,0 +1,17 @@
+{
+  "feature_slug": "users-rbac-custom-roles",
+  "feature_title": "IAM Users RBAC Custom Roles",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "usersRbacCustomRoles.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/usersRbacCustomRoles.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/iam/users/User.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

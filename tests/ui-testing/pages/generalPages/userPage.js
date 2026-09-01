@@ -70,6 +70,15 @@ export class UserPage {
 
         // OTable rows — used by searchUser / verifyUserExists poll loops.
         this.tableRows = page.locator('[data-test^="o2-table-row-"]');
+
+        // Role summary strip — role tiles + total tile double as the role facet.
+        // `user-list-summary` is the wait target for the async getOrgMembers()
+        // render (deterministic, unlike networkidle on deployed envs).
+        this.userListSummary = page.locator('[data-test="user-list-summary"]');
+        this.userSummaryTotal = page.locator('[data-test="user-summary-total"]');
+        // Enterprise/cloud-only custom-role multi-select in the Add-user dialog.
+        // Asserted ABSENT (count 0) in OSS — see the diff's RBAC gating.
+        this.userCustomRoleField = page.locator('[data-test="user-custom-role-field"]');
     }
 
     // -------- Factory helpers (runtime-dynamic locators) ----------
@@ -89,6 +98,12 @@ export class UserPage {
         // OSelect option items expose data-test="<parent>-option" with a
         // data-test-value="<value>" attribute keying to the option's value.
         return this.page.locator(`[data-test="user-role-field-option"][data-test-value="${role.toLowerCase()}"]`);
+    }
+
+    getRoleTile(key) {
+        // Role tiles key off a lowercase role name (e.g. "root", "admin") —
+        // the strip enumerates roles from row data, not a hardcoded list.
+        return this.page.locator(`[data-test="user-summary-role-${key}"]`);
     }
 
     async gotoIamPage() {
@@ -263,6 +278,72 @@ export class UserPage {
         }, { timeout: 15000, intervals: [250, 500, 1000] }).toBe(true);
 
 
+    }
+
+    async waitForUsersList() {
+        // The summary strip renders once getOrgMembers() has resolved and rows
+        // are ready — deterministic, unlike networkidle on deployed envs.
+        await this.userListSummary.waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    async expectRoleTileVisible(key) {
+        await expect(this.getRoleTile(key)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectSummaryTotalVisible() {
+        await expect(this.userSummaryTotal).toBeVisible({ timeout: 15000 });
+    }
+
+    async clickRoleTile(key) {
+        await this.getRoleTile(key).click();
+    }
+
+    async clickSummaryTotal() {
+        await this.userSummaryTotal.click();
+    }
+
+    async expectCustomRoleFieldCount(count) {
+        await expect(this.userCustomRoleField).toHaveCount(count);
+    }
+
+    async openAddUserDialog() {
+        await this.addUserButton.click();
+        await this.userEmailFieldInput.waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    async expectRowAbsent(email) {
+        // A row can be filtered OUT by the role facet while others remain, so
+        // poll for the email's absence rather than an empty-state flag (which
+        // only appears when the whole table is empty).
+        await expect.poll(async () => {
+            const rowCount = await this.tableRows.count().catch(() => 0);
+            for (let i = 0; i < rowCount; i++) {
+                const visible = await this.tableRows.nth(i).isVisible().catch(() => false);
+                if (!visible) continue;
+                const text = (await this.tableRows.nth(i).textContent().catch(() => '')) ?? '';
+                if (text.includes(email)) return false;
+            }
+            return true;
+        }, { timeout: 15000, intervals: [250, 500, 1000] }).toBe(true);
+    }
+
+    registerCustomRolesRequestTracker() {
+        // The diff gates getCustomRoles (/api/{org}/roles) and the batched
+        // getAllUserRoles (/api/{org}/users/roles/all) behind edition+rbac. In
+        // OSS neither may fire; the allowed role-options fetch (/api/{org}/users/roles)
+        // legitimately fires and must NOT be tracked. Attached to the live page
+        // before gotoIamPage() mounts User.vue.
+        const org = process.env["ORGNAME"] || "default";
+        const counts = { list: 0, batched: 0 };
+        this.page.on('request', (request) => {
+            const url = request.url();
+            if (url.includes(`/api/${org}/roles`) && !url.includes('/users/roles')) {
+                counts.list += 1;
+            } else if (url.includes('/users/roles/all')) {
+                counts.batched += 1;
+            }
+        });
+        return counts;
     }
 
 }

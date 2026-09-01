@@ -1,0 +1,25 @@
+{
+  "feature_slug": "users-rbac-custom-roles",
+  "feature_title": "IAM Users RBAC Custom Roles",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "usersRbacCustomRoles.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/usersRbacCustomRoles.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/iam/users/User.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The single changed path is web/src/components/iam/users/User.vue, which lives in the OSS web frontend (web/src/**), not under any enterprise-owned directory (enterprise/, o2_enterprise/, src/enterprise/). The diff's symbols (rbac_enabled, config.isEnterprise, isEnterpriseOrCloud) reference enterprise RBAC gating, but that is a keyword/symbol hint only and is never sufficient alone; the authoritative path signal is unambiguously OSS, so edition is 'oss'.",
+    "skip": "No skip marker present: trigger_comment.txt and feature_hint.txt are empty and no tests-added label was passed. The change is not docs/CI/comment-only — it alters runtime behavior in a user-facing Vue component (the IAM users page now guards the custom-roles fetch behind rbac_enabled), so it is not skipped.",
+    "e2e": "E2E is warranted because the change modifies a user-facing UI flow in web/src: on the IAM users management page, the custom-roles list is now only fetched/rendered when RBAC is enabled (store.state.zoConfig.rbac_enabled). The users table's role column and the fire-and-forget role fetch both change, so the users page behavior (with and without RBAC enabled) needs verification.",
+    "area": "The change is in the IAM users component (web/src/components/iam/users/User.vue), and user/org/identity-management E2E specs (usersOrg.spec.js, org.spec.js, serviceAccount.spec.js, changeOrg.spec.js) live in the GeneralTests area — there is no dedicated IAM/Users folder, so GeneralTests is the correct home.",
+    "group": "GeneralTests is the closest existing matrix shard: it already holds the sibling user/org specs (usersOrg.spec.js, org.spec.js, serviceAccount.spec.js) in both the OSS base ci_matrix.json and the ENT overlay, so the new spec joins that shard.",
+    "existing_tests": "No E2E specs in the diff — the only changed file is web/src/components/iam/users/User.vue, and there are no files under tests/ui-testing/playwright-tests/**, so there is no existing Playwright E2E coverage for this feature to extend."
+  }
+}
