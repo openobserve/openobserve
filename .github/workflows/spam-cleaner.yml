@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   delete_mediafire_comments:
-    runs-on: ubicloud-standard-8
+    runs-on: ubuntu-latest
     steps:
       - name: Check for Mediafire in comments
         uses: actions/github-script@v9
