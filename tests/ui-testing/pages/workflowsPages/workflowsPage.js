@@ -37,6 +37,7 @@ class WorkflowsPage {
     // differs across builds (o2-table-root vs o2-table / forwarded workflow-list-table).
     this.searchInput = '[data-test="workflow-list-search-input-field"]';
     this.listTable = '[data-test="workflows-list-page"]';
+    this.draftTag = '[data-test="workflow-list-draft-tag"]';
     // Editor
     this.editorPage = '[data-test="workflow-editor-page"]';
     // Name and description are inline-edited titles (OInlineEdit): a display
@@ -55,6 +56,7 @@ class WorkflowsPage {
     this.nodeFunctionSaveBtn = '[data-test="wf-function-save-btn"]';
     this.nodeFunctionNameInput = '[data-test="wf-saved-function-name-input-field"]';
     this.saveBtn = '[data-test="workflow-editor-save"]';
+    this.saveDraftBtn = '[data-test="workflow-editor-save-draft"]';
     this.publishBtn = '[data-test="workflow-editor-publish"]';
     this.testBtn = '[data-test="workflow-editor-test"]';
     this.cancelBtn = '[data-test="workflow-editor-cancel"]';
@@ -233,6 +235,19 @@ class WorkflowsPage {
       if (!b) throw new Error('publish button not found: ' + sel);
       b.click();
     }, this.publishBtn);
+  }
+
+  // K9: same tooltip-interception bypass as clickPublish, applied to Save-as-Draft.
+  // Save-as-Draft is lenient (name only, no graph checks) and the editor's goBack()
+  // fires only after persistDraft resolves — wait for the editor to unmount so the
+  // caller can't navigate away mid-create and abort the in-flight draft POST.
+  async clickSaveDraft() {
+    await this.page.evaluate((sel) => {
+      const b = document.querySelector(sel);
+      if (!b) throw new Error('save draft button not found: ' + sel);
+      b.click();
+    }, this.saveDraftBtn);
+    await expect(this.page.locator(this.editorPage)).toBeHidden({ timeout: DRAWER_TIMEOUT_MS });
   }
 
   /**
@@ -421,6 +436,12 @@ class WorkflowsPage {
     }
   }
 
+  /** Assert the post-publish "link to alerts" dialog did NOT appear (trigger kinds with no
+   *  linksAlerts — incident_event — navigate straight to the list). */
+  async expectNoLinkAlertsDialog() {
+    await expect(this.page.locator(this.linkAlertsDialog)).toBeHidden({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
   /**
    * Full happy path: build a Trigger -> Destination workflow with a freshly-created destination
    * and save it. Returns nothing; caller verifies via the list.
@@ -518,6 +539,34 @@ class WorkflowsPage {
     return await this.rowByName(name).first()
       .waitFor({ state: 'attached', timeout: LIST_TIMEOUT_MS })
       .then(() => true).catch(() => false);
+  }
+
+  /** Assert the row's "Draft" tag is visible (draft) or absent (published/promoted). Filter to
+   *  the name first — the list is virtualized (K10), so an arbitrary row may not be rendered. */
+  async expectDraftTag(name, { visible = true } = {}) {
+    await this.waitForListReady();
+    await this.search(name);
+    await this.rowByName(name).first().waitFor({ state: 'attached', timeout: LIST_TIMEOUT_MS });
+    const tag = this.page.locator(this.draftTag).first();
+    if (visible) {
+      await expect(tag).toBeVisible({ timeout: LIST_TIMEOUT_MS });
+    } else {
+      // The tag is only rendered for draft rows (v-if="row.is_draft"); after promote it is
+      // removed from the DOM, so toBeHidden passes.
+      await expect(tag).toBeHidden({ timeout: LIST_TIMEOUT_MS });
+    }
+  }
+
+  /** Assert the row's pause/resume action reflects the expected enabled state. The OButton
+   *  carries a stable `data-row-action` attribute: 'pause' when enabled, 'resume' when paused. */
+  async expectWorkflowEnabledState(name, enabled) {
+    await this.waitForListReady();
+    await this.search(name);
+    const action = this.page.locator(`[data-test="workflow-list-${name}-pause-start-action"]`).first();
+    await action.waitFor({ state: 'attached', timeout: LIST_TIMEOUT_MS });
+    await expect(action).toHaveAttribute('data-row-action', enabled ? 'pause' : 'resume', {
+      timeout: LIST_TIMEOUT_MS,
+    });
   }
 
   // ---------- enable / disable ----------

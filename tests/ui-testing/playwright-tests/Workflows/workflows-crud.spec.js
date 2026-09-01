@@ -80,4 +80,65 @@ test.describe('Workflows CRUD & builder', { tag: ['@workflows', '@enterprise', '
   });
 
   // CT-12 — delete protection (linked workflow) is covered in workflows-delete.spec.js.
+
+  // Draft lifecycle: a new workflow can be saved as draft (lenient, name only), shows the
+  // "Draft" tag in the list, then promotes to a published workflow on edit+publish (tag gone).
+  test('saves as draft, shows Draft tag, and promotes on publish', { tag: ['@workflowsCrud'] }, async () => {
+    const id = uniq();
+    const name = `wf_auto_${id}`;
+    await pm.workflowsPage.goToAdd();
+    await pm.workflowsPage.setName(name);
+    await pm.workflowsPage.addNodeFromPalette('destination');
+    await pm.workflowsPage.createDestinationInline({
+      name: `wf_auto_dest_${id}`,
+      url: `http://localhost:5080/api/${process.env.ORGNAME || 'default'}/wf_auto_sink/_json`,
+    });
+    await pm.workflowsPage.saveNodeDrawer();
+    await pm.workflowsPage.clickSaveDraft();
+    await pm.workflowsPage.goToList();
+    expect(await pm.workflowsPage.isPresent(name)).toBeTruthy();
+    await pm.workflowsPage.expectDraftTag(name, { visible: true });
+    // Promote: publish on edit; the Draft tag must disappear from the row.
+    await pm.workflowsPage.openEdit(name);
+    await pm.workflowsPage.publishAndExpectAccepted();
+    await pm.workflowsPage.goToList();
+    await pm.workflowsPage.expectDraftTag(name, { visible: false });
+  });
+
+  // Edge Case 4 — the incident_event trigger has no linksAlerts, so publishing skips the
+  // post-create link-to-alerts dialog and navigates straight to the list.
+  test('incident_event trigger publishes without the link-alerts prompt', { tag: ['@workflowsCrud'] }, async () => {
+    const id = uniq();
+    const name = `wf_auto_${id}`;
+    await pm.workflowsPage.goToAdd('incident_event');
+    await pm.workflowsPage.setName(name);
+    await pm.workflowsPage.addNodeFromPalette('destination');
+    await pm.workflowsPage.createDestinationInline({
+      name: `wf_auto_dest_${id}`,
+      url: `http://localhost:5080/api/${process.env.ORGNAME || 'default'}/wf_auto_sink/_json`,
+    });
+    await pm.workflowsPage.saveNodeDrawer();
+    await pm.workflowsPage.publishAndExpectAccepted();
+    // The defining behavior: no link-alerts dialog ever appears for this trigger kind.
+    await pm.workflowsPage.expectNoLinkAlertsDialog();
+    await pm.workflowsPage.goToList();
+    expect(await pm.workflowsPage.isPresent(name)).toBeTruthy();
+  });
+
+  // Pause/resume flips a published workflow's enabled state (pause/resume row action).
+  test('pause and resume toggles a published workflow', { tag: ['@workflowsCrud'] }, async () => {
+    const id = uniq();
+    const name = `wf_auto_${id}`;
+    await pm.workflowsPage.buildTriggerToDestinationAndSave({
+      name,
+      destName: `wf_auto_dest_${id}`,
+      url: `http://localhost:5080/api/${process.env.ORGNAME || 'default'}/wf_auto_sink/_json`,
+    });
+    await pm.workflowsPage.goToList();
+    expect(await pm.workflowsPage.isPresent(name)).toBeTruthy();
+    await pm.workflowsPage.toggleEnable(name);
+    await pm.workflowsPage.expectWorkflowEnabledState(name, false);
+    await pm.workflowsPage.toggleEnable(name);
+    await pm.workflowsPage.expectWorkflowEnabledState(name, true);
+  });
 });

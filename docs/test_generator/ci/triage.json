@@ -1,0 +1,27 @@
+{
+  "feature_slug": "workflows",
+  "feature_title": "Workflows",
+  "area": "Workflows",
+  "edition": "enterprise",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "workflows-crud.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Workflows/workflows-crud.spec.js",
+  "playwright_group": "Workflows",
+  "source_files": [
+    "tests/ui-testing/pages/workflowsPages/workflowsPage.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-crud.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-negative.spec.js"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Changed paths are all test/CI infrastructure: tests/ui-testing/pages/workflowsPages/workflowsPage.js and tests/ui-testing/playwright-tests/Workflows/*.spec.js (OSS test tree) plus .github/workflows/api-testing.yml (the linked o2-enterprise sister PR #2514). No web/src or backend source paths changed. The feature under test is Workflows, which the specs themselves tag '@enterprise' and describe as 'an Enterprise-only feature'; they run only in the ENT playwright matrix (ci_matrix.ent.json Workflows shard) gated behind O2_WORKFLOWS_ENABLED. The change only touches an enterprise-gated module, so edition = enterprise.",
+    "skip": "Not skipping. No explicit opt-out (empty trigger comment, empty feature hint, no tests-added label in context). The diff is test/CI-only with no product code change, but it modifies Playwright E2E specs (workflows-crud.spec.js, workflows-negative.spec.js) — dev-authored E2E tests are explicitly NOT an auto-skip, so existing_tests_in_diff=true and the Architect reviews/enhances them instead.",
+    "e2e": "E2E is warranted. The PR un-parks the Workflows specs (removes test.skip 'Workflows feature under rework') and updates them to match merged markup — ODialog vs ODrawer node config, the single-screen function editor, insert-immediately palette behavior — and adds assertEnabled() to fail loudly rather than silently skip. These specs exercise a real user-facing UI flow (build/configure/publish a workflow plus negative validation), so the coverage needs review and verification.",
+    "area": "Area = Workflows. The changed specs live in tests/ui-testing/playwright-tests/Workflows/ and the ci_matrix.ent.json Workflows shard (actual_folder Workflows) already lists both spec files, so this is the existing Workflows E2E area.",
+    "group": "playwright_group = Workflows — the testfolder in tests/ui-testing/ci-matrix/ci_matrix.ent.json whose run_files already list workflows-crud.spec.js and workflows-negative.spec.js; playwright.yml builds shards from testfolder (e2e / Workflows) and maps them via actual_folder.",
+    "existing_tests": "E2E specs in the diff: tests/ui-testing/playwright-tests/Workflows/workflows-crud.spec.js and workflows-negative.spec.js. They cover the Workflows feature and are being un-skipped and updated to match the merged markup, so they are existing E2E coverage for this feature (enhance route). No Vitest/Rust unit tests are part of this change."
+  }
+}

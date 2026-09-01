@@ -1,0 +1,10 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Workflows/workflows-crud.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Workflows/workflows-crud.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-negative.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The dev's diff already un-skips and reconciles both Workflows specs, which cover the feature doc's 4 User Workflows (happy build+publish, trigger-only/empty-name validation, negative sweep incl. invalid-function and dead-destination, and NFR sweep incl. K9/K10/NFR-03). All headline behaviors are WIRED, so no fixme placeholders are needed. The remaining genuinely-distinct WIRED behaviors worth covering — Save-as-Draft → Draft tag → promote, the incident_event trigger path (skips link-alerts), and pause/resume — belong in the existing CRUD spec (same area, same imports/describe/beforeEach, same @workflowsCrud tag). Appending there avoids spec sprawl; both files are already registered in the ENT ci_matrix.ent.json Workflows shard, so no re-registration is required."
+}
