@@ -982,7 +982,6 @@ pub fn plan_group_updates(
 ) -> GroupPlan {
     let mut updates = Vec::with_capacity(classification.groups.len() + 1);
     let mut retained: HashSet<String> = HashSet::with_capacity(classification.groups.len());
-    let mut groups_firing = 0;
 
     for group in &classification.groups {
         let key = group_key(&group.labels);
@@ -1019,9 +1018,6 @@ pub fn plan_group_updates(
         } else {
             base_outcome
         };
-        if matches!(outcome, RunOutcome::Firing) {
-            groups_firing += 1;
-        }
 
         let mut update = apply_outcome(alert_id, &key, prev.get(&key), outcome, Some(level), at);
 
@@ -1085,7 +1081,11 @@ pub fn plan_group_updates(
         // so an overflowing alert would report "500 of 500" and be
         // indistinguishable from one that never overflowed.
         state.groups_observed = Some(classification.groups.len() + classification.dropped.len());
-        state.groups_firing = Some(groups_firing);
+        state.groups_firing = if is_firing {
+            Some(classification.firing_observed)
+        } else {
+            Some(0)
+        };
         // Exactness travels WITH the counts. Recomputing it later is impossible
         // — the cap is mutable config, so "count == cap" proves nothing after
         // someone raises it.
