@@ -1453,7 +1453,7 @@ pub(crate) fn merge_ledger(prior: &[String], succeeded: &[String]) -> Vec<String
     out
 }
 
-#[allow(clippy::cognitive_complexity,clippy::too_many_lines)]
+#[allow(clippy::cognitive_complexity, clippy::too_many_lines)]
 async fn handle_alert_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
