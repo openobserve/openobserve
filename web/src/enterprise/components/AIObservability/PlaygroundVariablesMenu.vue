@@ -1,12 +1,11 @@
 <!-- Copyright 2026 OpenObserve Inc.
 
-  The `{{variable}}` control for one variant: which variables exist, which of
-  them THIS variant actually references, and what each one is bound to.
+  The `{{variable}}` control for the bench: which variables exist, which of them
+  any message actually references, and what each one is bound to.
 
-  It lives beside Tools and Schema rather than in a strip above the bench.
-  Variables are shared by every column, so a row of inputs at the top spent the
-  full page width on something only some variants use — and pushed the outputs
-  it exists to feed off the screen.
+  ONE control, above the bench, because the state behind it is one map shared by
+  every column. Drawn per column it implied the values were per column, which
+  they never were.
 -->
 <template>
   <ODropdown align="start" side="bottom">
@@ -15,7 +14,7 @@
         variant="outline"
         size="xs"
         icon-left="data-array"
-        :data-test="`ai-playground-variables-btn-${variant.id}`"
+        data-test="ai-playground-variables-btn"
       >
         {{
           varNames.length
@@ -32,9 +31,9 @@
 
       <div v-for="name in varNames" :key="name" class="flex flex-col gap-1">
         <div class="flex items-center gap-1.5">
-          <!-- The tick is the whole point of listing them per variant: a
-               variable can exist on the bench and be referenced by none of the
-               messages in THIS column, which renders empty at run time. -->
+          <!-- A variable can be declared and referenced by no message at all,
+               which renders empty at run time. The tick is what separates the
+               two. -->
           <OIcon
             :name="used.includes(name) ? 'check-circle' : 'radio-button-unchecked'"
             size="xs"
@@ -46,16 +45,15 @@
                 : t('aiObservability.playground.variableUnused')
             "
           />
-          <button
-            type="button"
-            class="text-accent text-2xs cursor-pointer truncate font-mono font-semibold"
-            :title="t('aiObservability.playground.chipInsert')"
+          <!-- Text, not a button: typing `{{` in a message offers the same
+               variables as completions, at the caret, which is where the token
+               is wanted. A second way to insert only split the habit. -->
+          <span
+            class="text-accent text-2xs truncate font-mono font-semibold"
             :data-test="`ai-playground-var-chip-${name}`"
-            @mousedown.prevent
-            @click="emit('insert', name)"
           >
             {{ tokenFor(name) }}
-          </button>
+          </span>
           <div class="grow" />
           <OButton
             v-if="!used.includes(name)"
@@ -94,7 +92,7 @@
           v-model="newName"
           :placeholder="t('aiObservability.playground.variableNamePlaceholder')"
           size="sm"
-          :data-test="`ai-playground-var-new-${variant.id}`"
+          data-test="ai-playground-var-new"
         />
         <OTextarea
           v-model="newValue"
@@ -103,7 +101,7 @@
           :max-rows="5"
           size="sm"
           autogrow
-          :data-test="`ai-playground-var-new-value-${variant.id}`"
+          data-test="ai-playground-var-new-value"
         />
         <OButton
           variant="outline"
@@ -111,7 +109,7 @@
           type="submit"
           class="self-end"
           :disabled="!sanitized"
-          :data-test="`ai-playground-var-add-${variant.id}`"
+          data-test="ai-playground-var-add"
         >
           {{ t("common.add") }}
         </OButton>
@@ -133,23 +131,19 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import {
-  EXPECTED_OUTPUT_TOKEN,
-  extractVariantVars,
-  type PlaygroundVariant,
-} from "@/enterprise/views/AIObservability/playgroundDraft";
+import { EXPECTED_OUTPUT_TOKEN } from "@/enterprise/views/AIObservability/playgroundDraft";
 
 const props = defineProps<{
-  variant: PlaygroundVariant;
-  /** Every variable on the bench, not just this variant's. */
+  /** Every variable on the bench: declared, or referenced by any variant. */
   varNames: string[];
   vars: Record<string, string>;
+  /** Referenced by at least one variant — the rest are declared but unused. */
+  used: string[];
 }>();
 
 const emit = defineEmits<{
   "set-var": [name: string, value: string];
   "remove-var": [name: string];
-  insert: [name: string];
 }>();
 
 const { t } = useI18nTyped();
@@ -160,7 +154,7 @@ const newValue = ref("");
 const variableToken = raw("{{variables}}");
 const expectedToken = raw(`{{${EXPECTED_OUTPUT_TOKEN}}}`);
 
-const used = computed(() => extractVariantVars(props.variant));
+const used = computed(() => props.used);
 
 /** A token is `{{name}}`, so anything that would not survive the braces is not
  *  a name. Trimmed to the identifier characters rather than rejected, so a

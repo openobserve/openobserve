@@ -122,7 +122,7 @@ const CLIENTS: ClientDef[] = [
       auth
         ? `claude mcp add openobserve ${ep} \\
   -t http \\
-  --header "${auth}"`
+  --header "Authorization: ${auth}"`
         : `claude mcp add openobserve ${ep} -t http`,
   },
   {

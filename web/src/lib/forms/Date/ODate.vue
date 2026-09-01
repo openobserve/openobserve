@@ -128,7 +128,7 @@ const wrapperClasses = computed(() => [
     ? "border-datepicker-error-border"
     : "border-datepicker-border hover:border-datepicker-hover-border",
   "focus-within:border-datepicker-focus-border",
-  "focus-within:ring-[0.125rem] focus-within:ring-accent/25",
+  "focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
   props.disabled ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
   heightClasses[props.size ?? "md"],
 ]);

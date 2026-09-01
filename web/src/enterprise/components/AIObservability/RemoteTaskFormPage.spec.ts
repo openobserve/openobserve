@@ -17,6 +17,7 @@ vi.mock("vuex", () => ({
 const create = vi.fn();
 const saveDraft = vi.fn();
 const testConnection = vi.fn();
+const testCandidate = vi.fn();
 const get = vi.fn();
 const remove = vi.fn();
 vi.mock("@/services/remote-tasks.service", () => ({
@@ -24,6 +25,7 @@ vi.mock("@/services/remote-tasks.service", () => ({
     create: (...a: any[]) => create(...a),
     saveDraft: (...a: any[]) => saveDraft(...a),
     testConnection: (...a: any[]) => testConnection(...a),
+    testCandidate: (...a: any[]) => testCandidate(...a),
     get: (...a: any[]) => get(...a),
     delete: (...a: any[]) => remove(...a),
   },
@@ -372,5 +374,73 @@ describe("RemoteTaskFormPage — editing", () => {
     expect(payload).not.toHaveProperty("auth");
     expect(payload).not.toHaveProperty("signing");
     expect(testConnection).toHaveBeenCalledWith("acme", "head-1", expect.any(Object));
+  });
+});
+
+// A button labelled "Test Connection" used to register the task, publish a
+// version and navigate away. It now tests the candidate and nothing else.
+describe("RemoteTaskFormPage — test connection", () => {
+  async function runTest(wrapper: any) {
+    await (wrapper.vm as any).runCandidateTest();
+    await flushPromises();
+  }
+
+  it("tests the form as it stands, saving nothing", async () => {
+    testCandidate.mockResolvedValue({ verified: true, report });
+    const wrapper = mountForm();
+    await flushPromises();
+    await fillValid(wrapper);
+
+    await runTest(wrapper);
+
+    const [org, payload] = testCandidate.mock.calls[0];
+    expect(org).toBe("acme");
+    expect(payload).toMatchObject({
+      name: "summarizer",
+      endpoint: "https://tasks.example.com/run",
+    });
+    expect(create).not.toHaveBeenCalled();
+    expect(saveDraft).not.toHaveBeenCalled();
+    expect(testConnection).not.toHaveBeenCalled();
+  });
+
+  // Leaving the form on a pass threw away the raw exchange the panel exists to
+  // show, and the edits the user was not finished with.
+  it("stays on the form after a pass", async () => {
+    testCandidate.mockResolvedValue({ verified: true, report });
+    const wrapper = mountForm();
+    await flushPromises();
+    await fillValid(wrapper);
+
+    await runTest(wrapper);
+
+    expect(push).not.toHaveBeenCalled();
+    expect((wrapper.vm as any).testState).toBe("passed");
+    expect((wrapper.vm as any).testReport).toEqual(report);
+  });
+
+  it("surfaces the server's reason for a refusal", async () => {
+    testCandidate.mockResolvedValue({ verified: false, error: "401 Unauthorized", report });
+    const wrapper = mountForm();
+    await flushPromises();
+    await fillValid(wrapper);
+
+    await runTest(wrapper);
+
+    expect((wrapper.vm as any).testState).toBe("failed");
+    expect((wrapper.vm as any).testError).toBe("401 Unauthorized");
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("reports a transport failure rather than throwing", async () => {
+    testCandidate.mockRejectedValue({ response: { data: { message: "connection refused" } } });
+    const wrapper = mountForm();
+    await flushPromises();
+    await fillValid(wrapper);
+
+    await runTest(wrapper);
+
+    expect((wrapper.vm as any).testState).toBe("failed");
+    expect((wrapper.vm as any).testError).toBe("connection refused");
   });
 });

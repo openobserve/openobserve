@@ -1,63 +1,19 @@
 <!-- Copyright 2026 OpenObserve Inc.
 
-  Editor-bench input strip: one field per `{{variable}}` the messages reference,
-  an optional expected output, and the two controls that switch the bench into
-  table mode.
+  Editor-bench INPUT strip: one field per `{{variable}}` the messages reference,
+  plus the dataset-sampling controls.
 
-  `{{expected_output}}` never gets a field here. It is not an input to the
-  prompt — it is the answer the prompt is supposed to reach without seeing it.
+  The expected output is deliberately NOT here. It is not an input — the model
+  never sees it — so it lives with the outputs it is compared against, in
+  PlaygroundExpectedBar. What stays is the warning for a message that references
+  `{{expected_output}}`, which is a prompt mistake and so belongs beside the
+  prompt's own variables.
 -->
 <template>
   <div
     class="border-border-default flex flex-wrap items-start gap-2.5 border-b px-4 py-2.5"
     data-test="ai-playground-variable-bar"
   >
-    <!-- ONE grower, the expected field. A bare spacer beside it would split the
-         free space between the two and stall the field at half the width it
-         could have used. -->
-    <div class="flex min-w-0 flex-1 items-start gap-1.5">
-      <OButton
-        v-if="!showExpected"
-        variant="ghost-primary"
-        size="xs"
-        class="self-center"
-        :title="t('aiObservability.playground.expectedPlaceholder')"
-        data-test="ai-playground-add-expected"
-        @click="showExpected = true"
-      >
-        {{ t("aiObservability.playground.addExpected") }}
-      </OButton>
-
-      <!-- A golden answer is prose, not a value: it is routinely a paragraph,
-           and a one-line field showed forty characters of it with no way to
-           read the rest. It grows to three lines and scrolls past them. -->
-      <template v-else>
-        <span class="text-text-secondary text-2xs mt-1.5 shrink-0 font-mono font-semibold">
-          {{ t("aiObservability.playground.expectedLabel") }}
-        </span>
-        <OTextarea
-          class="min-w-0 flex-1"
-          :model-value="expected ?? ''"
-          :placeholder="t('aiObservability.playground.expectedPlaceholder')"
-          :rows="1"
-          :max-rows="3"
-          size="sm"
-          autogrow
-          data-test="ai-playground-expected-input"
-          @update:model-value="(value: string) => emit('set-expected', value)"
-        />
-        <OButton
-          variant="ghost-muted"
-          size="icon-xs"
-          icon-left="close"
-          class="mt-0.5"
-          :title="t('aiObservability.playground.removeExpected')"
-          data-test="ai-playground-remove-expected"
-          @click="clearExpected"
-        />
-      </template>
-    </div>
-
     <OTag
       v-if="provenance"
       variant="default"
@@ -115,9 +71,86 @@
       />
     </template>
 
+    <!-- Shared by every column, so they live here rather than being redrawn per
+         bench where the repetition implied per-bench values. Schema stays in the
+         column: a variant can run a provider that supports it beside one that
+         does not. -->
+    <div class="inline-flex items-stretch self-center">
+      <OButton
+        variant="outline"
+        size="xs"
+        icon-left="build"
+        class="rounded-s-default! rounded-e-none!"
+        data-test="ai-playground-tools-btn"
+        @click="openTool(null)"
+      >
+        {{
+          tools.length
+            ? t("aiObservability.playground.toolsCount", { count: tools.length })
+            : t("aiObservability.playground.tools")
+        }}
+      </OButton>
+      <ODropdown align="start" side="bottom">
+        <template #trigger>
+          <OButton
+            variant="outline"
+            size="icon-xs-sq"
+            class="rounded-e-default! rounded-s-none! border-s-0"
+            :aria-label="t('aiObservability.playground.tools')"
+            data-test="ai-playground-tools-menu"
+          >
+            <OIcon name="arrow-drop-down" size="sm" />
+          </OButton>
+        </template>
+        <ODropdownItem
+          v-for="(tool, index) in tools"
+          :key="index"
+          icon-left="build"
+          :data-test="`ai-playground-tool-item-${index}`"
+          @select="openTool(index)"
+        >
+          {{ raw(tool.name) || t("aiObservability.playground.toolUnnamed") }}
+          <!-- `.stop` keeps the row's own select from firing and opening the
+               dialog for the tool that is being deleted. -->
+          <template #icon-right>
+            <OButton
+              variant="ghost-destructive"
+              size="icon-xs"
+              icon-left="delete"
+              class="ms-auto"
+              :aria-label="t('aiObservability.playground.removeTool')"
+              :data-test="`ai-playground-tool-remove-${index}`"
+              @click.stop="removeTool(index)"
+            />
+          </template>
+        </ODropdownItem>
+        <ODropdownItem v-if="!tools.length" disabled data-test="ai-playground-tools-none">
+          {{ t("aiObservability.playground.toolsEmpty") }}
+        </ODropdownItem>
+
+        <!-- Also here, not only on the split button's left half: someone who
+             opened the list to see what exists is already looking for the way to
+             add one, and the button that does it is behind them. -->
+        <OSeparator v-if="tools.length" />
+        <ODropdownItem icon-left="add" data-test="ai-playground-tool-add" @select="openTool(null)">
+          {{ t("aiObservability.playground.addTool") }}
+        </ODropdownItem>
+      </ODropdown>
+    </div>
+
+    <PlaygroundVariablesMenu
+      class="self-center"
+      :var-names="varNames"
+      :vars="vars"
+      :used="usedVarNames"
+      @set-var="(name, value) => emit('set-var', name, value)"
+      @remove-var="(name) => emit('remove-var', name)"
+    />
+
     <OButton
       variant="outline"
       size="xs"
+      icon-left="table-chart"
       class="self-center"
       data-test="ai-playground-sample-btn"
       @click="emit('sample')"
@@ -128,6 +161,13 @@
           : t("aiObservability.playground.sampleFromDataset")
       }}
     </OButton>
+
+    <PlaygroundToolsDialog
+      v-model:open="toolsOpen"
+      :tools="tools"
+      :index="toolIndex"
+      @apply="(next) => emit('set-tools', next)"
+    />
 
     <p
       v-if="usesExpectedToken"
@@ -140,52 +180,63 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { computed, ref } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import PlaygroundToolsDialog from "./PlaygroundToolsDialog.vue";
+import PlaygroundVariablesMenu from "./PlaygroundVariablesMenu.vue";
 import {
   EXPECTED_OUTPUT_TOKEN,
   type PlaygroundProvenance,
   type PlaygroundSample,
+  type PlaygroundTool,
 } from "@/enterprise/views/AIObservability/playgroundDraft";
 
 const props = defineProps<{
   varNames: string[];
   vars: Record<string, string>;
-  expected: string | null;
+  /** Referenced by at least one variant; the rest are declared but unused. */
+  usedVarNames: string[];
+  /** One list, shared by every column. */
+  tools: PlaygroundTool[];
   provenance: PlaygroundProvenance | null;
   sample: PlaygroundSample | null;
   stepping?: boolean;
 }>();
 
 const emit = defineEmits<{
-  "set-expected": [value: string | null];
+  "set-tools": [tools: PlaygroundTool[]];
+  "set-var": [name: string, value: string];
+  "remove-var": [name: string];
   sample: [];
   "step-sample": [delta: number];
   "clear-sample": [];
 }>();
+
+const toolsOpen = ref(false);
+const toolIndex = ref<number | null>(null);
+
+/** null defines a new tool; an index opens that one for viewing. */
+function openTool(index: number | null) {
+  toolIndex.value = index;
+  toolsOpen.value = true;
+}
+
+function removeTool(index: number) {
+  emit(
+    "set-tools",
+    props.tools.filter((_, at) => at !== index),
+  );
+}
 
 const { t } = useI18nTyped();
 
 const expectedToken = `{{${EXPECTED_OUTPUT_TOKEN}}}`;
 
 const usesExpectedToken = computed(() => props.varNames.includes(EXPECTED_OUTPUT_TOKEN));
-
-const showExpected = ref(false);
-
-// An expected value arriving from an entry param opens the field on its own.
-watch(
-  () => props.expected,
-  (value) => {
-    if (value) showExpected.value = true;
-  },
-  { immediate: true },
-);
-
-function clearExpected() {
-  emit("set-expected", null);
-  showExpected.value = false;
-}
 </script>
