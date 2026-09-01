@@ -1285,7 +1285,7 @@ async fn handle_anomaly_detection_triggers(
 
     // Publish trigger run record to the triggers stream (same as alerts).
     let interval_us = parse_detection_interval_to_micros(&config.schedule_interval);
-    let next_run = now_micros() + interval_us;
+    let next_run = next_future_interval_run_at(trigger.next_run_at, interval_us, run_end_us);
     usage_reporting::publish_triggers_usage(TriggerData {
         _timestamp: run_start_us,
         org: trigger.org.clone(),
@@ -1372,6 +1372,41 @@ fn parse_detection_interval_to_micros(interval: &str) -> i64 {
         s.parse::<i64>().unwrap_or(5) * 60
     };
     secs * 1_000_000
+}
+
+fn next_future_interval_run_at(scheduled_at: i64, interval: i64, now: i64) -> i64 {
+    let interval = interval.max(1);
+    let next_run_at = scheduled_at.saturating_add(interval);
+    if next_run_at > now {
+        return next_run_at;
+    }
+
+    let elapsed = now.saturating_sub(scheduled_at);
+    let intervals_elapsed = elapsed / interval;
+    scheduled_at.saturating_add(interval.saturating_mul(intervals_elapsed.saturating_add(1)))
+}
+
+fn next_scheduled_alert_run_at(
+    condition: &TriggerCondition,
+    timezone_offset: i32,
+    scheduled_at: i64,
+    now: i64,
+) -> Result<i64, anyhow::Error> {
+    if scheduled_at <= 0 {
+        return condition.get_next_trigger_time(true, timezone_offset, false, None);
+    }
+
+    let mut next_run_at =
+        condition.get_next_trigger_time(true, timezone_offset, false, Some(scheduled_at))?;
+    while next_run_at <= now {
+        let previous_run_at = next_run_at;
+        next_run_at =
+            condition.get_next_trigger_time(true, timezone_offset, false, Some(previous_run_at))?;
+        if next_run_at <= previous_run_at {
+            return Err(anyhow::anyhow!("alert schedule did not advance"));
+        }
+    }
+    Ok(next_run_at)
 }
 
 /// Returns the skipped timestamps and the final timestamp to evaluate the alert.
@@ -1753,10 +1788,12 @@ async fn handle_alert_triggers(
             new_trigger.module_key
         );
 
-        new_trigger.next_run_at =
-            alert
-                .trigger_condition
-                .get_next_trigger_time(true, alert.tz_offset, false, None)?;
+        new_trigger.next_run_at = next_scheduled_alert_run_at(
+            &alert.trigger_condition,
+            alert.tz_offset,
+            trigger.next_run_at,
+            now,
+        )?;
 
         // Keep the last_satisfied_at field
         trigger_data.reset();
@@ -1932,11 +1969,11 @@ async fn handle_alert_triggers(
                 }
             }
             // This didn't work, update the next_run_at to the next expected trigger time
-            new_trigger.next_run_at = alert.trigger_condition.get_next_trigger_time(
-                true,
+            new_trigger.next_run_at = next_scheduled_alert_run_at(
+                &alert.trigger_condition,
                 alert.tz_offset,
-                false,
-                None,
+                trigger.next_run_at,
+                now,
             )?;
             trigger_data.reset();
             new_trigger.data = json::to_string(&trigger_data).unwrap();
@@ -2086,10 +2123,12 @@ async fn handle_alert_triggers(
         // For silence period, no need to store last end time
         should_store_last_end_time = false;
     } else {
-        new_trigger.next_run_at =
-            alert
-                .trigger_condition
-                .get_next_trigger_time(true, alert.tz_offset, false, None)?;
+        new_trigger.next_run_at = next_scheduled_alert_run_at(
+            &alert.trigger_condition,
+            alert.tz_offset,
+            trigger.next_run_at,
+            now,
+        )?;
     }
     trigger_data_stream.next_run_at = new_trigger.next_run_at;
 
@@ -6256,6 +6295,50 @@ mod tests {
     }
 
     // ── parse_detection_interval_to_micros ───────────────────────────────────
+
+    #[test]
+    fn interval_next_run_stays_anchored_to_scheduled_time() {
+        assert_eq!(
+            next_future_interval_run_at(1_000_000, 60_000_000, 5_000_000),
+            61_000_000
+        );
+    }
+
+    #[test]
+    fn interval_next_run_skips_missed_slots() {
+        assert_eq!(
+            next_future_interval_run_at(1_000_000, 60_000_000, 190_000_000),
+            241_000_000
+        );
+    }
+
+    #[test]
+    fn alert_next_run_stays_anchored_to_scheduled_time() {
+        let condition = TriggerCondition {
+            frequency: 60,
+            align_time: false,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            next_scheduled_alert_run_at(&condition, 0, 1_000_000, 5_000_000).unwrap(),
+            61_000_000
+        );
+    }
+
+    #[test]
+    fn alert_next_run_skips_missed_slots() {
+        let condition = TriggerCondition {
+            frequency: 60,
+            align_time: false,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            next_scheduled_alert_run_at(&condition, 0, 1_000_000, 190_000_000).unwrap(),
+            241_000_000
+        );
+    }
 
     #[test]
     fn test_parse_detection_interval_minutes() {
