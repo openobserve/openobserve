@@ -654,10 +654,12 @@ const graphBlockers = (allowOrphans: boolean): I18nText[] => {
 // A save/publish rejection names the offending node(s); surface the message with
 // real names AND flag those nodes on the canvas, so the author is not left
 // matching a uuid by eye.
-const reportGraphError = (e: any): string => {
+// Returns I18nText, not a bare string: the backend message is already human — it is
+// server copy, not a translation key — so it reaches toast() the same way raw() does.
+const reportGraphError = (e: any): I18nText => {
   const msg = e?.response?.data?.message;
   markNodesFromError(msg);
-  return humanizeNodeIds(msg);
+  return raw(humanizeNodeIds(msg));
 };
 
 const buildPayload = () => {

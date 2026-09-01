@@ -2352,6 +2352,9 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       fromNode: "",
       inputSource: "sample",
       inputRunLabel: "",
+      // Must carry EVERY key the default declares: dropping this one left it
+      // undefined, one refactor away from a Test dispatching to real destinations.
+      suppressDestinations: true,
       result: null,
     };
     editedInputsWorkflowId = "";

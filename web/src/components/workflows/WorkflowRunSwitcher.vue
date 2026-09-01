@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </span>
             <span class="flex shrink-0 items-center gap-1">
-              <OBadge v-if="isTestRun(run)" variant="neutral-soft" size="xs">
+              <OBadge v-if="isTestRun(run)" variant="default-soft" size="xs">
                 {{ t("workflow.history.testRun") }}
               </OBadge>
               <OBadge :variant="run.error ? 'error-soft' : 'success-soft'" size="xs">
