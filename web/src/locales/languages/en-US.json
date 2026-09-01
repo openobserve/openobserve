@@ -11956,7 +11956,8 @@
         "legendFalseCount": "false ({count})",
         "kpis": {
           "average": "Average",
-          "p50p95": "P50 / P95",
+          "p50": "P50",
+          "p95": "P95",
           "unhealthy": "Unhealthy",
           "healthy": "Healthy",
           "trueRate": "True rate",
