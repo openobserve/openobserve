@@ -385,6 +385,12 @@ test.describe("Users and Organizations", () => {
         await navigateToBase(page);
         pageManager = new PageManager(page);
 
+        // The custom-role field is gated on the edition alone (AddUser.vue
+        // `config.isEnterprise == 'true' || config.isCloud == 'true'`), so it
+        // renders in the CI enterprise build. This guard is OSS-specific.
+        const edition = await pageManager.editionFeaturesPage.detectEdition();
+        test.skip(edition !== 'opensource', `OSS-only regression guard (detected: ${edition})`);
+
         await pageManager.userPage.gotoIamPage();
         await pageManager.userPage.waitForUsersList();
         await pageManager.userPage.addUser(uniqueEmail);
@@ -422,11 +428,16 @@ test.describe("Users and Organizations", () => {
         testLogger.info('Test completed successfully');
     });
 
-    test.fixme("should render custom roles — not wired: enterprise/cloud + rbac_enabled required (web/src/aws-exports.ts:30; web/src/stores/index.ts:100)", { tag: ['@users-rbac-custom-roles', '@all'] }, async ({ page }, testInfo) => {
+    test("should render the custom-role select in the Add-user dialog (enterprise)", { tag: ['@users-rbac-custom-roles', '@all'] }, async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
 
         await navigateToBase(page);
         pageManager = new PageManager(page);
+
+        // The custom-role field renders whenever the bundle is enterprise/cloud
+        // (AddUser.vue gates on isEnterprise/isCloud, not rbac_enabled).
+        const edition = await pageManager.editionFeaturesPage.detectEdition();
+        test.skip(edition !== 'enterprise', `Enterprise-only (detected: ${edition})`);
 
         await pageManager.userPage.gotoIamPage();
         await pageManager.userPage.waitForUsersList();
