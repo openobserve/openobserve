@@ -96,39 +96,83 @@ async fn require_env_access(
     environments: &[String],
 ) -> Result<(), Response> {
     for id in environments {
-        // Grants name the environment, not its primary key, so the id on the
-        // check has to be resolved back to a name before it can be checked.
-        let name = match openobserve_synthetics::service::get_environment_name(org_id, id).await {
-            Ok(Some(name)) => name,
-            Ok(None) => {
-                return Err(MetaHttpResponse::bad_request(format!(
-                    "environments: no environment with id '{id}' in this org"
-                )));
-            }
-            Err(e) => {
-                tracing::error!("[synthetics] require_env_access: {e}");
-                return Err(MetaHttpResponse::forbidden("Forbidden"));
-            }
-        };
-        if !check_permissions(
-            &name,
-            org_id,
-            user_id,
-            "synthetic_environment",
-            "GET",
-            None,
-            false,
-            false,
-            true,
-        )
-        .await
-        {
+        let name = env_name(org_id, id).await?;
+        if !can_reach_env(org_id, user_id, &name).await {
             return Err(MetaHttpResponse::forbidden(format!(
                 "Forbidden: no access to environment '{name}'"
             )));
         }
     }
     Ok(())
+}
+
+/// Reconciles a check's environments on update against what the caller reaches.
+///
+/// Additions are validated; a stored environment the caller cannot reach is
+/// re-attached rather than treated as removed, because a body without it means a
+/// client that never rendered it far more often than a deliberate removal and the
+/// two are indistinguishable here. One the caller *can* reach stays removed —
+/// that omission is intent. Design §9.8.
+#[cfg(feature = "enterprise")]
+async fn reconcile_environments(
+    org_id: &str,
+    user_id: &str,
+    submitted: &[String],
+    stored: &[String],
+) -> Result<Vec<String>, Response> {
+    let added: Vec<String> = submitted
+        .iter()
+        .filter(|id| !stored.contains(id))
+        .cloned()
+        .collect();
+    require_env_access(org_id, user_id, &added).await?;
+
+    let mut out = submitted.to_vec();
+    for id in stored.iter().filter(|id| !submitted.contains(id)) {
+        // A stored id that no longer resolves is a deleted environment, not a
+        // permission failure — leave it dropped rather than 400 the update.
+        let Ok(Some(name)) =
+            openobserve_synthetics::service::get_environment_name(org_id, id).await
+        else {
+            continue;
+        };
+        if !can_reach_env(org_id, user_id, &name).await {
+            out.push(id.clone());
+        }
+    }
+    Ok(out)
+}
+
+/// Grants name the environment, not its primary key, so an id on a check has to
+/// be resolved back to a name before it can be checked.
+#[cfg(feature = "enterprise")]
+async fn env_name(org_id: &str, id: &str) -> Result<String, Response> {
+    match openobserve_synthetics::service::get_environment_name(org_id, id).await {
+        Ok(Some(name)) => Ok(name),
+        Ok(None) => Err(MetaHttpResponse::bad_request(format!(
+            "environments: no environment with id '{id}' in this org"
+        ))),
+        Err(e) => {
+            tracing::error!("[synthetics] env_name: {e}");
+            Err(MetaHttpResponse::forbidden("Forbidden"))
+        }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn can_reach_env(org_id: &str, user_id: &str, name: &str) -> bool {
+    check_permissions(
+        name,
+        org_id,
+        user_id,
+        "synthetic_environment",
+        "GET",
+        None,
+        false,
+        false,
+        true,
+    )
+    .await
 }
 
 // ── Runs API ──────────────────────────────────────────────────────────────────
@@ -538,11 +582,24 @@ pub async fn update_synthetic(
     {
         return MetaHttpResponse::forbidden("Forbidden");
     }
+    // An unloadable check leaves stored empty, so every id is an addition and the
+    // update below reports the missing check rather than this doing it twice.
     #[cfg(feature = "enterprise")]
-    if let Err(response) =
-        require_env_access(&org_id, &user_email.user_id, &body.environments).await
+    let mut body = body;
+    #[cfg(feature = "enterprise")]
     {
-        return response;
+        let stored = openobserve_synthetics::service::get_synthetic(&org_id, &id)
+            .await
+            .ok()
+            .flatten()
+            .map(|c| c.environments)
+            .unwrap_or_default();
+        match reconcile_environments(&org_id, &user_email.user_id, &body.environments, &stored)
+            .await
+        {
+            Ok(environments) => body.environments = environments,
+            Err(response) => return response,
+        }
     }
     match openobserve_synthetics::service::update_synthetic(&org_id, &id, body).await {
         Ok(check) => MetaHttpResponse::json(check),
