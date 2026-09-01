@@ -52,6 +52,43 @@ describe("llm-experiments compare()", () => {
   });
 });
 
+describe("get() slot status", () => {
+  it("keeps the server rollup and derives one when the field is absent", async () => {
+    const slot = (extra: Record<string, unknown>) => ({
+      row_id: "r1",
+      logical_id: "c1",
+      trial_index: 0,
+      input: "q",
+      expected_output: null,
+      execution: null,
+      client_scores: [],
+      ...extra,
+    });
+    mockClient.get.mockResolvedValue({
+      data: {
+        experiment: { id: "exp-1", name: "run" },
+        results: {
+          slots: [
+            slot({ status: "score_failed", task_status: "ok", scores: [] }),
+            slot({ task_status: "error", scores: [] }),
+            slot({ task_status: "ok", scores: [{ scorer_id: "s", status: "pending" }] }),
+            slot({ task_status: "ok", scores: [{ scorer_id: "s", status: "success" }] }),
+          ],
+        },
+      },
+    });
+
+    const detail = await llmExperimentsService.get("acme", "exp-1", { resultPage: 1 });
+
+    expect(detail.results.slots?.map((s) => s.status)).toEqual([
+      "score_failed",
+      "task_failed",
+      "scoring",
+      "completed",
+    ]);
+  });
+});
+
 describe("normalizeExperimentComparison()", () => {
   it("normalizes score-config metadata and aggregate oriented deltas", () => {
     const dimension = {

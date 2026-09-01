@@ -121,7 +121,7 @@ pub struct ExperimentComparisonRowBody {
     pub trials: Vec<ExperimentComparisonTrialBody>,
 }
 
-#[derive(Debug, Serialize, ToSchema)]
+#[derive(Clone, Debug, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExperimentComparisonTrialBody {
     pub trial_index: u32,

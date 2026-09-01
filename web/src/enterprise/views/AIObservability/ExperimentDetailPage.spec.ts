@@ -97,6 +97,7 @@ describe("ExperimentDetailPage", () => {
           incomplete: false,
           incompleteTaskSlots: 0,
           incompleteScoreDimensions: 0,
+          errorTaskSlots: 0,
         },
       },
     });
@@ -122,6 +123,7 @@ describe("ExperimentDetailPage", () => {
           incomplete: false,
           incompleteTaskSlots: 0,
           incompleteScoreDimensions: 0,
+          errorTaskSlots: 0,
         },
       },
     });
@@ -247,6 +249,7 @@ describe("ExperimentDetailPage", () => {
       ],
     });
     const taskStatuses = ["pending", "in_progress", "ok", "skipped", "error"] as const;
+    const slotStatuses = ["pending", "running", "completed", "skipped", "task_failed"] as const;
     const detail = makeExperimentDetail(experiment, {
       results: {
         executions: [],
@@ -261,6 +264,7 @@ describe("ExperimentDetailPage", () => {
           trialIndex: 0,
           input: `input-${index}`,
           expectedOutput: null,
+          status: slotStatuses[index],
           taskStatus,
           execution: null,
           scores:
@@ -323,14 +327,15 @@ describe("ExperimentDetailPage", () => {
     );
     expect(chipText.every((label) => label.length > 0)).toBe(true);
     expect(new Set(chipText).size).toBe(taskStatuses.length);
+    expect(chipText).toContain("Task Failed");
 
     // No row rail: the chip is the only status device on the row.
     expect(wrapper.findAll("tbody tr").every((row) => !row.attributes("data-rail"))).toBe(true);
   });
 
-  // The whole run is loaded in one request, so search and the status filter
+  // The whole run is loaded before rendering, so search and the status filter
   // cover every slot rather than the page that happened to be fetched.
-  it("asks for every slot in one request and paginates on the client", async () => {
+  it("asks for the largest server page and paginates on the client", async () => {
     get.mockResolvedValue(makeExperimentDetail(makeExperiment({ id: "exp-1" })));
     const seen: any[] = [];
     const wrapper = mount(ExperimentDetailPage, {
@@ -351,10 +356,95 @@ describe("ExperimentDetailPage", () => {
     expect(get).toHaveBeenCalledWith(
       "acme",
       "exp-1",
-      // Pinned to the server's MAX_RESULT_PAGE_SIZE until that cap is lifted.
-      expect.objectContaining({ resultPage: 1, resultPageSize: 50 }),
+      // Pinned to the server's MAX_RESULT_PAGE_SIZE.
+      expect.objectContaining({ resultPage: 1, resultPageSize: 100 }),
     );
     expect(seen[0].pagination).toBe("client");
+    wrapper.unmount();
+  });
+
+  // A run larger than one server page used to render only its first page, so a
+  // failure sorted past the cut-off was invisible on an all-green table.
+  it("walks every result page so late-sorting slots are visible", async () => {
+    const experiment = makeExperiment({ id: "exp-1" });
+    const slot = (index: number, taskStatus: string) => ({
+      rowId: `row-${index}`,
+      logicalId: `case-${index}`,
+      trialIndex: 0,
+      input: `q${index}`,
+      expectedOutput: null,
+      taskStatus,
+      execution: null,
+      scores: [],
+      clientScores: [],
+    });
+    const page = (n: number, slots: any[], totalSlots: number) =>
+      makeExperimentDetail(experiment, {
+        results: {
+          executions: [],
+          scores: [],
+          slots,
+          pagination: { page: n, pageSize: 100, totalSlots, hasMore: n * 100 < totalSlots },
+        },
+      });
+    get.mockImplementation((_org: string, _id: string, options: any) =>
+      Promise.resolve(
+        options.resultPage === 1
+          ? page(
+              1,
+              Array.from({ length: 100 }, (_, index) => slot(index, "ok")),
+              101,
+            )
+          : page(2, [slot(100, "error")], 101),
+      ),
+    );
+    const wrapper = mount(ExperimentDetailPage, {
+      global: {
+        stubs: {
+          OTable: {
+            props: ["data"],
+            template: `<table :data-rows="data.length" />`,
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    expect(get).toHaveBeenCalledWith(
+      "acme",
+      "exp-1",
+      expect.objectContaining({ resultPage: 2, resultPageSize: 100 }),
+    );
+    expect(
+      wrapper.get('[data-test="ai-experiment-detail-table"]').attributes("data-rows"),
+    ).toBe("101");
+    wrapper.unmount();
+  });
+
+  // "Incomplete" can be zero on a failed run — errors are terminal — so the
+  // retry affordance keys off the error count instead.
+  it("offers retry when the run holds errored slots", async () => {
+    const experiment = makeExperiment({ id: "exp-1", status: "failed" });
+    const detail = makeExperimentDetail(experiment, {
+      results: {
+        executions: [],
+        scores: [],
+        aggregateSummary: {
+          p50LatencyMs: null,
+          totalCost: 0,
+          incomplete: false,
+          incompleteTaskSlots: 0,
+          incompleteScoreDimensions: 0,
+          errorTaskSlots: 4,
+        },
+      },
+    });
+    get.mockResolvedValue(detail);
+
+    const wrapper = mount(ExperimentDetailPage);
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="ai-experiment-detail-retry"]').exists()).toBe(true);
     wrapper.unmount();
   });
 
@@ -371,6 +461,7 @@ describe("ExperimentDetailPage", () => {
             trialIndex: 0,
             input: "alpha question",
             expectedOutput: null,
+            status: "completed",
             taskStatus: "ok",
             execution: null,
             scores: [],
@@ -381,6 +472,7 @@ describe("ExperimentDetailPage", () => {
             trialIndex: 0,
             input: "beta question",
             expectedOutput: null,
+            status: "task_failed",
             taskStatus: "error",
             execution: null,
             scores: [],
@@ -417,9 +509,9 @@ describe("ExperimentDetailPage", () => {
     expect(rows.map((r) => r.input)).toEqual(["alpha question"]);
 
     (wrapper.vm as any).rowSearch = "";
-    (wrapper.vm as any).statusFilter = "error";
+    (wrapper.vm as any).statusFilter = "task_failed";
     await flushPromises();
-    expect(rows.map((r) => r.taskStatus)).toEqual(["error"]);
+    expect(rows.map((r) => r.status)).toEqual(["task_failed"]);
   });
 
   // A clone costs a full run, and it is normally made in order to change

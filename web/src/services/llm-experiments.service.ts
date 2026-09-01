@@ -218,7 +218,18 @@ export interface ExperimentResultScore {
   score: Record<string, unknown> | null;
 }
 
+export type ExperimentSlotStatus =
+  | "pending"
+  | "running"
+  | "scoring"
+  | "completed"
+  | "skipped"
+  | "task_failed"
+  | "score_failed";
+
 export interface ExperimentResultSlot extends ExperimentSlot {
+  /** Single lifecycle rollup of task and score evidence — the list-surface field. */
+  status: ExperimentSlotStatus;
   taskStatus: "pending" | "in_progress" | "ok" | "skipped" | "error";
   execution: ExperimentExecution | null;
   scores: ExperimentResultScore[];
@@ -237,6 +248,7 @@ export interface ExperimentAggregateSummary {
   incomplete: boolean;
   incompleteTaskSlots: number;
   incompleteScoreDimensions: number;
+  errorTaskSlots: number;
 }
 
 export interface ExperimentProgress {
@@ -357,6 +369,29 @@ export interface ExperimentResultQuery {
 
 const TASK_RESULT_STATUSES = ["pending", "in_progress", "ok", "skipped", "error"] as const;
 const SCORE_RESULT_STATUSES = ["pending", "in_progress", "success", "skipped", "error"] as const;
+const SLOT_STATUSES = [
+  "pending",
+  "running",
+  "scoring",
+  "completed",
+  "skipped",
+  "task_failed",
+  "score_failed",
+] as const;
+
+// Mirrors the server rollup so a response predating the field still gets one.
+function deriveSlotStatus(
+  taskStatus: ExperimentResultSlot["taskStatus"],
+  scores: ExperimentResultScore[],
+): ExperimentSlotStatus {
+  if (taskStatus === "pending") return "pending";
+  if (taskStatus === "in_progress") return "running";
+  if (taskStatus === "error") return "task_failed";
+  if (taskStatus === "skipped") return "skipped";
+  if (scores.some((s) => s.status === "pending" || s.status === "in_progress")) return "scoring";
+  if (scores.some((s) => s.status === "error")) return "score_failed";
+  return "completed";
+}
 
 function normalizeTaskResultStatus(input: unknown): ExperimentResultSlot["taskStatus"] {
   return TASK_RESULT_STATUSES.includes(input as (typeof TASK_RESULT_STATUSES)[number])
@@ -533,6 +568,7 @@ function normalizeResults(input: any): ExperimentResults {
       incompleteScoreDimensions: Number(
         value(aggregateSummary, "incompleteScoreDimensions", "incomplete_score_dimensions", 0),
       ),
+      errorTaskSlots: Number(value(aggregateSummary, "errorTaskSlots", "error_task_slots", 0)),
     },
   };
 }
@@ -558,20 +594,26 @@ function normalizeExecution(record: any): ExperimentExecution {
 }
 
 function normalizeResultSlot(slot: any): ExperimentResultSlot {
+  const taskStatus = normalizeTaskResultStatus(value(slot, "taskStatus", "task_status", "pending"));
+  const scores: ExperimentResultScore[] = (slot.scores ?? []).map((score: any) => ({
+    scorerId: value(score, "scorerId", "scorer_id", ""),
+    scorerVersion: Number(value(score, "scorerVersion", "scorer_version", 0)),
+    status: normalizeScoreResultStatus(score.status ?? "pending"),
+    score: score.score ?? null,
+  }));
+  const status = SLOT_STATUSES.includes(slot.status)
+    ? (slot.status as ExperimentSlotStatus)
+    : deriveSlotStatus(taskStatus, scores);
   return {
     rowId: value(slot, "rowId", "row_id", ""),
     logicalId: value(slot, "logicalId", "logical_id", ""),
     trialIndex: Number(value(slot, "trialIndex", "trial_index", 0)),
     input: slot.input,
     expectedOutput: value(slot, "expectedOutput", "expected_output", null),
-    taskStatus: normalizeTaskResultStatus(value(slot, "taskStatus", "task_status", "pending")),
+    status,
+    taskStatus,
     execution: slot.execution ? normalizeExecution(slot.execution) : null,
-    scores: (slot.scores ?? []).map((score: any) => ({
-      scorerId: value(score, "scorerId", "scorer_id", ""),
-      scorerVersion: Number(value(score, "scorerVersion", "scorer_version", 0)),
-      status: normalizeScoreResultStatus(score.status ?? "pending"),
-      score: score.score ?? null,
-    })),
+    scores,
   };
 }
 

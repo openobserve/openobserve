@@ -27,7 +27,8 @@ use openobserve_core::llm_evaluations::{
     experiment_results::{
         ExperimentAggregateSummary, ExperimentClientScoreSummary, ExperimentProgress,
         ExperimentResultScore, ExperimentResultScoreStatus, ExperimentResultSlot,
-        ExperimentResultTaskStatus, ExperimentScoreSummary, ExperimentSkipSummary, ScoringStatus,
+        ExperimentResultTaskStatus, ExperimentScoreSummary, ExperimentSkipSummary,
+        ExperimentSlotStatus, ScoringStatus,
     },
     experiments::{
         CloneExperimentOverrides, CreateExperiment, CreateExperimentResult, Experiment,
@@ -1083,6 +1084,8 @@ pub struct ExperimentResultSlotBody {
     pub trial_index: u32,
     pub input: Value,
     pub expected_output: Option<Value>,
+    /// The one field a list surface needs; task and score statuses remain for drill-down.
+    pub status: ExperimentSlotStatusBody,
     pub task_status: ExperimentResultTaskStatusBody,
     pub execution: Option<Value>,
     pub scores: Vec<ExperimentResultScoreBody>,
@@ -1108,6 +1111,18 @@ pub enum ExperimentResultTaskStatusBody {
     Ok,
     Skipped,
     Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExperimentSlotStatusBody {
+    Pending,
+    Running,
+    Scoring,
+    Completed,
+    Skipped,
+    TaskFailed,
+    ScoreFailed,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -1182,6 +1197,21 @@ pub struct ExperimentAggregateSummaryBody {
     pub incomplete: bool,
     pub incomplete_task_slots: u64,
     pub incomplete_score_dimensions: u64,
+    pub error_task_slots: u64,
+}
+
+impl From<ExperimentSlotStatus> for ExperimentSlotStatusBody {
+    fn from(value: ExperimentSlotStatus) -> Self {
+        match value {
+            ExperimentSlotStatus::Pending => Self::Pending,
+            ExperimentSlotStatus::Running => Self::Running,
+            ExperimentSlotStatus::Scoring => Self::Scoring,
+            ExperimentSlotStatus::Completed => Self::Completed,
+            ExperimentSlotStatus::Skipped => Self::Skipped,
+            ExperimentSlotStatus::TaskFailed => Self::TaskFailed,
+            ExperimentSlotStatus::ScoreFailed => Self::ScoreFailed,
+        }
+    }
 }
 
 impl From<ExperimentResultTaskStatus> for ExperimentResultTaskStatusBody {
@@ -1229,6 +1259,7 @@ impl From<ExperimentResultSlot> for ExperimentResultSlotBody {
             trial_index: value.trial_index,
             input: value.input,
             expected_output: value.expected_output,
+            status: value.status.into(),
             task_status: value.task_status.into(),
             execution: value
                 .execution
@@ -1305,6 +1336,7 @@ impl From<ExperimentAggregateSummary> for ExperimentAggregateSummaryBody {
             incomplete: value.incomplete,
             incomplete_task_slots: value.incomplete_task_slots,
             incomplete_score_dimensions: value.incomplete_score_dimensions,
+            error_task_slots: value.error_task_slots,
         }
     }
 }
