@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { createStore } from "vuex";
+import type { TraceTimeRange } from "@/services/traces";
 
 // Mirror of the initial organizationData below; used by resetOrganizationData.
 const organizationObj = {
@@ -24,7 +25,7 @@ const organizationObj = {
   },
   // Mirror of the production organizationObj — see src/stores/index.ts.
   correlatedTracesStreams: {
-    byTraceId: {} as Record<string, string>,
+    byTraceId: {} as Record<string, { stream: string; range?: TraceTimeRange }>,
     knownStreams: [] as string[],
   },
   quotaThresholdMsg: "",
@@ -243,10 +244,13 @@ const store = createStore({
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
     },
-    setCorrelatedTracesStream(state, payload: { traceId: string; stream: string }) {
+    setCorrelatedTracesStream(
+      state,
+      payload: { traceId: string; stream: string; range?: TraceTimeRange },
+    ) {
       const cache = state.organizationData.correlatedTracesStreams;
       if (Object.keys(cache.byTraceId).length >= 1000) cache.byTraceId = {};
-      cache.byTraceId[payload.traceId] = payload.stream;
+      cache.byTraceId[payload.traceId] = { stream: payload.stream, range: payload.range };
       if (!cache.knownStreams.includes(payload.stream)) cache.knownStreams.push(payload.stream);
     },
     // setAllCurrentDashboards(state, payload) {
