@@ -55,13 +55,13 @@ pub fn set_parent_or_trace_id(
     let _ = span.set_parent(cx);
 }
 
-// sub-search ids look like `{base}-{n}-{suffix}`; only the 32-hex base is a trace id
-fn logical_trace_id_base(trace_id: &str) -> Option<&str> {
+// 32-hex base of `{base}-{n}-{suffix}` sub-search ids, lowercased for the W3C propagator
+fn logical_trace_id_base(trace_id: &str) -> Option<String> {
     let base = trace_id.split('-').next().unwrap_or_default();
     (base.len() == 32
         && base.chars().all(|c| c.is_ascii_hexdigit())
         && !base.chars().all(|c| c == '0'))
-    .then_some(base)
+    .then(|| base.to_ascii_lowercase())
 }
 
 #[cfg(test)]
@@ -71,11 +71,16 @@ mod tests {
     #[test]
     fn test_logical_trace_id_base() {
         assert_eq!(
-            logical_trace_id_base("01a05c4446cc71ac872a7b594bcdc883"),
+            logical_trace_id_base("01a05c4446cc71ac872a7b594bcdc883").as_deref(),
             Some("01a05c4446cc71ac872a7b594bcdc883")
         );
         assert_eq!(
-            logical_trace_id_base("01a05c4446cc71ac872a7b594bcdc883-7-yQou3Fe"),
+            logical_trace_id_base("01a05c4446cc71ac872a7b594bcdc883-7-yQou3Fe").as_deref(),
+            Some("01a05c4446cc71ac872a7b594bcdc883")
+        );
+        // uppercase is accepted but lowercased for the W3C propagator
+        assert_eq!(
+            logical_trace_id_base("01A05C4446CC71AC872A7B594BCDC883").as_deref(),
             Some("01a05c4446cc71ac872a7b594bcdc883")
         );
         assert_eq!(logical_trace_id_base(""), None);
