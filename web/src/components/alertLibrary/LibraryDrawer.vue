@@ -350,12 +350,12 @@ const tunables = computed(() => (file.value ? readTunables(file.value) : null));
 
 /**
  * The file with readTunables' floors written back — what the preview evaluates
- * and what install receives.
+ * and what the add receives.
  *
  * A published file may carry `period: 0` or `threshold: 0`, or no
  * `trigger_condition` at all (`assertAlertFile` only checks it is an object).
  * Raw, that previews over a zero-length window — or an `undefined` relative time
- * that reaches the search API as `new Date(NaN)` — and installs an alert that
+ * that reaches the search API as `new Date(NaN)` — and adds an alert that
  * fires on every evaluation. It would also contradict the panel above it, which
  * shows the FLOORED threshold.
  */

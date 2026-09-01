@@ -122,10 +122,15 @@ vi.mock("@/composables/useStreams", () => ({
 
 import AlertLibrary from "./AlertLibrary.vue";
 
+// Tracked so afterEach can tear them down: the specs below reassign the shared
+// `manifestRef`, and every still-mounted view re-renders on every reassignment.
+const mounted: Array<ReturnType<typeof mount>> = [];
+
 const mountView = async () => {
   const wrapper = mount(AlertLibrary, {
     global: { provide: { store }, plugins: [i18n, router] },
   });
+  mounted.push(wrapper);
   await flushPromises();
   return wrapper;
 };
@@ -148,6 +153,7 @@ describe("AlertLibrary", () => {
   });
 
   afterEach(() => {
+    while (mounted.length) mounted.pop()?.unmount();
     vi.clearAllMocks();
   });
 
@@ -545,6 +551,551 @@ describe("AlertLibrary", () => {
         .trigger("click");
       await flushPromises();
       expect(rail.props("search")).toBe("");
+    });
+  });
+  it("shows the All tile as the active one until a facet is chosen", async () => {
+    // The strip has a state — "no availability filter" — that used to light no
+    // tile at all, while the All tile it corresponds to was a button that could
+    // never look pressed.
+    const wrapper = await mountView();
+    const pressed = () =>
+      ["ready", "missing", "all"].filter(
+        (key) =>
+          wrapper.find(`[data-test="alert-library-stat-${key}"]`).attributes("aria-pressed") ===
+          "true",
+      );
+
+    expect(pressed()).toEqual(["all"]);
+
+    await wrapper.find('[data-test="alert-library-stat-ready"]').trigger("click");
+    await flushPromises();
+    expect(pressed()).toEqual(["ready"]);
+
+    // Toggling the active tile off returns to All — and now says so.
+    await wrapper.find('[data-test="alert-library-stat-ready"]').trigger("click");
+    await flushPromises();
+    expect(pressed()).toEqual(["all"]);
+  });
+
+  // ── selection ──────────────────────────────────────────────────────────────
+  describe("bulk selection", () => {
+    const CARD = "alert-library-card-k8s/pod-oom-killed";
+    const BOX = "alert-library-select-k8s/pod-oom-killed";
+    const BAR = "alert-library-selection-bar";
+    const ALL = "alert-library-select-all-in-view";
+
+    type View = ReturnType<typeof mount>;
+
+    /** Ticking is on the box itself; clicking the card would open the drawer. */
+    // `get`, not `find`: a missing hook then names itself in the failure.
+    const tick = async (wrapper: View, test: string) => {
+      await wrapper.get(`[data-test="${test}"]`).get('[role="checkbox"]').trigger("click");
+      await flushPromises();
+    };
+
+    const press = async (wrapper: View, test: string) => {
+      await wrapper.get(`[data-test="${test}"]`).trigger("click");
+      await flushPromises();
+    };
+
+    const bar = (wrapper: View) => wrapper.find(`[data-test="${BAR}"]`);
+    const dialog = (wrapper: View) => wrapper.findComponent({ name: "LibraryInstallDialog" });
+
+    /** The toolbar box; the rail's own filter is an OInput, so this is unique. */
+    const search = async (wrapper: View, term: string) => {
+      wrapper.findComponent({ name: "OSearchInput" }).vm.$emit("update:modelValue", term);
+      await flushPromises();
+    };
+
+    /** A manifest whose k8s/pod group holds two alerts, not one. */
+    const withPairedGroup = () => ({
+      ...manifestFixture,
+      alerts: [
+        ...manifestFixture.alerts,
+        entry({
+          id: "k8s/pod-restart-storm",
+          name: "pod-restart-storm",
+          category: "pod",
+          title: "Pod Restart Storm",
+          severity: "warning",
+          description: "A pod is restarting far more often than its baseline.",
+        }),
+      ],
+    });
+
+    it("keeps the selection controls out of the grid's row, so the grid never moves", async () => {
+      // Selecting used to insert a row between the strip and the grid, pushing
+      // every card down by the height of that row.
+      const wrapper = await mountView();
+      const toolbar = () => wrapper.get('[data-test="alert-library-toolbar"]').element;
+      expect(toolbar().contains(wrapper.get('[data-test="alert-library-grid"]').element)).toBe(
+        false,
+      );
+
+      await tick(wrapper, BOX);
+      expect(toolbar().contains(wrapper.get(`[data-test="${BAR}"]`).element)).toBe(true);
+    });
+
+    it("shares the search row, leaving the stat tiles alone", async () => {
+      // The strip's tiles are elastic, so hosting the controls there would make
+      // all three re-flow on the first tick — the same shift, moved sideways.
+      const wrapper = await mountView();
+      await tick(wrapper, BOX);
+
+      const searchRow = wrapper.get('[data-test="alert-library-toolbar"]').element;
+      expect(searchRow.contains(wrapper.get('[data-test="alert-library-search"]').element)).toBe(
+        true,
+      );
+      expect(searchRow.contains(wrapper.get('[data-test="alert-library-strip"]').element)).toBe(
+        false,
+      );
+      // The search field is the only elastic thing on the row, so it is the only
+      // thing the controls take width from.
+      expect(wrapper.get('[data-test="alert-library-search"]').classes()).toContain("flex-1");
+    });
+
+    it("keeps the tri-state control pinned as the last thing in the row", async () => {
+      // Anything after it would push it sideways when the selection appears.
+      const wrapper = await mountView();
+      await tick(wrapper, BOX);
+      const cluster = wrapper.get('[data-test="alert-library-toolbar-actions"]').element;
+
+      expect(cluster.lastElementChild).toBe(wrapper.get(`[data-test="${ALL}"]`).element);
+      expect(cluster.firstElementChild).toBe(wrapper.get(`[data-test="${BAR}"]`).element);
+    });
+
+    it("shows no action row until something is selected", async () => {
+      const wrapper = await mountView();
+      expect(bar(wrapper).exists()).toBe(false);
+      await tick(wrapper, BOX);
+      expect(bar(wrapper).exists()).toBe(true);
+    });
+
+    it("selects one alert from its card and counts it", async () => {
+      const wrapper = await mountView();
+      await tick(wrapper, BOX);
+      expect(bar(wrapper).attributes("data-selected")).toBe("1");
+      expect(wrapper.find(`[data-test="${CARD}"]`).attributes("data-selected")).toBe("true");
+    });
+
+    it("selects every visible alert from the toolbar, and deselects them again", async () => {
+      const wrapper = await mountView();
+      await tick(wrapper, ALL);
+      expect(bar(wrapper).attributes("data-selected")).toBe("4");
+      await tick(wrapper, ALL);
+      expect(bar(wrapper).exists()).toBe(false);
+    });
+
+    it("reads none, some and all as the selection grows", async () => {
+      const wrapper = await mountView();
+      const state = () => wrapper.find(`[data-test="${ALL}"]`).find('[role="checkbox"]').attributes("aria-checked");
+      expect(state()).toBe("false");
+      await tick(wrapper, BOX);
+      expect(state()).toBe("mixed");
+      await tick(wrapper, ALL);
+      expect(state()).toBe("true");
+    });
+
+    it("deselects only what is in view, never the rest of the batch", async () => {
+      // B1 lets a selection outlive the filters that made it. Emptying it from
+      // a control labelled "in view" would silently discard that work.
+      const wrapper = await mountView();
+      await tick(wrapper, BOX);
+      await tickRail(wrapper, "alert-library-rail-category-node");
+
+      await tick(wrapper, ALL);
+      expect(bar(wrapper).attributes("data-selected")).toBe("2");
+      await tick(wrapper, ALL);
+      expect(bar(wrapper).attributes("data-selected")).toBe("1");
+      expect(bar(wrapper).attributes("data-offscreen")).toBe("1");
+    });
+
+    it("hides the toolbar control when there is nothing in view to select", async () => {
+      const wrapper = await mountView();
+      expect(wrapper.find(`[data-test="${ALL}"]`).exists()).toBe(true);
+      await search(wrapper, "zzzz-no-such-alert");
+      expect(wrapper.find(`[data-test="${ALL}"]`).exists()).toBe(false);
+    });
+
+    it("offers no select-all while the page is still loading", async () => {
+      // `visibleEntries` is empty during the skeleton; a control over nothing
+      // would claim there is nothing to select.
+      let release: () => void = () => {};
+      getStreams.mockReturnValueOnce(
+        new Promise((resolve) => {
+          release = () => resolve({ name: "all", list: STREAM_LIST });
+        }),
+      );
+      const wrapper = await mountView();
+      expect(wrapper.find(`[data-test="${ALL}"]`).exists()).toBe(false);
+
+      release();
+      await flushPromises();
+      expect(wrapper.find(`[data-test="${ALL}"]`).exists()).toBe(true);
+    });
+
+    it("keeps a selection across a filter change, and says how much is off screen", async () => {
+      const wrapper = await mountView();
+      await tick(wrapper, BOX);
+      await tickRail(wrapper, "alert-library-rail-category-node");
+
+      expect(wrapper.find(`[data-test="${CARD}"]`).exists()).toBe(false);
+      expect(bar(wrapper).attributes("data-selected")).toBe("1");
+      expect(bar(wrapper).attributes("data-offscreen")).toBe("1");
+      expect(bar(wrapper).text()).toContain(
+        i18n.global.t("alert_library.selectionOffscreen", { count: 1 }, 1),
+      );
+    });
+
+    it("counts the off-screen part of a bigger selection", async () => {
+      // One is not enough to catch a set difference taken the wrong way round.
+      const wrapper = await mountView();
+      await tick(wrapper, ALL);
+      await tickRail(wrapper, "alert-library-rail-category-node");
+
+      expect(bar(wrapper).attributes("data-selected")).toBe("4");
+      expect(bar(wrapper).attributes("data-offscreen")).toBe("3");
+    });
+
+    it("says nothing about off-screen alerts when there are none", async () => {
+      const wrapper = await mountView();
+      await tick(wrapper, BOX);
+      expect(bar(wrapper).attributes("data-offscreen")).toBe("0");
+      // Count-free needle: "0 not in view" would satisfy a count-carrying one.
+      expect(bar(wrapper).text()).not.toContain("not in view");
+      expect(bar(wrapper).text()).not.toContain(
+        i18n.global.t("alert_library.selectionOffscreen", { count: 0 }, 0),
+      );
+    });
+
+    it("keeps the action row over an empty grid, so a selection is never stranded", async () => {
+      const wrapper = await mountView();
+      await tick(wrapper, BOX);
+      await search(wrapper, "zzzz-no-such-alert");
+
+      expect(wrapper.find('[data-test="alert-library-no-results"]').exists()).toBe(true);
+      expect(bar(wrapper).attributes("data-selected")).toBe("1");
+    });
+
+    it("clears filters without clearing the selection — different intents", async () => {
+      const wrapper = await mountView();
+      await tick(wrapper, BOX);
+      await search(wrapper, "zzzz-no-such-alert");
+      await wrapper
+        .find('[data-test="alert-library-no-results"]')
+        .findComponent({ name: "OButton" })
+        .trigger("click");
+      await flushPromises();
+
+      expect(wrapper.find(`[data-test="${CARD}"]`).exists()).toBe(true);
+      expect(bar(wrapper).attributes("data-selected")).toBe("1");
+    });
+
+    it("keeps the selection when the rail clears its categories", async () => {
+      // The gallery has two Clear-filters controls with different scopes; B4
+      // has to hold for both.
+      const wrapper = await mountView();
+      await tick(wrapper, BOX);
+      await tickRail(wrapper, "alert-library-rail-category-node");
+      await press(wrapper, "alert-library-rail-clear-categories");
+
+      expect(bar(wrapper).attributes("data-selected")).toBe("1");
+    });
+
+    it("empties the selection from its own control", async () => {
+      const wrapper = await mountView();
+      await tick(wrapper, ALL);
+      await press(wrapper, "alert-library-clear-selection");
+      expect(bar(wrapper).exists()).toBe(false);
+    });
+
+    it("keeps focus on the page after clearing, not on a control it just removed", async () => {
+      // The action row unmounts with the selection, taking the focused button
+      // with it — a keyboard user would restart from the top of the grid.
+      const wrapper = mount(AlertLibrary, {
+        global: { provide: { store }, plugins: [i18n, router] },
+        attachTo: document.body,
+      });
+      mounted.push(wrapper);
+      await flushPromises();
+
+      await tick(wrapper, ALL);
+      await press(wrapper, "alert-library-clear-selection");
+      await flushPromises();
+
+      expect(bar(wrapper).exists()).toBe(false);
+      expect(document.activeElement).toBe(
+        wrapper.get(`[data-test="${ALL}"]`).get('[role="checkbox"]').element,
+      );
+    });
+
+    it("selects every alert in that group and nothing outside it", async () => {
+      // A group of ONE cannot tell "selects the group" from "selects its first
+      // entry", so this one holds two.
+      manifestRef.value = withPairedGroup();
+      const wrapper = await mountView();
+      await press(wrapper, "alert-library-select-group-k8s/pod");
+
+      expect(bar(wrapper).attributes("data-selected")).toBe("2");
+      expect(wrapper.find(`[data-test="${CARD}"]`).attributes("data-selected")).toBe("true");
+      expect(
+        wrapper
+          .find('[data-test="alert-library-card-k8s/pod-restart-storm"]')
+          .attributes("data-selected"),
+      ).toBe("true");
+      expect(
+        wrapper
+          .find('[data-test="alert-library-card-k8s/node-disk-pressure"]')
+          .attributes("data-selected"),
+      ).toBe("false");
+    });
+
+    it("still offers select-all while a group is only partly selected", async () => {
+      // "Clear N" the moment ANY member is ticked would strand the rest of the
+      // group behind a control that no longer adds anything.
+      manifestRef.value = withPairedGroup();
+      const wrapper = await mountView();
+      await tick(wrapper, BOX);
+
+      const toggle = wrapper.get('[data-test="alert-library-select-group-k8s/pod"]');
+      expect(toggle.text()).toBe(i18n.global.t("alert_library.selectAllInGroup", { count: 2 }, 2));
+
+      await press(wrapper, "alert-library-select-group-k8s/pod");
+      expect(bar(wrapper).attributes("data-selected")).toBe("2");
+    });
+
+    it("keeps the group control out of the heading it sits beside", async () => {
+      // A button inside an <h2> becomes part of that heading's accessible name,
+      // so heading navigation would read "Kubernetes · Pods 2 Select all 2".
+      manifestRef.value = withPairedGroup();
+      const wrapper = await mountView();
+      const heading = wrapper.get('[data-test="alert-library-group-k8s/pod"]');
+
+      expect(heading.element.tagName).toBe("H2");
+      expect(heading.find('[data-test="alert-library-select-group-k8s/pod"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="alert-library-select-group-k8s/pod"]').exists()).toBe(true);
+    });
+
+    it("counts the group on its own control", async () => {
+      manifestRef.value = withPairedGroup();
+      const wrapper = await mountView();
+      const toggle = () => wrapper.find('[data-test="alert-library-select-group-k8s/pod"]');
+      expect(toggle().text()).toBe("Select all 2");
+      await press(wrapper, "alert-library-select-group-k8s/pod");
+      expect(toggle().text()).toBe("Clear 2");
+    });
+
+    it("turns the group heading into a clear once that group is full", async () => {
+      manifestRef.value = withPairedGroup();
+      const wrapper = await mountView();
+      const toggle = () => wrapper.find('[data-test="alert-library-select-group-k8s/pod"]');
+      const label = (key: string) => i18n.global.t(`alert_library.${key}`, { count: 2 }, 2);
+      // vue-i18n answers a missing key with the key path, which would make both
+      // sides of the comparison below the same string over a broken UI.
+      expect(label("selectAllInGroup")).not.toContain("alert_library.");
+      expect(label("selectAllInGroup")).not.toBe(label("clearGroupSelection"));
+
+      expect(toggle().text()).toBe(label("selectAllInGroup"));
+      await press(wrapper, "alert-library-select-group-k8s/pod");
+      expect(toggle().text()).toBe(label("clearGroupSelection"));
+      await press(wrapper, "alert-library-select-group-k8s/pod");
+      expect(bar(wrapper).exists()).toBe(false);
+    });
+
+    it("adds to the selection from a group rather than replacing it", async () => {
+      manifestRef.value = withPairedGroup();
+      const wrapper = await mountView();
+      await tick(wrapper, "alert-library-select-k8s/node-disk-pressure");
+      await press(wrapper, "alert-library-select-group-k8s/pod");
+      expect(bar(wrapper).attributes("data-selected")).toBe("3");
+    });
+
+    it("drops the group heading control when only one group is on screen", async () => {
+      // It would duplicate the toolbar's control on the same screen.
+      const wrapper = await mountView();
+      await tickRail(wrapper, "alert-library-rail-category-pod");
+      expect(wrapper.find('[data-test="alert-library-select-group-k8s/pod"]').exists()).toBe(false);
+    });
+
+    it("selects the not-ingested alerts the strip is showing", async () => {
+      // B3 in its stated form: stand on "Not ingested", select all in view.
+      const wrapper = await mountView();
+      await press(wrapper, "alert-library-stat-missing");
+      await tick(wrapper, ALL);
+
+      expect(bar(wrapper).attributes("data-selected")).toBe("1");
+      expect(
+        wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').attributes(
+          "data-selected",
+        ),
+      ).toBe("true");
+    });
+
+    it("includes an alert whose stream this org does not receive", async () => {
+      // They are legitimately addable — the product already promises they start
+      // working when the data arrives — so select-all must not quietly skip them.
+      const wrapper = await mountView();
+      await tick(wrapper, ALL);
+      expect(
+        wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').attributes(
+          "data-selected",
+        ),
+      ).toBe("true");
+      expect(bar(wrapper).attributes("data-selected")).toBe("4");
+    });
+
+    it("counts one alert and many alerts differently on the button", async () => {
+      const wrapper = await mountView();
+      await tick(wrapper, BOX);
+      const label = (count: number) =>
+        i18n.global.t("alert_library.addSelected", { count }, count);
+      const button = () => wrapper.get('[data-test="alert-library-add-selected"]').text();
+
+      expect(label(1)).not.toContain("alert_library.");
+      expect(label(1)).not.toBe(label(2)); // else the assertion below proves nothing
+      expect(button()).toBe(label(1));
+      await tick(wrapper, "alert-library-select-k8s/node-disk-pressure");
+      expect(button()).toBe(label(2));
+    });
+
+    it("hands the wizard the selection, frozen, with no seed", async () => {
+      const wrapper = await mountView();
+      await tick(wrapper, BOX);
+      await tick(wrapper, "alert-library-select-k8s/node-disk-pressure");
+      await press(wrapper, "alert-library-add-selected");
+
+      const wizard = dialog(wrapper);
+      expect(wizard.props("open")).toBe(true);
+      expect(wizard.props("seed")).toBe(null);
+      expect((wizard.props("preselect") as AlertLibraryEntry[]).map((e) => e.id)).toEqual([
+        "k8s/pod-oom-killed",
+        "k8s/node-disk-pressure",
+      ]);
+    });
+
+    it("resolves the batch against the whole manifest, not the filtered view", async () => {
+      // The off-view selection is the reason B2 exists; dropping it at the
+      // hand-off would install a different set from the one that was counted.
+      const wrapper = await mountView();
+      await tick(wrapper, BOX);
+      await tickRail(wrapper, "alert-library-rail-category-node");
+      await press(wrapper, "alert-library-add-selected");
+
+      expect((dialog(wrapper).props("preselect") as AlertLibraryEntry[]).map((e) => e.id)).toEqual([
+        "k8s/pod-oom-killed",
+      ]);
+    });
+
+    it("does not move the batch when the gallery re-filters behind the open wizard", async () => {
+      const wrapper = await mountView();
+      await tick(wrapper, ALL);
+      await press(wrapper, "alert-library-add-selected");
+      await tickRail(wrapper, "alert-library-rail-category-node");
+
+      expect((dialog(wrapper).props("preselect") as AlertLibraryEntry[])).toHaveLength(4);
+    });
+
+    it("ignores the gallery selection when the drawer starts the add", async () => {
+      // Reading one alert and pressing Add must not drag in eleven others.
+      const wrapper = await mountView();
+      await tick(wrapper, ALL);
+      await wrapper.find('[data-test="alert-library-card-k8s/cert-expiring"]').trigger("click");
+      await flushPromises();
+
+      const file = { name: "cert-expiring" };
+      wrapper
+        .findComponent({ name: "LibraryDrawer" })
+        .vm.$emit("install", { entry: manifestFixture.alerts[2], file });
+      await flushPromises();
+
+      const wizard = dialog(wrapper);
+      expect(wizard.props("open")).toBe(true);
+      expect((wizard.props("seed") as any).entry.id).toBe("k8s/cert-expiring");
+      expect(wizard.props("preselect")).toEqual([]);
+    });
+
+    it("keeps the selection when the wizard is cancelled without running", async () => {
+      // Building a twelve-alert batch is real work with no undo; a cancelled
+      // modal must not destroy it. This is what makes the "no destinations in
+      // this org" dead end survivable.
+      const wrapper = await mountView();
+      await tick(wrapper, ALL);
+      await press(wrapper, "alert-library-add-selected");
+      expect(dialog(wrapper).props("open")).toBe(true);
+
+      dialog(wrapper).vm.$emit("update:open", false);
+      await flushPromises();
+
+      expect(dialog(wrapper).props("open")).toBe(false);
+      expect(bar(wrapper).attributes("data-selected")).toBe("4");
+    });
+
+    it("drops the batch when the wizard closes, so the drawer starts clean", async () => {
+      // A stale pendingBatch would reach the drawer's own add and violate B8
+      // without any test above noticing.
+      const wrapper = await mountView();
+      await tick(wrapper, ALL);
+      await press(wrapper, "alert-library-add-selected");
+      dialog(wrapper).vm.$emit("update:open", false);
+      await flushPromises();
+
+      await wrapper.get('[data-test="alert-library-card-k8s/cert-expiring"]').trigger("click");
+      await flushPromises();
+      wrapper
+        .findComponent({ name: "LibraryDrawer" })
+        .vm.$emit("install", { entry: manifestFixture.alerts[2], file: { name: "cert-expiring" } });
+      await flushPromises();
+
+      expect(dialog(wrapper).props("preselect")).toEqual([]);
+    });
+
+    it("takes only the alerts that were added off the selection, mid-run", async () => {
+      // `installed` fires at the end of a run and after each retry, while the
+      // dialog is still open. Failures stay selected so a retry is one click.
+      const wrapper = await mountView();
+      await tick(wrapper, ALL);
+      await press(wrapper, "alert-library-add-selected");
+
+      dialog(wrapper).vm.$emit("installed", {
+        entryIds: ["k8s/pod-oom-killed", "k8s/cert-expiring"],
+      });
+      await flushPromises();
+
+      expect(bar(wrapper).attributes("data-selected")).toBe("2");
+      // The open wizard keeps the batch it started with.
+      expect((dialog(wrapper).props("preselect") as AlertLibraryEntry[])).toHaveLength(4);
+    });
+
+    it("opens the drawer from the card title, which is now the control", async () => {
+      const wrapper = await mountView();
+      const drawer = wrapper.findComponent({ name: "LibraryDrawer" });
+
+      await wrapper.find('[data-test="alert-library-card-title-k8s/cert-expiring"]').trigger("click");
+      expect(drawer.props("open")).toBe(true);
+      expect((drawer.props("entry") as AlertLibraryEntry).id).toBe("k8s/cert-expiring");
+    });
+
+    it("forgets an alert the catalog no longer ships", async () => {
+      // A stale id would fail its row at run time for a reason nobody can act on.
+      const wrapper = await mountView();
+      await tick(wrapper, ALL);
+      expect(bar(wrapper).attributes("data-selected")).toBe("4");
+
+      manifestRef.value = {
+        ...manifestFixture,
+        alerts: manifestFixture.alerts.filter((a) => a.id !== "k8s/cert-expiring"),
+      };
+      await flushPromises();
+
+      expect(bar(wrapper).attributes("data-selected")).toBe("3");
+    });
+
+    it("keeps the selection when the manifest reloads unchanged", async () => {
+      const wrapper = await mountView();
+      await tick(wrapper, BOX);
+      manifestRef.value = { ...manifestFixture, alerts: [...manifestFixture.alerts] };
+      await flushPromises();
+      expect(bar(wrapper).attributes("data-selected")).toBe("1");
     });
   });
 });

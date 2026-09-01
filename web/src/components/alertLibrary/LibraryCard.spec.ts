@@ -163,23 +163,153 @@ describe("LibraryCard", () => {
     );
   });
 
-  it("opens the drawer on click — the card IS the affordance, there is no button", () => {
+  it("opens the drawer when the card body is clicked", () => {
+    // Kept as a mouse convenience once the card stopped being a button itself:
+    // everything it offers is also reachable from a real control inside it.
     const wrapper = mountCard();
     wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').trigger("click");
     expect(wrapper.emitted("open")).toHaveLength(1);
   });
 
-  it.each(["enter", "space"])("opens on %s, so the grid is reachable without a mouse", (key) => {
+  it("opens the drawer from the title button — once, not twice", () => {
+    // The title sits inside the card's own click handler. Without stopping
+    // propagation a single click opens the drawer twice.
     const wrapper = mountCard();
-    wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]').trigger(`keydown.${key}`);
+    wrapper.find('[data-test="alert-library-card-title-k8s/pod-oom-killed"]').trigger("click");
     expect(wrapper.emitted("open")).toHaveLength(1);
   });
 
-  it("names what it opens, since the card is a control with no visible label", () => {
+  it("makes the TITLE the control, so a checkbox can live beside it", () => {
+    // The card used to be the affordance. A card with two actions cannot be:
+    // a control nested inside role="button" is invalid for keyboard and AT.
+    const wrapper = mountCard();
+    const root = wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]');
+    expect(root.attributes("role")).toBeUndefined();
+    expect(root.attributes("tabindex")).toBeUndefined();
+    expect(root.attributes("aria-label")).toBeUndefined();
+
+    const title = wrapper.find('[data-test="alert-library-card-title-k8s/pod-oom-killed"]');
+    expect(title.element.tagName).toBe("BUTTON");
+    expect(title.text()).toContain("Pod OOM Killed");
+  });
+
+  it("keeps the pointer cursor on the card, which is still clickable", () => {
     const root = mountCard().find('[data-test="alert-library-card-k8s/pod-oom-killed"]');
-    expect(root.attributes("role")).toBe("button");
-    expect(root.attributes("tabindex")).toBe("0");
-    expect(root.attributes("aria-label")).toContain("Pod OOM Killed");
+    expect(root.classes()).toContain("cursor-pointer");
+  });
+
+  it("moves the focus ring to the title, where focus can actually land", () => {
+    const wrapper = mountCard();
+    const ringed = (test: string) =>
+      wrapper
+        .find(`[data-test="${test}"]`)
+        .classes()
+        .some((c) => c.startsWith("focus-visible:ring"));
+    expect(ringed("alert-library-card-title-k8s/pod-oom-killed")).toBe(true);
+    expect(ringed("alert-library-card-k8s/pod-oom-killed")).toBe(false);
+  });
+
+  // ── selection ────────────────────────────────────────────────────────────
+
+  it("renders a selection checkbox, always — not on hover", () => {
+    // Hover-reveal leaves a touch user with no way to START a selection from a
+    // card, and a hidden control cannot take the focus that would reveal it.
+    // Both mechanisms §7.2a rejects are ruled out: display and opacity.
+    const wrapper = mountCard();
+    const box = wrapper.find('[data-test="alert-library-select-k8s/pod-oom-killed"]');
+    expect(box.exists()).toBe(true);
+    expect(box.attributes("hidden")).toBeUndefined();
+    // Read off the CARD, not the checkbox's own root: the reveal would live on
+    // a wrapper the checkbox knows nothing about.
+    const html = wrapper.html();
+    expect(html).not.toMatch(/opacity-0/);
+    expect(html).not.toMatch(/group-hover:/);
+  });
+
+  it("no longer opens the drawer from the card's own key handlers", () => {
+    // The root is not a control any more. A leftover handler there would put an
+    // action on a non-interactive element, which nothing in web/ lints for.
+    const wrapper = mountCard();
+    const root = wrapper.find('[data-test="alert-library-card-k8s/pod-oom-killed"]');
+    root.trigger("keydown.enter");
+    root.trigger("keydown.space");
+    expect(wrapper.emitted("open")).toBeUndefined();
+  });
+
+  it("opens from the title on Enter and Space, because it is a real button", () => {
+    // Native button semantics: asserted through the element, not a handler, so
+    // this stays true however the click is wired.
+    const title = mountCard().find('[data-test="alert-library-card-title-k8s/pod-oom-killed"]');
+    expect(title.element.tagName).toBe("BUTTON");
+    expect((title.element as HTMLButtonElement).type).toBe("button");
+    expect(title.attributes("disabled")).toBeUndefined();
+  });
+
+  it("puts the checkbox before the title, so tab order reads left to right", () => {
+    const wrapper = mountCard();
+    const stops = wrapper
+      .findAll('[data-test^="alert-library-card-title-"], [role="checkbox"]')
+      .map((node) => (node.attributes("role") === "checkbox" ? "checkbox" : "title"));
+    expect(stops).toEqual(["checkbox", "title"]);
+  });
+
+  it("names the checkbox, which has no visible label of its own", () => {
+    const wrapper = mountCard();
+    const box = wrapper.find('[data-test="alert-library-select-k8s/pod-oom-killed"]');
+    expect(box.find('[role="checkbox"]').attributes("aria-label")).toContain("Pod OOM Killed");
+  });
+
+  it("emits update:selected from the checkbox and does NOT open the drawer", () => {
+    const wrapper = mountCard();
+    wrapper
+      .find('[data-test="alert-library-select-k8s/pod-oom-killed"]')
+      .find('[role="checkbox"]')
+      .trigger("click");
+    expect(wrapper.emitted("update:selected")).toEqual([[true]]);
+    expect(wrapper.emitted("open")).toBeUndefined();
+  });
+
+  it("unticks from the checkbox when it is already selected", () => {
+    const wrapper = mountCard({ selected: true });
+    wrapper
+      .find('[data-test="alert-library-select-k8s/pod-oom-killed"]')
+      .find('[role="checkbox"]')
+      .trigger("click");
+    expect(wrapper.emitted("update:selected")).toEqual([[false]]);
+  });
+
+  it("marks a selected card, so the ring is not the only cue", () => {
+    const test = '[data-test="alert-library-card-k8s/pod-oom-killed"]';
+    expect(mountCard({ selected: true }).find(test).attributes("data-selected")).toBe("true");
+    expect(mountCard().find(test).attributes("data-selected")).toBe("false");
+  });
+
+  it("drops the default border rules when selected, rather than layering over them", () => {
+    // `hover:border-border-strong` outranks a plain `border-accent`, so leaving
+    // the resting rules in place makes a selected card lose its accent on hover.
+    const classes = (selected: boolean) =>
+      mountCard({ selected })
+        .find('[data-test="alert-library-card-k8s/pod-oom-killed"]')
+        .classes();
+
+    expect(classes(true)).toContain("border-accent");
+    expect(classes(true)).not.toContain("border-border-default");
+    expect(classes(true)).not.toContain("hover:border-border-strong");
+    expect(classes(false)).toContain("border-border-default");
+    expect(classes(false)).toContain("hover:border-border-strong");
+  });
+
+  it("names the title button by its own text, so the heading is not renamed", () => {
+    // An aria-label on the only child of the <h3> becomes the HEADING's name,
+    // so screen-reader heading navigation reads "Open Pod OOM Killed".
+    const title = mountCard().find('[data-test="alert-library-card-title-k8s/pod-oom-killed"]');
+    expect(title.attributes("aria-label")).toBeUndefined();
+    expect(title.text()).toBe("Pod OOM Killed");
+  });
+
+  it("defaults to unselected, so the gallery owns the state", () => {
+    const box = mountCard().find('[data-test="alert-library-select-k8s/pod-oom-killed"]');
+    expect(box.find('[role="checkbox"]').attributes("aria-checked")).toBe("false");
   });
 
   it("survives an entry with no description", () => {
