@@ -58,7 +58,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OCard from "@/lib/core/Card/OCard.vue";
@@ -71,6 +71,24 @@ import {
 import { burnWindowLabel } from "@/utils/alerts/sloAlertPayload";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
 import { formatTimestampInTimezone } from "@/utils/date";
+
+/** A field row. Loose by construction: the optional render hints (`mono`,
+ *  `badge`, `link`) are set on some rows and not others, and inferring per-row
+ *  literal types splits the list into a union the template cannot read. */
+interface SummaryField {
+  key: string;
+  label: I18nText;
+  value: any;
+  mono?: boolean;
+  badge?: string;
+  link?: Record<string, any>;
+}
+
+interface SummarySection {
+  key: string;
+  title: I18nText;
+  fields: SummaryField[];
+}
 
 const props = defineProps<{
   alert: any;
@@ -163,7 +181,7 @@ const sloKindLabel = computed(() => {
 
 const sloFields = computed(() => {
   const cond = sloCondition.value;
-  const fields: Record<string, any>[] = [
+  const fields: SummaryField[] = [
     {
       key: "slo",
       label: t("alerts.sloColumn"),
@@ -236,7 +254,7 @@ const anomalyTimestamp = (us: unknown): string => {
 const anomalySourceFields = computed(() => {
   const a = props.alert;
   const customSql = a?.query_mode === "custom_sql";
-  const fields: Record<string, any>[] = [
+  const fields: SummaryField[] = [
     { key: "stream", label: t("alerts.streamName"), value: a?.stream_name || EMPTY },
     { key: "stream-type", label: t("alerts.streamType"), value: a?.stream_type || EMPTY },
     {
@@ -337,7 +355,7 @@ const anomalyScheduleFields = computed(() => {
 
 const anomalyModelFields = computed(() => {
   const a = props.alert;
-  const fields: Record<string, any>[] = [
+  const fields: SummaryField[] = [
     {
       key: "status",
       label: t("alerts.status"),
@@ -365,13 +383,13 @@ const anomalyModelFields = computed(() => {
   return fields;
 });
 
-const anomalySections = computed(() => [
+const anomalySections = computed<SummarySection[]>(() => [
   { key: "source", title: t("alerts.configuration"), fields: anomalySourceFields.value },
   { key: "schedule", title: t("alerts.groups.schedule"), fields: anomalyScheduleFields.value },
   { key: "model", title: t("alerts.anomaly.model"), fields: anomalyModelFields.value },
 ]);
 
-const genericSections = computed(() => [
+const genericSections = computed<SummarySection[]>(() => [
   {
     key: "source",
     title: t("alerts.configuration"),
