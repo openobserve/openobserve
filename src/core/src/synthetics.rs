@@ -618,6 +618,7 @@ mod tests {
             degraded: false,
             failing_locations: vec!["aws-us-east-1".into(), "aws-us-west-1".into()],
             passing_locations: vec!["aws-eu-central-1".into()],
+            failing_environments: vec![],
         }
     }
 
