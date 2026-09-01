@@ -389,7 +389,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom>
             <div class="flex h-12 w-full items-center gap-x-2">
-              <div class="flex w-25 items-center text-xs font-normal">
+              <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
                 {{ t("modelPricing.modelsCount", { count: resultTotal }) }}
               </div>
               <OButton

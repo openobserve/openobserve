@@ -218,9 +218,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   })
                 }}
               </template>
-              <template v-else>
+              <span v-else class="max-md:hidden">
                 {{ t("aiObservability.discovery.footerTitle", { scope: scopeNoun }) }}
-              </template>
+              </span>
             </span>
             <AddToQueueMenu
               v-if="selectedIds.length"

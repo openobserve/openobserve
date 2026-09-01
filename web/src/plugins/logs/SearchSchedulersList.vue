@@ -229,7 +229,7 @@
           </template>
           <template #bottom>
             <div class="flex h-12 w-full items-center justify-between">
-              <div class="mr-md flex w-25 items-center text-xs font-normal">
+              <div class="mr-md flex w-25 items-center text-xs font-normal max-md:hidden">
                 {{ resultTotal }} {{ t("search_scheduler_job.results") }}
               </div>
               <div class="mr-2 ml-auto">

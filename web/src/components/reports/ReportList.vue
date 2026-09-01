@@ -88,7 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     />
                   </div>
-                  <div class="min-w-0 flex-1 max-md:min-w-40">
+                  <!-- < md search takes its own full row below the icon controls. -->
+                  <div class="min-w-0 flex-1 max-md:order-last max-md:basis-full">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -263,7 +264,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex h-12 w-full items-center justify-between">
                   <!-- Left: count + action buttons grouped together -->
                   <div class="flex items-center gap-2">
-                    <div class="flex items-center text-xs font-normal whitespace-nowrap">
+                    <div
+                      class="flex items-center text-xs font-normal whitespace-nowrap max-md:hidden"
+                    >
                       {{ resultTotal }} {{ t("reports.header") }}
                     </div>
                     <OButton

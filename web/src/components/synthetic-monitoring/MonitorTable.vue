@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               total: data.length,
             })
           }}</template>
-          <template v-else>{{ data.length }} {{ resolvedFooterTitle }}</template>
+          <span v-else class="max-md:hidden">{{ data.length }} {{ resolvedFooterTitle }}</span>
         </span>
         <template v-if="localSelectedIds.length > 0">
           <OButton

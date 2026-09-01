@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom>
-            <span class="text-xs font-normal"
+            <span class="text-xs font-normal max-md:hidden"
               >{{ serviceAccountsState.service_accounts_users.length }}
               {{ t("serviceAccounts.header") }}</span
             >

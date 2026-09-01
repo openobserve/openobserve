@@ -172,9 +172,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       })
                     }}
                   </template>
-                  <template v-else>
+                  <span v-else class="max-md:hidden">
                     {{ resultTotal }} {{ t("synthetics.locations.bottomHeader") }}
-                  </template>
+                  </span>
                 </span>
                 <template v-if="selectedLocations.length > 0">
                   <OButton

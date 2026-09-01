@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Toolbar content rendered inside OTable's toolbar bar -->
           <template #toolbar>
-            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:flex-wrap">
+            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:contents">
               <!-- Type tabs -->
               <OToggleGroup :model-value="activeTab" @update:model-value="onTabChange">
                 <OToggleGroupItem
@@ -178,7 +178,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroup>
 
               <!-- Search -->
-              <div class="min-w-0 flex-1 max-md:min-w-40">
+              <!-- < md search takes its own full row below the icon controls. -->
+              <div class="min-w-0 flex-1 max-md:order-last max-md:basis-full">
                 <OInput
                   v-model="search"
                   :placeholder="

@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom="{ totalRows }">
-            <div class="mr-4 flex items-center py-2 text-xs font-normal">
+            <div class="mr-4 flex items-center py-2 text-xs font-normal max-md:hidden">
               {{ totalRows }} {{ t("pipeline.header") }}
             </div>
           </template>

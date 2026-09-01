@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #bottom>
               <div class="flex items-center gap-2">
-                <span class="text-xs font-normal">
+                <span class="text-xs font-normal max-md:hidden">
                   {{ t("regex_patterns.bottom_header", { count: resultTotal }) }}
                 </span>
                 <OButton

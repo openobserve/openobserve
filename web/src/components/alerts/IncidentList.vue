@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Bottom -->
         <template #bottom>
           <div class="flex h-12 w-full items-center justify-between">
-            <div class="mr-md flex w-25 items-center text-xs font-normal">
+            <div class="mr-md flex w-25 items-center text-xs font-normal max-md:hidden">
               {{ visibleIncidents.length }}
               {{
                 visibleIncidents.length === 1

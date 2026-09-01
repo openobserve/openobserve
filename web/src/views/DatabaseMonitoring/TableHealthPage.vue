@@ -262,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-text-secondary flex w-full items-center gap-2.5"
             data-test="dbm-table-health-status-bar"
           >
-            <span>{{ countLine }}</span>
+            <span class="max-md:hidden">{{ countLine }}</span>
           </div>
         </template>
 

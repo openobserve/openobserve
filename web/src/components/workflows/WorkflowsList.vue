@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    dropped — a legacy CSS-framework class this repo does not
                    generate, so it never applied. -->
               <div class="flex h-12 w-full items-center justify-between">
-                <div class="o2-table-footer-title flex w-50 items-center">
+                <div class="o2-table-footer-title flex w-50 items-center max-md:hidden">
                   {{ resultTotal }} {{ t("workflow.header") }}
                 </div>
               </div>
