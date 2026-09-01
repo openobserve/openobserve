@@ -15,7 +15,7 @@
 | Leaked IntersectionObservers / IndexedDB connections / `window "load"` listeners | **FIXED** — all **0** |
 | **Dashboard-open leak, "5.71 MB / 2,697 nodes per open"** | **DOES NOT EXIST** — it was a measurement artifact (§7.1) |
 | **`@tanstack/vue-form` leak** — streams 4,051 nodes/navigation | **FIXED** via patch-package — streams now **0** |
-| **Logs route** — retains 1,438 nodes/navigation | **REAL, OPEN** — cause not yet identified (§4.2) |
+| **Logs route** — retained 1,438 nodes/navigation | **FIXED** — two independent retainers (§4.2); logs now **0** |
 
 The route-change leak was a discarded cleanup function:
 `onMounted(() => { …; return () => cleanup(); })`. Vue **ignores** what
@@ -30,8 +30,7 @@ decelerating (0.46 → 0.15 MB per open — caches settling, not linear growth).
 
 The largest real leak was **not in dashboards**: `@tanstack/vue-form` discarded
 the cleanup returned by `FormApi.mount()`, costing streams ~6× what the dashboard
-list ever did. It is now patched and streams measures 0. The logs route still
-retains 1,438 nodes per navigation from an unidentified cause.
+list ever did. **Every route measured now retains 0 DOM nodes per navigation.**
 
 ---
 
@@ -213,13 +212,55 @@ A late stream callback can invoke `loadData()` after `onUnmounted` has already
 removed the listener, re-adding it permanently. Moved to `onMounted` so the
 add/remove pair is symmetric. `window:cancelQuery` no longer grows.
 
-### 4.2 Still open: logs retains 1,438 nodes per navigation
+### 4.2 Logs route: two independent retainers — FIXED
 
-Not `form-devtools`, not `cancelQuery` — both are now flat while the node count
-still grows. No window/document listener grows on that route any more, so the
-retainer is something else on the logs page. Use `leaked-components.mjs` against
-a logs-cycle snapshot to name the leaked component, as was done for dashboards
-in §3.
+The logs route retained 1,438 DOM nodes per navigation. The leaked root was
+`PageSearch` (`plugins/logs/Index.vue`), one instance per navigation, with the
+`PanelEditor` / `AddToDashboard` subtree hanging off each.
+
+It had **two independent retainers holding the same tree**, which is why fixing
+either one alone changed the node count by exactly zero — the count only drops
+when the last retainer goes. Each fix did move the retaining path on to the
+next holder, which is how the second one was found.
+
+**a. `vue-draggable-next` never destroys its Sortable instance**
+(`web/patches/vue-draggable-next+2.3.0.patch`)
+
+The component imports only `onMounted`, registers no unmount hook, and never
+calls `.destroy()`. Sortable keeps every live instance's element in a
+module-level `sortables` array, and the component sets
+`targetDomElement.__draggable_component__ = proxy`, so that element walks
+straight back to the component tree. Patched to destroy on unmount and delete
+the back-reference.
+
+**b. Monaco `addCommand` leaks into the global `CommandsRegistry`**
+(`web/src/components/CodeQueryEditor.vue`)
+
+`editor.addCommand()` registers the handler in monaco's module-level
+`CommandsRegistry` and **discards the disposable it gets back**, so the entry
+outlives `editor.dispose()`. The handler closes over `emit`, retaining the
+component. It was also being re-registered on every `onDidFocusEditorWidget`,
+minting a fresh permanent entry per focus.
+
+Replaced with `editor.onKeyDown(...)`, which returns a disposable tied to the
+editor's own lifecycle, removing both the per-mount and per-focus entries and
+the `ctrlenter` context-key workaround along with them.
+
+Retaining path that identified it:
+
+```
+Window -> .monaco -> closure -> ._commands (Map) -> command -> .handler closure
+  -> ... -> .parent -> PageSearch
+```
+
+**Result:** logs 1,438 -> **0** nodes/navigation; listeners 102 -> 6 per
+navigation.
+
+> **Tooling note:** `retain-path.mjs` initially reported a path through a
+> WeakMap. WeakMap/WeakSet entries are ephemerons — reaching a value through the
+> table is not retention, since the entry dies with its key — so the tool now
+> skips edges named `part of key (…) -> value (…) pair in WeakMap (…)`. Without
+> that filter it produces convincing but false retainer paths.
 
 ---
 
