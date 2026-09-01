@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <!-- < md the bar wraps (mode toggles drop below the query label). -->
     <div
-      class="sql-bar bg-section-header-bg border-border-default flex h-10 flex-row items-center justify-between gap-x-3 border-t border-b max-md:h-auto max-md:flex-wrap max-md:gap-y-1 max-md:py-1"
+      class="sql-bar bg-section-header-bg border-border-default flex h-10 flex-row items-center justify-between gap-x-3 border-t border-b max-md:h-auto max-md:flex-wrap max-md:gap-y-1 max-md:px-2 max-md:py-1"
       @click.stop
     >
       <div
@@ -179,8 +179,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </div>
+  <!-- < md the editor keeps a bounded height — flex-1 stretched it over the
+       whole leftover scroll area, a screen of empty grey below one line. -->
   <div
-    class="flex flex-1 flex-col overflow-hidden"
+    class="flex flex-1 flex-col overflow-hidden max-md:h-80 max-md:flex-none"
     :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0; flex: none;' : ''"
     data-test="dashboard-query"
   >

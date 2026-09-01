@@ -27,8 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Custom URL Input Section with Folder Dropdown -->
     <template #url-input-section="{ url, updateUrl }">
-      <div class="my-[0.725rem] flex items-end gap-2">
-        <div class="w-[69%]">
+      <div class="my-[0.725rem] flex items-end gap-2 max-md:flex-wrap">
+        <div class="w-[69%] max-md:w-full">
           <OInput
             data-test="alert-import-url-input"
             :model-value="url"
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div class="w-[30%]" data-test="alert-folder-dropdown">
+        <div class="w-[30%] max-md:w-full" data-test="alert-folder-dropdown">
           <SelectFolderDropDown
             :type="'alerts'"
             @folder-selected="updateActiveFolderId"
@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Custom File Input Section with Folder Dropdown -->
     <template #file-input-section="{ jsonFiles, updateFiles }">
-      <div class="mb-1 flex w-[calc(100%-0.625rem)] items-start gap-2">
-        <div class="w-[69%]">
+      <div class="mb-1 flex w-[calc(100%-0.625rem)] items-start gap-2 max-md:flex-wrap">
+        <div class="w-[69%] max-md:w-full">
           <OFile
             data-test="alert-import-json-file-input"
             :model-value="jsonFiles"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="md"
           />
         </div>
-        <div class="w-[30%]">
+        <div class="w-[30%] max-md:w-full">
           <SelectFolderDropDown
             :type="'alerts'"
             @folder-selected="updateActiveFolderId"
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Output Section with Alert-specific Error Display -->
     <template #output-content>
-      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-l">
+      <div class="border-border-default flex h-full w-full min-w-100 max-md:min-w-0 flex-col border-l">
         <div
           v-if="alertErrorsToDisplay.length > 0"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"

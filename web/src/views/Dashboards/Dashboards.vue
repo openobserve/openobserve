@@ -286,12 +286,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-actions="{ row }">
               <span class="row-actions flex items-center justify-end gap-0.5">
+                <!-- < md the inline icons fold into the overflow menu so the
+                     actions column stops eating half the table's width. -->
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="drive-file-move"
                   :title="t('dashboard.move_to_another_folder')"
                   variant="ghost"
                   size="icon-xs-sq"
+                  class="max-md:hidden"
                   data-test="dashboard-move-to-another-folder"
                   @click.stop="showMoveDashboardPanel(row)"
                 />
@@ -301,6 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.duplicate')"
                   variant="ghost"
                   size="icon-xs-sq"
+                  class="max-md:hidden"
                   data-test="dashboard-duplicate"
                   data-row-action="duplicate"
                   @click.stop="duplicateDashboard(row.id, row.folder_id)"
@@ -311,6 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.delete')"
                   variant="ghost-destructive"
                   size="icon-xs-sq"
+                  class="max-md:hidden"
                   data-test="dashboard-delete"
                   data-row-action="delete"
                   @click.stop="showDeleteDialogFn({ row })"
@@ -329,6 +334,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop
                     />
                   </template>
+                  <ODropdownItem
+                    icon-left="drive-file-move"
+                    class="md:hidden"
+                    data-test="dashboard-move-to-another-folder-menu"
+                    @select="showMoveDashboardPanel(row)"
+                  >
+                    <span>{{ t("dashboard.move_to_another_folder") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="content-copy"
+                    class="md:hidden"
+                    data-test="dashboard-duplicate-menu"
+                    @select="duplicateDashboard(row.id, row.folder_id)"
+                  >
+                    <span>{{ t("dashboard.duplicate") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    data-test="dashboard-delete-menu"
+                    @select="showDeleteDialogFn({ row })"
+                  >
+                    <span>{{ t("dashboard.delete") }}</span>
+                  </ODropdownItem>
                   <ODropdownItem
                     :icon-left="isHome(row.id) ? 'keep' : 'keep-outline'"
                     data-test="dashboard-list-set-home-btn"
@@ -367,7 +397,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #bottom>
               <div class="flex w-full items-center justify-between gap-4 py-1">
-                <div class="flex shrink-0 items-center text-xs font-normal">
+                <div class="flex shrink-0 items-center text-xs font-normal max-md:hidden">
                   {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
                 <div v-if="selectedIds.length > 0" class="bulk-action-bar flex items-center gap-2">

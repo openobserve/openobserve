@@ -276,6 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               icon-left="visibility"
+              class="max-md:hidden"
               @click="showDetailsDialog(row)"
               data-test="alert-history-view-details"
             >
@@ -287,6 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-destructive"
               size="icon-sm"
               icon-left="error"
+              class="max-md:hidden"
               @click.stop="showErrorDialog(row)"
             >
               <OTooltip
@@ -295,6 +297,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="alert-history-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="visibility"
+                class="md:hidden"
+                data-test="alert-history-view-details-menu"
+                @select="showDetailsDialog(row)"
+              >
+                <span>{{ t("alerts.viewDetails") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.error"
+                icon-left="error"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`pipeline-list-${row.name}-error-indicator-menu`"
+                @select="showErrorDialog(row)"
+              >
+                <span>{{
+                  t("common.lastErrorAt", { time: new Date(row.timestamp / 1000).toLocaleString() })
+                }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
         </OTable>
       </div>
@@ -524,6 +558,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { COL } from "@/lib/core/Table/OTable.types";

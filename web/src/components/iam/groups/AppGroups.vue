@@ -82,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('common.edit')"
                 @click="editGroup(row)"
               >
@@ -92,11 +93,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('common.delete')"
                 @click="showConfirmDialog(row)"
               >
                 <OIcon name="delete" size="sm" />
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="iam-groups-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  :data-test="`iam-groups-edit-${row.group_name}-role-icon-menu`"
+                  @select="editGroup(row)"
+                >
+                  <span>{{ t("common.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  :data-test="`iam-groups-delete-${row.group_name}-role-icon-menu`"
+                  @select="showConfirmDialog(row)"
+                >
+                  <span>{{ t("common.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
           <template #empty>
@@ -108,7 +139,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #bottom>
-            <span class="text-xs font-normal">{{ rows.length }} {{ t("iam.groups") }}</span>
+            <span class="text-xs font-normal max-md:hidden"
+              >{{ rows.length }} {{ t("iam.groups") }}</span
+            >
             <OButton
               v-if="selectedGroups.length > 0"
               data-test="iam-groups-bulk-delete-btn"
@@ -155,6 +188,8 @@ import { ref, onBeforeMount, computed } from "vue";
 import AddGroup from "./AddGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";

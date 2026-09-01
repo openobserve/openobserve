@@ -76,7 +76,7 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="text-xs font-normal">
+          <span class="text-xs font-normal max-md:hidden">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.job.listTitle") }}
           </span>
           <OButton
@@ -124,6 +124,7 @@
               icon-left="play-arrow"
               :loading="pendingStatusId === row.id"
               :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+              class="max-md:hidden"
               @click.stop="$emit('activate', row)"
             />
             <OButton
@@ -135,6 +136,7 @@
               icon-left="pause"
               :loading="pendingStatusId === row.id"
               :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+              class="max-md:hidden"
               @click.stop="$emit('pause', row)"
             />
             <OButton
@@ -143,6 +145,7 @@
               size="icon-sm"
               :title="t('onlineEvals.actions.edit')"
               icon-left="edit"
+              class="max-md:hidden"
               @click.stop="$emit('edit', row)"
             />
             <OButton
@@ -151,8 +154,59 @@
               size="icon-sm"
               :title="t('onlineEvals.actions.delete')"
               icon-left="delete"
+              class="max-md:hidden"
               @click.stop="$emit('delete', row)"
             />
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="eval-job-list-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                v-if="canActivate(row.status)"
+                icon-left="play-arrow"
+                class="md:hidden"
+                :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+                :data-test="`eval-job-list-${row.name}-activate-btn-menu`"
+                @select="$emit('activate', row)"
+              >
+                <span>{{ t("onlineEvals.actions.activate") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="canPause(row.status)"
+                icon-left="pause"
+                variant="destructive"
+                class="md:hidden"
+                :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+                :data-test="`eval-job-list-${row.name}-pause-btn-menu`"
+                @select="$emit('pause', row)"
+              >
+                <span>{{ t("onlineEvals.actions.pause") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`eval-job-list-${row.name}-edit-btn-menu`"
+                @select="$emit('edit', row)"
+              >
+                <span>{{ t("onlineEvals.actions.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`eval-job-list-${row.name}-delete-btn-menu`"
+                @select="$emit('delete', row)"
+              >
+                <span>{{ t("onlineEvals.actions.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
       </OTable>
@@ -165,6 +219,8 @@ import { computed, ref, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";

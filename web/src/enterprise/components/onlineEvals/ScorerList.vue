@@ -107,7 +107,7 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="text-xs font-normal">
+          <span class="text-xs font-normal max-md:hidden">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scorer.listTitle") }}
           </span>
           <OButton

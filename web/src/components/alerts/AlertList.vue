@@ -163,7 +163,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span class="max-md:hidden">{{ tab.label }}</span>
                     </OToggleGroupItem>
                   </OToggleGroup>
-                  <div class="min-w-0 flex-1 max-md:min-w-40">
+                  <!-- < md search takes its own full row below the icon controls
+                       instead of being crushed between them. -->
+                  <div class="min-w-0 flex-1 max-md:order-last max-md:basis-full">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -487,7 +489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="alert-list-loading-alert"
                     v-if="alertStateLoadingMap[row.uuid]"
                     style="display: inline-block; width: 2.07125rem; height: auto"
-                    class="ml-1 flex items-center justify-center"
+                    class="ml-1 flex items-center justify-center max-md:hidden"
                     :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
                   >
                     <OSpinner size="xs" />
@@ -496,7 +498,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else
                     :data-row-action="row.enabled ? 'pause' : 'resume'"
                     :data-test="`alert-list-${row.name}-pause-start-alert`"
-                    class="ml-1"
+                    class="ml-1 max-md:hidden"
                     :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                     size="icon-sm"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -514,6 +516,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     icon-left="edit"
+                    class="max-md:hidden"
                     @click.stop="editAlert(row)"
                   >
                     <OTooltip
@@ -527,7 +530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        button receives no pointer events, so a tooltip anchored
                        to it would never open — leaving a greyed-out control
                        with no way to find out why. -->
-                  <span class="inline-flex">
+                  <span class="inline-flex max-md:hidden">
                     <OTooltip
                       v-if="isSloRow(row)"
                       side="bottom"
@@ -580,6 +583,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`alert-list-${row.name}-more-options`"
                       />
                     </template>
+                    <ODropdownItem
+                      class="md:hidden"
+                      :disabled="!!alertStateLoadingMap[row.uuid]"
+                      :data-test="`alert-list-${row.name}-pause-start-alert-menu`"
+                      @select="toggleAlertState(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon :name="row.enabled ? 'pause' : 'play-arrow'" size="sm" />
+                      </template>
+                      {{ row.enabled ? t("alerts.pause") : t("alerts.start") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      class="md:hidden"
+                      :data-test="`alert-list-${row.name}-update-alert-menu`"
+                      @select="editAlert(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="edit" size="sm" />
+                      </template>
+                      {{ t("alerts.edit") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      class="md:hidden"
+                      :disabled="isSloRow(row)"
+                      :data-test="`alert-list-${row.name}-clone-alert-menu`"
+                      @select="duplicateAlert(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="content-copy" size="sm" />
+                      </template>
+                      {{ t("alerts.clone") }}
+                    </ODropdownItem>
+                    <ODropdownSeparator class="md:hidden" />
                     <ODropdownItem
                       :data-test="`alert-list-${row.name}-move-alert`"
                       @select="moveAlertToAnotherFolder(row)"
@@ -687,7 +723,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >{{ selectedAlerts.length }} {{ t("alerts.conditionOf") }} {{ resultTotal }}
                       {{ t("alerts.selectedLabel") }}</template
                     >
-                    <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
+                    <span v-else class="max-md:hidden"
+                      >{{ resultTotal }} {{ t("alerts.header") }}</span
+                    >
                   </div>
 
                   <OButton

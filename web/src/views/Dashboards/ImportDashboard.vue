@@ -337,6 +337,17 @@ export default defineComponent({
     const { isMobile } = useBreakpoint();
     const splitterModel = ref(60);
 
+    // < md the error pane earns its half of the screen only once it has
+    // something to show — empty, it buried the form's own controls.
+    watch(
+      [isMobile, () => dashboardErrorsToDisplay.value.length],
+      ([mobile, errCount]) => {
+        if (mobile) splitterModel.value = errCount > 0 ? 55 : 100;
+        else if (splitterModel.value === 100) splitterModel.value = 60;
+      },
+      { immediate: true },
+    );
+
     // holds the value of the loading for any of the import type
     const isLoading = ref(false);
     const queryEditorPlaceholderFlag = ref(true);
