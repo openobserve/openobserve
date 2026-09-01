@@ -727,11 +727,6 @@ impl SearchHistoryRequest {
         if self.start_time >= self.end_time {
             return Err("start_time must be less than end_time".to_string());
         }
-        if let Some(stream_type) = self.stream_type.as_deref()
-            && !matches!(stream_type, "logs" | "metrics" | "traces")
-        {
-            return Err(format!("invalid stream_type: {stream_type}"));
-        }
         Ok(true)
     }
 
