@@ -557,13 +557,10 @@ jobs:
         working-directory: tests/mobile-testing/apps/o2-rum-tester
         run: |
           if [ -n "$O2_RN_SDK_VERSION" ]; then
-            npm install --legacy-peer-deps \
-                        "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
+            npm install "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
                         "@openobserve/mobile-react-native-session-replay@$O2_RN_SDK_VERSION"
           else
-            # RN 0.87 declares optional React 19 types while this compatibility
-            # fixture intentionally remains on React 18; honor the committed lock.
-            npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+            npm ci || npm install
           fi
           # Release build: embeds the JS bundle (Debug loads it from the Metro dev server, which
           # isn't running in CI → blank screen). The release buildType is debug-signed in the RN
@@ -753,11 +750,10 @@ jobs:
         working-directory: tests/mobile-testing/apps/o2-rum-tester
         run: |
           if [ -n "$O2_RN_SDK_VERSION" ]; then
-            npm install --legacy-peer-deps \
-                        "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
+            npm install "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
                         "@openobserve/mobile-react-native-session-replay@$O2_RN_SDK_VERSION"
           else
-            npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+            npm ci || npm install
           fi
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true" ios/O2RumTester/Info.plist || true
           (cd ios && pod install)
