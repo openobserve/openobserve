@@ -335,18 +335,21 @@ export default defineComponent({
 }
 
 @media print {
-  // .table-wrapper is the containing block (position:relative).
-  // It clips the expanded table at the panel height; the footer is
-  // pinned to its bottom edge via absolute positioning (see below).
+  // Grow with the table's natural content height instead of clipping at the
+  // panel height. The old height:100% + overflow:hidden pair sliced whichever
+  // row straddled the panel edge and hid every row after it, and the
+  // absolutely-pinned opaque footer then painted over the last visible row —
+  // so a 4-row table printed 3 rows under a footer still reading "1-4 of 4".
+  // Rows that don't fit the page now continue on the next page.
   .table-wrapper {
     position: relative !important;
-    height: 100% !important;
+    height: auto !important;
+    min-height: 100% !important;
     max-height: none !important;
-    overflow: hidden !important;
+    overflow: visible !important;
   }
 
   .my-sticky-virtscroll-table {
-    // Expand to natural content height so all rows are rendered from the top.
     height: auto !important;
     overflow: visible !important;
 
@@ -356,28 +359,26 @@ export default defineComponent({
       top: auto !important;
     }
 
+    // Repeat the column headers at the top of every printed page.
+    :deep(thead) {
+      display: table-header-group !important;
+    }
+
     // Let the scroll container expand to show all rows.
     :deep(.table-container) {
       overflow: visible !important;
       height: auto !important;
     }
 
-    // Pin the footer to the bottom of .table-wrapper (the nearest
-    // position:relative ancestor) so it is always visible at the
-    // bottom of the panel, regardless of how many rows the table has.
-    :deep([data-test="dashboard-table-pagination"]) {
-      position: absolute !important;
-      bottom: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      background-color: #fff !important;
-      z-index: 1 !important;
+    // Never slice a row across a page boundary — move it whole to the next page.
+    :deep(tbody tr) {
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
-  }
 
-  .body--dark .my-sticky-virtscroll-table {
+    // Footer flows below the last row instead of being pinned over it.
     :deep([data-test="dashboard-table-pagination"]) {
-      background-color: #1a1a2e !important;
+      position: static !important;
     }
   }
 }
