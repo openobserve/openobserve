@@ -183,8 +183,8 @@
           <template #cell-slotStatus="{ row }: { row: any }">
             <OTag
               size="sm"
-              :variant="statusVariant(row.status, 'eval').variant"
-              :label="statusVariant(row.status, 'eval').label"
+              :variant="statusVariant(row.taskStatus, 'eval').variant"
+              :label="statusVariant(row.taskStatus, 'eval').label"
               :data-test="`ai-experiment-slot-status-${row.slotKey}`"
             />
           </template>
@@ -348,15 +348,7 @@ const slotRows = computed(() =>
   }),
 );
 
-const STATUS_FILTERS = [
-  "pending",
-  "running",
-  "scoring",
-  "completed",
-  "skipped",
-  "task_failed",
-  "score_failed",
-] as const;
+const STATUS_FILTERS = ["pending", "in_progress", "ok", "skipped", "error"] as const;
 
 const statusOptions = computed(() =>
   STATUS_FILTERS.map((status) => ({
@@ -370,14 +362,17 @@ const statusOptions = computed(() =>
 const visibleSlots = computed(() => {
   const term = rowSearch.value.trim().toLowerCase();
   return slotRows.value.filter((row) => {
-    if (statusFilter.value && row.status !== statusFilter.value) return false;
+    if (statusFilter.value && row.taskStatus !== statusFilter.value) return false;
     if (!term) return true;
     return `${row.input} ${row.output}`.toLowerCase().includes(term);
   });
 });
 
-// Errored slots are terminal, so the "incomplete" counters never include them.
-const failedSlotCount = computed(() => detail.value?.results.aggregateSummary?.errorTaskSlots ?? 0);
+// Run-level: a page-local count would show or hide the action depending on
+// which page happened to be loaded.
+const failedSlotCount = computed(
+  () => detail.value?.results.aggregateSummary?.incompleteTaskSlots ?? 0,
+);
 
 // Built as parts rather than one interpolated sentence so a task without a
 // model simply drops that segment instead of rendering a dash.
@@ -497,7 +492,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "slotStatus",
     header: t("aiObservability.experiments.detail.slotStatus"),
-    accessorKey: "status",
+    accessorKey: "taskStatus",
     sortable: true,
     size: COL.status,
     meta: { align: "left" as const },
@@ -549,10 +544,9 @@ async function refresh() {
     const slots = [...(first.results.slots ?? [])];
     let page = first.results.pagination?.page ?? 1;
     let hasMore = first.results.pagination?.hasMore ?? false;
-    // Summary/progress/score-summary fields are already computed over the WHOLE
-    // experiment on every page, so later pages only need to contribute the
-    // page-scoped parts: `slots`, plus the `executions`/`scores` records the
-    // status column and discovery read per row.
+    // Summary/progress/score fields are already computed over the WHOLE
+    // experiment on every page — only `slots` is page-scoped, so later pages
+    // only need to contribute more slots, not replace `first`.
     while (hasMore) {
       page += 1;
       const next = await llmExperimentsService.get(orgId.value, experimentId.value, {
@@ -560,8 +554,6 @@ async function refresh() {
         resultPageSize: RESULTS_PAGE_SIZE,
       });
       slots.push(...(next.results.slots ?? []));
-      first.results.executions.push(...next.results.executions);
-      first.results.scores.push(...next.results.scores);
       hasMore = next.results.pagination?.hasMore ?? false;
     }
     first.results.slots = slots;
