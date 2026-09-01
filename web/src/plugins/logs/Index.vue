@@ -1200,9 +1200,10 @@ export default defineComponent({
             const streams = searchObj.data.stream.selectedStream;
 
             streams.forEach((stream: string, index: number) => {
-              // Add UNION for all but the first SELECT statement
+              // UNION would delete rows duplicated across streams; BY NAME merges streams
+              // whose column sets differ instead of failing the plan.
               if (index > 0) {
-                searchObj.data.query += " UNION ";
+                searchObj.data.query += " UNION ALL BY NAME ";
               }
               searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${whereClause}`;
             });
@@ -3231,11 +3232,11 @@ export default defineComponent({
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
-        } else if (
-          this.searchObj.data.stream.selectedStream.length > 1 &&
-          this.searchObj.meta.sqlMode == true
-        ) {
-          this.resetHistogramWithError(this.t("logs.index.histogramNotAvailableMultiStream"));
+        } else if (this.searchObj.data.stream.selectedStream.length > 1) {
+          this.resetHistogramWithError(
+            this.t("logs.index.histogramUnavailableCtesDistinctJoinLimit"),
+            -1,
+          );
         } else if (this.searchObj.data.queryResults.is_histogram_eligible == false) {
           this.resetHistogramWithError(
             this.t("logs.index.histogramUnavailableCtesDistinctLimit"),

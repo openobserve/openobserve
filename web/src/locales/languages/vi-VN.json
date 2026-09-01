@@ -1172,9 +1172,8 @@
     "failedToFetchFieldValues": "Không thể lấy giá trị trường.",
     "fieldMissingInStreams": "Trường '{field}' không tồn tại trong một hoặc nhiều stream.\n",
     "fieldStreamCountMismatch": "Trường '{field}' tồn tại ở số lượng stream khác nhau.\n",
-    "histogramNotAvailableMultiStream": "Histogram không khả dụng cho tìm kiếm chế độ SQL đa stream.",
     "histogramSearchQueryCancelled": "Truy vấn tìm kiếm histogram đã bị hủy",
-    "histogramUnavailableForQueries": "Histogram không khả dụng cho các truy vấn CTE, DISTINCT, JOIN và LIMIT.",
+    "histogramUnavailableForQueries": "Histogram không khả dụng cho các truy vấn CTE, DISTINCT, UNION, JOIN và LIMIT.",
     "invalidDateFormat": "Định dạng ngày không hợp lệ.",
     "missingStreamFilterFields": "Một hoặc nhiều trường lọc không tồn tại trong \"{streams}\", do đó không có tìm kiếm nào được thực hiện trong stream được đề cập.\n",
     "noColumnFoundInStream": "Không tìm thấy cột nào trong stream đã chọn.",
@@ -12937,8 +12936,7 @@
       "selectStarNotSupportedForVisualization": "Truy vấn Select * không được hỗ trợ cho trực quan hóa",
       "errorUpdatingVisualization": "Lỗi khi cập nhật trực quan hóa",
       "queryEmptySelectFieldsToBuild": "Truy vấn trống, vui lòng chọn các trường để xây dựng truy vấn",
-      "histogramUnavailableCtesDistinctJoinLimit": "Biểu đồ histogram không khả dụng cho các truy vấn CTE, DISTINCT, JOIN và LIMIT.",
-      "histogramNotAvailableMultiStream": "Biểu đồ histogram không khả dụng cho tìm kiếm nhiều stream.",
+      "histogramUnavailableCtesDistinctJoinLimit": "Biểu đồ histogram không khả dụng cho các truy vấn CTE, DISTINCT, UNION, JOIN và LIMIT.",
       "histogramUnavailableCtesDistinctLimit": "Biểu đồ histogram không khả dụng cho các truy vấn CTE, DISTINCT và LIMIT."
     },
     "searchSchedulersList": {

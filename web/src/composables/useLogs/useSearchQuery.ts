@@ -341,7 +341,7 @@ export const useSearchQuery = (t: TranslateFn) => {
             interestingFields.map((field: string) => quoteSqlIdentifierIfNeeded(field)).join(","),
           );
         }
-      } else {
+      } else if (searchObj.data.stream.selectedStream.length === 1) {
         req.query.sql = req.query.sql.replace("[FIELD_LIST]", "*");
       }
 
@@ -579,67 +579,59 @@ export const useSearchQuery = (t: TranslateFn) => {
     }
 
     const preSQLQuery = req.query.sql;
-    req.query.sql = [];
 
-    streams
-      .join(",")
-      .split(",")
-      .forEach((item: any) => {
-        let finalQuery: string = preSQLQuery.replace("[INDEX_NAME]", item);
+    // A stream listed twice would emit two identical arms and duplicate every row.
+    const uniqueStreams: string[] = [...new Set<string>(streams.join(",").split(","))].filter(
+      (stream: string) => stream.trim() !== "",
+    );
 
-        // Per-stream WHERE rewrite: if this stream has equivalent field names
-        // for any filter fields (reverse semantic group mapping), swap them in.
-        if (multiStreamFieldMapping?.has(item)) {
-          const mapping = multiStreamFieldMapping.get(item)!;
+    const arms: string[] = uniqueStreams.map((item: string) => {
+      let finalQuery: string = preSQLQuery.replace("[INDEX_NAME]", item);
 
-          // Build a parsable SQL by temporarily replacing template placeholders
-          const hasFieldListPlaceholder = finalQuery.includes("[FIELD_LIST]");
+      // Per-stream WHERE rewrite: if this stream has equivalent field names
+      // for any filter fields (reverse semantic group mapping), swap them in.
+      if (multiStreamFieldMapping?.has(item)) {
+        const mapping = multiStreamFieldMapping.get(item)!;
+
+        // Build a parsable SQL by temporarily replacing template placeholders
+        const hasFieldListPlaceholder = finalQuery.includes("[FIELD_LIST]");
+        if (hasFieldListPlaceholder) {
+          finalQuery = finalQuery.replace("[FIELD_LIST]", "__field_list_placeholder__");
+        }
+
+        const parsed = fnParsedSQL(finalQuery);
+        if (parsed?.where) {
+          replaceColumnRefsInWhere(parsed.where, mapping);
+          finalQuery = fnUnparsedSQL(parsed);
+
+          finalQuery = finalQuery.replace(/`/g, '"');
+
           if (hasFieldListPlaceholder) {
-            finalQuery = finalQuery.replace("[FIELD_LIST]", "__field_list_placeholder__");
-          }
-
-          const parsed = fnParsedSQL(finalQuery);
-          if (parsed?.where) {
-            replaceColumnRefsInWhere(parsed.where, mapping);
-            finalQuery = fnUnparsedSQL(parsed);
-
-            finalQuery = finalQuery.replace(/`/g, '"');
-
-            if (hasFieldListPlaceholder) {
-              finalQuery = finalQuery
-                .replace(/"__field_list_placeholder__"/g, "[FIELD_LIST]")
-                .replace(/__field_list_placeholder__/g, "[FIELD_LIST]");
-            }
+            finalQuery = finalQuery
+              .replace(/"__field_list_placeholder__"/g, "[FIELD_LIST]")
+              .replace(/__field_list_placeholder__/g, "[FIELD_LIST]");
           }
         }
+      }
 
-        const listOfFields: any = [];
-        let streamField: any = {};
+      // The arms must stay wildcard: _timestamp and _o2_id are injected by the backend
+      // only for non-complex statements, and a UNION never qualifies.
+      return finalQuery.replace("[FIELD_LIST]", `*, '${item}' as _stream_name`);
+    });
 
-        for (const field of searchObj.data.stream.interestingFieldList) {
-          for (streamField of searchObj.data.stream.selectedStreamFields) {
-            if (
-              streamField?.name == field &&
-              streamField?.streams.indexOf(item) > -1 &&
-              listOfFields.indexOf(field) == -1
-            ) {
-              listOfFields.push(field);
-            }
-          }
-        }
+    if (arms.length === 0) {
+      return null;
+    }
 
-        let queryFieldList: string = "";
-        if (listOfFields.length > 0) {
-          queryFieldList = "," + listOfFields.join(",");
-        }
-
-        finalQuery = finalQuery.replace(
-          "[FIELD_LIST]",
-          `'${item}' as _stream_name` + queryFieldList,
-        );
-
-        req.query.sql.push(finalQuery);
-      });
+    // UNION ALL BY NAME, never UNION: UNION deletes rows that are genuinely duplicated
+    // across streams, and BY NAME merges streams whose column sets differ instead of
+    // failing the plan. A set operation gets no implicit ORDER BY, so it must be explicit.
+    req.query.sql =
+      arms.length > 1
+        ? `${arms.join(" UNION ALL BY NAME ")} ORDER BY ${
+            store.state.zoConfig.timestamp_column || "_timestamp"
+          } DESC`
+        : arms[0];
 
     return req;
   };
