@@ -88,7 +88,7 @@ function cronAlert(name) {
     ...a.trigger_condition,
     frequency_type: 'cron',
     frequency: 1,
-    cron: '*/10 * * * *',
+    cron: '0 */10 * * * *',
   };
   return a;
 }

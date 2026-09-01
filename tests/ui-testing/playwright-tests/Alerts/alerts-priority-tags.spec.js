@@ -202,7 +202,7 @@ test.describe('Alerts — priority, tags & additional variables', {
         await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
         await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
 
-        await pm.alertsPage.expectFrequencyCell(cronName, '*/10 * * * *');
+        await pm.alertsPage.expectFrequencyCell(cronName, '0 */10 * * * *');
         await pm.alertsPage.expectFrequencyCell(minsName, '10 Mins');
         await pm.alertsPage.expectFrequencyCell(rtName, '--');
         testLogger.info('Frequency cells render cron, minutes and realtime cadence correctly');
