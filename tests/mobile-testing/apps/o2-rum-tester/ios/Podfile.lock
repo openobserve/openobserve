@@ -31,7 +31,7 @@ PODS:
     - OpenObserveInternal (= 0.1.0)
   - OpenObserveRUM (0.1.0):
     - OpenObserveInternal (= 0.1.0)
-  - OpenObserveSDKReactNative (0.1.1):
+  - OpenObserveSDKReactNative (0.1.2):
     - OpenObserveCore (= 0.1.0)
     - OpenObserveCrashReporting (= 0.1.0)
     - OpenObserveFlags (= 0.1.0)
@@ -40,7 +40,7 @@ PODS:
     - OpenObserveTrace (= 0.1.0)
     - OpenObserveWebViewTracking (= 0.1.0)
     - React-Core
-  - OpenObserveSDKReactNativeSessionReplay (0.1.1):
+  - OpenObserveSDKReactNativeSessionReplay (0.1.2):
     - OpenObserveSDKReactNative
     - OpenObserveSessionReplay (= 0.1.0)
     - React-Core
@@ -1773,8 +1773,8 @@ SPEC CHECKSUMS:
   OpenObserveInternal: acea595df12eaf3f0f12c0adae897996e14ddace
   OpenObserveLogs: 8429fbe2da22e23440b2ea3c7bdcc45e5964471c
   OpenObserveRUM: afd9978cf063774b836df64ff221179488ac236a
-  OpenObserveSDKReactNative: b7f62a3b3940495c40b720d6ed1f12c7215b5173
-  OpenObserveSDKReactNativeSessionReplay: ec136fda6316dc244c39c9a88883a95dc7ce7141
+  OpenObserveSDKReactNative: 6b715c9e4e65becb28b57cdb82bfeaa65d6fe158
+  OpenObserveSDKReactNativeSessionReplay: a4cafa21c17081c836c6aadb829b02cf5a96d7ac
   OpenObserveSessionReplay: 23d7de49ce048640c7ebc25985ca5803f09880f7
   OpenObserveTrace: 4546a69405ed595f99f653b2c59cd5739a0b4547
   OpenObserveWebViewTracking: 03ad2b3362dea454274a6b234b0c87fdd3e47d9c
