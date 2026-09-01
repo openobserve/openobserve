@@ -55,7 +55,18 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
     let fetchResponse;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      fetchResponse = await post();
+      try {
+        fetchResponse = await post();
+      } catch (networkError) {
+        // A connect timeout / socket reset rejects before any status exists, so the
+        // status-based retries below never see it and beforeEach dies on a blip.
+        if (attempt === MAX_ATTEMPTS) throw networkError;
+        testLogger.warn(
+          `Ingestion request failed (${networkError.message}) — retrying (attempt ${attempt}/${MAX_ATTEMPTS})`
+        );
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+        continue;
+      }
 
       // The per-org cloud passcode can be rotated mid-session (another shard, or expiry).
       // The 401 leaves no data ingested and surfaces far away as "No dropdown options
@@ -90,7 +101,7 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
     ingestedStreams.add(ingestKey);
     return await fetchResponse.json();
   } catch (error) {
-    testLogger.error("Ingestion failed", { error });
+    testLogger.error("Ingestion failed", { error: error.message, cause: String(error.cause ?? '') });
     throw error;
   }
 };
