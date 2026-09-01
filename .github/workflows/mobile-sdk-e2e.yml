@@ -170,7 +170,7 @@ jobs:
     name: Decide platforms
     needs: preflight
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 5
     outputs:
       run_android: ${{ steps.d.outputs.run_android }}
       run_ios: ${{ steps.d.outputs.run_ios }}
@@ -252,7 +252,7 @@ jobs:
     needs: [preflight, decide]
     if: needs.decide.outputs.run_android == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
     permissions:
       actions: read
       contents: read
