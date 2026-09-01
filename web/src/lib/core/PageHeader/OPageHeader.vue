@@ -71,14 +71,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'contents'
       "
     >
-      <!-- max-md:min-w-24 is the floor that decides the mobile header's shape:
-           actions share this row while the title keeps 6rem (it truncates below
-           that), and only wrap once even that can't hold — so a page that keeps
-           its toolbar compact, with the rest behind #actions-overflow, stays on
-           one line. Without a floor min-w-0 lets this shrink towards nothing, so
-           the actions never wrap and overlap the title instead. -->
+      <!-- The min-w floor decides the mobile header's shape: flex-1 makes this
+           block basis-0, so the floor alone is what forces the actions to wrap
+           once they can't leave it this much room. 10rem when a back tile eats
+           into the block, 6rem otherwise — so a short list-page title still
+           shares its row with a full toolbar. -->
+      <!-- Wrap only when inline tabs need their own row; otherwise nowrap so
+           the title truncates BESIDE the back tile instead of under it. -->
       <div
-        class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-md:min-w-24 max-md:flex-wrap"
+        class="flex h-full min-w-0 flex-1 items-center gap-3.25"
+        :class="[
+          hasBack ? 'max-md:min-w-40' : 'max-md:min-w-24',
+          hasTabs && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
+        ]"
       >
         <slot name="title-prefix" />
 

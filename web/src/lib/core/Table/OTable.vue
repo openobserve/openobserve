@@ -27,6 +27,7 @@ import {
 } from "./OTable.types";
 
 import { useTableCore } from "./composables/useTableCore";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useTablePagination } from "./composables/useTablePagination";
 import { useTableSorting } from "./composables/useTableSorting";
 import { useTableSelection } from "./composables/useTableSelection";
@@ -92,6 +93,12 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
 
 const emit = defineEmits<OTableEmits<TData>>();
 const slots = defineSlots<OTableSlots<TData>>();
+
+// < md every table behaves as horizontalScroll: columns keep their natural
+// width and the extra ones are reached by scrolling WITHIN the table, instead
+// of being crushed until only the name column survives.
+const { isMobile: isMobileViewport } = useBreakpoint();
+const horizontalScrollOn = computed(() => !!props.horizontalScroll || isMobileViewport.value);
 
 // A row only gets the pointer cursor when it's actually interactive — i.e. the
 // parent listens for @row-click / @row-dblclick, or row-click toggles expansion.
@@ -808,7 +815,7 @@ provide("o2TableBoundedFill", hasBoundedFill);
 // is still absorbing the leftover the table fits, so a stray 1-2px scrollbar
 // from rounding must stay hidden.
 const allowHorizontalScroll = computed(() => {
-  if (props.horizontalScroll) return true;
+  if (horizontalScrollOn.value) return true;
   if (!hasFillColumn.value) return true;
   if (useComputedWidth.value) {
     if (containerWidth.value <= 0) return false;
@@ -992,6 +999,14 @@ const computedTableWidth = computed<string | undefined>(() => {
   // container → spacer grows (blank before the flush-right actions). Real
   // columns always get their exact width — no redistribution.
   return `${Math.max(containerWidth.value || 0, realSum())}px`;
+});
+
+// < md a fill-layout table refuses to crush its columns below their defined
+// sizes: their sum becomes the table's floor and the container scrolls.
+const mobileMinTableWidth = computed<string | undefined>(() => {
+  if (!isMobileViewport.value || props.horizontalScroll || props.defaultColumns) return undefined;
+  const sum = table.getVisibleLeafColumns().reduce((a, c) => a + c.getSize(), 0);
+  return sum > 0 ? `${sum}px` : undefined;
 });
 
 // Virtual measureElement callback — wraps the virtualizer's measure.
@@ -1280,6 +1295,7 @@ defineExpose({
             ...measuredColumnSizeVars,
             ...dynamicSizeVars,
             ...(computedTableWidth ? { width: computedTableWidth } : {}),
+            ...(mobileMinTableWidth ? { minWidth: mobileMinTableWidth } : {}),
             '--table-row-height':
               props.rowHeight != null
                 ? `${props.rowHeight}px`

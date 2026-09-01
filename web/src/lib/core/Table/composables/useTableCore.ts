@@ -67,26 +67,23 @@ export function useTableCore<TData>(
   // value is derived from the row's position so pages need not hand-roll a
   // `"#"` field in their data. Under server pagination we add the page offset
   // so numbering stays continuous across pages.
-  // < md: drop columns flagged hideBelowMd, and the auto index column — on a
-  // phone they only force the table into a horizontal scroll.
-  // Desktop column sizes (e.g. a 320px Name) also cap at 10rem there, so the
-  // surviving identity + actions columns fit a phone without a scroll.
-  const MOBILE_MAX_COL_SIZE = 160;
+  // < md the table scrolls horizontally within itself (see OTable's
+  // horizontalScrollOn), so every column stays available; only oversized
+  // identity columns are capped so the FIRST screen shows name + neighbours.
+  const MOBILE_MAX_COL_SIZE = 200;
   const { isMobile } = useBreakpoint();
   const responsiveColumns = computed<OTableColumnDef<TData>[]>(() => {
     if (!isMobile.value) return props.columns;
-    return props.columns
-      .filter((c) => !c.hideBelowMd)
-      .map((c) => {
-        if (c.isAction || c.id === "actions") return c;
-        if ((c.size ?? 0) <= MOBILE_MAX_COL_SIZE && (c.minSize ?? 0) <= MOBILE_MAX_COL_SIZE)
-          return c;
-        return {
-          ...c,
-          size: Math.min(c.size ?? MOBILE_MAX_COL_SIZE, MOBILE_MAX_COL_SIZE),
-          minSize: c.minSize != null ? Math.min(c.minSize, MOBILE_MAX_COL_SIZE) : c.minSize,
-        };
-      });
+    return props.columns.map((c) => {
+      if (c.isAction || c.id === "actions") return c;
+      if ((c.size ?? 0) <= MOBILE_MAX_COL_SIZE && (c.minSize ?? 0) <= MOBILE_MAX_COL_SIZE)
+        return c;
+      return {
+        ...c,
+        size: Math.min(c.size ?? MOBILE_MAX_COL_SIZE, MOBILE_MAX_COL_SIZE),
+        minSize: c.minSize != null ? Math.min(c.minSize, MOBILE_MAX_COL_SIZE) : c.minSize,
+      };
+    });
   });
 
   const indexColumn = computed<OTableColumnDef<TData> | null>(() => {
@@ -180,7 +177,9 @@ export function useTableCore<TData>(
   // cell's right padding, in px. Keep in sync with the token (0.75rem = 12px).
   const PAGE_EDGE_PX = 12;
   const actionColumnWidth = (actionCount?: number): number => {
-    const n = Math.max(1, Number(actionCount) || 2);
+    // < md rows collapse their inline action icons behind one overflow kebab,
+    // so the column budgets a single button there.
+    const n = isMobile.value ? 1 : Math.max(1, Number(actionCount) || 2);
     // Cell padding: px-2 is 8+8=16. When the actions column is the row's last
     // cell (no trailing spacer) the edge inset replaces its right padding with
     // the page-edge inset, so budget 8 + PAGE_EDGE_PX — exact, so the buttons
