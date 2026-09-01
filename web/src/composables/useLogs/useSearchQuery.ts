@@ -398,7 +398,7 @@ export const useSearchQuery = (t: TranslateFn) => {
       if (searchObj.meta.sqlMode == true) {
         return handleSqlMode(query, req, readOnly);
       } else {
-        return handleNonSqlMode(query, req);
+        return handleNonSqlMode(query, req, ignoreQuickMode);
       }
     } catch (e: any) {
       notificationMsg.value = t("search.errorConstructingSearchQuery");
@@ -502,7 +502,11 @@ export const useSearchQuery = (t: TranslateFn) => {
     return buildSearch(true);
   };
 
-  const handleNonSqlMode = (query: string, req: any): SearchRequestPayload | null => {
+  const handleNonSqlMode = (
+    query: string,
+    req: any,
+    ignoreQuickMode: boolean = false,
+  ): SearchRequestPayload | null => {
     const parseQuery = [query];
     let queryFunctions = "";
     let whereClause = "";
@@ -551,7 +555,7 @@ export const useSearchQuery = (t: TranslateFn) => {
     req.query.sql = req.query.sql.replace("[QUERY_FUNCTIONS]", queryFunctions.trim());
 
     if (searchObj.data.stream.selectedStream.length > 1) {
-      return handleMultiStream(req, whereClause);
+      return handleMultiStream(req, whereClause, ignoreQuickMode);
     } else {
       req.query.sql = req.query.sql.replace(
         "[INDEX_NAME]",
@@ -562,7 +566,33 @@ export const useSearchQuery = (t: TranslateFn) => {
     return finalizeRequest(req);
   };
 
-  const handleMultiStream = (req: any, whereClause: string): SearchRequestPayload | null => {
+  const armProjection = (stream: string, ignoreQuickMode: boolean): string => {
+    if (!searchObj.meta.quickMode || ignoreQuickMode) {
+      return "*";
+    }
+
+    const timestampCol = store.state.zoConfig.timestamp_column || "_timestamp";
+    const fields = searchObj.data.stream.interestingFieldList.filter((field: string) =>
+      searchObj.data.stream.selectedStreamFields.some(
+        (streamField: any) => streamField?.name === field && streamField?.streams?.includes(stream),
+      ),
+    );
+
+    if (fields.length === 0) {
+      return "*";
+    }
+
+    // A set operation is never rewritten by AddTimestampVisitor, so the arm must ask for _timestamp.
+    return [timestampCol, ...fields.filter((field: string) => field !== timestampCol)]
+      .map((field: string) => quoteSqlIdentifierIfNeeded(field))
+      .join(",");
+  };
+
+  const handleMultiStream = (
+    req: any,
+    whereClause: string,
+    ignoreQuickMode: boolean = false,
+  ): SearchRequestPayload | null => {
     let streams: any = searchObj.data.stream.selectedStream;
 
     if (whereClause.trim() != "") {
@@ -614,8 +644,10 @@ export const useSearchQuery = (t: TranslateFn) => {
         }
       }
 
-      // Arms stay wildcard: the backend injects _timestamp/_o2_id only for non-complex statements.
-      return finalQuery.replace("[FIELD_LIST]", `*, '${item}' as _stream_name`);
+      return finalQuery.replace(
+        "[FIELD_LIST]",
+        `${armProjection(item, ignoreQuickMode)}, '${item}' as _stream_name`,
+      );
     });
 
     if (arms.length === 0) {
