@@ -29,23 +29,6 @@ export interface TraceLocation {
   range?: TraceTimeRange;
 }
 
-// A found range can be a lower bound (`partial`), and span timestamps sit at
-// its very edges — pad before querying with it.
-export const TRACE_RANGE_PADDING_US = 60_000_000; // ±1 min
-
-/** The window to query a trace over: its indexed range padded, else the caller's. */
-export function traceQueryWindow(
-  range: TraceTimeRange | undefined,
-  fallbackStartUs: number,
-  fallbackEndUs: number,
-): { startTime: number; endTime: number } {
-  if (!range) return { startTime: fallbackStartUs, endTime: fallbackEndUs };
-  return {
-    startTime: range.start_time - TRACE_RANGE_PADDING_US,
-    endTime: range.end_time + TRACE_RANGE_PADDING_US,
-  };
-}
-
 // Probes look up a trace by id, but the caller's window is event-derived and
 // ingestion can lag it — widen like useRumSpanBuilder's RUM_TIME_BUFFER_US,
 // but generously: probes are `limit 1` point lookups, so the wider window is

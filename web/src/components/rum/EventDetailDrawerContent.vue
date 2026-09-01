@@ -445,9 +445,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { rumField, normalizeTraceId } from "@/utils/rum/fields";
-import useCorrelatedTracesStream, {
-  traceQueryWindow,
-} from "@/composables/rum/useCorrelatedTracesStream";
+import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
+import { traceQueryWindow } from "@/utils/rum/traceWindow";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";

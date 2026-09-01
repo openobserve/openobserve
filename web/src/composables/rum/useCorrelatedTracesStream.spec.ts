@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import useCorrelatedTracesStream, {
-  traceQueryWindow,
-  TRACE_RANGE_PADDING_US,
-} from "@/composables/rum/useCorrelatedTracesStream";
+import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
 import i18nInstance from "@/locales";
 const t = (i18nInstance.global as any).t;
 
@@ -520,18 +517,5 @@ describe("useCorrelatedTracesStream", () => {
       expect(await resolveTracesStream(T2, 1_000, 2_000)).toBe("payments_traces");
       expect(mockGetTraceTimeRanges).not.toHaveBeenCalled();
     });
-  });
-});
-
-describe("traceQueryWindow", () => {
-  it("pads an indexed range on both sides", () => {
-    expect(traceQueryWindow({ start_time: 1_000_000, end_time: 2_000_000 }, 7, 8)).toEqual({
-      startTime: 1_000_000 - TRACE_RANGE_PADDING_US,
-      endTime: 2_000_000 + TRACE_RANGE_PADDING_US,
-    });
-  });
-
-  it("falls back to the caller's window when there is no range", () => {
-    expect(traceQueryWindow(undefined, 7, 8)).toEqual({ startTime: 7, endTime: 8 });
   });
 });

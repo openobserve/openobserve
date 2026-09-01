@@ -220,9 +220,8 @@ import {
 } from "@/utils/rum/fields";
 import { formatTimeWithSuffix, formatLargeNumber, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import useCorrelatedTracesStream, {
-  traceQueryWindow,
-} from "@/composables/rum/useCorrelatedTracesStream";
+import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
+import { traceQueryWindow } from "@/utils/rum/traceWindow";
 import type { TraceTimeRange } from "@/services/traces";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

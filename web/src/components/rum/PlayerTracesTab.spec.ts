@@ -61,13 +61,9 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 // default stream and the pre-discovery tests keep their single-call shape;
 // individual tests override with per-id locations.
 const mockResolveTraceLocationsBulk = vi.fn().mockResolvedValue({});
-vi.mock("@/composables/rum/useCorrelatedTracesStream", async (importOriginal) => {
-  const actual: any = await importOriginal();
-  return {
-    ...actual,
-    default: () => ({ resolveTraceLocationsBulk: mockResolveTraceLocationsBulk }),
-  };
-});
+vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
+  default: () => ({ resolveTraceLocationsBulk: mockResolveTraceLocationsBulk }),
+}));
 
 // ---------------------------------------------------------------------------
 // Test data factories

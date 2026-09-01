@@ -92,13 +92,9 @@ const mockRelatedResources = [createMockResource(), createMockError()];
 // padded-navigation tests keep their `stream: "default"` shape and the ±10s
 // caller window; tests override for custom streams and ranges.
 const mockResolveTraceLocation = vi.fn().mockResolvedValue({ stream: "default" });
-vi.mock("@/composables/rum/useCorrelatedTracesStream", async (importOriginal) => {
-  const actual: any = await importOriginal();
-  return {
-    ...actual,
-    default: () => ({ resolveTraceLocation: mockResolveTraceLocation }),
-  };
-});
+vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
+  default: () => ({ resolveTraceLocation: mockResolveTraceLocation }),
+}));
 
 // ============================================================================
 // TEST HELPERS
