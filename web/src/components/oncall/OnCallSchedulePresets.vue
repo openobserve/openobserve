@@ -55,8 +55,6 @@
              name cannot: what applying this one actually builds. -->
         <OText variant="meta">{{ raw(chosen.description) }}</OText>
 
-        <OnCallPresetCoverage v-if="layers" :layers="layers" />
-
         <!-- One row per layer, in the priority order the schedule will hold
              them. A layer's people and its hours belong on one line: they are
              read together and, until this screen, were three stacked fields
@@ -347,7 +345,6 @@ import {
 } from "@/utils/oncall";
 
 import OnCallMemberPicker from "./OnCallMemberPicker.vue";
-import OnCallPresetCoverage from "./OnCallPresetCoverage.vue";
 import {
   WEEK_DAYS,
   dayName,

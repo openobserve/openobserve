@@ -168,7 +168,6 @@ const stubs = {
     emits: ["update:modelValue"],
     template: `<div class="member-picker" />`,
   },
-  OnCallPresetCoverage: { name: "OnCallPresetCoverage", template: "<div />" },
 };
 
 async function renderOpen(rotationCount = 0) {
