@@ -19,7 +19,7 @@ use arrow_schema::Field;
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_batch_size, get_config,
     meta::{
-        promql::{EXEMPLARS_LABEL, HASH_LABEL},
+        promql::{EXEMPLARS_LABEL, HASH_LABEL, STREAMING_AGG_TABLE_SUFFIX},
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, StreamType},
     },
@@ -51,7 +51,7 @@ use datafusion::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::WorkGroup;
 use vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::VortexSession};
-use vortex_datafusion::VortexFormat;
+use vortex_datafusion::{VortexFormat, VortexTableOptions};
 
 use super::{
     peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,
@@ -107,6 +107,11 @@ fn create_session_config(
             .options_mut()
             .execution
             .split_file_groups_by_statistics = true;
+        // a round-robin exchange would trade the chains' ordering for a re-sort
+        config
+            .options_mut()
+            .optimizer
+            .enable_round_robin_repartition = false;
     }
 
     // When set to true, skips verifying that the schema produced by planning the input of
@@ -514,17 +519,36 @@ pub async fn register_metrics_table(
     schema: Arc<Schema>,
     table_name: &str,
     files: Vec<FileKey>,
+    sort_order: FileSortOrder,
 ) -> Result<SessionContext> {
     let schema = metrics_query_schema(schema);
     let ctx = DataFusionContextBuilder::new()
         .trace_id(&session.id)
         .work_group(session.work_group.clone())
         .stream_type(StreamType::Metrics)
+        .sort_order(sort_order)
         .build(session.target_partitions)
         .await?;
 
+    let file_stat_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
+    // The ordered table is registered separately: declaring the ordering on the
+    // main table would split its scan into one file group per overlapping file,
+    // changing the unsorted path's partitioning.
+    if sort_order.is_sorted() {
+        let tables = TableBuilder::new()
+            .sort_order(sort_order)
+            .file_stat_cache(file_stat_cache.clone())
+            .build(session.clone(), files.clone(), schema.clone())
+            .await?;
+        let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
+        ctx.register_table(
+            format!("{table_name}{STREAMING_AGG_TABLE_SUFFIX}"),
+            union_table,
+        )?;
+    }
+
     let tables = TableBuilder::new()
-        .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
+        .file_stat_cache(file_stat_cache)
         .build(session.clone(), files, schema.clone())
         .await?;
     let union_table = Arc::new(NewUnionTable::new(schema, tables));
@@ -708,7 +732,14 @@ impl TableBuilder {
             FileFormat::Parquet => Arc::new(ParquetFormat::default()),
             FileFormat::Vortex => {
                 let vortex_session = VortexSession::default().with_tokio();
-                Arc::new(VortexFormat::new(vortex_session))
+                if self.sort_order.is_sorted() {
+                    // bands already parallelize; per-file spawned read-ahead only buys memory
+                    let mut options = VortexTableOptions::default();
+                    options.scan_concurrency = Some(1);
+                    Arc::new(VortexFormat::new_with_options(vortex_session, options))
+                } else {
+                    Arc::new(VortexFormat::new(vortex_session))
+                }
             }
         };
 
@@ -1481,7 +1512,9 @@ mod tests {
                 row_group_size: None,
             }];
 
-            let result = register_metrics_table(&session, schema, "test_table", files).await;
+            let result =
+                register_metrics_table(&session, schema, "test_table", files, FileSortOrder::None)
+                    .await;
 
             // Should create context successfully
             assert!(result.is_ok());

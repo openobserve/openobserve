@@ -20,6 +20,8 @@
 mod accumulator;
 mod eval;
 mod op;
+mod streaming;
 
 pub(crate) use eval::fused_range_agg;
 pub(crate) use op::FusedAggOp;
+pub(crate) use streaming::{FusedShape, StreamingSelector, streaming_fused_agg};

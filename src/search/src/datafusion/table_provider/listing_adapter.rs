@@ -16,17 +16,17 @@
 use std::sync::Arc;
 
 use arrow_schema::SchemaRef;
-use config::{TIMESTAMP_COL_NAME, get_config};
+use config::{TIMESTAMP_COL_NAME, get_config, meta::promql::HASH_LABEL};
 use datafusion::{
     catalog::{Session, TableProvider, memory::DataSourceExec},
-    common::Result,
+    common::{Result, ScalarValue},
     datasource::{
         TableType,
-        listing::{ListingTable, ListingTableConfig},
+        listing::{ListingTable, ListingTableConfig, PartitionedFile},
         physical_plan::{FileGroup, FileScanConfig},
     },
     execution::cache::cache_manager::FileStatisticsCache,
-    logical_expr::TableProviderFilterPushDown,
+    logical_expr::{Operator, TableProviderFilterPushDown},
     physical_plan::ExecutionPlan,
     prelude::Expr,
 };
@@ -141,16 +141,16 @@ impl TableProvider for ListingTableAdapter {
 
         // The files are sorted but DataFusion dropped the ordering (overlapping
         // files in one group): regroup them by statistics ourselves.
-        let regroup_order = (self.sort_order.is_sorted()
-            && parquet_exec.properties().output_ordering().is_none())
-        .then_some(self.sort_order);
+        let ordering_missing = parquet_exec.properties().output_ordering().is_none();
         let target_partitions = self.listing_table.options().target_partitions;
         let parquet_exec = handler_tantivy_index(
             &self.trace_id,
             state,
             parquet_exec,
-            regroup_order,
+            self.sort_order,
+            ordering_missing,
             target_partitions,
+            hash_interval(filters),
         );
 
         // if the index condition can remove filter, we can skip the config
@@ -190,8 +190,10 @@ fn handler_tantivy_index(
     trace_id: &str,
     state: &dyn Session,
     plan: Arc<dyn ExecutionPlan>,
-    regroup_order: Option<FileSortOrder>,
+    sort_order: FileSortOrder,
+    ordering_missing: bool,
     target_partitions: usize,
+    hash_range: Option<(u64, u64)>,
 ) -> Arc<dyn ExecutionPlan> {
     if let Some(data_source_exec) = plan.downcast_ref::<DataSourceExec>()
         && let Some(config) = data_source_exec
@@ -200,20 +202,34 @@ fn handler_tantivy_index(
     {
         let mut file_groups = config.file_groups.clone();
 
-        if let Some(sort_order) = regroup_order {
+        // prune before regrouping so ordered chains form from survivors only
+        if let Some(range) = hash_range {
+            let schema = config.file_source().table_schema().table_schema();
+            file_groups = prune_groups_by_hash_range(file_groups, schema, range);
+        }
+
+        // banded scans re-chain to the fewest chains: one task merges them all
+        let band_chains = hash_range.is_some() && sort_order.is_sorted();
+        let regroup = sort_order.is_sorted() && ordering_missing;
+        if band_chains || regroup {
             let schema = config.file_source().table_schema().table_schema();
             match sort_order.physical_ordering(schema) {
                 Some(ordering) => {
-                    match FileScanConfig::split_groups_by_statistics_with_target_partitions(
-                        schema,
-                        &file_groups,
-                        &ordering,
-                        target_partitions,
-                    ) {
+                    let split = if band_chains {
+                        FileScanConfig::split_groups_by_statistics(schema, &file_groups, &ordering)
+                    } else {
+                        FileScanConfig::split_groups_by_statistics_with_target_partitions(
+                            schema,
+                            &file_groups,
+                            &ordering,
+                            target_partitions,
+                        )
+                    };
+                    match split {
                         Ok(new_file_groups) => {
                             file_groups = new_file_groups;
                         }
-                        Err(e) if sort_order.is_timestamp_desc() => {
+                        Err(e) if regroup && sort_order.is_timestamp_desc() => {
                             // files are listed oldest first; reversing each group
                             // is the best effort approximation of `_timestamp DESC`
                             log::warn!(
@@ -275,7 +291,8 @@ fn handler_tantivy_index(
         let mut plan = Arc::new(DataSourceExec::new(Arc::new(config))) as Arc<dyn ExecutionPlan>;
         // skip repartitioning when the files were regrouped by statistics: the
         // groups already carry the ordering and there are plenty of them
-        if regroup_order.is_none()
+        if !regroup
+            && !band_chains
             && let Ok(Some(repartition_plan)) =
                 plan.repartitioned(target_partitions, state.config_options())
         {
@@ -284,6 +301,86 @@ fn handler_tantivy_index(
         return plan;
     }
     plan
+}
+
+/// The closed `__hash__` interval implied by the pushed-down scan filters.
+/// `None` when no hash bound is present (non-band scans).
+fn hash_interval(filters: &[Expr]) -> Option<(u64, u64)> {
+    let mut lo = 0u64;
+    let mut hi = u64::MAX;
+    let mut found = false;
+    for filter in filters {
+        let Expr::BinaryExpr(binary) = filter else {
+            continue;
+        };
+        let Expr::Column(column) = binary.left.as_ref() else {
+            continue;
+        };
+        if column.name != HASH_LABEL {
+            continue;
+        }
+        let Expr::Literal(ScalarValue::UInt64(Some(value)), _) = binary.right.as_ref() else {
+            continue;
+        };
+        match binary.op {
+            Operator::GtEq => lo = lo.max(*value),
+            Operator::Gt => lo = lo.max(value.saturating_add(1)),
+            Operator::LtEq => hi = hi.min(*value),
+            Operator::Lt => hi = hi.min(value.saturating_sub(1)),
+            Operator::Eq => {
+                lo = lo.max(*value);
+                hi = hi.min(*value);
+            }
+            _ => continue,
+        }
+        found = true;
+    }
+    found.then_some((lo, hi))
+}
+
+/// Keeps only files whose `__hash__` statistics may intersect `[lo, hi]`;
+/// files without usable statistics always survive.
+fn prune_groups_by_hash_range(
+    file_groups: Vec<FileGroup>,
+    schema: &arrow_schema::Schema,
+    (lo, hi): (u64, u64),
+) -> Vec<FileGroup> {
+    let Ok(hash_index) = schema.index_of(HASH_LABEL) else {
+        return file_groups;
+    };
+    let mut pruned: Vec<FileGroup> = file_groups
+        .into_iter()
+        .map(|group| {
+            FileGroup::new(
+                group
+                    .into_inner()
+                    .into_iter()
+                    .filter(|file| file_may_intersect(file, hash_index, lo, hi))
+                    .collect(),
+            )
+        })
+        .filter(|group| !group.is_empty())
+        .collect();
+    // a scan needs at least one (empty) partition
+    if pruned.is_empty() {
+        pruned.push(FileGroup::new(vec![]));
+    }
+    pruned
+}
+
+fn file_may_intersect(file: &PartitionedFile, hash_index: usize, lo: u64, hi: u64) -> bool {
+    let Some(statistics) = file.statistics.as_ref() else {
+        return true;
+    };
+    let Some(column) = statistics.column_statistics.get(hash_index) else {
+        return true;
+    };
+    match (column.min_value.get_value(), column.max_value.get_value()) {
+        (Some(ScalarValue::UInt64(Some(min))), Some(ScalarValue::UInt64(Some(max)))) => {
+            *max >= lo && *min <= hi
+        }
+        _ => true,
+    }
 }
 
 #[cfg(test)]
@@ -324,6 +421,111 @@ mod tests {
     }
 
     /// Write one file whose rows are ordered by (__hash__, _timestamp).
+    #[test]
+    fn test_hash_interval_extraction() {
+        use datafusion::prelude::{col, lit};
+        let ge = col(HASH_LABEL).gt_eq(lit(5u64));
+        let le = col(HASH_LABEL).lt_eq(lit(9u64));
+        assert_eq!(hash_interval(&[ge.clone(), le.clone()]), Some((5, 9)));
+        assert_eq!(hash_interval(&[ge]), Some((5, u64::MAX)));
+        assert_eq!(hash_interval(&[le]), Some((0, 9)));
+        assert_eq!(
+            hash_interval(&[col(HASH_LABEL).gt(lit(5u64)), col(HASH_LABEL).lt(lit(9u64))]),
+            Some((6, 8))
+        );
+        assert_eq!(
+            hash_interval(&[col(HASH_LABEL).eq(lit(7u64))]),
+            Some((7, 7))
+        );
+        // other columns, non-u64 literals, and unrelated ops leave no interval
+        assert_eq!(hash_interval(&[col("other").gt_eq(lit(5u64))]), None);
+        assert_eq!(hash_interval(&[col(HASH_LABEL).gt_eq(lit("5"))]), None);
+        assert_eq!(hash_interval(&[]), None);
+    }
+
+    #[tokio::test]
+    async fn test_scan_prunes_files_outside_hash_interval() {
+        let dir = tempfile::tempdir().unwrap();
+        write_hash_sorted_file(
+            dir.path(),
+            "a.parquet",
+            &[(1, 10), (3, 20)],
+            FileFormat::Parquet,
+        )
+        .await;
+        write_hash_sorted_file(
+            dir.path(),
+            "b.parquet",
+            &[(5, 10), (7, 20)],
+            FileFormat::Parquet,
+        )
+        .await;
+        write_hash_sorted_file(
+            dir.path(),
+            "c.parquet",
+            &[(9, 10), (11, 20)],
+            FileFormat::Parquet,
+        )
+        .await;
+
+        let sort_order = FileSortOrder::HashTimestampAsc;
+        let ctx = DataFusionContextBuilder::new()
+            .trace_id("test_hash_prune")
+            .sort_order(sort_order)
+            .build(2)
+            .await
+            .unwrap();
+        let listing_options = ListingOptions::new(Arc::new(ParquetFormat::default()))
+            .with_target_partitions(2)
+            .with_collect_stat(true)
+            .with_file_sort_order(vec![sort_order.logical_sort_exprs()]);
+        let url = ListingTableUrl::parse(format!("file://{}/", dir.path().display())).unwrap();
+        let config = ListingTableConfig::new(url)
+            .with_listing_options(listing_options)
+            .with_schema(hash_sorted_schema());
+        let table = ListingTableAdapter::try_new(
+            config,
+            "test_hash_prune".to_string(),
+            sort_order,
+            None,
+            vec![],
+            None,
+        )
+        .unwrap();
+        ctx.register_table("t", Arc::new(table)).unwrap();
+
+        let plan = ctx
+            .state()
+            .create_logical_plan(&format!(
+                "SELECT * FROM t WHERE {HASH_LABEL} >= 5 AND {HASH_LABEL} <= 7 ORDER BY {}",
+                sort_order.order_by_clause().unwrap()
+            ))
+            .await
+            .unwrap();
+        let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+        let display = displayable(physical_plan.as_ref()).indent(true).to_string();
+        assert!(
+            display.contains("b.parquet") && !display.contains("a.parquet"),
+            "expected only the intersecting file in the scan, got:\n{display}"
+        );
+        assert!(!display.contains("c.parquet"), "got:\n{display}");
+
+        let batches = collect(physical_plan, ctx.task_ctx()).await.unwrap();
+        let hashes: Vec<u64> = batches
+            .iter()
+            .flat_map(|batch| {
+                batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<UInt64Array>()
+                    .unwrap()
+                    .values()
+                    .to_vec()
+            })
+            .collect();
+        assert_eq!(hashes, vec![5, 7]);
+    }
+
     async fn write_hash_sorted_file(
         dir: &std::path::Path,
         name: &str,
