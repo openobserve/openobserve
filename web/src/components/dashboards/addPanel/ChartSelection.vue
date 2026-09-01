@@ -16,12 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="h-full">
-    <!-- < md the two-column grid spreads into a wrapping icon grid across
-         the full width — every chart type stays visible without a scroller. -->
+    <!-- < md the chart picker is ONE horizontal strip that scrolls within
+         itself — a wrapped grid ate a third of the phone screen before the
+         query builder even started. -->
     <div class="w-25 p-0 max-md:w-full">
-      <ul class="m-0 flex list-none flex-wrap p-0 max-md:justify-center">
+      <ul class="m-0 flex list-none flex-wrap p-0 max-md:flex-nowrap max-md:overflow-x-auto">
         <li
-          class="w-12.5"
+          class="w-12.5 max-md:shrink-0"
           v-for="(item, index) in ChartsArray"
           :key="index"
           :class="[

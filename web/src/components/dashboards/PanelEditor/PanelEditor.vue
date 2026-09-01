@@ -37,9 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="mainContentContainerClass"
         :style="mainContentContainerStyle"
       >
-        <!-- Collapsed field list bar -->
+        <!-- Collapsed field list bar (< md the fields drawer replaces it) -->
         <div
-          v-if="!dashboardPanelData.layout.showFieldList"
+          v-if="!dashboardPanelData.layout.showFieldList && !isMobile"
           class="bg-surface-panel! border-border-default flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start overflow-y-auto border-r"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div :class="fieldListWrapperClass">
               <div
-                v-if="dashboardPanelData.layout.showFieldList"
+                v-if="dashboardPanelData.layout.showFieldList && !isMobile"
                 class="bg-surface-panel! flex flex-col"
                 :style="fieldListContainerStyle"
               >
@@ -95,6 +95,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @scroll.passive="onBuilderScroll"
               >
                 <div class="flex h-full w-full flex-col" :style="layoutPanelContainerStyle">
+                  <!-- < md fields are added from a drawer; this is its opener. -->
+                  <div
+                    v-if="isMobile"
+                    class="border-border-default flex items-center border-b px-2 py-1.5"
+                  >
+                    <OButton
+                      variant="outline"
+                      size="sm"
+                      icon-left="add"
+                      data-test="panel-editor-mobile-fields-btn"
+                      @click="mobileFieldsOpen = true"
+                    >
+                      {{ t("panel.fields") }}
+                    </OButton>
+                  </div>
                   <!-- Mode selection + Add To Dashboard row. Skip when empty (e.g.
                        dashboard mode) so its `my-2` margin isn't dead space. -->
                   <div
@@ -398,9 +413,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex"
         :style="{ height: contentHeight, flex: 1, overflow: 'hidden' }"
       >
-        <!-- Collapsed field list bar for custom chart -->
+        <!-- Collapsed field list bar for custom chart (< md the drawer replaces it) -->
         <div
-          v-if="!dashboardPanelData.layout.showFieldList"
+          v-if="!dashboardPanelData.layout.showFieldList && !isMobile"
           class="bg-surface-panel! border-border-default flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start overflow-y-auto border-r"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
@@ -424,7 +439,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :before-class="fieldListPaneClass"
           :disable="!dashboardPanelData.layout.showFieldList"
           :style="{
-            width: dashboardPanelData.layout.showFieldList ? '100%' : 'calc(100% - 3.125rem)',
+            width:
+              dashboardPanelData.layout.showFieldList || isMobile
+                ? '100%'
+                : 'calc(100% - 3.125rem)',
             height: '100%',
           }"
           separatorClass="field-list-separator"
@@ -445,7 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div :class="fieldListWrapperClass">
               <div
-                v-if="dashboardPanelData.layout.showFieldList"
+                v-if="dashboardPanelData.layout.showFieldList && !isMobile"
                 class="bg-surface-panel! flex flex-col"
                 :style="fieldListContainerStyle"
               >
@@ -463,6 +481,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :style="{ height: contentHeight, overflow: 'hidden' }"
             >
               <div class="scroll flex h-full min-w-0 flex-1 flex-col">
+                <!-- < md fields open in the drawer instead of the splitter pane. -->
+                <div
+                  v-if="isMobile"
+                  class="border-border-default flex items-center border-b px-2 py-1.5"
+                >
+                  <OButton
+                    variant="outline"
+                    size="sm"
+                    icon-left="add"
+                    data-test="panel-editor-mobile-fields-btn"
+                    @click="mobileFieldsOpen = true"
+                  >
+                    {{ t("panel.fields") }}
+                  </OButton>
+                </div>
                 <!-- Editor/Preview splitter -->
                 <div class="h-125 shrink-0 overflow-hidden">
                   <OSplitter
@@ -608,6 +641,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <!-- < md field list drawer: stays open across adds so several fields can
+         be placed on the axes in one visit. -->
+    <ODrawer
+      v-if="isMobile"
+      v-model:open="mobileFieldsOpen"
+      side="left"
+      size="sm"
+      bleed
+      :title="t('panel.fields')"
+      data-test="panel-editor-mobile-fields-drawer"
+    >
+      <div class="flex h-full min-h-0 flex-col">
+        <PanelFieldList :editMode="editMode" frameless @collapse="mobileFieldsOpen = false" />
+      </div>
+    </ODrawer>
+
     <!-- Legends Dialog -->
     <ShowLegendsPopup
       v-model:open="showLegendsDialog"
@@ -662,6 +711,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type OverrideConfigComponent from "@/components/dashboards/addPanel/OverrideConfig.vue";
 
@@ -825,6 +875,7 @@ const {
 // in), and expanding it opens at ~half width — the desktop 20% splitter is
 // unusable on a phone.
 const { isMobile } = useBreakpoint();
+const mobileFieldsOpen = ref(false);
 const MOBILE_FIELD_SPLITTER = 45;
 const collapseFieldList = (): void => {
   baseCollapseFieldList();
@@ -1013,10 +1064,11 @@ const splitterLimits = computed<[number, number]>(() => {
   return [0, 20];
 });
 
-// Splitter style
+// Splitter style (< md there is no collapsed bar to reserve width for)
 const splitterStyle = computed(() => {
   return {
-    width: dashboardPanelData.layout.showFieldList ? "100%" : "calc(100% - 3.125rem)",
+    width:
+      dashboardPanelData.layout.showFieldList || isMobile.value ? "100%" : "calc(100% - 3.125rem)",
     height: "100%",
   };
 });
