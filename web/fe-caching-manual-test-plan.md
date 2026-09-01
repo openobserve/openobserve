@@ -1251,6 +1251,10 @@ exists"*. For bulk seeding use **scheduled** pipelines (`source.source_type: "sc
 
 **Browser-verified with 24 pipelines (3 realtime + 21 scheduled), after the fix:**
 
+> ⚠️ The counts below are **as measured at the time** (24 pipelines: 3 realtime + 21 scheduled).
+> Seed data has grown since, so a re-run will show different totals — check that the tab counts
+> still **add up** (realtime + scheduled = all), not that they match these exact numbers.
+
 | # | Check | Result |
 | --- | --- | --- |
 | C1 | Cold read | ✅ **1** request — `GET /api/{org}/pipelines`. Rows render immediately, **no tab click needed** (this is the #21 regression check) |
