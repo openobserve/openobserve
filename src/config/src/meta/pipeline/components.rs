@@ -217,6 +217,10 @@ pub struct Edge {
     pub source: String,
     /// Target node id (data flows to this node)
     pub target: String,
+    /// Which output handle of the source node this edge leaves from, for multi-output
+    /// nodes such as Branch. Absent on every pre-existing edge, so it must not serialize.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_handle: Option<String>,
 }
 
 impl MemorySize for Edge {
@@ -225,13 +229,30 @@ impl MemorySize for Edge {
             + self.id.mem_size()
             + self.source.mem_size()
             + self.target.mem_size()
+            + self.source_handle.mem_size()
     }
 }
 
 impl Edge {
     pub fn new(source: String, target: String) -> Self {
         let id = format!("e{source}-{target}");
-        Self { id, source, target }
+        Self {
+            id,
+            source,
+            target,
+            source_handle: None,
+        }
+    }
+
+    pub fn new_with_handle(source: String, target: String, source_handle: String) -> Self {
+        // handle is part of the id so two arms of one branch to the same target stay distinct
+        let id = format!("e{source}-{target}-{source_handle}");
+        Self {
+            id,
+            source,
+            target,
+            source_handle: Some(source_handle),
+        }
     }
 }
 
@@ -247,6 +268,11 @@ pub enum NodeData {
     LlmEvaluation(LlmEvaluationParams),
     WorkflowTrigger,
     Destination(WorkflowDestination),
+    Branch(BranchParams),
+    // A node type written by a newer node. Without this the whole workflow fails to
+    // deserialize, and the list path's `try_into()?` then fails every other row too.
+    #[serde(other)]
+    Unsupported,
 }
 
 impl MemorySize for NodeData {
@@ -261,6 +287,8 @@ impl MemorySize for NodeData {
                 NodeData::LlmEvaluation(llm_evaluation_params) => llm_evaluation_params.mem_size(),
                 NodeData::WorkflowTrigger => 0, // no sub-members
                 NodeData::Destination(dest) => dest.mem_size(),
+                NodeData::Branch(branch_params) => branch_params.mem_size(),
+                NodeData::Unsupported => 0, // no sub-members
             }
     }
 }
@@ -285,6 +313,7 @@ impl NodeData {
                 | Self::Function(_)
                 | Self::Condition(_)
                 | Self::Destination(_)
+                | Self::Branch(_)
         )
     }
 
@@ -452,6 +481,41 @@ impl MemorySize for LlmEvaluationParams {
             + self.name.mem_size()
             + self.scorers.iter().map(|s| s.mem_size()).sum::<usize>()
             + self.input_mapping.mem_size()
+    }
+}
+
+/// One arm of a Branch node: records matching `conditions` leave via `handle`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+pub struct BranchCase {
+    pub handle: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    pub conditions: ConditionParams,
+}
+
+impl MemorySize for BranchCase {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<BranchCase>()
+            + self.handle.mem_size()
+            + self.label.mem_size()
+            + self.conditions.mem_size()
+    }
+}
+
+/// Exclusive router: cases are evaluated top-down and the first match wins.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
+pub struct BranchParams {
+    #[serde(default)]
+    pub cases: Vec<BranchCase>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub else_handle: Option<String>,
+}
+
+impl MemorySize for BranchParams {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<BranchParams>()
+            + self.cases.iter().map(|c| c.mem_size()).sum::<usize>()
+            + self.else_handle.mem_size()
     }
 }
 
@@ -1190,5 +1254,98 @@ mod tests {
     #[test]
     fn test_default_sampling_rate() {
         assert!((default_sampling_rate() - 0.01).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_edge_without_source_handle_round_trips_byte_identical() {
+        let stored = r#"{"id":"esource-1-target-2","source":"source-1","target":"target-2"}"#;
+        let edge: Edge = serde_json::from_str(stored).unwrap();
+
+        assert_eq!(edge.source_handle, None);
+        assert_eq!(serde_json::to_string(&edge).unwrap(), stored);
+    }
+
+    #[test]
+    fn test_edge_with_source_handle_deserializes_and_serializes() {
+        let stored = r#"{"id":"ebranch-1-target-2-true","source":"branch-1","target":"target-2","source_handle":"true"}"#;
+        let edge: Edge = serde_json::from_str(stored).unwrap();
+
+        assert_eq!(edge.source_handle.as_deref(), Some("true"));
+        assert_eq!(serde_json::to_string(&edge).unwrap(), stored);
+    }
+
+    #[test]
+    fn test_edge_new_keeps_legacy_id_and_no_handle() {
+        let edge = Edge::new("a".to_string(), "b".to_string());
+
+        assert_eq!(edge.id, "ea-b");
+        assert_eq!(edge.source_handle, None);
+    }
+
+    #[test]
+    fn test_edge_new_with_handle_ids_do_not_collide() {
+        let true_edge = Edge::new_with_handle("a".to_string(), "b".to_string(), "true".to_string());
+        let false_edge =
+            Edge::new_with_handle("a".to_string(), "b".to_string(), "false".to_string());
+
+        assert_ne!(true_edge.id, false_edge.id);
+        assert_eq!(true_edge.source_handle.as_deref(), Some("true"));
+        assert_eq!(false_edge.source_handle.as_deref(), Some("false"));
+        assert_eq!(true_edge.source, "a");
+        assert_eq!(true_edge.target, "b");
+    }
+
+    #[test]
+    fn test_branch_is_workflow_node_but_not_pipeline_node() {
+        let branch = NodeData::Branch(BranchParams {
+            cases: vec![BranchCase {
+                handle: "case_0".to_string(),
+                label: None,
+                conditions: ConditionParams::V1 {
+                    conditions: ConditionList::LegacyConditions(vec![]),
+                },
+            }],
+            else_handle: Some("else".to_string()),
+        });
+
+        assert!(branch.is_workflow_node());
+        assert!(!branch.is_pipeline_node());
+        assert!(!branch.is_a_leaf_node());
+    }
+
+    #[test]
+    fn test_branch_node_data_deserializes_from_json() {
+        let data = json::json!({
+            "node_type": "branch",
+            "cases": [{
+                "handle": "case_0",
+                "label": "high severity",
+                "conditions": {
+                    "conditions": {"and": [{"column": "severity", "operator": "=", "value": "high"}]}
+                }
+            }],
+            "else_handle": "else"
+        });
+
+        let node: NodeData = json::from_value(data).unwrap();
+        let NodeData::Branch(params) = node else {
+            panic!("`node_type: branch` must deserialize as NodeData::Branch");
+        };
+        assert_eq!(params.cases.len(), 1);
+        assert_eq!(params.cases[0].handle, "case_0");
+        assert_eq!(params.cases[0].label.as_deref(), Some("high severity"));
+        assert_eq!(params.else_handle.as_deref(), Some("else"));
+    }
+
+    #[test]
+    fn unknown_node_type_decodes_to_unsupported_and_is_not_a_workflow_node() {
+        let data = json::json!({ "node_type": "some_future_node", "whatever": 1 });
+        let node: NodeData = json::from_value(data).unwrap();
+
+        assert!(matches!(node, NodeData::Unsupported));
+        // Re-serializing Unsupported REWRITES the newer node's data, so it must never
+        // reach a save path — every allowlist has to reject it.
+        assert!(!node.is_workflow_node());
+        assert!(!node.is_pipeline_node());
     }
 }

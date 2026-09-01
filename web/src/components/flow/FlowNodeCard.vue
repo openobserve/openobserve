@@ -26,6 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ioType        — input | default | output (drives handle colour class)
     hasInput / hasOutput — whether to render the target / source handle
     inputPosition / outputPosition — handle sides (default top / bottom)
+    outputHandles — optional list of source handles ({ id }), in render order,
+                    for fan-out nodes (workflow Branch: true/false, N-way
+                    Switch). Omitted/empty keeps the single id="output" handle.
 
   Slots: #body (the node's label/content), #actions (hover buttons), #footer
   (extra affordances under the card). The shared node typography (15px / bold /
@@ -33,8 +36,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   and both canvases render identically.
   Native @click / @mouseenter / @mouseleave fall through to the root element.
 
-  Emits: outputClick — the source handle was clicked (Pipelines uses it to open
-  the "add next step" picker; see the connect-on-click note in PipelineFlow).
+  Emits: outputClick — the source handle was clicked, with the handle's id
+  (Pipelines uses it to open the "add next step" picker; see the
+  connect-on-click note in PipelineFlow).
 
   Card background/border colour comes from the VueFlow node wrapper
   (`.vue-flow__node-<ioType>`) styled by each flow, and the handle look from the
@@ -72,15 +76,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Clicking the source dot is the "add next step" affordance (Pipelines).
          Emitted rather than handled here so this stays presentational; a canvas
-         that does not listen keeps the plain handle. -->
+         that does not listen keeps the plain handle.
+         VueFlow pins every handle of one side at the same 50% offset, so a fan-out
+         node's arms would render on top of each other and only the last would be
+         hittable — `--fnc-handle-offset` (the dynamic-CSS-var pattern) moves each
+         one along the card's edge. -->
     <Handle
-      v-if="hasOutput"
-      id="output"
+      v-for="(h, i) in sourceHandles"
+      :id="h.id"
+      :key="h.id"
       type="source"
       :position="outputPosition"
-      :class="handleClass"
+      :class="[handleClass, spread ? spreadClass : '']"
+      :style="spread ? { '--fnc-handle-offset': handleOffset(i) } : undefined"
       :data-test="outputHandleTest"
-      @click.stop="emit('outputClick', $event)"
+      @click.stop="emit('outputClick', $event, h.id)"
     />
 
     <!-- hover actions (delete, etc.) supplied by the wrapper -->
@@ -102,6 +112,7 @@ const props = withDefaults(
     ioType?: string;
     hasInput?: boolean;
     hasOutput?: boolean;
+    outputHandles?: { id: string }[];
     inputPosition?: Position;
     outputPosition?: Position;
     inputHandleTest?: string;
@@ -112,6 +123,7 @@ const props = withDefaults(
     ioType: "default",
     hasInput: true,
     hasOutput: true,
+    outputHandles: undefined,
     inputPosition: Position.Top,
     outputPosition: Position.Bottom,
     inputHandleTest: undefined,
@@ -121,7 +133,25 @@ const props = withDefaults(
 
 // Click on the source (output) handle — the wrapper decides what it means. The
 // event travels with it so the wrapper can anchor a popover at the click.
-const emit = defineEmits<{ (e: "outputClick", event: MouseEvent): void }>();
+const emit = defineEmits<{ (e: "outputClick", event: MouseEvent, handleId: string): void }>();
+
+// Pipelines (and every single-output workflow node) pass no `outputHandles`, and
+// must keep the one id="output" handle they have always rendered.
+const sourceHandles = computed(() =>
+  props.hasOutput ? (props.outputHandles?.length ? props.outputHandles : [{ id: "output" }]) : [],
+);
 
 const handleClass = computed(() => `node_handle_custom handle_${props.ioType || "default"}`);
+
+// Single-output nodes (every pipeline node) keep VueFlow's centred handle untouched.
+const spread = computed(() => sourceHandles.value.length > 1);
+// Which edge the offset runs along: a left/right handle column spreads vertically.
+const spreadClass = computed(() =>
+  props.outputPosition === Position.Left || props.outputPosition === Position.Right
+    ? "top-[var(--fnc-handle-offset)]!"
+    : "left-[var(--fnc-handle-offset)]!",
+);
+// (i+1)/(n+1) keeps every arm strictly inside the card, so more paths narrow the gap rather than overflow.
+const handleOffset = (index: number) =>
+  `${((index + 1) * 100) / (sourceHandles.value.length + 1)}%`;
 </script>

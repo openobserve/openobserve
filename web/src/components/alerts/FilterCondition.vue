@@ -261,8 +261,14 @@ const filterColumns = (val: string) => {
     filteredFields.value = base;
   } else {
     const value = val.toLowerCase();
+    // Match the label too: workflow fields display dotted (`meta.alert_name`) but store
+    // flattened (`meta_alert_name`), so value-only matching finds nothing for what's shown.
     filteredFields.value = base.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
+      (column: any) =>
+        column.value.toLowerCase().indexOf(value) > -1 ||
+        String(column.label ?? "")
+          .toLowerCase()
+          .indexOf(value) > -1,
     );
   }
 };

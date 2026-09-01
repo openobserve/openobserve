@@ -88,6 +88,4 @@ export const ALERT_PAYLOAD_FIELDS: WorkflowFieldOption[] = [
   { label: raw("meta.org_id"), value: "meta_org_id", type: "Utf8" },
   { label: raw("meta.alert_start_time"), value: "meta_alert_start_time", type: "Utf8" },
   { label: raw("meta.alert_end_time"), value: "meta_alert_end_time", type: "Utf8" },
-  { label: raw("meta.alert_trigger_time"), value: "meta_alert_trigger_time", type: "Utf8" },
-  { label: raw("meta.alert_url"), value: "meta_alert_url", type: "Utf8" },
 ];

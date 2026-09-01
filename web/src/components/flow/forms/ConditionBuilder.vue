@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :group="conditionGroup"
           :depth="0"
           name-prefix="conditions"
-          condition-input-width="w-[8.125rem]"
+          condition-input-width="w-[11.25rem]"
           :allow-custom-columns="allowCustomColumns"
           :indent-rem="0.625"
           :module="module"

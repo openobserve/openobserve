@@ -161,6 +161,37 @@ describe("FlowEdge.vue", () => {
     });
   });
 
+  describe("branch path label (label prop)", () => {
+    const chip = (w: any) => w.find('[data-test="workflow-edge-label"]');
+
+    it("renders no label by default (pipelines opt out)", () => {
+      wrapper = createWrapper();
+      expect(chip(wrapper).exists()).toBe(false);
+    });
+
+    it("renders no label for an empty label (a non-branch edge)", () => {
+      wrapper = createWrapper({ label: "" });
+      expect(chip(wrapper).exists()).toBe(false);
+    });
+
+    it("renders the label text when one is supplied", () => {
+      wrapper = createWrapper({ label: "Severe (>=1000)" });
+      expect(chip(wrapper).exists()).toBe(true);
+      expect(chip(wrapper).text()).toBe("Severe (>=1000)");
+    });
+
+    it("exposes the full text as a title so a truncated label stays readable", () => {
+      const long = "Severe breach over one thousand requests per second sustained";
+      wrapper = createWrapper({ label: long });
+      expect(chip(wrapper).attributes("title")).toBe(long);
+    });
+
+    it("positions the label from the bezier midpoint via the shared CSS var", () => {
+      wrapper = createWrapper({ label: "Moderate", sourceX: 10, sourceY: 20 });
+      expect(chip(wrapper).attributes("style")).toContain("--wf-edge-mid");
+    });
+  });
+
   describe("edge cases", () => {
     it("renders when source and target positions are the same", () => {
       wrapper = createWrapper({ sourcePosition: "bottom", targetPosition: "bottom" });

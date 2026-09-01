@@ -46,6 +46,7 @@ vi.mock("vue-router", () => ({
 const {
   triggerSubmit,
   conditionSubmit,
+  branchSubmit,
   functionSubmit,
   destinationSubmit,
   functionIsDirty,
@@ -55,6 +56,7 @@ const {
 } = vi.hoisted(() => ({
   triggerSubmit: vi.fn(),
   conditionSubmit: vi.fn(),
+  branchSubmit: vi.fn(),
   functionSubmit: vi.fn(),
   destinationSubmit: vi.fn(),
   functionIsDirty: vi.fn(() => false),
@@ -75,6 +77,9 @@ vi.mock("@/plugins/workflows/nodes/WorkflowTrigger.vue", () =>
 );
 vi.mock("@/plugins/workflows/nodes/WorkflowCondition.vue", () =>
   makeBodyStub("WorkflowCondition", () => conditionSubmit()),
+);
+vi.mock("@/plugins/workflows/nodes/WorkflowBranch.vue", () =>
+  makeBodyStub("WorkflowBranch", () => branchSubmit()),
 );
 vi.mock("@/plugins/workflows/nodes/WorkflowFunction.vue", () =>
   makeBodyStub(
@@ -110,7 +115,12 @@ import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
-import useWorkflowCanvas, { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
+import useWorkflowCanvas, {
+  workflowObj,
+  setNodeEditedInput,
+  clearNodeEditedInput,
+} from "@/plugins/workflows/useWorkflowCanvas";
+import workflowService from "@/services/workflows";
 
 const t = (k: string, v?: any) => i18n.global.t(k, v ?? {});
 
@@ -266,6 +276,7 @@ describe("WorkflowNodeDrawer", () => {
     it.each([
       ["workflow_trigger", "WorkflowTrigger"],
       ["condition", "WorkflowCondition"],
+      ["branch", "WorkflowBranch"],
       ["function", "WorkflowFunction"],
       ["destination", "WorkflowDestination"],
     ])("renders the %s body form", (nodeType, testId) => {
@@ -312,13 +323,46 @@ describe("WorkflowNodeDrawer", () => {
       await nextTick();
       expect(body(wrapper).classes()).not.toContain("p-4");
     });
+
+    // Branch is an IO node like the rest: it gets the Input/Output panes and owns
+    // its own insets, so the fallback padding must NOT apply to it.
+    it("treats branch as an IO node (three-pane layout, no fallback padding)", () => {
+      stageNode("branch");
+      wrapper = mountDrawer();
+      expect(wrapper.find('[data-test="workflow-ndv-body"]').classes()).not.toContain("p-4");
+      expect(wrapper.find('[data-test="WorkflowBranch"]').exists()).toBe(true);
+    });
+
+    // The whole point of the config body: closing the panel commits { cases,
+    // else_handle } onto the node, which is what makes the Branch publishable.
+    it("commits the branch body's { cases, else_handle } payload onto the node", async () => {
+      const node = stageNode("branch", { isEdit: true });
+      const cases = [
+        {
+          handle: "case-0",
+          label: "high",
+          conditions: { version: 2, conditions: { filterType: "group" } },
+        },
+        { handle: "case-1", conditions: { version: 2, conditions: { filterType: "group" } } },
+      ];
+      branchSubmit.mockReturnValue({ cases, else_handle: "else" });
+      wrapper = mountDrawer();
+
+      await wrapper.find(".btn-close").trigger("click");
+      await flushPromises();
+
+      expect(branchSubmit).toHaveBeenCalled();
+      const saved = workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === node.id);
+      expect(saved.data.cases).toEqual(cases);
+      expect(saved.data.else_handle).toBe("else");
+    });
   });
 
   // ONE container for every node, run or not: the NDV dialog. The old per-type side
   // drawer is gone, so a step looks the same whether you are building it or
   // inspecting a run of it.
   describe("container: always the NDV dialog", () => {
-    it.each(["condition", "function", "destination", "workflow_trigger"])(
+    it.each(["condition", "branch", "function", "destination", "workflow_trigger"])(
       "uses the NDV dialog for an untested %s (never a side drawer)",
       (nodeType) => {
         stageNode(nodeType, { isEdit: true });
@@ -820,6 +864,174 @@ describe("WorkflowNodeDrawer", () => {
     });
   });
 
+  // ── A run that stored NO per-node data at all ─────────────────────────────
+  // Distinct from "this node was added after the run": there the graph really has
+  // changed, here the run simply has nothing stored (predates persistence, or the
+  // 30-day sweep removed it). Saying "not included in this run" about EVERY node
+  // of a Success run states something false about the graph.
+  describe("a run with no stored step data", () => {
+    const stageEmptyRun = (runId = "run-empty") => {
+      workflowObj.readOnly = true;
+      workflowObj.currentSelectedWorkflow.id = "wf-1";
+      workflowObj.testRun.result = {
+        errors: {},
+        inputs: {},
+        outputs: {},
+        ranNodeIds: [],
+        blockedNodeIds: [],
+        mode: "history",
+        runId,
+      } as any;
+    };
+
+    afterEach(() => {
+      workflowObj.readOnly = false;
+      workflowObj.testRun.result = null;
+    });
+
+    it("does not claim the step is missing from the graph", async () => {
+      stageEmptyRun();
+      stageNode("function", { isEdit: true, id: "fn-1" });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="workflow-ndv-not-in-run"]').exists()).toBe(false);
+    });
+
+    it("says the run stored no step data", async () => {
+      stageEmptyRun();
+      stageNode("function", { isEdit: true, id: "fn-1" });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="workflow-ndv-no-run-data"]').exists()).toBe(true);
+    });
+
+    it("still flags a node genuinely absent from a run that DID store data", async () => {
+      stageEmptyRun();
+      workflowObj.testRun.result.inputs = { "other-node": [{ a: 1 }] };
+      stageNode("function", { isEdit: true, id: "fn-1" });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="workflow-ndv-not-in-run"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-ndv-no-run-data"]').exists()).toBe(false);
+    });
+  });
+
+  // ── Config is a property of the WORKFLOW, not of the run ──────────────────
+  // "Why didn't this branch fire?" is answered by the un-taken node's CONFIG, so
+  // hiding it on a step the run skipped removes the one thing worth looking at.
+  // Only Input/Output legitimately depend on execution.
+  describe("config visibility on a step the run skipped", () => {
+    const stageRunWithout = (id: string) => {
+      workflowObj.readOnly = true;
+      workflowObj.currentSelectedWorkflow.id = "wf-1";
+      workflowObj.testRun.result = {
+        errors: {},
+        inputs: { "other-node": [{ a: 1 }] },
+        outputs: {},
+        ranNodeIds: ["other-node"],
+        blockedNodeIds: [],
+        mode: "history",
+        runId: "run-9",
+      } as any;
+      stageNode("destination", { isEdit: true, id });
+    };
+
+    afterEach(() => {
+      workflowObj.readOnly = false;
+      workflowObj.testRun.result = null;
+    });
+
+    it("shows the Config pane for a destination that was not on the taken branch", async () => {
+      stageRunWithout("dest-untaken");
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="workflow-ndv-config"]').exists()).toBe(true);
+    });
+
+    it("keeps the not-in-run notice, which is true of Input/Output only", async () => {
+      stageRunWithout("dest-untaken");
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="workflow-ndv-not-in-run"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-ndv-input"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="workflow-ndv-output"]').exists()).toBe(false);
+    });
+
+    // The same holds for a run that stored no per-node data at all.
+    it("shows the Config pane when the run stored no step data", async () => {
+      workflowObj.readOnly = true;
+      workflowObj.currentSelectedWorkflow.id = "wf-1";
+      workflowObj.testRun.result = {
+        errors: {},
+        inputs: {},
+        outputs: {},
+        ranNodeIds: [],
+        blockedNodeIds: [],
+        mode: "history",
+        runId: "run-empty",
+      } as any;
+      stageNode("condition", { isEdit: true, id: "cond-1" });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="workflow-ndv-config"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-ndv-no-run-data"]').exists()).toBe(true);
+    });
+  });
+
+  // ── No input-validation error on a read-only run ──────────────────────────
+  // A recorded per-node input is a single record OBJECT, and the user is not
+  // entering anything, so the editable-input array validator must not run here.
+  describe("input validation on a read-only run", () => {
+    afterEach(() => {
+      workflowObj.readOnly = false;
+      workflowObj.testRun.result = null;
+      clearNodeEditedInput("cond");
+    });
+
+    // The pane shows the run's recorded record (a single OBJECT), while the array
+    // validator runs against the editable buffer — a leftover per-node test edit that
+    // outlives the editing session. Nothing is being entered here, so it must be mute.
+    it("does not flag a recorded object input as invalid JSON", async () => {
+      seedGraph();
+      openNode("cond");
+      setNodeEditedInput("cond", JSON.stringify({ meta: { alert_count: 50 }, data: [] }));
+      workflowObj.testRun.result = {
+        errors: {},
+        inputs: { cond: [{ meta: { alert_count: 50 }, data: [] }] },
+        outputs: {},
+        ranNodeIds: ["trig", "cond"],
+        blockedNodeIds: [],
+        mode: "history",
+        runId: "run-3",
+      } as any;
+      workflowObj.readOnly = true;
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="workflow-ndv-input-invalid"]').exists()).toBe(false);
+    });
+
+    // The editable path is unchanged: bad JSON in the EDITOR still reports.
+    it("still flags genuinely invalid JSON while editing", async () => {
+      seedGraph();
+      openNode("cond");
+      wrapper = mountDrawer();
+      await nextTick();
+      const editor = wrapper.find('[data-test="workflow-ndv-input"] .code-editor');
+      await editor.trigger("update:query", "{not json");
+      (wrapper.vm as any).onEditInput?.("{not json");
+      await nextTick();
+
+      expect(wrapper.find('[data-test="workflow-ndv-input-invalid"]').exists()).toBe(true);
+    });
+  });
+
   // ── "Edit This Step" (run history → editor) ───────────────────────────────
   // Inspecting a run is read-only, so every verb is disabled and the user is left
   // with nothing to do. This is the one safe action: hand the run id and the node
@@ -911,5 +1123,668 @@ describe("WorkflowNodeDrawer", () => {
         query: expect.objectContaining({ id: "wf-1", run_id: "run-7", node_id: "fn-1" }),
       });
     });
+  });
+
+  // A trigger delivers ONE event, so wrapping a single record in a JSON array made
+  // the Input pane read as a batch and pushed every field a level deeper. The pane
+  // shows the bare object; the backend contract (`inputs: [...]`) is unchanged.
+  describe("single-record test input reads as an object, not a 1-element array", () => {
+    const inputEditor = (w: any) =>
+      w.find('[data-test="workflow-ndv-input"]').findComponent({ name: "CodeQueryEditor" });
+
+    it("seeds a lone record as a bare object", async () => {
+      seedGraph();
+      openNode("cond", false);
+      wrapper = mountDrawer();
+      await nextTick();
+
+      const shown = inputEditor(wrapper).props("query").trim();
+      expect(shown.startsWith("{")).toBe(true);
+      expect(shown.startsWith("[")).toBe(false);
+    });
+
+    it("still submits an ARRAY to the backend when Run Step executes", async () => {
+      (workflowService as any).testWorkflow = vi
+        .fn()
+        .mockResolvedValue({ data: { outputs: {}, errors: {} } });
+      seedGraph();
+      openNode("cond", false);
+      wrapper = mountDrawer();
+      await nextTick();
+
+      await inputEditor(wrapper).vm.$emit("update:query", '{"only":"one"}');
+      await nextTick();
+      await wrapper.find('[data-test="workflow-node-execute"]').trigger("click");
+      await flushPromises();
+
+      const sent = (workflowService as any).testWorkflow.mock.calls[0][0].inputs;
+      expect(Array.isArray(sent)).toBe(true);
+      expect(sent).toEqual([{ only: "one" }]);
+    });
+
+    it("keeps Run Step enabled for a bare object (not flagged invalid JSON)", async () => {
+      seedGraph();
+      openNode("cond", false);
+      wrapper = mountDrawer();
+      await nextTick();
+
+      await inputEditor(wrapper).vm.$emit("update:query", '{"only":"one"}');
+      await nextTick();
+
+      expect(wrapper.find('[data-test="workflow-ndv-input-invalid"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="workflow-node-execute"]').attributes("disabled"),
+      ).toBeFalsy();
+    });
+
+    // A pasted multi-record batch is still a legitimate payload — it must survive.
+    it("leaves a genuine multi-record array alone and submits it whole", async () => {
+      (workflowService as any).testWorkflow = vi
+        .fn()
+        .mockResolvedValue({ data: { outputs: {}, errors: {} } });
+      seedGraph();
+      openNode("cond", false);
+      wrapper = mountDrawer();
+      await nextTick();
+
+      await inputEditor(wrapper).vm.$emit("update:query", '[{"a":1},{"b":2}]');
+      await nextTick();
+      await wrapper.find('[data-test="workflow-node-execute"]').trigger("click");
+      await flushPromises();
+
+      const sent = (workflowService as any).testWorkflow.mock.calls[0][0].inputs;
+      expect(sent).toEqual([{ a: 1 }, { b: 2 }]);
+    });
+  });
+
+  // A hand-edited test input belongs to the NODE, not to the drawer instance.
+  // Walking to another step and back must return the user's edit, because re-typing a
+  // payload after every prev/next is the single biggest cost of the NDV's test loop.
+  // Today `editableInput` is a plain ref re-seeded by a watch on [nodeId, testRun.result],
+  // so any edit is silently discarded the moment the node changes.
+  describe("per-node edited test input persists across node switches", () => {
+    const inputEditor = (w: any) =>
+      w.find('[data-test="workflow-ndv-input"]').findComponent({ name: "CodeQueryEditor" });
+
+    // Type into the Input pane exactly as the user does (CodeQueryEditor emits update:query).
+    const typeInput = async (w: any, text: string) => {
+      await inputEditor(w).vm.$emit("update:query", text);
+      await nextTick();
+    };
+
+    it("restores a node's edited input after switching away and back", async () => {
+      seedGraph();
+      openNode("cond", false);
+      wrapper = mountDrawer();
+      await nextTick();
+
+      await typeInput(wrapper, '[{"edited":"cond"}]');
+      expect(inputEditor(wrapper).props("query")).toContain("edited");
+
+      // Walk to the next step, then back — the same drawer instance, node id changes.
+      openNode("dest", false);
+      await nextTick();
+      openNode("cond", false);
+      await nextTick();
+
+      expect(inputEditor(wrapper).props("query")).toContain('"edited": "cond"');
+    });
+
+    it("keeps each node's edit separate rather than sharing one buffer", async () => {
+      seedGraph();
+      openNode("cond", false);
+      wrapper = mountDrawer();
+      await nextTick();
+      await typeInput(wrapper, '[{"who":"cond"}]');
+
+      openNode("dest", false);
+      await nextTick();
+      await typeInput(wrapper, '[{"who":"dest"}]');
+      expect(inputEditor(wrapper).props("query")).toContain("dest");
+      expect(inputEditor(wrapper).props("query")).not.toContain("cond");
+
+      openNode("cond", false);
+      await nextTick();
+      expect(inputEditor(wrapper).props("query")).toContain("cond");
+      expect(inputEditor(wrapper).props("query")).not.toContain("dest");
+    });
+
+    it("survives closing and reopening the drawer on the same node", async () => {
+      seedGraph();
+      openNode("cond", false);
+      wrapper = mountDrawer();
+      await nextTick();
+      await typeInput(wrapper, '[{"kept":true}]');
+
+      wrapper.unmount();
+      openNode("cond", false);
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(inputEditor(wrapper).props("query")).toContain("kept");
+    });
+
+    // The ONLY sanctioned way back to the sample: an explicit reset control.
+    it("offers a reset-to-sample control that discards the edit and re-seeds", async () => {
+      seedGraph();
+      openNode("cond", false);
+      wrapper = mountDrawer();
+      await nextTick();
+      await typeInput(wrapper, '[{"edited":"cond"}]');
+
+      const reset = wrapper.find('[data-test="workflow-ndv-input-reset"]');
+      expect(reset.exists()).toBe(true);
+
+      await reset.trigger("click");
+      await nextTick();
+
+      const query = inputEditor(wrapper).props("query");
+      expect(query).not.toContain("edited");
+      // back to the trigger sample seed, not an empty editor
+      expect(query).toContain("alert_name");
+    });
+
+    it("clears the stored edit for that node only, leaving siblings intact", async () => {
+      seedGraph();
+      openNode("cond", false);
+      wrapper = mountDrawer();
+      await nextTick();
+      await typeInput(wrapper, '[{"who":"cond"}]');
+      openNode("dest", false);
+      await nextTick();
+      await typeInput(wrapper, '[{"who":"dest"}]');
+
+      await wrapper.find('[data-test="workflow-ndv-input-reset"]').trigger("click");
+      await nextTick();
+      expect(inputEditor(wrapper).props("query")).not.toContain("dest");
+
+      openNode("cond", false);
+      await nextTick();
+      expect(inputEditor(wrapper).props("query")).toContain("cond");
+    });
+  });
+
+  // The payload is a genuine BATCH array (backend sends vec![final_data]), but
+  // the NDV dumping the whole array is why authors reach for `row[0]`. Display one
+  // event at a time with an "n of N" pager. Wire format unchanged.
+  describe("NDV renders one event at a time", () => {
+    const inputEditor = (w: any) =>
+      w.find('[data-test="workflow-ndv-input"]').findComponent({ name: "CodeQueryEditor" });
+    const outputEditor = (w: any) =>
+      w.find('[data-test="workflow-ndv-output"]').findComponent({ name: "CodeQueryEditor" });
+
+    const threeEvents = [
+      { meta: { alert_name: "first" }, data: [{ n: 1 }] },
+      { meta: { alert_name: "second" }, data: [{ n: 2 }] },
+      { meta: { alert_name: "third" }, data: [{ n: 3 }] },
+    ];
+
+    it("shows only the first event in the Output pane, not the whole array", () => {
+      seedGraph();
+      workflowObj.testRun.result = {
+        inputs: {},
+        outputs: { cond: threeEvents },
+        errors: {},
+      } as any;
+      openNode("cond", false);
+      wrapper = mountDrawer();
+
+      const query = outputEditor(wrapper).props("query");
+      expect(query).toContain("first");
+      expect(query).not.toContain("second");
+      // the rendered JSON is an object, not a top-level array
+      expect(JSON.parse(query)).not.toBeInstanceOf(Array);
+    });
+
+    it("shows an n-of-N pager on the Output pane for a multi-event batch", () => {
+      seedGraph();
+      workflowObj.testRun.result = {
+        inputs: {},
+        outputs: { cond: threeEvents },
+        errors: {},
+      } as any;
+      openNode("cond", false);
+      wrapper = mountDrawer();
+
+      const pager = wrapper.find('[data-test="workflow-ndv-output-pager"]');
+      expect(pager.exists()).toBe(true);
+      expect(pager.text()).toMatch(/1\D+3/);
+    });
+
+    it("steps to the next event in the Output pane", async () => {
+      seedGraph();
+      workflowObj.testRun.result = {
+        inputs: {},
+        outputs: { cond: threeEvents },
+        errors: {},
+      } as any;
+      openNode("cond", false);
+      wrapper = mountDrawer();
+
+      await wrapper.find('[data-test="workflow-ndv-output-next"]').trigger("click");
+      await nextTick();
+
+      const query = outputEditor(wrapper).props("query");
+      expect(query).toContain("second");
+      expect(query).not.toContain("first");
+      expect(wrapper.find('[data-test="workflow-ndv-output-pager"]').text()).toMatch(/2\D+3/);
+    });
+
+    // Forward-only paging forces a full wrap to see the event before the current one.
+    it("steps to the previous event in the Output pane", async () => {
+      seedGraph();
+      workflowObj.testRun.result = {
+        inputs: {},
+        outputs: { cond: threeEvents },
+        errors: {},
+      } as any;
+      openNode("cond", false);
+      wrapper = mountDrawer();
+
+      await wrapper.find('[data-test="workflow-ndv-output-next"]').trigger("click");
+      await nextTick();
+      await wrapper.find('[data-test="workflow-ndv-output-prev"]').trigger("click");
+      await nextTick();
+
+      const query = outputEditor(wrapper).props("query");
+      expect(query).toContain("first");
+      expect(wrapper.find('[data-test="workflow-ndv-output-pager"]').text()).toMatch(/1\D+3/);
+    });
+
+    it("wraps backwards from the first Output event to the last", async () => {
+      seedGraph();
+      workflowObj.testRun.result = {
+        inputs: {},
+        outputs: { cond: threeEvents },
+        errors: {},
+      } as any;
+      openNode("cond", false);
+      wrapper = mountDrawer();
+
+      await wrapper.find('[data-test="workflow-ndv-output-prev"]').trigger("click");
+      await nextTick();
+
+      expect(wrapper.find('[data-test="workflow-ndv-output-pager"]').text()).toMatch(/3\D+3/);
+    });
+
+    it("steps to the previous event in the read-only Input pane", async () => {
+      seedGraph();
+      workflowObj.readOnly = true;
+      workflowObj.testRun.result = {
+        inputs: { cond: threeEvents },
+        outputs: {},
+        errors: {},
+      } as any;
+      openNode("cond", false);
+      wrapper = mountDrawer();
+
+      await wrapper.find('[data-test="workflow-ndv-input-prev"]').trigger("click");
+      await nextTick();
+
+      expect(wrapper.find('[data-test="workflow-ndv-input-pager"]').text()).toMatch(/3\D+3/);
+      expect(inputEditor(wrapper).props("query")).toContain("third");
+    });
+
+    // Paging is gated on READ-ONLY, not on "a run exists" — in the editor a recorded run
+    // IS the editable Run Step input, and parsedInput rejects a non-array.
+    it("pages the Input pane on the read-only Runs canvas", () => {
+      seedGraph();
+      workflowObj.readOnly = true;
+      workflowObj.testRun.result = {
+        inputs: { cond: threeEvents },
+        outputs: {},
+        errors: {},
+      } as any;
+      openNode("cond", false);
+      wrapper = mountDrawer();
+
+      const query = inputEditor(wrapper).props("query");
+      expect(query).toContain("first");
+      expect(query).not.toContain("third");
+      expect(wrapper.find('[data-test="workflow-ndv-input-pager"]').exists()).toBe(true);
+    });
+
+    // A single-event batch is the overwhelmingly common case — a "1 of 1" pager there
+    // is chrome for nothing.
+    it("hides the pager for a single-event batch but still unwraps it", () => {
+      seedGraph();
+      workflowObj.testRun.result = {
+        inputs: {},
+        outputs: { cond: [threeEvents[0]] },
+        errors: {},
+      } as any;
+      openNode("cond", false);
+      wrapper = mountDrawer();
+
+      expect(wrapper.find('[data-test="workflow-ndv-output-pager"]').exists()).toBe(false);
+      expect(JSON.parse(outputEditor(wrapper).props("query"))).not.toBeInstanceOf(Array);
+    });
+
+    // The invariant that keeps Run Step working: with no recorded run the Input pane is
+    // the EDITABLE payload, never paged. A lone event shows unwrapped (parsedInput
+    // re-wraps it for the backend), so only a real batch stays an array.
+    it("shows the editable Run Step input unpaged, unwrapping a lone event", () => {
+      seedGraph();
+      workflowObj.testRun.result = null as any;
+      openNode("cond", false);
+      wrapper = mountDrawer();
+
+      const query = inputEditor(wrapper).props("query");
+      expect(JSON.parse(query)).not.toBeInstanceOf(Array);
+      expect(wrapper.find('[data-test="workflow-ndv-input-pager"]').exists()).toBe(false);
+    });
+
+    // A payload stored before the unwrap existed replays through reprettyJson, which
+    // bypasses the seed — so the array came back for anyone with a saved edit.
+    it("unwraps a lone event restored from a previously stored edit", () => {
+      seedGraph();
+      workflowObj.testRun.result = null as any;
+      setNodeEditedInput("cond", JSON.stringify([{ meta: { alert_count: 7 } }]));
+      openNode("cond", false);
+      wrapper = mountDrawer();
+
+      expect(JSON.parse(inputEditor(wrapper).props("query"))).not.toBeInstanceOf(Array);
+    });
+  });
+
+  // ── Steps rail: telling sibling steps of the SAME type apart ─────────────────
+  // A Branch fans out into several Destinations, so the rail renders N rows whose
+  // type title is identical ("Destination"). The canvas card and the Test "Run From"
+  // dropdown already disambiguate these with nodeConfigDetail; the rail did not, so
+  // four arms read as four copies of one step.
+  describe("steps rail labels for same-type siblings", () => {
+    const seedBranchArms = () => {
+      workflowObj.currentSelectedWorkflow.nodes = [
+        { id: "trig", position: { x: 0, y: 0 }, data: { node_type: "workflow_trigger" } },
+        { id: "split", position: { x: 0, y: 0 }, data: { node_type: "branch" } },
+        {
+          id: "d1",
+          position: { x: 0, y: 0 },
+          data: { node_type: "destination", destination_id: "pagerduty" },
+        },
+        {
+          id: "d2",
+          position: { x: 0, y: 0 },
+          data: { node_type: "destination", destination_id: "slack" },
+        },
+      ] as any;
+      workflowObj.currentSelectedWorkflow.edges = [
+        { id: "e1", source: "trig", target: "split" },
+        { id: "e2", source: "split", target: "d1" },
+        { id: "e3", source: "split", target: "d2" },
+      ] as any;
+    };
+
+    const railText = (wrapper: any, id: string) =>
+      wrapper.find(`[data-test="workflow-ndv-step-${id}"]`).text();
+
+    it("distinguishes two Destination arms by their destination name", async () => {
+      seedBranchArms();
+      openNode("d1");
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(railText(wrapper, "d1")).toContain("pagerduty");
+      expect(railText(wrapper, "d2")).toContain("slack");
+    });
+
+    it("keeps a user-set custom label instead of the destination name", async () => {
+      seedBranchArms();
+      const d1 = workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === "d1");
+      d1.meta = { label: "Page The Oncall" };
+      openNode("d1");
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(railText(wrapper, "d1")).toContain("Page The Oncall");
+    });
+
+    it("leaves a step with no configured detail on its plain type title", async () => {
+      seedBranchArms();
+      const d2 = workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === "d2");
+      d2.data.destination_id = "";
+      openNode("d1");
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(railText(wrapper, "d2")).toContain(t("workflow.node.destination"));
+    });
+  });
+
+  // ── The run chip identifies a run the way every other surface does ───────────
+  // A raw KSUID ("Run · 3IiNQZ77pQQBFs52FdLKEFS22Sm") is backend jargon; the runs
+  // table and the run switcher both label a run by its start TIMESTAMP. The id stays
+  // on the chip's title attribute for support.
+  describe("run chip in the header", () => {
+    const stageLoadedRun = (runId = "run-9", startTime = 1_788_255_420_000_000) => {
+      workflowObj.readOnly = true;
+      workflowObj.currentSelectedWorkflow.id = "wf-1";
+      workflowObj.runsHistory.list = [
+        { run_id: runId, start_time: startTime, end_time: startTime + 1000 },
+      ] as any;
+      workflowObj.testRun.result = {
+        errors: {},
+        inputs: { "fn-1": [{ a: 1 }] },
+        outputs: {},
+        ranNodeIds: ["fn-1"],
+        blockedNodeIds: [],
+        mode: "history",
+        runId,
+      } as any;
+    };
+
+    afterEach(() => {
+      workflowObj.readOnly = false;
+      workflowObj.testRun.result = null;
+      workflowObj.runsHistory.list = [] as any;
+    });
+
+    it("does not print the raw run id as the chip's visible text", async () => {
+      stageLoadedRun("3IiNQZ77pQQBFs52FdLKEFS22Sm");
+      stageNode("function", { isEdit: true, id: "fn-1" });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      const chip = wrapper.find('[data-test="workflow-ndv-run-label"]');
+      expect(chip.exists()).toBe(true);
+      expect(chip.text()).not.toContain("3IiNQZ77pQQBFs52FdLKEFS22Sm");
+    });
+
+    it("labels the run by its start time", async () => {
+      stageLoadedRun();
+      stageNode("function", { isEdit: true, id: "fn-1" });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      const chip = wrapper.find('[data-test="workflow-ndv-run-label"]');
+      expect(chip.findComponent({ name: "OTimeCell" }).exists()).toBe(true);
+    });
+
+    // Opening a run without visiting the Runs page first leaves runsHistory empty, so
+    // the timestamp cannot resolve and the chip degrades to a bare "Run · —".
+    it("fetches the runs list so the chip can name a directly-opened run", async () => {
+      workflowObj.readOnly = true;
+      workflowObj.currentSelectedWorkflow.id = "wf-1";
+      workflowObj.runsHistory.list = [] as any;
+      workflowObj.testRun.result = {
+        errors: {},
+        inputs: { "fn-1": [{ a: 1 }] },
+        outputs: {},
+        ranNodeIds: ["fn-1"],
+        blockedNodeIds: [],
+        mode: "history",
+        runId: "run-9",
+      } as any;
+      stageNode("function", { isEdit: true, id: "fn-1" });
+      wrapper = mountDrawer();
+      await flushPromises();
+
+      // The list arrives after the drawer mounts; the chip must pick it up.
+      workflowObj.runsHistory.list = [
+        { run_id: "run-9", start_time: 1_788_255_420_000_000, end_time: 1_788_255_421_000_000 },
+      ] as any;
+      await nextTick();
+
+      const cell = wrapper
+        .find('[data-test="workflow-ndv-run-label"]')
+        .findComponent({ name: "OTimeCell" });
+      expect(cell.props("value")).toBe(1_788_255_420_000_000);
+    });
+
+    // The read-only config gave no reason for being read-only: a past run is a
+    // record of what HAPPENED, and the way out is the editor.
+    it("says why the config is read-only while a past run is loaded", async () => {
+      stageLoadedRun();
+      stageNode("function", { isEdit: true, id: "fn-1" });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      const note = wrapper.find('[data-test="workflow-ndv-readonly-note"]');
+      expect(note.exists()).toBe(true);
+      expect(note.text()).toContain(t("workflow.ndv.readOnlyRun"));
+    });
+
+    it("offers the way out of history mode from inside that note", async () => {
+      stageLoadedRun();
+      stageNode("function", { isEdit: true, id: "fn-1" });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      await wrapper.find('[data-test="workflow-ndv-readonly-note-edit"]').trigger("click");
+
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "workflowEditor",
+        query: expect.objectContaining({ id: "wf-1", run_id: "run-9", node_id: "fn-1" }),
+      });
+    });
+
+    it("shows no such note in a normal editing session", async () => {
+      seedGraph();
+      openNode("cond", false);
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="workflow-ndv-readonly-note"]').exists()).toBe(false);
+    });
+
+    // A bare history icon beside the chip never said it CHANGED runs. The chip
+    // already names the run, so the chip itself is the control.
+    it("makes the run chip itself the switcher trigger", async () => {
+      stageLoadedRun();
+      stageNode("function", { isEdit: true, id: "fn-1" });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      const chip = wrapper.find('[data-test="workflow-ndv-run-switcher"]');
+      expect(chip.exists()).toBe(true);
+      expect(chip.find('[data-test="workflow-ndv-run-label"]').exists()).toBe(true);
+      expect(chip.findComponent({ name: "OTimeCell" }).exists()).toBe(true);
+    });
+
+    it("shows a caret so the chip reads as a menu, not a static label", async () => {
+      stageLoadedRun();
+      stageNode("function", { isEdit: true, id: "fn-1" });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      const icons = wrapper
+        .find('[data-test="workflow-ndv-run-switcher"]')
+        .findAll(".o-icon")
+        .map((i: any) => i.attributes("data-name"));
+      expect(icons).toContain("chevron-down");
+    });
+
+    it("keeps the run id in the tooltip for support", async () => {
+      stageLoadedRun("3IiNQZ77pQQBFs52FdLKEFS22Sm");
+      stageNode("function", { isEdit: true, id: "fn-1" });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="workflow-ndv-run-switcher"]').attributes("title")).toContain(
+        "3IiNQZ77pQQBFs52FdLKEFS22Sm",
+      );
+    });
+  });
+});
+
+// ── Retry from this step (from_node) ─────────────────────────────────────────
+// The backend's retry takes an optional from_node, replaying the run from one
+// step downward. That pairs with the NDV, where the user is already looking at
+// the step that failed. Gated exactly like the run-level retry: a Test or Retry
+// run has no stored input, so the step offers nothing rather than a dead button.
+describe("WorkflowNodeDrawer — retry from this step", () => {
+  const RETRY = '[data-test="workflow-node-retry-from"]';
+  let wrapper: any;
+
+  const stageRetryableRun = (runId = "run-9", eventType = "AlertFired") => {
+    workflowObj.readOnly = true;
+    workflowObj.currentSelectedWorkflow.id = "wf-1";
+    workflowObj.runsHistory = {
+      list: [{ run_id: runId, error: "boom", event_type: eventType }],
+      fetchedAt: 0,
+      params: { start: 0, end: 0 },
+      loading: false,
+    } as any;
+    workflowObj.testRun.result = {
+      errors: {},
+      inputs: {},
+      ranNodeIds: [],
+      blockedNodeIds: [],
+      mode: "history",
+      runId,
+    } as any;
+  };
+
+  beforeEach(() => {
+    (workflowService as any).retryWorkflow = vi.fn().mockResolvedValue({ data: {} });
+  });
+
+  afterEach(() => {
+    workflowObj.readOnly = false;
+    workflowObj.testRun.result = null;
+    wrapper?.unmount?.();
+  });
+
+  it("offers retry-from-here on a step of a replayable run", async () => {
+    stageRetryableRun();
+    stageNode("function", { isEdit: true, id: "fn-1" });
+    wrapper = mountDrawer();
+    await nextTick();
+    expect(wrapper.find(RETRY).exists()).toBe(true);
+  });
+
+  it("does NOT offer it on a TEST run — no stored input to replay from", async () => {
+    stageRetryableRun("run-9", "Test");
+    stageNode("function", { isEdit: true, id: "fn-1" });
+    wrapper = mountDrawer();
+    await nextTick();
+    expect(wrapper.find(RETRY).exists()).toBe(false);
+  });
+
+  it("does NOT offer it on a RETRY run", async () => {
+    stageRetryableRun("run-9", "Retry");
+    stageNode("function", { isEdit: true, id: "fn-1" });
+    wrapper = mountDrawer();
+    await nextTick();
+    expect(wrapper.find(RETRY).exists()).toBe(false);
+  });
+
+  it("is absent in a normal editing session (no run loaded)", async () => {
+    stageNode("function", { isEdit: true, id: "fn-1" });
+    wrapper = mountDrawer();
+    await nextTick();
+    expect(wrapper.find(RETRY).exists()).toBe(false);
+  });
+
+  it("sends this node as from_node so the replay starts here", async () => {
+    stageRetryableRun();
+    stageNode("function", { isEdit: true, id: "fn-1" });
+    wrapper = mountDrawer();
+    await nextTick();
+    await wrapper.find(RETRY).trigger("click");
+    await flushPromises();
+    expect((workflowService as any).retryWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({ run_id: "run-9", from_node: "fn-1" }),
+    );
   });
 });

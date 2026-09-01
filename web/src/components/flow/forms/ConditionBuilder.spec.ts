@@ -210,6 +210,17 @@ describe("ConditionBuilder", () => {
     expect(wrapper.findComponent({ name: "FilterGroup" }).props("namePrefix")).toBe("conditions");
   });
 
+  // The condition inputs sit in a node drawer, and this width governs the column
+  // select as well as the operator/value inputs. At 8.125rem a dotted trigger
+  // field ("meta.alert_start_time") truncates to an unreadable stub, which is the
+  // whole complaint — the select is wide enough to pick from, not to read.
+  it("gives the condition inputs room for long dotted field names", () => {
+    const wrapper = createWrapper();
+    const width = wrapper.findComponent({ name: "FilterGroup" }).props("conditionInputWidth");
+    const rem = Number(/\[([\d.]+)rem\]/.exec(String(width))?.[1] ?? 0);
+    expect(rem).toBeGreaterThanOrEqual(11);
+  });
+
   it("passes allowCustomColumns through to FilterGroup", () => {
     const wrapper = createWrapper({ allowCustomColumns: true });
     expect(wrapper.findComponent({ name: "FilterGroup" }).props("allowCustomColumns")).toBe(true);

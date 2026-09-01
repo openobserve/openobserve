@@ -35,7 +35,7 @@ use usage_reporting::publish_triggers_usage;
 
 use crate::{
     common::{meta::authz::Authz, utils::get_nats_lock},
-    pipeline::batch_execution::{ExecutablePipeline, WorkflowResult},
+    pipeline::batch_execution::{ExecutablePipeline, WorkflowResult, WorkflowRunOptions},
 };
 
 pub mod runtime;
@@ -59,6 +59,13 @@ pub struct WorkflowTrigger {
     pub metadata: HashMap<String, Value>,
     pub run_id: String,
     pub origin_cluster: String,
+}
+
+/// The two run flags travel together; separate bool params would push `test_workflow` past
+/// the argument limit and read as positional noise at the call site.
+pub struct TestWorkflowOptions {
+    pub is_draft: bool,
+    pub suppress_destinations: bool,
 }
 
 enum WorkflowExecutionStatus {
@@ -434,19 +441,194 @@ pub async fn delete_draft(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn run_outcome_for(error: Option<&str>) -> RunOutcome {
+    if error.is_some() {
+        RunOutcome::Error
+    } else {
+        RunOutcome::Succeeded
+    }
+}
+
+/// process_workflow returns Ok with a populated `errors` map when individual nodes fail,
+/// so a run that errored on every node is only visible through that map.
+fn run_error_from_result(res: &Result<WorkflowResult, anyhow::Error>) -> Option<String> {
+    match res {
+        Err(e) => Some(e.to_string()),
+        Ok(result) if !result.errors.is_empty() => {
+            let mut node_ids: Vec<&str> = result.errors.keys().map(String::as_str).collect();
+            node_ids.sort_unstable();
+            Some(format!("errors in nodes: {}", node_ids.join(", ")))
+        }
+        Ok(_) => None,
+    }
+}
+
+/// Records a synchronously-executed run in the history stream. Test and retry
+/// runs never enter the trigger queue, so nothing else would publish them.
+fn record_workflow_run(
+    org_id: &str,
+    workflow_id: &str,
+    trigger_type: WorkflowTriggerType,
+    source_id: &str,
+    run_id: &str,
+    start_time: i64,
+    error: Option<String>,
+) {
+    let end_time = chrono::Utc::now().timestamp_micros();
+    let status = run_outcome_for(error.as_deref());
+    publish_triggers_usage(TriggerData {
+        _timestamp: start_time,
+        org: org_id.to_string(),
+        module: TriggerDataType::Workflow,
+        key: workflow_history_key(workflow_id, trigger_type, source_id, run_id),
+        is_realtime: false,
+        is_silenced: false,
+        status,
+        start_time,
+        end_time,
+        error,
+        source_node: Some(config::cluster::LOCAL_NODE.name.clone()),
+        evaluation_took_in_secs: Some((end_time - start_time) as f64 / 1_000_000.0),
+        ..Default::default()
+    });
+}
+
+/// Folds a finished run into the row we persist: node errors plus the per-node input/output
+/// maps. A clean run yields an empty `data` and a fully populated map, which is what makes a
+/// successful run inspectable after the fact.
+fn run_errors_from_parts(
+    org_id: &str,
+    workflow_id: &str,
+    run_id: &str,
+    node_errors: &HashMap<String, config::meta::self_reporting::error::NodeErrors>,
+    input_map: HashMap<String, Vec<Value>>,
+    output_map: HashMap<String, Vec<Value>>,
+) -> WorkflowRunErrors {
+    let mut errored_input_map = HashMap::new();
+    let mut workflow_errors = Vec::new();
+
+    for (node_id, errors) in node_errors {
+        let mut inputs = Vec::with_capacity(errors.error_count as usize);
+        let mut err_list = Vec::with_capacity(errors.error_count as usize);
+
+        for (e, val) in &errors.errors {
+            let mut e = e.clone();
+            // stored in db, so cap the string length here and the count below
+            e.truncate(100);
+            err_list.push(e);
+            if let Some(mut v) = val.clone() {
+                // a vrl fn over a result array errors with the whole array; store the
+                // individual entries instead so a retry can replay them
+                if let Some(arr) = v.as_array_mut() {
+                    for v in arr.drain(0..) {
+                        inputs.push(v);
+                    }
+                } else {
+                    inputs.push(v);
+                }
+            }
+        }
+        // errors without inputs must still reach the user, so the error list and the
+        // input map are populated independently
+        if !err_list.is_empty() {
+            err_list.truncate(50);
+            workflow_errors.push(WorkflowError {
+                node_id: node_id.clone(),
+                error: err_list,
+            });
+        }
+        if !inputs.is_empty() {
+            errored_input_map.insert(node_id.clone(), inputs);
+        }
+    }
+
+    let ip_map = InputMap {
+        error_node_map: errored_input_map,
+        input_map,
+        output_map,
+    };
+
+    // the run errors row doubles as the execution-history map: same structure, so a
+    // true error v/s a clean run is distinguished by `data` being empty or not
+    WorkflowRunErrors {
+        org_id: org_id.to_string(),
+        cluster: config::get_cluster_name(),
+        id: 0, // will be set directly in db
+        workflow_id: workflow_id.to_string(),
+        run_id: run_id.to_string(),
+        ran_at: chrono::Utc::now().timestamp_micros(),
+        data: workflow_errors,
+        input_data: Some(serde_json::to_string(&ip_map).unwrap_or_default()),
+    }
+}
+
+/// The workflow has already run, so a failure to store its history is logged, not returned.
+async fn persist_run_errors(
+    org_id: &str,
+    workflow_id: &str,
+    run_id: &str,
+    errors: WorkflowRunErrors,
+) {
+    if let Err(e) = db::workflows::save_workflow_errors(errors).await {
+        log::error!(
+            "[Workflows] : error saving workflow run errors for run id {run_id} for workflow {org_id}/{workflow_id} in db : {e}"
+        );
+    }
+}
+
+/// `workflow_id` is the REAL saved id, not the synthetic `test-<uuid>` the executable runs
+/// under: the history API matches on `key LIKE '{workflow_id}/%'`, so a synthetic id there
+/// would make every Test row unreadable.
 pub async fn test_workflow(
     org_id: &str,
+    workflow_id: &str,
     workflow: Workflow,
     inputs: Vec<serde_json::Value>,
     from_node: Option<String>,
-    is_draft: bool,
+    options: TestWorkflowOptions,
+    user_id: &str,
 ) -> Result<WorkflowResult, anyhow::Error> {
+    let TestWorkflowOptions {
+        is_draft,
+        suppress_destinations,
+    } = options;
     validate_workflow(&workflow, is_draft).await?;
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
+    let run_id = config::ider::uuid();
+    let start_time = chrono::Utc::now().timestamp_micros();
     let res = executable
-        .process_workflow(org_id, inputs, from_node)
-        .await?;
-    Ok(res)
+        .process_workflow_with_options(
+            org_id,
+            inputs,
+            from_node,
+            WorkflowRunOptions {
+                suppress_destinations,
+            },
+        )
+        .await;
+    record_workflow_run(
+        org_id,
+        workflow_id,
+        WorkflowTriggerType::Test,
+        user_id,
+        &run_id,
+        start_time,
+        run_error_from_result(&res),
+    );
+    // a test run is listed in history like any other, so its per-node data has to be
+    // stored too or re-opening it later shows every node as never having run
+    if let Ok(result) = &res {
+        let errors = run_errors_from_parts(
+            org_id,
+            workflow_id,
+            &run_id,
+            &result.errors,
+            result.inputs.clone(),
+            result.outputs.clone(),
+        );
+        persist_run_errors(org_id, workflow_id, &run_id, errors).await;
+    }
+    res
 }
 
 pub async fn trigger_workflow(
@@ -472,8 +654,8 @@ pub async fn trigger_workflow(
     if let Err(e) = send_workflow_trigger(
         &trace_id,
         org_id,
-        "Webhook".to_string(),
-        WorkflowTriggerType::Webhook,
+        user_id.to_string(),
+        WorkflowTriggerType::Manual,
         id,
         metadata,
         &inputs,
@@ -507,81 +689,18 @@ async fn execute_workflow(
 
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
 
-    let now = chrono::Utc::now().timestamp_micros();
     let res = executable.process_workflow(org_id, inputs, None).await?;
 
-    let mut errored_input_map = HashMap::new();
-    let mut workflow_errors = Vec::new();
-
-    for (node_id, errors) in res.errors {
-        let mut inputs = Vec::with_capacity(errors.error_count as usize);
-        let mut err_list = Vec::with_capacity(errors.error_count as usize);
-
-        for (mut e, val) in errors.errors {
-            // because we are storing the errors in db, we don't want to have
-            // a long string * a lot of errors
-            // so we truncate the length here, and then limit the count below
-            e.truncate(100);
-            err_list.push(e);
-            if let Some(mut v) = val {
-                // top level value should always be a single json value,
-                // except when the erroring node was a vrl fn over a result array
-                // in that case we actually want to store the individual entries
-                // instead of the whole array, so we can replay it correctly
-                if let Some(arr) = v.as_array_mut() {
-                    for v in arr.drain(0..) {
-                        inputs.push(v);
-                    }
-                } else {
-                    inputs.push(v);
-                }
-            }
-        }
-        // it is possible that we have errors, but no corresponding inputs
-        // we should always show the errors to user, so we store it in db
-        // but only create entry in input map if inputs are present
-        if !err_list.is_empty() {
-            err_list.truncate(50);
-            workflow_errors.push(WorkflowError {
-                node_id: node_id.clone(),
-                error: err_list,
-            });
-        }
-        if !inputs.is_empty() {
-            errored_input_map.insert(node_id, inputs);
-        }
-    }
-
-    let ip_map = InputMap {
-        error_node_map: errored_input_map,
-        input_map: res.inputs,
-        output_map: res.outputs,
-    };
-
+    let WorkflowResult {
+        errors: node_errors,
+        inputs: input_map,
+        outputs: output_map,
+        ..
+    } = res;
+    let errors = run_errors_from_parts(org_id, id, run_id, &node_errors, input_map, output_map);
     // if this is not empty, then some node errored
-    let errored = !workflow_errors.is_empty();
-
-    // we hijack the workflow run errors to store both the error as well as execution history map
-    // as both have essentially the same structure and no point in duplicating tables and adding
-    // migration true error v/s just run can be distinguished by workflow_errors is empty or
-    // not.
-    let errors = WorkflowRunErrors {
-        org_id: org_id.to_string(),
-        cluster: config::get_cluster_name(),
-        id: 0, // will be set directly in db
-        workflow_id: id.to_string(),
-        run_id: run_id.to_string(),
-        ran_at: now,
-        data: workflow_errors,
-        input_data: Some(serde_json::to_string(&ip_map).unwrap()),
-    };
-    // workflow has already run, so not much point in returning error because
-    // we couldn't save the errors to db, log and ignore
-    if let Err(e) = db::workflows::save_workflow_errors(errors).await {
-        log::error!(
-            "[Workflows] : error saving workflow run errors for run id {run_id} for workflow {org_id}/{id} in db : {e}"
-        );
-    }
+    let errored = !errors.data.is_empty();
+    persist_run_errors(org_id, id, run_id, errors).await;
 
     if errored {
         Ok(WorkflowExecutionStatus::Errored)
@@ -661,10 +780,20 @@ pub async fn retry_run(
         "node id {node_id} does not have any associated input data in the stored inputs"
     ))?;
 
-    let res = executable
-        .process_workflow(org_id, inputs, from_node)
-        .await?;
-    Ok(res)
+    let start_time = chrono::Utc::now().timestamp_micros();
+    let res = executable.process_workflow(org_id, inputs, from_node).await;
+    // the retry is its own run; the failed run's id stays as source_id for provenance
+    let retry_run_id = config::ider::uuid();
+    record_workflow_run(
+        org_id,
+        wid,
+        WorkflowTriggerType::Retry,
+        run_id,
+        &retry_run_id,
+        start_time,
+        run_error_from_result(&res),
+    );
+    res
 }
 
 pub async fn send_workflow_trigger(
@@ -712,6 +841,17 @@ pub async fn send_workflow_trigger(
     log::info!("successfully sent workflow trigger for trace id {trace_id} run id {run_id}");
 
     Ok(())
+}
+
+/// The 4-part positional run-history key. Display, not Debug: a Debug-formatted
+/// variant would put braces and spaces into a key the history API parses.
+pub fn workflow_history_key(
+    workflow_id: &str,
+    trigger_type: WorkflowTriggerType,
+    source_id: &str,
+    run_id: &str,
+) -> String {
+    format!("{workflow_id}/{trigger_type}/{source_id}/{run_id}")
 }
 
 pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
@@ -819,9 +959,11 @@ pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
         org: trigger.org_id.clone(),
         module: TriggerDataType::Workflow,
         // this order matters in the workflow history api, as we parse this there
-        key: format!(
-            "{}/{:?}/{}/{}",
-            trigger.workflow_id, trigger.trigger_type, trigger.source_id, run_id
+        key: workflow_history_key(
+            &trigger.workflow_id,
+            trigger.trigger_type,
+            &trigger.source_id,
+            &run_id,
         ),
         is_realtime: false,
         is_silenced: false,
@@ -861,4 +1003,227 @@ pub async fn get_data_for_run(
 ) -> Result<Option<String>, anyhow::Error> {
     let ret = infra::table::workflows::get_run_data(org_id, workflow_id, run_id).await?;
     Ok(ret)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn history_key_for_a_manual_run_records_manual_and_the_firing_user() {
+        let key = workflow_history_key(
+            "wf123",
+            WorkflowTriggerType::Manual,
+            "user@example.com",
+            "run789",
+        );
+        assert_eq!(key, "wf123/Manual/user@example.com/run789");
+        assert!(
+            !key.contains("/Webhook/"),
+            "a manual run must not be recorded as a webhook"
+        );
+    }
+
+    #[test]
+    fn history_key_source_id_is_the_user_not_the_literal_trigger_name() {
+        let key = workflow_history_key(
+            "wf123",
+            WorkflowTriggerType::Manual,
+            "user@example.com",
+            "run789",
+        );
+        let source_id = key.split('/').nth(2).unwrap();
+        assert_ne!(source_id, "Webhook");
+        assert_eq!(source_id, "user@example.com");
+    }
+
+    #[test]
+    fn history_key_for_test_and_retry_runs_use_their_own_trigger_types() {
+        assert_eq!(
+            workflow_history_key("wf1", WorkflowTriggerType::Test, "u1", "r1"),
+            "wf1/Test/u1/r1"
+        );
+        assert_eq!(
+            workflow_history_key("wf1", WorkflowTriggerType::Retry, "u1", "r1"),
+            "wf1/Retry/u1/r1"
+        );
+    }
+
+    #[test]
+    fn history_key_is_positional_with_the_trigger_type_second() {
+        let key = workflow_history_key("wf1", WorkflowTriggerType::AlertFired, "src", "run");
+        let parts: Vec<_> = key.split('/').collect();
+        assert_eq!(parts[0], "wf1");
+        assert_eq!(parts[1], "AlertFired");
+        assert_eq!(parts[3], "run");
+    }
+    #[tokio::test]
+    async fn an_unsupported_node_is_rejected_before_it_can_be_saved() {
+        // Unsupported is what a node type from a NEWER build decodes to. Re-serializing it
+        // rewrites that node as {"node_type":"unsupported"}, so saving one destroys data.
+        // The allowlist check runs before any DB lookup, so this needs no fixtures.
+        let workflow = Workflow {
+            id: "w1".to_string(),
+            org_id: "org1".to_string(),
+            name: "w".to_string(),
+            description: String::new(),
+            enabled: true,
+            created_at: 0,
+            updated_at: 0,
+            created_by: String::new(),
+            nodes: vec![config::meta::pipeline::components::Node::new(
+                "u1".to_string(),
+                NodeData::Unsupported,
+                0.0,
+                0.0,
+                "default".to_string(),
+            )],
+            edges: vec![],
+        };
+
+        assert!(validate_workflow(&workflow, false).await.is_err());
+        assert!(validate_workflow(&workflow, true).await.is_err());
+    }
+
+    fn node_errors_with(msg: &str) -> config::meta::self_reporting::error::NodeErrors {
+        let mut ne = config::meta::self_reporting::error::NodeErrors::new(
+            "n1".to_string(),
+            "FunctionNode".to_string(),
+            None,
+        );
+        ne.errors.insert((msg.to_string(), None));
+        ne.error_count = 1;
+        ne
+    }
+
+    #[test]
+    fn a_run_whose_nodes_all_errored_is_not_recorded_as_succeeded() {
+        let mut result = WorkflowResult::default();
+        result
+            .errors
+            .insert("n1".to_string(), node_errors_with("boom"));
+
+        let error = run_error_from_result(&Ok(result));
+        assert!(
+            error.is_some(),
+            "node-level errors must surface as a run error"
+        );
+        assert_eq!(run_outcome_for(error.as_deref()), RunOutcome::Error);
+    }
+
+    #[test]
+    fn a_failed_run_is_recorded_as_error_not_succeeded() {
+        let res: Result<WorkflowResult, anyhow::Error> = Err(anyhow::anyhow!("exploded"));
+        let error = run_error_from_result(&res);
+        assert_eq!(error.as_deref(), Some("exploded"));
+        assert_eq!(run_outcome_for(error.as_deref()), RunOutcome::Error);
+    }
+
+    #[test]
+    fn a_clean_run_is_still_recorded_as_succeeded() {
+        let res: Result<WorkflowResult, anyhow::Error> = Ok(WorkflowResult::default());
+        let error = run_error_from_result(&res);
+        assert!(error.is_none());
+        assert_eq!(run_outcome_for(error.as_deref()), RunOutcome::Succeeded);
+    }
+
+    #[test]
+    fn a_retry_run_gets_its_own_run_id_and_keeps_the_original_as_source() {
+        let original_run_id = "original-run-1";
+        let retry_run_id = config::ider::uuid();
+        assert_ne!(
+            retry_run_id, original_run_id,
+            "a retry must not reuse the failed run's id as its own run_id"
+        );
+
+        let key = workflow_history_key(
+            "wf1",
+            WorkflowTriggerType::Retry,
+            original_run_id,
+            &retry_run_id,
+        );
+        let parts: Vec<_> = key.split('/').collect();
+        assert_eq!(parts[2], original_run_id, "source_id keeps the provenance");
+        assert_ne!(parts[3], parts[2], "run_id must be a fresh id");
+    }
+
+    #[test]
+    fn a_test_run_is_recorded_under_the_real_workflow_id() {
+        // the history API queries `key LIKE '{workflow_id}/%'`, so a synthetic
+        // `test-<uuid>` id in slot 0 would make every Test row unreadable
+        let key = workflow_history_key(
+            "wf-real-id",
+            WorkflowTriggerType::Test,
+            "user@example.com",
+            "run1",
+        );
+        assert!(key.starts_with("wf-real-id/"));
+        assert!(!key.starts_with("test-"));
+        assert_eq!(key.split('/').nth(2).unwrap(), "user@example.com");
+    }
+
+    #[test]
+    fn a_clean_run_still_stores_every_nodes_input_and_output() {
+        // a successful run has no node errors, so the only thing that can make its
+        // steps inspectable later is the input/output map being persisted anyway
+        let mut result = WorkflowResult::default();
+        result
+            .inputs
+            .insert("n1".to_string(), vec![serde_json::json!({"in": 1})]);
+        result
+            .outputs
+            .insert("n1".to_string(), vec![serde_json::json!({"out": 2})]);
+
+        let errors = run_errors_from_parts(
+            "org1",
+            "wf1",
+            "run1",
+            &result.errors,
+            result.inputs.clone(),
+            result.outputs.clone(),
+        );
+
+        assert!(
+            errors.data.is_empty(),
+            "a clean run must not fabricate node errors"
+        );
+        let ip_map: InputMap = serde_json::from_str(
+            errors
+                .input_data
+                .as_deref()
+                .expect("input_data must be stored"),
+        )
+        .expect("stored input_data must be a valid InputMap");
+        assert_eq!(
+            ip_map.input_map.get("n1").map(Vec::len),
+            Some(1),
+            "every node's input must be stored so the run can be inspected later"
+        );
+        assert_eq!(
+            ip_map.output_map.get("n1").map(Vec::len),
+            Some(1),
+            "every node's output must be stored so the run can be inspected later"
+        );
+    }
+
+    #[test]
+    fn an_errored_node_still_records_its_error_and_replay_input() {
+        let mut result = WorkflowResult::default();
+        result
+            .errors
+            .insert("n1".to_string(), node_errors_with("boom"));
+
+        let errors = run_errors_from_parts(
+            "org1",
+            "wf1",
+            "run1",
+            &result.errors,
+            result.inputs.clone(),
+            result.outputs.clone(),
+        );
+
+        assert_eq!(errors.data.len(), 1, "the node error must be persisted");
+        assert_eq!(errors.data[0].node_id, "n1");
+        assert_eq!(errors.data[0].error, vec!["boom".to_string()]);
+    }
 }

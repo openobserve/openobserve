@@ -66,6 +66,13 @@ struct BatchBuffer {
     last_write: Instant,
 }
 
+/// Per-run switches; only the Test path sets these, so triggers and retries are unchanged.
+#[derive(Default, Clone, Copy)]
+pub struct WorkflowRunOptions {
+    /// Destination nodes report the routing they resolved instead of dispatching.
+    pub suppress_destinations: bool,
+}
+
 #[derive(Default)]
 pub struct WorkflowResult {
     pub stream_details: HashMap<StreamParams, Vec<(usize, Value)>>,
@@ -252,6 +259,10 @@ pub struct ExecutablePipeline {
     sorted_nodes: Vec<String>,
     function_map: HashMap<String, CompiledFunctionRuntime>,
     node_map: HashMap<String, ExecutableNode>,
+    /// Parallel to `node_map`: per node, the targets grouped by the `source_handle` they
+    /// leave from. Kept out of `ExecutableNode.children` because that must stay the full
+    /// handle-blind fan-out that topological sort and the leaf checks depend on.
+    handle_children: HashMap<String, Vec<(String, Vec<String>)>>,
     pub kind: PipelineKind,
 }
 
@@ -265,6 +276,7 @@ impl MemorySize for ExecutablePipeline {
             + self.sorted_nodes.mem_size()
             + self.function_map.mem_size()
             + self.node_map.mem_size()
+            + self.handle_children.mem_size()
     }
 }
 
@@ -370,6 +382,7 @@ impl ExecutablePipeline {
             node_map,
             sorted_nodes,
             function_map,
+            handle_children: HashMap::new(), // pipelines have no output handles
             kind: pipeline.kind.clone(),
         })
     }
@@ -395,6 +408,18 @@ impl ExecutablePipeline {
                 )
             })
             .collect();
+
+        let mut handle_children: HashMap<String, Vec<(String, Vec<String>)>> = HashMap::new();
+        for edge in &workflow.edges {
+            let Some(handle) = edge.source_handle.as_ref() else {
+                continue;
+            };
+            let handles = handle_children.entry(edge.source.clone()).or_default();
+            match handles.iter_mut().find(|(h, _)| h == handle) {
+                Some((_, targets)) => targets.push(edge.target.clone()),
+                None => handles.push((handle.clone(), vec![edge.target.clone()])),
+            }
+        }
 
         // TODO YJDoc2: check if we should make the error type as workflow error rather than reusing
         // the pipeline error
@@ -452,6 +477,7 @@ impl ExecutablePipeline {
             node_map,
             sorted_nodes,
             function_map,
+            handle_children,
             is_realtime: false,
             kind: PipelineKind::User,
         })
@@ -568,6 +594,8 @@ impl ExecutablePipeline {
                 print_event,
                 leaf_dest_stream: _leaf_dest_stream,
                 return_value_for_error: false, // pipelines do not support this
+                suppress_destinations: false,  // pipelines have no destination nodes
+                flatten_records: true,         // ingest depends on flattened records
             };
             let channels = ProcessChannels {
                 receiver: node_receiver,
@@ -762,6 +790,17 @@ impl ExecutablePipeline {
         records: Vec<Value>,
         from_node: Option<String>,
     ) -> Result<WorkflowResult> {
+        self.process_workflow_with_options(org_id, records, from_node, Default::default())
+            .await
+    }
+
+    pub async fn process_workflow_with_options(
+        &self,
+        org_id: &str,
+        records: Vec<Value>,
+        from_node: Option<String>,
+        options: WorkflowRunOptions,
+    ) -> Result<WorkflowResult> {
         let batch_size = records.len();
         let pipeline_name = self.name.clone();
         // Unique invocation ID to correlate logs across concurrent pipeline runs
@@ -848,6 +887,8 @@ impl ExecutablePipeline {
                 print_event: false, // do not print events for workflows
                 leaf_dest_stream: _leaf_dest_stream,
                 return_value_for_error: true,
+                suppress_destinations: options.suppress_destinations,
+                flatten_records: false,
                 source_stream_name: "system_workflow_trigger".to_string(),
             };
             let channels = ProcessChannels {
@@ -858,7 +899,29 @@ impl ExecutablePipeline {
                 inputs_sender: Some(inputs_sender_cp),
                 outputs_sender: Some(outputs_sender_cp),
             };
-            let task = tokio::spawn(process_node(metadata, node, function_runtime, channels));
+            let handle_routes = self
+                .handle_children
+                .get(node_id)
+                .map(|handles| {
+                    handles
+                        .iter()
+                        .map(|(handle, targets)| {
+                            let senders = targets
+                                .iter()
+                                .filter_map(|target| node_senders.get(target).cloned())
+                                .collect();
+                            (handle.clone(), senders)
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            let task = tokio::spawn(process_node_with_routes(
+                metadata,
+                node,
+                function_runtime,
+                channels,
+                handle_routes,
+            ));
             node_tasks.push(task);
         }
 
@@ -1125,6 +1188,8 @@ impl ExecutableNode {
             NodeData::LlmEvaluation(p) => format!("llm_evaluation:{}", p.name),
             NodeData::WorkflowTrigger => "workflow_trigger".to_string(),
             NodeData::Destination(d) => format!("destination:{}", d.destination_id),
+            NodeData::Branch(p) => format!("branch:{}", p.cases.len()),
+            NodeData::Unsupported => "unsupported".to_string(),
         }
     }
 }
@@ -1140,6 +1205,8 @@ impl std::fmt::Display for ExecutableNode {
             NodeData::LlmEvaluation(_) => write!(f, "llm_evaluation"),
             NodeData::WorkflowTrigger => write!(f, "workflow_trigger"),
             NodeData::Destination(_) => write!(f, "destination"),
+            NodeData::Branch(_) => write!(f, "branch"),
+            NodeData::Unsupported => write!(f, "unsupported"),
         }
     }
 }
@@ -1197,6 +1264,10 @@ struct ProcessMetadata {
     print_event: bool,
     leaf_dest_stream: Option<StreamParams>,
     return_value_for_error: bool,
+    suppress_destinations: bool,
+    /// Ingest flattens so conditions can index a flat row; a workflow's event shape is a
+    /// user-facing contract, so it is preserved and columns are resolved against it.
+    flatten_records: bool,
 }
 
 #[allow(clippy::type_complexity)]
@@ -1241,7 +1312,17 @@ async fn process_node(
     metadata: ProcessMetadata,
     node: ExecutableNode,
     function_runtime: Option<CompiledFunctionRuntime>,
+    channels: ProcessChannels,
+) -> Result<()> {
+    process_node_with_routes(metadata, node, function_runtime, channels, Vec::new()).await
+}
+
+async fn process_node_with_routes(
+    metadata: ProcessMetadata,
+    node: ExecutableNode,
+    function_runtime: Option<CompiledFunctionRuntime>,
     mut channels: ProcessChannels,
+    handle_routes: Vec<(String, Vec<Sender<PipelineItem>>)>,
 ) -> Result<()> {
     let pl_name = metadata.pipeline_name.clone();
     let node_idx = metadata.node_idx;
@@ -1386,6 +1467,55 @@ async fn process_node(
             }
             log::info!(
                 "[Pipeline] {} [inv={inv_id}]: destination {node_idx} skipped {skipped_count} records",
+                metadata.pipeline_name
+            );
+            0
+        }
+
+        NodeData::Branch(branch_params) => {
+            process_branch_node(
+                branch_params,
+                metadata,
+                &node,
+                channels,
+                handle_routes,
+                &mut busy,
+            )
+            .await
+            .routed
+        }
+
+        // Reached only when a newer node wrote a node type this build cannot run. Report
+        // it per record rather than skipping, so the run surfaces as errored not succeeded.
+        NodeData::Unsupported => {
+            log::warn!(
+                "[Pipeline] {} [inv={inv_id}]: node {node_idx} has a node type this version does not support",
+                metadata.pipeline_name
+            );
+            let mut errored_count = 0usize;
+            while let Some(item) = channels.receiver.recv().await {
+                channels.send_input(&metadata, &node.id, &item.record).await;
+                if let Err(send_err) = channels
+                    .error_sender
+                    .send((
+                        node.id.to_string(),
+                        node.node_type(),
+                        "node type not supported by this version".to_string(),
+                        None,
+                        None,
+                    ))
+                    .await
+                {
+                    log::error!(
+                        "[Pipeline] {} [inv={inv_id}]: UnsupportedNode failed sending errors for collection caused by: {send_err}",
+                        metadata.pipeline_name
+                    );
+                    break;
+                }
+                errored_count += 1;
+            }
+            log::info!(
+                "[Pipeline] {} [inv={inv_id}]: unsupported node {node_idx} errored {errored_count} records",
                 metadata.pipeline_name
             );
             0
@@ -1617,7 +1747,7 @@ async fn process_remote_stream_node(
         };
 
         // handle timestamp before sending to remote_write service
-        if !flattened && !record.is_null() && record.is_object() {
+        if metadata.flatten_records && !flattened && !record.is_null() && record.is_object() {
             record = match flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level) {
                 Ok(flattened) => flattened,
                 Err(e) => {
@@ -2189,7 +2319,7 @@ async fn process_condition_node(
         };
 
         // value must be flattened before condition params can take effect
-        if !flattened && !record.is_null() && record.is_object() {
+        if metadata.flatten_records && !flattened && !record.is_null() && record.is_object() {
             let flatten_timer = Instant::now();
             let flatten_res = flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level);
             *busy += flatten_timer.elapsed();
@@ -2265,6 +2395,142 @@ async fn process_condition_node(
     count
 }
 
+/// A bare routed count of 0 cannot be told apart from "no records arrived", so drops
+/// are counted separately.
+#[derive(Debug, Default, PartialEq)]
+struct BranchOutcome {
+    routed: usize,
+    dropped: usize,
+}
+
+async fn process_branch_node(
+    branch_params: &config::meta::pipeline::components::BranchParams,
+    metadata: ProcessMetadata,
+    node: &ExecutableNode,
+    mut channels: ProcessChannels,
+    mut handle_routes: Vec<(String, Vec<Sender<PipelineItem>>)>,
+    busy: &mut Duration,
+) -> BranchOutcome {
+    let mut outcome = BranchOutcome::default();
+    let cfg = config::get_config();
+    let inv_id = metadata.inv_id.clone();
+    log::debug!(
+        "[Pipeline] {} [inv={inv_id}]: branch node {} starts processing",
+        metadata.pipeline_name,
+        metadata.node_idx
+    );
+    let mut total_received: usize = 0;
+    while let Some(pipeline_item) = channels.receiver.recv().await {
+        channels
+            .send_input(&metadata, &node.id, &pipeline_item.record)
+            .await;
+        total_received += 1;
+        let PipelineItem {
+            idx,
+            mut record,
+            mut flattened,
+        } = pipeline_item;
+
+        let value_copy = if metadata.return_value_for_error {
+            Some(record.clone())
+        } else {
+            None
+        };
+
+        // value must be flattened before conditions can take effect
+        if metadata.flatten_records && !flattened && !record.is_null() && record.is_object() {
+            let flatten_timer = Instant::now();
+            let flatten_res = flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level);
+            *busy += flatten_timer.elapsed();
+            record = match flatten_res {
+                Ok(flattened) => flattened,
+                Err(e) => {
+                    let err_msg = format!("BranchNode error with flattening: {e}");
+                    if let Err(send_err) = channels
+                        .error_sender
+                        .send((
+                            node.id.to_string(),
+                            node.node_type(),
+                            err_msg,
+                            None,
+                            value_copy,
+                        ))
+                        .await
+                    {
+                        log::error!(
+                            "[Pipeline] {} [inv={inv_id}]: BranchNode failed sending errors for collection caused by: {send_err}",
+                            metadata.pipeline_name
+                        );
+                        break;
+                    }
+                    continue;
+                }
+            };
+            flattened = true;
+        }
+
+        // a null / non-object record was filtered out upstream and can satisfy no case
+        if !record.is_object() {
+            continue;
+        }
+
+        // first match wins: the record leaves via exactly one handle
+        let eval_timer = Instant::now();
+        let mut matched_handle: Option<&str> = None;
+        for case in &branch_params.cases {
+            let passes = match &case.conditions {
+                config::meta::pipeline::components::ConditionParams::V1 { conditions } => {
+                    conditions.evaluate(record.as_object().unwrap()).await
+                }
+                config::meta::pipeline::components::ConditionParams::V2 { conditions } => {
+                    conditions.evaluate(record.as_object().unwrap()).await
+                }
+            };
+            if passes {
+                matched_handle = Some(case.handle.as_str());
+                break;
+            }
+        }
+        *busy += eval_timer.elapsed();
+
+        let target_handle = matched_handle.or(branch_params.else_handle.as_deref());
+        let Some(target_handle) = target_handle else {
+            outcome.dropped += 1;
+            continue;
+        };
+
+        let Some((_, senders)) = handle_routes
+            .iter_mut()
+            .find(|(handle, _)| handle == target_handle)
+        else {
+            // a handle with no outgoing edge is a dead end, not an error
+            outcome.dropped += 1;
+            continue;
+        };
+
+        channels.send_output(&metadata, &node.id, &record).await;
+        send_to_children(
+            senders,
+            PipelineItem {
+                idx,
+                record,
+                flattened,
+            },
+            "BranchNode",
+        )
+        .await;
+        outcome.routed += 1;
+    }
+    log::info!(
+        "[Pipeline] {} [inv={inv_id}]: branch node {} done: received={total_received}, routed={}, dropped={}",
+        metadata.pipeline_name,
+        metadata.node_idx,
+        outcome.routed,
+        outcome.dropped,
+    );
+    outcome
+}
+
 async fn process_stream_node(
     stream_params: &StreamParams,
     metadata: ProcessMetadata,
@@ -2302,7 +2568,7 @@ async fn process_stream_node(
                 None
             };
 
-            if !flattened && !record.is_null() && record.is_object() {
+            if metadata.flatten_records && !flattened && !record.is_null() && record.is_object() {
                 let flatten_timer = Instant::now();
                 let flatten_res =
                     flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level);
@@ -2473,6 +2739,32 @@ async fn process_stream_node(
 }
 
 #[cfg(feature = "enterprise")]
+async fn drain_destination_node_with_error(
+    metadata: &ProcessMetadata,
+    channels: &mut ProcessChannels,
+    node: &ExecutableNode,
+    message: String,
+) -> Result<usize, anyhow::Error> {
+    while let Some(pipeline_item) = channels.receiver.recv().await {
+        channels
+            .send_input(metadata, &node.id, &pipeline_item.record)
+            .await;
+    }
+    if let Err(send_err) = channels
+        .error_sender
+        .send((node.id.to_string(), node.node_type(), message, None, None))
+        .await
+    {
+        log::error!(
+            "[Workflow] {} [inv={}]: destination node failed sending error for collection caused by: {send_err}",
+            metadata.pipeline_name,
+            metadata.inv_id,
+        );
+    }
+    Ok(0)
+}
+
+#[cfg(feature = "enterprise")]
 async fn process_destination_node(
     metadata: ProcessMetadata,
     mut channels: ProcessChannels,
@@ -2480,6 +2772,41 @@ async fn process_destination_node(
     destination: &WorkflowDestination,
 ) -> Result<usize, anyhow::Error> {
     if destination.destination_id.is_empty() {
+        return drain_destination_node_with_error(
+            &metadata,
+            &mut channels,
+            node,
+            "This destination node has no destination selected. Pick a destination for it."
+                .to_string(),
+        )
+        .await;
+    }
+
+    // Validation only: a suppressed run drops this and returns before any dispatch code.
+    let resolved = crate::alerts::destinations::get_with_template(
+        &metadata.org_id,
+        &destination.destination_id,
+    )
+    .await;
+
+    let resolved = match resolved {
+        Ok(v) => v,
+        Err(e) => {
+            return drain_destination_node_with_error(
+                &metadata,
+                &mut channels,
+                node,
+                format!(
+                    "Destination \"{}\" could not be resolved: {e}. It may have been renamed or deleted.",
+                    destination.destination_id
+                ),
+            )
+            .await;
+        }
+    };
+
+    if metadata.suppress_destinations {
+        drop(resolved);
         let mut count = 0;
         while let Some(pipeline_item) = channels.receiver.recv().await {
             channels
@@ -2487,19 +2814,22 @@ async fn process_destination_node(
                 .await;
             count += 1;
         }
-        log::debug!(
-            "[Pipeline] {} [inv={}]: skipped {count} records in destination due to empty destination id",
+        let preview = json::json!({
+            "suppressed": true,
+            "destination_id": destination.destination_id,
+            "record_count": count,
+        });
+        channels.send_output(&metadata, &node.id, &preview).await;
+        log::info!(
+            "[Workflow] {} [inv={}]: destination {} suppressed for a test run, {count} records not dispatched",
+            metadata.pipeline_name,
             metadata.inv_id,
-            metadata.pipeline_name
+            destination.destination_id,
         );
-        return Ok(0);
+        return Ok(count);
     }
 
-    let (dest, _) = crate::alerts::destinations::get_with_template(
-        &metadata.org_id,
-        &destination.destination_id,
-    )
-    .await?;
+    let (dest, _) = resolved;
 
     let cfg = config::get_config();
 
@@ -2898,6 +3228,7 @@ mod tests {
             sorted_nodes: vec!["eval".to_string()],
             function_map: HashMap::new(),
             node_map,
+            handle_children: HashMap::new(),
             kind: PipelineKind::User,
         };
 
@@ -2928,6 +3259,8 @@ mod tests {
             print_event: false,
             leaf_dest_stream: None,
             return_value_for_error: false,
+            suppress_destinations: false,
+            flatten_records: true,
         };
         let (input_tx, input_rx) = tokio::sync::mpsc::channel(1);
         let (child_tx, mut child_rx) = tokio::sync::mpsc::channel(1);
@@ -3561,6 +3894,8 @@ mod tests {
             print_event: false,
             leaf_dest_stream: None,
             return_value_for_error: false,
+            suppress_destinations: false,
+            flatten_records: true,
         }
     }
 
@@ -3805,5 +4140,887 @@ mod tests {
             .expect("currently succeeds instead of erroring on a trigger-less graph");
 
         assert_eq!(executable.source_node_id, "dest-1");
+    }
+
+    fn branch_metadata() -> ProcessMetadata {
+        ProcessMetadata {
+            pipeline_id: "pipeline-1".to_string(),
+            node_idx: 1,
+            org_id: "org-1".to_string(),
+            pipeline_name: "branch-workflow".to_string(),
+            pipeline_kind: PipelineKind::User,
+            stream_name: Some("logs".to_string()),
+            source_stream_name: "logs".to_string(),
+            source_stream_type: StreamType::Logs,
+            inv_id: "test".to_string(),
+            print_event: false,
+            leaf_dest_stream: None,
+            return_value_for_error: false,
+            suppress_destinations: false,
+            flatten_records: false,
+        }
+    }
+
+    fn eq_case(
+        handle: &str,
+        column: &str,
+        value: &str,
+    ) -> config::meta::pipeline::components::BranchCase {
+        config::meta::pipeline::components::BranchCase {
+            handle: handle.to_string(),
+            label: None,
+            conditions: config::meta::pipeline::components::ConditionParams::V1 {
+                conditions: config::meta::alerts::ConditionList::EndCondition(
+                    config::meta::alerts::Condition {
+                        column: column.to_string(),
+                        operator: config::meta::alerts::Operator::EqualTo,
+                        value: json::json!(value),
+                        ignore_case: false,
+                    },
+                ),
+            },
+        }
+    }
+
+    fn pass_all_condition() -> config::meta::pipeline::components::ConditionParams {
+        config::meta::pipeline::components::ConditionParams::V1 {
+            conditions: config::meta::alerts::ConditionList::EndCondition(
+                config::meta::alerts::Condition {
+                    column: "severity".to_string(),
+                    operator: config::meta::alerts::Operator::EqualTo,
+                    value: json::json!("high"),
+                    ignore_case: false,
+                },
+            ),
+        }
+    }
+
+    fn branch_exec_node(
+        id: &str,
+        params: config::meta::pipeline::components::BranchParams,
+        children: Vec<String>,
+    ) -> ExecutableNode {
+        ExecutableNode {
+            id: id.to_string(),
+            node_data: NodeData::Branch(params),
+            children,
+            is_disabled: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_branch_first_match_wins_when_record_matches_two_cases() {
+        let params = config::meta::pipeline::components::BranchParams {
+            cases: vec![
+                eq_case("case_0", "severity", "high"),
+                eq_case("case_1", "team", "nobody"),
+                eq_case("case_2", "region", "us"),
+            ],
+            else_handle: None,
+        };
+        let node = branch_exec_node(
+            "b1",
+            params.clone(),
+            vec!["c0".to_string(), "c1".to_string(), "c2".to_string()],
+        );
+
+        let (input_tx, input_rx) = tokio::sync::mpsc::channel(1);
+        let (c0_tx, mut c0_rx) = tokio::sync::mpsc::channel(1);
+        let (c1_tx, mut c1_rx) = tokio::sync::mpsc::channel(1);
+        let (c2_tx, mut c2_rx) = tokio::sync::mpsc::channel(1);
+        let (error_tx, _error_rx) = tokio::sync::mpsc::channel(1);
+
+        // matches case_0 and case_2; exclusivity means only case_0's child may receive it
+        input_tx
+            .send(PipelineItem {
+                idx: 0,
+                record: json::json!({"severity": "high", "region": "us"}),
+                flattened: true,
+            })
+            .await
+            .unwrap();
+        drop(input_tx);
+
+        let handle_routes = vec![
+            ("case_0".to_string(), vec![c0_tx]),
+            ("case_1".to_string(), vec![c1_tx]),
+            ("case_2".to_string(), vec![c2_tx]),
+        ];
+
+        let mut busy = Duration::ZERO;
+        let outcome = process_branch_node(
+            &params,
+            branch_metadata(),
+            &node,
+            ProcessChannels {
+                receiver: input_rx,
+                child_senders: vec![],
+                result_sender: None,
+                error_sender: error_tx,
+                inputs_sender: None,
+                outputs_sender: None,
+            },
+            handle_routes,
+            &mut busy,
+        )
+        .await;
+
+        assert_eq!(outcome.routed, 1);
+        assert_eq!(outcome.dropped, 0);
+        assert!(
+            c0_rx.try_recv().is_ok(),
+            "first matching case must receive the record"
+        );
+        assert!(c1_rx.try_recv().is_err());
+        assert!(
+            c2_rx.try_recv().is_err(),
+            "later matching case must not also receive it"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_branch_unmatched_record_goes_to_else_handle() {
+        let params = config::meta::pipeline::components::BranchParams {
+            cases: vec![eq_case("case_0", "severity", "high")],
+            else_handle: Some("else".to_string()),
+        };
+        let node = branch_exec_node(
+            "b1",
+            params.clone(),
+            vec!["c0".to_string(), "ce".to_string()],
+        );
+
+        let (input_tx, input_rx) = tokio::sync::mpsc::channel(1);
+        let (c0_tx, mut c0_rx) = tokio::sync::mpsc::channel(1);
+        let (ce_tx, mut ce_rx) = tokio::sync::mpsc::channel(1);
+        let (error_tx, _error_rx) = tokio::sync::mpsc::channel(1);
+
+        input_tx
+            .send(PipelineItem {
+                idx: 0,
+                record: json::json!({"severity": "low"}),
+                flattened: true,
+            })
+            .await
+            .unwrap();
+        drop(input_tx);
+
+        let handle_routes = vec![
+            ("case_0".to_string(), vec![c0_tx]),
+            ("else".to_string(), vec![ce_tx]),
+        ];
+
+        let mut busy = Duration::ZERO;
+        let outcome = process_branch_node(
+            &params,
+            branch_metadata(),
+            &node,
+            ProcessChannels {
+                receiver: input_rx,
+                child_senders: vec![],
+                result_sender: None,
+                error_sender: error_tx,
+                inputs_sender: None,
+                outputs_sender: None,
+            },
+            handle_routes,
+            &mut busy,
+        )
+        .await;
+
+        assert_eq!(outcome.routed, 1);
+        assert_eq!(outcome.dropped, 0);
+        assert!(c0_rx.try_recv().is_err());
+        assert!(
+            ce_rx.try_recv().is_ok(),
+            "unmatched record must leave via the else handle"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_branch_unmatched_record_without_else_is_dropped_and_counted() {
+        let params = config::meta::pipeline::components::BranchParams {
+            cases: vec![eq_case("case_0", "severity", "high")],
+            else_handle: None,
+        };
+        let node = branch_exec_node("b1", params.clone(), vec!["c0".to_string()]);
+
+        let (input_tx, input_rx) = tokio::sync::mpsc::channel(1);
+        let (c0_tx, mut c0_rx) = tokio::sync::mpsc::channel(1);
+        let (error_tx, _error_rx) = tokio::sync::mpsc::channel(1);
+
+        input_tx
+            .send(PipelineItem {
+                idx: 0,
+                record: json::json!({"severity": "low"}),
+                flattened: true,
+            })
+            .await
+            .unwrap();
+        drop(input_tx);
+
+        let handle_routes = vec![("case_0".to_string(), vec![c0_tx])];
+
+        let mut busy = Duration::ZERO;
+        let outcome = process_branch_node(
+            &params,
+            branch_metadata(),
+            &node,
+            ProcessChannels {
+                receiver: input_rx,
+                child_senders: vec![],
+                result_sender: None,
+                error_sender: error_tx,
+                inputs_sender: None,
+                outputs_sender: None,
+            },
+            handle_routes,
+            &mut busy,
+        )
+        .await;
+
+        assert!(
+            c0_rx.try_recv().is_err(),
+            "record matching no case must not be routed"
+        );
+        // A routed count of 0 alone cannot be told apart from "no records arrived", so
+        // the drop is only observable if it is counted separately.
+        assert_eq!(outcome.routed, 0);
+        assert_eq!(outcome.dropped, 1);
+    }
+
+    #[tokio::test]
+    async fn test_branch_routes_each_matching_record_to_its_own_handle() {
+        let params = config::meta::pipeline::components::BranchParams {
+            cases: vec![
+                eq_case("case_0", "severity", "high"),
+                eq_case("case_1", "severity", "low"),
+            ],
+            else_handle: None,
+        };
+        let node = branch_exec_node(
+            "b1",
+            params.clone(),
+            vec!["c0".to_string(), "c1".to_string()],
+        );
+
+        let (input_tx, input_rx) = tokio::sync::mpsc::channel(4);
+        let (c0_tx, mut c0_rx) = tokio::sync::mpsc::channel(4);
+        let (c1_tx, mut c1_rx) = tokio::sync::mpsc::channel(4);
+        let (error_tx, _error_rx) = tokio::sync::mpsc::channel(1);
+
+        for (idx, severity) in ["high", "low", "high"].iter().enumerate() {
+            input_tx
+                .send(PipelineItem {
+                    idx,
+                    record: json::json!({"severity": severity}),
+                    flattened: true,
+                })
+                .await
+                .unwrap();
+        }
+        drop(input_tx);
+
+        let handle_routes = vec![
+            ("case_0".to_string(), vec![c0_tx]),
+            ("case_1".to_string(), vec![c1_tx]),
+        ];
+
+        let mut busy = Duration::ZERO;
+        let outcome = process_branch_node(
+            &params,
+            branch_metadata(),
+            &node,
+            ProcessChannels {
+                receiver: input_rx,
+                child_senders: vec![],
+                result_sender: None,
+                error_sender: error_tx,
+                inputs_sender: None,
+                outputs_sender: None,
+            },
+            handle_routes,
+            &mut busy,
+        )
+        .await;
+
+        assert_eq!(outcome.routed, 3);
+        assert_eq!(outcome.dropped, 0);
+        let mut c0 = 0;
+        while c0_rx.try_recv().is_ok() {
+            c0 += 1;
+        }
+        let mut c1 = 0;
+        while c1_rx.try_recv().is_ok() {
+            c1 += 1;
+        }
+        assert_eq!(c0, 2);
+        assert_eq!(c1, 1);
+    }
+
+    #[tokio::test]
+    async fn test_condition_node_still_fans_out_to_all_children_on_pass() {
+        let params = config::meta::pipeline::components::ConditionParams::V1 {
+            conditions: config::meta::alerts::ConditionList::EndCondition(
+                config::meta::alerts::Condition {
+                    column: "severity".to_string(),
+                    operator: config::meta::alerts::Operator::EqualTo,
+                    value: json::json!("high"),
+                    ignore_case: false,
+                },
+            ),
+        };
+        let node = ExecutableNode {
+            id: "cond-1".to_string(),
+            node_data: NodeData::Condition(params.clone()),
+            children: vec!["c0".to_string(), "c1".to_string()],
+            is_disabled: false,
+        };
+
+        let (input_tx, input_rx) = tokio::sync::mpsc::channel(2);
+        let (c0_tx, mut c0_rx) = tokio::sync::mpsc::channel(2);
+        let (c1_tx, mut c1_rx) = tokio::sync::mpsc::channel(2);
+        let (error_tx, _error_rx) = tokio::sync::mpsc::channel(1);
+
+        input_tx
+            .send(PipelineItem {
+                idx: 0,
+                record: json::json!({"severity": "high"}),
+                flattened: true,
+            })
+            .await
+            .unwrap();
+        input_tx
+            .send(PipelineItem {
+                idx: 1,
+                record: json::json!({"severity": "low"}),
+                flattened: true,
+            })
+            .await
+            .unwrap();
+        drop(input_tx);
+
+        let mut busy = Duration::ZERO;
+        let count = process_condition_node(
+            &params,
+            branch_metadata(),
+            &node,
+            ProcessChannels {
+                receiver: input_rx,
+                child_senders: vec![c0_tx, c1_tx],
+                result_sender: None,
+                error_sender: error_tx,
+                inputs_sender: None,
+                outputs_sender: None,
+            },
+            &mut busy,
+        )
+        .await;
+
+        // adding Branch must not turn Condition into an exclusive router
+        assert_eq!(count, 1);
+        assert!(c0_rx.try_recv().is_ok());
+        assert!(c1_rx.try_recv().is_ok());
+        assert!(c0_rx.try_recv().is_err());
+        assert!(c1_rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn test_workflow_without_handles_keeps_full_fan_out_children() {
+        let trigger = Node::new(
+            "t1".to_string(),
+            NodeData::WorkflowTrigger,
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        let dest_a = Node::new(
+            "d1".to_string(),
+            NodeData::Destination(config::meta::pipeline::components::WorkflowDestination {
+                destination_id: "dest-a".to_string(),
+                template_override: None,
+            }),
+            0.0,
+            0.0,
+            "output".to_string(),
+        );
+        let dest_b = Node::new(
+            "d2".to_string(),
+            NodeData::Destination(config::meta::pipeline::components::WorkflowDestination {
+                destination_id: "dest-b".to_string(),
+                template_override: None,
+            }),
+            0.0,
+            0.0,
+            "output".to_string(),
+        );
+        let workflow = test_workflow(
+            vec![trigger, dest_a, dest_b],
+            vec![
+                Edge::new("t1".to_string(), "d1".to_string()),
+                Edge::new("t1".to_string(), "d2".to_string()),
+            ],
+        );
+
+        let executable = ExecutablePipeline::new_from_workflow(&workflow)
+            .await
+            .expect("handle-less graph must still build");
+
+        let trigger_node = executable.node_map.get("t1").unwrap();
+        assert_eq!(trigger_node.children.len(), 2);
+        // leaf detection must survive the parallel handle structure
+        assert!(executable.node_map.get("d1").unwrap().children.is_empty());
+        assert!(executable.node_map.get("d2").unwrap().children.is_empty());
+
+        // Same graph with ONE handled edge added: the handle-less children must be
+        // unaffected BY the presence of handle-aware wiring, which is the actual
+        // zero-impact guarantee. Without this the assertions above never reach the new path.
+        let mixed = test_workflow(
+            vec![
+                Node::new(
+                    "t1".to_string(),
+                    NodeData::WorkflowTrigger,
+                    0.0,
+                    0.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "d1".to_string(),
+                    NodeData::Destination(
+                        config::meta::pipeline::components::WorkflowDestination {
+                            destination_id: "dest-a".to_string(),
+                            template_override: None,
+                        },
+                    ),
+                    0.0,
+                    0.0,
+                    "output".to_string(),
+                ),
+            ],
+            vec![Edge::new_with_handle(
+                "t1".to_string(),
+                "d1".to_string(),
+                "true".to_string(),
+            )],
+        );
+        let executable = ExecutablePipeline::new_from_workflow(&mixed)
+            .await
+            .expect("graph with a handled edge must still build");
+        assert_eq!(executable.node_map.get("t1").unwrap().children.len(), 1);
+        assert!(executable.node_map.get("d1").unwrap().children.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_workflow_branch_routes_record_to_the_matching_handles_child() {
+        let branch_params = config::meta::pipeline::components::BranchParams {
+            cases: vec![
+                eq_case("case_0", "severity", "high"),
+                eq_case("case_1", "severity", "low"),
+            ],
+            else_handle: None,
+        };
+        let workflow = test_workflow(
+            vec![
+                Node::new(
+                    "t1".to_string(),
+                    NodeData::WorkflowTrigger,
+                    0.0,
+                    0.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "b1".to_string(),
+                    NodeData::Branch(branch_params),
+                    0.0,
+                    0.0,
+                    "default".to_string(),
+                ),
+                Node::new(
+                    "high_arm".to_string(),
+                    NodeData::Condition(pass_all_condition()),
+                    0.0,
+                    0.0,
+                    "default".to_string(),
+                ),
+                Node::new(
+                    "low_arm".to_string(),
+                    NodeData::Condition(pass_all_condition()),
+                    0.0,
+                    0.0,
+                    "default".to_string(),
+                ),
+            ],
+            vec![
+                Edge::new("t1".to_string(), "b1".to_string()),
+                Edge::new_with_handle(
+                    "b1".to_string(),
+                    "high_arm".to_string(),
+                    "case_0".to_string(),
+                ),
+                Edge::new_with_handle(
+                    "b1".to_string(),
+                    "low_arm".to_string(),
+                    "case_1".to_string(),
+                ),
+            ],
+        );
+
+        let executable = ExecutablePipeline::new_from_workflow(&workflow)
+            .await
+            .expect("branch workflow must build");
+
+        let result = executable
+            .process_workflow("org-1", vec![json::json!({"severity": "high"})], None)
+            .await
+            .expect("workflow run must not fail");
+
+        assert!(
+            result.inputs.contains_key("high_arm"),
+            "case_0's child must receive the record, got inputs for {:?}",
+            result.inputs.keys().collect::<Vec<_>>()
+        );
+        assert!(
+            !result.inputs.contains_key("low_arm"),
+            "the non-matching handle's child must receive nothing"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_suppressed_destination_reports_routing_without_dispatching() {
+        seed_pipeline_destination("org-1", "pagerduty");
+        let workflow = destination_workflow("pagerduty");
+
+        let executable = ExecutablePipeline::new_from_workflow(&workflow)
+            .await
+            .expect("workflow must build");
+
+        let result = executable
+            .process_workflow_with_options(
+                "org-1",
+                vec![json::json!({"severity": "high"})],
+                None,
+                WorkflowRunOptions {
+                    suppress_destinations: true,
+                },
+            )
+            .await
+            .expect("suppressed run must not fail");
+
+        assert!(
+            result.errors.is_empty(),
+            "a suppressed destination must not surface an error, got {:?}",
+            result.errors.keys().collect::<Vec<_>>()
+        );
+        let output = result
+            .outputs
+            .get("d1")
+            .expect("suppressed destination must still report an output");
+        assert_eq!(
+            output.first().and_then(|v| v.get("suppressed")),
+            Some(&json::json!(true)),
+            "suppressed destination output must be marked suppressed, got {output:?}"
+        );
+        assert_eq!(
+            output.first().and_then(|v| v.get("destination_id")),
+            Some(&json::json!("pagerduty")),
+            "suppressed destination must report WHICH destination it would have used"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn seed_pipeline_destination(org_id: &str, name: &str) {
+        use config::meta::destinations::{Destination, Endpoint, Module};
+        common::infra::config::DESTINATIONS.insert(
+            format!("{org_id}/{name}"),
+            Destination {
+                id: None,
+                org_id: org_id.to_string(),
+                name: name.to_string(),
+                module: Module::Pipeline {
+                    endpoint: Endpoint {
+                        url: "http://127.0.0.1:1/never-dispatched".to_string(),
+                        ..Default::default()
+                    },
+                },
+            },
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn destination_workflow(destination_id: &str) -> Workflow {
+        let trigger = Node::new(
+            "t1".to_string(),
+            NodeData::WorkflowTrigger,
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        let dest = Node::new(
+            "d1".to_string(),
+            NodeData::Destination(config::meta::pipeline::components::WorkflowDestination {
+                destination_id: destination_id.to_string(),
+                template_override: None,
+            }),
+            0.0,
+            0.0,
+            "output".to_string(),
+        );
+        test_workflow(
+            vec![trigger, dest],
+            vec![Edge::new("t1".to_string(), "d1".to_string())],
+        )
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_suppressed_run_with_unknown_destination_reports_node_error() {
+        let workflow = destination_workflow("THIS_DOES_NOT_EXIST");
+        let executable = ExecutablePipeline::new_from_workflow(&workflow)
+            .await
+            .expect("workflow must build");
+
+        let result = executable
+            .process_workflow_with_options(
+                "org-1",
+                vec![json::json!({"severity": "high"})],
+                None,
+                WorkflowRunOptions {
+                    suppress_destinations: true,
+                },
+            )
+            .await
+            .expect("run must complete");
+
+        let node_error = result
+            .errors
+            .get("d1")
+            .expect("an unresolvable destination must surface as a node error");
+        let messages: Vec<String> = node_error.errors.iter().map(|(m, _)| m.clone()).collect();
+        assert!(
+            messages.iter().any(|m| m.contains("THIS_DOES_NOT_EXIST")),
+            "the error must name the destination, got {messages:?}"
+        );
+        assert!(
+            !result.outputs.contains_key("d1"),
+            "an unresolvable destination must not report a green suppressed output"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_empty_destination_id_reports_node_error() {
+        let workflow = destination_workflow("");
+        let executable = ExecutablePipeline::new_from_workflow(&workflow)
+            .await
+            .expect("workflow must build");
+
+        let result = executable
+            .process_workflow_with_options(
+                "org-1",
+                vec![json::json!({"severity": "high"})],
+                None,
+                WorkflowRunOptions {
+                    suppress_destinations: true,
+                },
+            )
+            .await
+            .expect("run must complete");
+
+        let node_error = result
+            .errors
+            .get("d1")
+            .expect("an empty destination id must surface as a node error, not a silent no-op");
+        let messages: Vec<String> = node_error.errors.iter().map(|(m, _)| m.clone()).collect();
+        assert!(
+            messages.iter().any(|m| m.contains("no destination")),
+            "the error must state that no destination is selected, got {messages:?}"
+        );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_unsuppressed_run_with_unknown_destination_reports_node_error() {
+        let workflow = destination_workflow("ALSO_MISSING");
+        let executable = ExecutablePipeline::new_from_workflow(&workflow)
+            .await
+            .expect("workflow must build");
+
+        let result = executable
+            .process_workflow_with_options(
+                "org-1",
+                vec![json::json!({"severity": "high"})],
+                None,
+                WorkflowRunOptions {
+                    suppress_destinations: false,
+                },
+            )
+            .await
+            .expect("run must complete");
+
+        let node_error = result
+            .errors
+            .get("d1")
+            .expect("an unresolvable destination must error even when not suppressed");
+        let messages: Vec<String> = node_error.errors.iter().map(|(m, _)| m.clone()).collect();
+        assert!(
+            messages.iter().any(|m| m.contains("ALSO_MISSING")),
+            "the error must name the destination, got {messages:?}"
+        );
+    }
+
+    fn eq_case_num(
+        handle: &str,
+        column: &str,
+        value: i64,
+    ) -> config::meta::pipeline::components::BranchCase {
+        config::meta::pipeline::components::BranchCase {
+            handle: handle.to_string(),
+            label: None,
+            conditions: config::meta::pipeline::components::ConditionParams::V1 {
+                conditions: config::meta::alerts::ConditionList::EndCondition(
+                    config::meta::alerts::Condition {
+                        column: column.to_string(),
+                        operator: config::meta::alerts::Operator::EqualTo,
+                        value: json::json!(value),
+                        ignore_case: false,
+                    },
+                ),
+            },
+        }
+    }
+
+    fn nested_alert_payload() -> Value {
+        json::json!({
+            "meta": {"alert_count": 50, "alert_name": "verify"},
+            "data": []
+        })
+    }
+
+    // A workflow's event shape (`meta`, `data[]`) is the contract the user writes
+    // conditions and functions against, so a Condition node must pass it through intact.
+    #[tokio::test]
+    async fn test_workflow_condition_does_not_flatten_the_record() {
+        let condition = config::meta::pipeline::components::ConditionParams::V1 {
+            conditions: config::meta::alerts::ConditionList::EndCondition(
+                config::meta::alerts::Condition {
+                    column: "meta_alert_count".to_string(),
+                    operator: config::meta::alerts::Operator::EqualTo,
+                    value: json::json!(50),
+                    ignore_case: false,
+                },
+            ),
+        };
+        let workflow = test_workflow(
+            vec![
+                Node::new(
+                    "t1".to_string(),
+                    NodeData::WorkflowTrigger,
+                    0.0,
+                    0.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "c1".to_string(),
+                    NodeData::Condition(condition),
+                    0.0,
+                    0.0,
+                    "default".to_string(),
+                ),
+            ],
+            vec![Edge::new("t1".to_string(), "c1".to_string())],
+        );
+
+        let executable = ExecutablePipeline::new_from_workflow(&workflow)
+            .await
+            .expect("condition workflow must build");
+
+        let result = executable
+            .process_workflow("org-1", vec![nested_alert_payload()], None)
+            .await
+            .expect("workflow run must not fail");
+
+        let output = result
+            .outputs
+            .get("c1")
+            .and_then(|o| o.first())
+            .expect("a condition matching on the flat key must still pass the record");
+        assert_eq!(
+            output,
+            &nested_alert_payload(),
+            "the condition node must forward the record unflattened"
+        );
+    }
+
+    // The same guarantee for Branch, whose routing also evaluates conditions.
+    #[tokio::test]
+    async fn test_workflow_branch_does_not_flatten_the_record() {
+        let branch_params = config::meta::pipeline::components::BranchParams {
+            cases: vec![eq_case_num("case_0", "meta_alert_count", 50)],
+            else_handle: None,
+        };
+        let workflow = test_workflow(
+            vec![
+                Node::new(
+                    "t1".to_string(),
+                    NodeData::WorkflowTrigger,
+                    0.0,
+                    0.0,
+                    "input".to_string(),
+                ),
+                Node::new(
+                    "b1".to_string(),
+                    NodeData::Branch(branch_params),
+                    0.0,
+                    0.0,
+                    "default".to_string(),
+                ),
+                Node::new(
+                    "arm".to_string(),
+                    NodeData::Condition(config::meta::pipeline::components::ConditionParams::V1 {
+                        conditions: config::meta::alerts::ConditionList::EndCondition(
+                            config::meta::alerts::Condition {
+                                column: "meta.alert_name".to_string(),
+                                operator: config::meta::alerts::Operator::EqualTo,
+                                value: json::json!("verify"),
+                                ignore_case: false,
+                            },
+                        ),
+                    }),
+                    0.0,
+                    0.0,
+                    "default".to_string(),
+                ),
+            ],
+            vec![
+                Edge::new("t1".to_string(), "b1".to_string()),
+                Edge::new_with_handle("b1".to_string(), "arm".to_string(), "case_0".to_string()),
+            ],
+        );
+
+        let executable = ExecutablePipeline::new_from_workflow(&workflow)
+            .await
+            .expect("branch workflow must build");
+
+        let result = executable
+            .process_workflow("org-1", vec![nested_alert_payload()], None)
+            .await
+            .expect("workflow run must not fail");
+
+        let arm_input = result
+            .inputs
+            .get("arm")
+            .and_then(|i| i.first())
+            .expect("the matching handle's child must receive the record");
+        assert_eq!(
+            arm_input,
+            &nested_alert_payload(),
+            "the branch node must route the record unflattened"
+        );
+        // A dotted-path condition downstream must also still match the nested record.
+        assert!(
+            result.outputs.contains_key("arm"),
+            "the downstream condition must match against the nested shape"
+        );
     }
 }
