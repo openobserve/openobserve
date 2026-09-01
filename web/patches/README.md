@@ -11,33 +11,50 @@ They are applied by `patch-package` through the `postinstall` script in
 
 ---
 
-## Upgrades are allowed — the install fails loudly instead
+## Upgrades are allowed — only a patch that cannot apply is fatal
 
 These packages are **not pinned**. They upgrade normally, including through the
-weekly `npm-update` workflow.
-
-`patch-package` binds a patch file to one exact version
-(`@tanstack+vue-form+1.33.3.patch` applies to 1.33.3), so any bump invalidates
-the patch. That is fine, because `postinstall` runs with:
+weekly `npm-update` workflow. `postinstall` runs:
 
 ```
-patch-package --error-on-fail --error-on-warn
+patch-package --error-on-fail
 ```
 
-`--error-on-warn` is the important half. Without it, a version bump where the
-patch still applies only prints a warning and exits 0 — the patch quietly stops
-matching and the leak comes back unnoticed. With it, **any** drift is a non-zero
-exit and the install fails.
+That gives exactly two outcomes, both verified against this repo:
 
-So when one of these is upgraded:
+| Situation | Result |
+|---|---|
+| Version changed, patch still applies to the new source | **warning, exit 0** — patch applied, install proceeds |
+| Patch content no longer matches the source | **exit 1** — install fails, naming the package |
 
-- `npm ci` fails in the PR's CI checks with a patch-package error naming the
-  package. (The `npm-update` workflow itself only runs
-  `npm install --package-lock-only`, which skips scripts — the red check appears
-  on the PR it opens, not in the workflow.)
-- Local installs fail the same way.
+A version bump on its own does not break the build; only genuinely stale patch
+content does. (`--error-on-warn` would fail the first row too, which is why it is
+deliberately *not* used.)
 
-**What to do when that happens** — do not just delete the patch to get green:
+### Why the version stays in the patch filename
+
+`patch-package` identifies which package a patch belongs to by parsing
+`name+version.patch`. The version is structural, not decorative — renaming
+`vue-draggable-next+2.3.0.patch` to `vue-draggable-next.patch` gives:
+
+```
+Unrecognized patch file in patches directory vue-draggable-next.patch
+patch-package finished with 1 warning(s).
+```
+
+…exiting **0 with the patch silently unapplied** — the worst available failure
+mode. Leave the version in the name. The mismatch warning it prints after an
+upgrade is informational: it says the patch is running against a version it was
+not authored against, without blocking anything.
+
+### When an upgrade does break a patch
+
+`npm ci` fails in the PR's CI checks naming the package. The `npm-update`
+workflow itself only runs `npm install --package-lock-only`, which skips
+scripts, so the red check appears on the PR it opens rather than in the workflow
+log. Local installs fail the same way.
+
+**Do not just delete the patch to get green:**
 
 1. Check whether upstream has released the fix. For `@tanstack/vue-form` that is
    https://github.com/TanStack/form/pull/2364 — once it ships, **delete the

@@ -8,7 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "postinstall": "patch-package --error-on-fail --error-on-warn",
+    "postinstall": "patch-package --error-on-fail",
     "dev": "vite --base /web/",
     "devcloud": "NODE_ENV=devcloud vite --mode=devcloud",
     "build-alpha1": "run-p type-check build-only-alpha1",
