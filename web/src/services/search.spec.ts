@@ -720,13 +720,7 @@ describe("Search Service", () => {
     });
 
     it("should get search history scoped to a traces stream", async () => {
-      await search.get_history(
-        "test-org",
-        1609459200,
-        1609545600,
-        "traces",
-        "my-trace-stream",
-      );
+      await search.get_history("test-org", 1609459200, 1609545600, "traces", "my-trace-stream");
 
       expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/_search_history", {
         stream_type: "traces",
@@ -739,13 +733,7 @@ describe("Search Service", () => {
     });
 
     it("should get search history scoped to a metrics stream", async () => {
-      await search.get_history(
-        "test-org",
-        1609459200,
-        1609545600,
-        "metrics",
-        "my-metric-stream",
-      );
+      await search.get_history("test-org", 1609459200, 1609545600, "metrics", "my-metric-stream");
 
       expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/_search_history", {
         stream_type: "metrics",
