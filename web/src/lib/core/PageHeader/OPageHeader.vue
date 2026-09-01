@@ -56,9 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[
       tabsBelow
         ? 'flex flex-col'
-        : // < md the fixed 60px row relaxes: actions may wrap under the title
-          // instead of crushing it to zero width.
-          'flex items-center justify-between gap-x-4 gap-y-1 max-md:min-h-15 max-md:flex-wrap max-md:py-1.5 md:h-15',
+        : // min-h (not h): when the actions don't fit beside the title they
+          // wrap under it instead of overlapping or crushing it to zero width.
+          'flex min-h-15 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-1.5',
     ]"
   >
     <!-- Row 1. In two-row mode this is its own flex row; otherwise it collapses
@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       :class="
         tabsBelow
-          ? 'flex items-center justify-between gap-x-4 gap-y-1 max-md:min-h-15 max-md:flex-wrap max-md:py-1.5 md:h-15'
+          ? 'flex min-h-15 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-1.5'
           : 'contents'
       "
     >
@@ -78,8 +78,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            shares its row with a full toolbar. -->
       <!-- Wrap only when inline tabs need their own row; otherwise nowrap so
            the title truncates BESIDE the back tile instead of under it. -->
+      <!-- md:min-w-60: flex-1 makes the block basis-0, so without a desktop
+           floor a wide toolbar never wraps — it overlaps the title instead. -->
       <div
-        class="flex h-full min-w-0 flex-1 items-center gap-3.25"
+        class="flex h-full min-w-0 flex-1 items-center gap-3.25 md:min-w-60"
         :class="[
           hasBack ? 'max-md:min-w-40' : 'max-md:min-w-24',
           hasTabs && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
@@ -122,9 +124,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- max-md:shrink: a long subtitle must not push the block past the
              viewport on phones — it truncates instead (desktop keeps shrink-0
              so inline tabs can't squeeze a short title). -->
+        <!-- Without inline tabs there is nothing to defend shrink-0 against, and
+             keeping it lets a long title overlap a wide actions row — so the
+             block stays shrinkable (with a floor so a stub always survives)
+             and truncates instead. -->
         <div
           class="flex min-w-0 flex-col justify-center"
-          :class="titleOverflow === 'visible' ? '' : 'shrink-0 max-md:shrink'"
+          :class="
+            titleOverflow === 'visible'
+              ? ''
+              : hasTabs && !tabsBelow
+                ? 'shrink-0 max-md:shrink'
+                : 'shrink md:min-w-32'
+          "
         >
           <h1
             class="text-text-heading min-h-6 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
@@ -179,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            instead of wrapping within its own row. -->
       <div
         v-if="hasActions || hasActionsOverflow"
-        class="flex shrink-0 items-center gap-2 max-md:ml-auto max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
+        class="ml-auto flex shrink-0 items-center gap-2 max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
       >
         <slot name="actions" />
 
