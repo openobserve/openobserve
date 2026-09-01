@@ -18,7 +18,12 @@ use std::sync::Arc;
 use arrow::record_batch::RecordBatch;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
-    meta::{cluster::IntoArcVec, search::ScanStats, stream::StreamType},
+    meta::{
+        cluster::IntoArcVec,
+        promql::{HASH_LABEL, STREAMING_AGG_TABLE_SUFFIX},
+        search::ScanStats,
+        stream::StreamType,
+    },
 };
 use datafusion::{
     arrow::datatypes::Schema,
@@ -104,12 +109,62 @@ pub(crate) async fn create_context(
         .stream_type(StreamType::Metrics)
         .build(0)
         .await?;
-    let mem_table = Arc::new(MemTable::try_new(schema.clone(), vec![batches])?);
+    let mem_table = match hash_sorted_wal_table(&schema, &batches)? {
+        Some(sorted) => {
+            let sorted = Arc::new(sorted);
+            ctx.register_table(
+                format!("{stream_name}{STREAMING_AGG_TABLE_SUFFIX}"),
+                sorted.clone(),
+            )?;
+            sorted
+        }
+        None => Arc::new(MemTable::try_new(schema.clone(), vec![batches])?),
+    };
     log::info!("[trace_id {trace_id}] promql->wal->search: register mem table done");
     ctx.register_table(stream_name, mem_table)?;
     resp.push((ctx, schema, stats, true));
 
     Ok(resp)
+}
+
+/// The WAL rows sorted by `(__hash__, _timestamp)` with the order declared, so
+/// the streaming path can merge them as one more chain per band; `None` when
+/// the schema cannot support the ordered scan.
+fn hash_sorted_wal_table(
+    schema: &Arc<Schema>,
+    batches: &[RecordBatch],
+) -> Result<Option<MemTable>> {
+    if !get_config().search.feature_metrics_streaming_agg_enabled {
+        return Ok(None);
+    }
+    let hash_is_u64 = schema
+        .field_with_name(HASH_LABEL)
+        .is_ok_and(|field| field.data_type() == &arrow::datatypes::DataType::UInt64);
+    if !hash_is_u64 || schema.field_with_name(TIMESTAMP_COL_NAME).is_err() {
+        return Ok(None);
+    }
+    let merged = arrow::compute::concat_batches(schema, batches)?;
+    let sort_column = |name: &str| arrow::compute::SortColumn {
+        values: merged.column_by_name(name).expect("field checked").clone(),
+        options: None,
+    };
+    let indices = arrow::compute::lexsort_to_indices(
+        &[sort_column(HASH_LABEL), sort_column(TIMESTAMP_COL_NAME)],
+        None,
+    )?;
+    let columns = merged
+        .columns()
+        .iter()
+        .map(|column| arrow::compute::take(column.as_ref(), &indices, None))
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    let sorted = RecordBatch::try_new(schema.clone(), columns)?;
+    let sort_order = vec![vec![
+        col(HASH_LABEL).sort(true, false),
+        col(TIMESTAMP_COL_NAME).sort(true, false),
+    ]];
+    Ok(Some(
+        MemTable::try_new(schema.clone(), vec![vec![sorted]])?.with_sort_order(sort_order),
+    ))
 }
 
 /// Register a placeholder metrics table for a distributed WAL search.

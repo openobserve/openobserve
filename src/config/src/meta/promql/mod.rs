@@ -76,6 +76,9 @@ pub const BUCKET_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
+/// Table registered alongside a metrics table when every backing file is
+/// `(__hash__, _timestamp)` sorted, with that ordering declared to DataFusion.
+pub const STREAMING_AGG_TABLE_SUFFIX: &str = "__hash_sorted";
 
 /// Columns that metrics ingestion may exclude when deriving [`HASH_LABEL`].
 ///

@@ -16,7 +16,7 @@
 //! Vector/matrix selector evaluation and data loading. Reads `ctx`,
 //! `label_selector`, and `skip_labels`; writes `result_type`.
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::{NAME_LABEL, value::*};
 use datafusion::error::{DataFusionError, Result};
@@ -25,14 +25,16 @@ use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
 use promql_parser::{
     label::{MatchOp, Matchers},
-    parser::{Offset, VectorSelector},
+    parser::{LabelModifier, MatrixSelector, Offset, VectorSelector},
 };
 use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 use super::Engine;
 use crate::{
+    functions, fused,
     load_series::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
     micros,
+    promql::rewrite::remove_filter_all,
 };
 
 impl Engine {
@@ -503,6 +505,108 @@ impl Engine {
         );
 
         Ok(metrics)
+    }
+
+    /// Attempts the streaming fused path: series arrive whole from
+    /// `(__hash__, _timestamp)` ordered scans and fold straight into the
+    /// aggregation, so the sample matrix is never materialized. `None` means
+    /// the query shape or the storage layout requires the materializing path.
+    pub(super) async fn try_streaming_fused_agg(
+        &mut self,
+        matrix_selector: &MatrixSelector,
+        modifier: &Option<LabelModifier>,
+        func: Arc<dyn functions::RangeFunc>,
+        op: fused::FusedAggOp,
+    ) -> Result<Option<Value>> {
+        let query_ctx = &self.ctx.query_ctx;
+        if !config::get_config()
+            .search
+            .feature_metrics_streaming_agg_enabled
+            || query_ctx.query_exemplars
+            || query_ctx.query_data
+            || query_ctx.is_super_cluster
+        {
+            return Ok(None);
+        }
+        let MatrixSelector { vs, range } = matrix_selector;
+        let range = *range;
+        let mut selector = vs.clone();
+        remove_filter_all(&mut selector);
+        if !selector.matchers.or_matchers.is_empty() || selector.at.is_some() {
+            return Ok(None);
+        }
+        if selector.name.is_none() {
+            let names = selector.matchers.find_matchers(NAME_LABEL);
+            let Some(matcher) = names.first() else {
+                return Ok(None);
+            };
+            selector.name = Some(matcher.value.clone());
+            selector
+                .matchers
+                .matchers
+                .retain(|mat| mat.name != NAME_LABEL);
+        }
+        let table_name = selector.name.clone().unwrap();
+
+        let offset = get_offset_modifier(selector.offset.clone());
+        let start = self.ctx.start - micros(range) - offset;
+        let end = self.ctx.end - offset;
+        let mut filters = equal_matcher_filters(&selector.matchers);
+        let mut label_selector = self.label_selector.clone();
+        label_selector.extend(self.ctx.label_selector.iter().cloned());
+
+        let ctxs = self
+            .ctx
+            .table_provider
+            .create_context(
+                &query_ctx.org_id,
+                &table_name,
+                (start, end),
+                selector.matchers.clone(),
+                label_selector,
+                &mut filters,
+            )
+            .await?;
+        // every context contributes chains to the same bands; an empty schema
+        // is the no-data WAL placeholder
+        let mut scan_stats = config::meta::search::ScanStats::default();
+        let mut streaming_ctxs = Vec::with_capacity(ctxs.len());
+        for (ctx, schema, stats, keep_filters) in ctxs {
+            if schema.fields().is_empty() {
+                continue;
+            }
+            scan_stats.add(&stats);
+            streaming_ctxs.push((ctx, schema, keep_filters));
+        }
+        if streaming_ctxs.is_empty() {
+            return Ok(None);
+        }
+
+        let value = fused::streaming_fused_agg(
+            &streaming_ctxs,
+            fused::StreamingSelector {
+                table_name: &table_name,
+                matchers: &selector.matchers,
+                start: self.eval_ctx.start - offset,
+                end: self.eval_ctx.end - offset,
+                step: self.eval_ctx.step,
+                lookback: micros(range),
+                offset,
+            },
+            fused::FusedShape { op, func, range },
+            modifier,
+            &self.eval_ctx,
+            query_ctx.timeout,
+        )
+        .await?;
+        if value.is_some() {
+            let mut ctx_scan_stats = self.ctx.scan_stats.write().await;
+            ctx_scan_stats.add(&scan_stats);
+            if self.result_type.is_none() {
+                self.result_type = Some("matrix".to_string());
+            }
+        }
+        Ok(value)
     }
 }
 
