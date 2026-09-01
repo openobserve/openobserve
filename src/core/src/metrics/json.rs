@@ -431,7 +431,7 @@ pub async fn ingest(
         ));
         let mut triggers: TriggerAlertData =
             Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
-        let mut evaluated_alerts = HashSet::new();
+        let mut trigger_slots: HashMap<String, super::TriggerSlot> = HashMap::new();
         // End get stream alert
 
         for (mut record, metric_type) in json_data {
@@ -556,9 +556,7 @@ pub async fn ingest(
             stream_status.status.successful += 1;
 
             // start check for alert trigger
-            if let Some(alerts) = cur_stream_alerts
-                && triggers.len() < alerts.len()
-            {
+            if let Some(alerts) = cur_stream_alerts {
                 let end_time = now_micros();
                 for alert in alerts {
                     let key = format!(
@@ -568,15 +566,20 @@ pub async fn ingest(
                         alert.stream_name,
                         alert.get_unique_key()
                     );
-                    // For one alert, only one trigger per request
-                    // Trigger for this alert is already added.
-                    if evaluated_alerts.contains(&key) {
+                    // One row per label set: a series repeats its labels on every sample.
+                    if !super::trigger_wants_labels(&trigger_slots, &key, hash) {
                         continue;
                     }
                     match alert.evaluate(Some(&record), (None, end_time), None).await {
                         Ok(trigger_results) if trigger_results.data.is_some() => {
-                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
-                            evaluated_alerts.insert(key);
+                            super::merge_trigger_rows(
+                                &mut triggers,
+                                &mut trigger_slots,
+                                &key,
+                                hash,
+                                alert,
+                                trigger_results.data.unwrap(),
+                            );
                         }
                         Ok(_) => {
                             // the data doesn't satisfy the alert condition

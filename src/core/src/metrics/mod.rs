@@ -13,17 +13,34 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::{HashMap, HashSet};
+
 use config::{
-    meta::promql::{METRICS_HASH_EXCLUDED_LABELS, Metadata},
+    meta::{
+        alerts::{alert, level::PAYLOAD_SAMPLE_ROWS},
+        promql::{METRICS_HASH_EXCLUDED_LABELS, Metadata},
+    },
     utils::hash::{Sum64, gxhash},
 };
 use datafusion::arrow::datatypes::Schema;
+
+use crate::ingestion::TriggerAlertData;
 
 pub mod json;
 mod native_histogram;
 pub mod otlp;
 mod otlp_json_compat;
 pub mod prom;
+
+/// Distinct label sets one realtime notification carries, matching the scheduled path's sample.
+const TRIGGER_LABEL_LIMIT: usize = PAYLOAD_SAMPLE_ROWS as usize;
+
+/// An alert's pending notification for the request being ingested.
+struct TriggerSlot {
+    idx: usize,
+    /// Label sets already represented, so a series repeating across samples adds one row.
+    labels: HashSet<u64>,
+}
 
 /// The value policy for every metric we ingest, on every path.
 ///
@@ -83,6 +100,46 @@ pub fn signature_without_labels(
 
 fn get_exclude_labels() -> &'static [&'static str] {
     METRICS_HASH_EXCLUDED_LABELS
+}
+
+/// Whether this label set would add anything to `key`'s pending notification.
+fn trigger_wants_labels(
+    trigger_slots: &HashMap<String, TriggerSlot>,
+    key: &str,
+    labels: u64,
+) -> bool {
+    match trigger_slots.get(key) {
+        Some(slot) => slot.labels.len() < TRIGGER_LABEL_LIMIT && !slot.labels.contains(&labels),
+        None => true,
+    }
+}
+
+/// Record an evaluation against `key`, one row per distinct label set.
+fn merge_trigger_rows(
+    triggers: &mut TriggerAlertData,
+    trigger_slots: &mut HashMap<String, TriggerSlot>,
+    key: &str,
+    labels: u64,
+    alert: &alert::Alert,
+    rows: Vec<config::utils::json::Map<String, config::utils::json::Value>>,
+) {
+    match trigger_slots.get_mut(key) {
+        Some(slot) => {
+            if slot.labels.len() < TRIGGER_LABEL_LIMIT && slot.labels.insert(labels) {
+                triggers[slot.idx].1.extend(rows);
+            }
+        }
+        None => {
+            trigger_slots.insert(
+                key.to_string(),
+                TriggerSlot {
+                    idx: triggers.len(),
+                    labels: HashSet::from([labels]),
+                },
+            );
+            triggers.push((alert.clone(), rows));
+        }
+    }
 }
 
 #[cfg(test)]
@@ -226,5 +283,155 @@ mod tests {
     #[test]
     fn test_get_prom_metadata_from_schema_absent_metadata_is_none() {
         assert!(get_prom_metadata_from_schema(&Schema::empty()).is_none());
+    }
+    fn labelled_row(label: &str) -> json::Map<String, json::Value> {
+        let mut row = json::Map::new();
+        row.insert("label".to_string(), json::Value::String(label.to_string()));
+        row
+    }
+
+    #[test]
+    fn merge_trigger_rows_creates_a_slot_on_first_match() {
+        let mut triggers: TriggerAlertData = Vec::new();
+        let mut slots = HashMap::new();
+        merge_trigger_rows(
+            &mut triggers,
+            &mut slots,
+            "k",
+            1,
+            &alert::Alert::default(),
+            vec![labelled_row("east")],
+        );
+        assert_eq!(triggers.len(), 1);
+        assert_eq!(triggers[0].1.len(), 1);
+        assert_eq!(slots["k"].idx, 0);
+    }
+
+    #[test]
+    fn merge_trigger_rows_adds_a_row_per_distinct_label_set() {
+        // Each label set is its own series and every one has to reach the row
+        // template, which is what the reported bug loses.
+        let mut triggers: TriggerAlertData = Vec::new();
+        let mut slots = HashMap::new();
+        let alert = alert::Alert::default();
+        for (labels, name) in [(1u64, "east"), (2, "west"), (3, "north")] {
+            merge_trigger_rows(
+                &mut triggers,
+                &mut slots,
+                "k",
+                labels,
+                &alert,
+                vec![labelled_row(name)],
+            );
+        }
+        assert_eq!(triggers.len(), 1, "still one notification per alert");
+        let seen: Vec<_> = triggers[0]
+            .1
+            .iter()
+            .map(|r| r["label"].as_str().unwrap())
+            .collect();
+        assert_eq!(seen, ["east", "west", "north"]);
+    }
+
+    #[test]
+    fn merge_trigger_rows_ignores_a_repeated_label_set() {
+        // One series repeats its labels once per sample in a request; those
+        // samples describe the same dimension, so they must not each add a row.
+        let mut triggers: TriggerAlertData = Vec::new();
+        let mut slots = HashMap::new();
+        let alert = alert::Alert::default();
+        for value in ["t1", "t2", "t3"] {
+            merge_trigger_rows(
+                &mut triggers,
+                &mut slots,
+                "k",
+                7,
+                &alert,
+                vec![labelled_row(value)],
+            );
+        }
+        assert_eq!(triggers[0].1.len(), 1);
+        assert_eq!(triggers[0].1[0]["label"].as_str().unwrap(), "t1");
+    }
+
+    #[test]
+    fn merge_trigger_rows_keeps_separate_alerts_apart() {
+        let mut triggers: TriggerAlertData = Vec::new();
+        let mut slots = HashMap::new();
+        merge_trigger_rows(
+            &mut triggers,
+            &mut slots,
+            "a",
+            1,
+            &alert::Alert::default(),
+            vec![labelled_row("x")],
+        );
+        merge_trigger_rows(
+            &mut triggers,
+            &mut slots,
+            "b",
+            1,
+            &alert::Alert::default(),
+            vec![labelled_row("y")],
+        );
+        assert_eq!(triggers.len(), 2);
+        assert_eq!(triggers[0].1.len(), 1);
+        assert_eq!(triggers[1].1.len(), 1);
+    }
+
+    #[test]
+    fn merge_trigger_rows_stops_at_the_label_limit() {
+        let mut triggers: TriggerAlertData = Vec::new();
+        let mut slots = HashMap::new();
+        let alert = alert::Alert::default();
+        for i in 0..(TRIGGER_LABEL_LIMIT + 25) {
+            merge_trigger_rows(
+                &mut triggers,
+                &mut slots,
+                "k",
+                i as u64,
+                &alert,
+                vec![labelled_row(&i.to_string())],
+            );
+        }
+        assert_eq!(triggers[0].1.len(), TRIGGER_LABEL_LIMIT);
+    }
+
+    #[test]
+    fn trigger_wants_labels_gates_on_seen_and_capacity() {
+        let mut triggers: TriggerAlertData = Vec::new();
+        let mut slots = HashMap::new();
+        let alert = alert::Alert::default();
+        assert!(
+            trigger_wants_labels(&slots, "k", 1),
+            "an alert with nothing yet takes any label set"
+        );
+        merge_trigger_rows(
+            &mut triggers,
+            &mut slots,
+            "k",
+            1,
+            &alert,
+            vec![labelled_row("east")],
+        );
+        assert!(
+            !trigger_wants_labels(&slots, "k", 1),
+            "a label set already represented adds nothing"
+        );
+        assert!(trigger_wants_labels(&slots, "k", 2), "a new one still does");
+        for i in 2..=(TRIGGER_LABEL_LIMIT as u64) {
+            merge_trigger_rows(
+                &mut triggers,
+                &mut slots,
+                "k",
+                i,
+                &alert,
+                vec![labelled_row("x")],
+            );
+        }
+        assert!(
+            !trigger_wants_labels(&slots, "k", 9_999),
+            "a full notification takes nothing new"
+        );
     }
 }
