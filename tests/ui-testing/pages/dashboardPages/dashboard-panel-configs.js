@@ -1634,6 +1634,27 @@ export default class DashboardPanelConfigs {
   }
 
   /**
+   * Turn pagination on, tolerating a default that already has it enabled.
+   * @returns {Promise<void>}
+   */
+  async enablePagination() {
+    if (await this.isPaginationEnabled()) return;
+    await this.togglePagination();
+    await this.rowsPerPageWrapper.waitFor({ state: "visible", timeout: 10000 });
+  }
+
+  /**
+   * Returns the rows-per-page minimum, or null when the control declares none.
+   * @returns {Promise<string|null>}
+   */
+  async getRowsPerPageMin() {
+    // OInput only puts `min` on the inner field when it declares it as a prop;
+    // otherwise the attribute falls through to the wrapper div. Check both.
+    const fieldMin = await this.rowsPerPageField.getAttribute("min");
+    return fieldMin ?? (await this.rowsPerPageWrapper.getAttribute("min"));
+  }
+
+  /**
    * Set the rows-per-page value.
    * Targets the inner OInput field (not the wrapper div).
    * @param {string|number} value

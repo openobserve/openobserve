@@ -978,6 +978,7 @@ pub fn plan_group_updates(
     classification: &GroupClassification,
     prev: &HashMap<String, AlertState>,
     at: i64,
+    pending_period_sec: i64,
 ) -> GroupPlan {
     let mut updates = Vec::with_capacity(classification.groups.len() + 1);
     let mut retained: HashSet<String> = HashSet::with_capacity(classification.groups.len());
@@ -993,14 +994,32 @@ pub fn plan_group_updates(
         // reading as Critical.
         let level = group.level.unwrap_or(AlertLevel::Ok);
 
-        let mut update = apply_outcome(
-            alert_id,
-            &key,
-            prev.get(&key),
-            group_outcome(group.level),
-            Some(level),
-            at,
-        );
+        let prev_out = prev.get(&key);
+
+        let base_outcome = group_outcome(group.level);
+        let is_firing = matches!(base_outcome, RunOutcome::Firing);
+
+        let outcome = if pending_period_sec > 0 {
+            match prev_out {
+                None if is_firing => RunOutcome::Pending,
+                Some(state) => match (state.last_outcome.as_ref(), state.since.as_ref()) {
+                    (None, _) | (Some(RunOutcome::Normal), _) if is_firing => RunOutcome::Pending,
+                    (Some(RunOutcome::Pending), Some(last)) => {
+                        if at - last < pending_period_sec.saturating_mul(1_000_000) && is_firing {
+                            RunOutcome::Pending
+                        } else {
+                            base_outcome
+                        }
+                    }
+                    _ => base_outcome,
+                },
+                _ => base_outcome,
+            }
+        } else {
+            base_outcome
+        };
+
+        let mut update = apply_outcome(alert_id, &key, prev.get(&key), outcome, Some(level), at);
 
         if let Some(state) = update.state.as_mut() {
             state.group_labels = Some(rendered.clone());
@@ -1025,11 +1044,34 @@ pub fn plan_group_updates(
     // `level_at`, so composite staleness (§6.4) sees the level rotting rather
     // than being made fresh by a run that observed nothing. §7.3 (NoData) owns
     // turning that into a real level.
+
+    let base_outcome = group_outcome(classification.rollup);
+    let is_firing = matches!(base_outcome, RunOutcome::Firing);
+
+    let rollup_outcome = if pending_period_sec > 0 {
+        match prev.get(ROLLUP_GROUP_KEY) {
+            None => RunOutcome::Pending,
+            Some(state) => match (state.last_outcome.as_ref(), state.since.as_ref()) {
+                (None, _) | (Some(RunOutcome::Normal), _) if is_firing => RunOutcome::Pending,
+                (Some(RunOutcome::Pending), Some(last)) => {
+                    if at - last < pending_period_sec.saturating_mul(1_000_000) && is_firing {
+                        RunOutcome::Pending
+                    } else {
+                        base_outcome
+                    }
+                }
+                _ => base_outcome,
+            },
+        }
+    } else {
+        base_outcome
+    };
+
     let mut rollup = apply_outcome(
         alert_id,
         ROLLUP_GROUP_KEY,
         prev.get(ROLLUP_GROUP_KEY),
-        group_outcome(classification.rollup),
+        rollup_outcome,
         classification.rollup,
         at,
     );
@@ -1039,7 +1081,11 @@ pub fn plan_group_updates(
         // so an overflowing alert would report "500 of 500" and be
         // indistinguishable from one that never overflowed.
         state.groups_observed = Some(classification.groups.len() + classification.dropped.len());
-        state.groups_firing = Some(classification.firing_observed);
+        state.groups_firing = if is_firing {
+            Some(classification.firing_observed)
+        } else {
+            Some(0)
+        };
         // Exactness travels WITH the counts. Recomputing it later is impossible
         // — the cap is mutable config, so "count == cap" proves nothing after
         // someone raises it.
@@ -2123,7 +2169,7 @@ mod tests {
             500,
         );
 
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
         let updates = plan.updates;
 
         assert_eq!(updates.len(), 3, "two groups plus the rollup row");
@@ -2142,7 +2188,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
         let updates = plan.updates;
 
         for u in &updates {
@@ -2166,7 +2212,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
         let updates = plan.updates;
 
         let a = update_for(&updates, &group_key(&labels(&[("host", "a")]))).unwrap();
@@ -2188,7 +2234,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
         let updates = plan.updates;
         let rollup = update_for(&updates, ROLLUP_GROUP_KEY).unwrap();
 
@@ -2213,7 +2259,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
         let updates = plan.updates;
         let rollup = update_for(&updates, ROLLUP_GROUP_KEY).unwrap();
 
@@ -2242,7 +2288,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
         let updates = plan.updates;
         let a = update_for(&updates, &key_a).unwrap();
 
@@ -2286,7 +2332,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
         let updates = plan.updates;
 
         let a = update_for(&updates, &key_a).unwrap();
@@ -2331,7 +2377,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
         let updates = plan.updates;
 
         let a = update_for(&updates, &key_a)
@@ -2378,7 +2424,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
         let updates = plan.updates;
         let new = update_for(&updates, &key_new).unwrap();
 
@@ -2419,7 +2465,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
         let updates = plan.updates;
 
         assert!(
@@ -2444,7 +2490,7 @@ mod tests {
         let classification = classify_groups(vec![], &c, 500);
         assert_eq!(classification.rollup, None);
 
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
         let updates = plan.updates;
         let rollup = update_for(&updates, ROLLUP_GROUP_KEY)
             .expect("the rollup row is still written on an empty result");
@@ -2495,7 +2541,7 @@ mod tests {
             .collect();
         let classification = classify_groups(obs, &c, cap);
 
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
 
         assert_eq!(
             classification.dropped.len(),
@@ -2570,7 +2616,7 @@ mod tests {
             .collect();
         let classification = classify_groups(obs, &c, 3);
 
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 200);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 200, 0);
         assert!(
             plan.evicted.is_empty(),
             "nothing was tracked, so nothing can be evicted"
@@ -2601,7 +2647,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
 
         assert!(
             !plan.evicted.contains(&key_gone),
@@ -2620,7 +2666,7 @@ mod tests {
             .collect();
         let classification = classify_groups(obs, &c, 500);
 
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
 
         // Must be PERSISTED on the rollup row, not merely returned: the
         // overflow banner renders from stored state on the list and detail
@@ -2657,7 +2703,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
         let rollup = update_for(&plan.updates, ROLLUP_GROUP_KEY)
             .unwrap()
             .state
@@ -2679,7 +2725,7 @@ mod tests {
             500,
         );
 
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
         let t = update_for(&plan.updates, &key_a)
             .unwrap()
             .transition
@@ -2701,7 +2747,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
 
         let g = update_for(&plan.updates, &key_a)
             .unwrap()
@@ -2735,7 +2781,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
 
         let g = update_for(&plan.updates, &key_a)
             .unwrap()
@@ -2756,7 +2802,7 @@ mod tests {
             .collect();
         let classification = classify_groups(obs, &c, 500);
 
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
         let updates = plan.updates;
         assert_eq!(updates.len(), 501, "500 retained groups plus the rollup");
     }
@@ -2856,8 +2902,8 @@ mod tests {
             )
         };
 
-        let first = plan_group_updates("alert-1", &build(), &HashMap::new(), 100);
-        let second = plan_group_updates("alert-1", &build(), &HashMap::new(), 100);
+        let first = plan_group_updates("alert-1", &build(), &HashMap::new(), 100, 0);
+        let second = plan_group_updates("alert-1", &build(), &HashMap::new(), 100, 0);
         assert_eq!(first, second);
     }
 
@@ -3819,7 +3865,7 @@ mod tests {
             "fixture must actually overflow"
         );
 
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
 
         assert!(
             plan.evicted.contains(&key_absent),
@@ -3851,7 +3897,7 @@ mod tests {
             .map(|i| GroupObservation::new(labels(&[("host", &format!("h{i}"))]), 150.0))
             .collect();
         let classification = classify_groups(obs, &c, 2);
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
 
         assert!(
             !plan.evicted.iter().any(|k| k == ROLLUP_GROUP_KEY),
@@ -3883,8 +3929,8 @@ mod tests {
             classify_groups(obs, &c, 2)
         };
 
-        let first = plan_group_updates("alert-1", &build(), &prev, 200);
-        let second = plan_group_updates("alert-1", &build(), &prev, 200);
+        let first = plan_group_updates("alert-1", &build(), &prev, 200, 0);
+        let second = plan_group_updates("alert-1", &build(), &prev, 200, 0);
 
         assert_eq!(first.evicted, second.evicted);
         let mut sorted = first.evicted.clone();
@@ -4063,7 +4109,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
         let rollup = update_for(&plan.updates, ROLLUP_GROUP_KEY)
             .unwrap()
             .state
@@ -4091,7 +4137,7 @@ mod tests {
 
         assert_eq!(classification.firing_observed, 900);
 
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
         let rollup = update_for(&plan.updates, ROLLUP_GROUP_KEY)
             .unwrap()
             .state
@@ -4111,7 +4157,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
         let rollup = update_for(&plan.updates, ROLLUP_GROUP_KEY)
             .unwrap()
             .state
@@ -4130,7 +4176,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
         let group = plan
             .updates
             .iter()
@@ -4217,7 +4263,7 @@ mod tests {
             reached_healthy: false,
         });
 
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
         let rollup = update_for(&plan.updates, ROLLUP_GROUP_KEY)
             .unwrap()
             .state
@@ -4239,7 +4285,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100);
+        let plan = plan_group_updates("alert-1", &classification, &HashMap::new(), 100, 0);
         let rollup = update_for(&plan.updates, ROLLUP_GROUP_KEY)
             .unwrap()
             .state
@@ -4274,7 +4320,7 @@ mod tests {
             &c,
             500,
         );
-        let plan = plan_group_updates("alert-1", &classification, &prev, 200);
+        let plan = plan_group_updates("alert-1", &classification, &prev, 200, 0);
         let t = update_for(&plan.updates, &key_a)
             .unwrap()
             .transition

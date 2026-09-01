@@ -169,6 +169,7 @@ mod m20260818_000002_create_llm_remote_tasks;
 mod m20260820_000001_add_icon_to_folders;
 mod m20260820_000003_create_llm_secrets;
 mod m20260824_000001_create_llm_playground_snapshots;
+mod m20260825_000001_add_alert_pending_period_col;
 mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
 mod m20260827_000001_drop_table_action_scripts;
 
@@ -207,13 +208,18 @@ pub(crate) async fn create_scheduled_jobs_for_test(
 pub(crate) async fn create_composite_alert_tables_for_test(
     db: &sea_orm::DatabaseConnection,
 ) -> Result<(), DbErr> {
+    use m20260825_000001_add_alert_pending_period_col as update;
     use sea_orm_migration::MigrationTrait;
 
     create_scheduled_jobs_for_test(db).await?;
     let manager = SchemaManager::new(db);
     m20260812_000001_create_composite_alerts::Migration
         .up(&manager)
-        .await
+        .await?;
+    manager
+        .alter_table(update::get_update_stmt_composites())
+        .await?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -221,6 +227,7 @@ pub(crate) fn composite_alert_migration_sql_for_test(
     backend: sea_orm::DatabaseBackend,
 ) -> Vec<String> {
     use m20260812_000001_create_composite_alerts as migration;
+    use m20260825_000001_add_alert_pending_period_col as update;
 
     let mut sql = vec![
         backend
@@ -229,6 +236,9 @@ pub(crate) fn composite_alert_migration_sql_for_test(
         backend.build(&migration::children_statement()).to_string(),
         backend
             .build(&migration::reverse_index_statement())
+            .to_string(),
+        backend
+            .build(&update::get_update_stmt_composites())
             .to_string(),
     ];
     sql.extend(
@@ -415,6 +425,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260820_000003_create_llm_secrets::Migration),
             Box::new(m20260824_000001_create_llm_playground_snapshots::Migration),
             Box::new(m20260825_000001_add_steps_configured_to_synthetics_jobs::Migration),
+            Box::new(m20260825_000001_add_alert_pending_period_col::Migration),
             Box::new(m20260827_000001_drop_table_action_scripts::Migration),
         ]
     }

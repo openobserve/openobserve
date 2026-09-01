@@ -314,6 +314,7 @@ fn composite_input(
         tags: alert.tags,
         owner: alert.owner.or_else(|| Some(user_id.clone())),
         last_edited_by: Some(user_id),
+        pending_period_sec: alert.pending_period_sec,
     }
 }
 
@@ -472,6 +473,7 @@ async fn composite_detail_response(
         },
         "children": children,
         "evaluation": evaluation_json,
+        "pending_period_sec": definition.pending_period_sec,
     }))
 }
 
@@ -585,6 +587,9 @@ fn composite_error_response(
                 "composite_internal_error",
                 error,
             )
+        }
+        CompositeServiceError::NegativePendingPeriod => {
+            composite_machine_error(StatusCode::BAD_REQUEST, "negative_pending_period", error)
         }
     }
 }
