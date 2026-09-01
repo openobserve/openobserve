@@ -292,7 +292,7 @@ export const useSearchQuery = () => {
             interestingFields.join(","),
           );
         }
-      } else {
+      } else if (searchObj.data.stream.selectedStream.length <= 1) {
         req.query.sql = req.query.sql.replace("[FIELD_LIST]", "*");
       }
 
@@ -346,7 +346,7 @@ export const useSearchQuery = () => {
       if (searchObj.meta.sqlMode == true) {
         return handleSqlMode(query, req, readOnly);
       } else {
-        return handleNonSqlMode(query, req);
+        return handleNonSqlMode(query, req, ignoreQuickMode);
       }
     } catch (e: any) {
       notificationMsg.value =
@@ -443,7 +443,11 @@ export const useSearchQuery = () => {
     return buildSearch(true);
   };
 
-  const handleNonSqlMode = (query: string, req: any): SearchRequestPayload => {
+  const handleNonSqlMode = (
+    query: string,
+    req: any,
+    ignoreQuickMode: boolean = false,
+  ): SearchRequestPayload => {
     const parseQuery = [query];
     let queryFunctions = "";
     let whereClause = "";
@@ -489,7 +493,7 @@ export const useSearchQuery = () => {
     );
 
     if (searchObj.data.stream.selectedStream.length > 1) {
-      return handleMultiStream(req, whereClause);
+      return handleMultiStream(req, whereClause, ignoreQuickMode);
     } else {
       req.query.sql = req.query.sql.replace(
         "[INDEX_NAME]",
@@ -500,9 +504,36 @@ export const useSearchQuery = () => {
     return finalizeRequest(req);
   };
 
+  const armProjection = (stream: string, ignoreQuickMode: boolean): string => {
+    if (!searchObj.meta.quickMode || ignoreQuickMode) {
+      return "*";
+    }
+
+    const timestampCol = store.state.zoConfig.timestamp_column || "_timestamp";
+    const fields = searchObj.data.stream.interestingFieldList.filter(
+      (field: string) =>
+        searchObj.data.stream.selectedStreamFields.some(
+          (streamField: any) =>
+            streamField?.name === field &&
+            streamField?.streams?.includes(stream),
+        ),
+    );
+
+    if (fields.length === 0) {
+      return "*";
+    }
+
+    // A set operation is never rewritten by AddTimestampVisitor, so the arm must ask for _timestamp.
+    return [
+      timestampCol,
+      ...fields.filter((f: string) => f !== timestampCol),
+    ].join(",");
+  };
+
   const handleMultiStream = (
     req: any,
     whereClause: string,
+    ignoreQuickMode: boolean = false,
   ): SearchRequestPayload => {
     let streams: any = searchObj.data.stream.selectedStream;
 
@@ -523,41 +554,31 @@ export const useSearchQuery = () => {
     }
 
     const preSQLQuery = req.query.sql;
-    req.query.sql = [];
 
-    streams
-      .join(",")
-      .split(",")
-      .forEach((item: any) => {
-        let finalQuery: string = preSQLQuery.replace("[INDEX_NAME]", item);
+    // A stream listed twice would emit two identical arms and duplicate every row.
+    const uniqueStreams: string[] = [
+      ...new Set<string>(streams.join(",").split(",")),
+    ].filter((stream: string) => stream.trim() !== "");
 
-        const listOfFields: any = [];
-        let streamField: any = {};
+    const arms: string[] = uniqueStreams.map((item: string) => {
+      const finalQuery: string = preSQLQuery.replace("[INDEX_NAME]", item);
+      return finalQuery.replace(
+        "[FIELD_LIST]",
+        `${armProjection(item, ignoreQuickMode)}, '${item}' as _stream_name`,
+      );
+    });
 
-        for (const field of searchObj.data.stream.interestingFieldList) {
-          for (streamField of searchObj.data.stream.selectedStreamFields) {
-            if (
-              streamField?.name == field &&
-              streamField?.streams.indexOf(item) > -1 &&
-              listOfFields.indexOf(field) == -1
-            ) {
-              listOfFields.push(field);
-            }
-          }
-        }
+    if (arms.length === 0) {
+      return null;
+    }
 
-        let queryFieldList: string = "";
-        if (listOfFields.length > 0) {
-          queryFieldList = "," + listOfFields.join(",");
-        }
-
-        finalQuery = finalQuery.replace(
-          "[FIELD_LIST]",
-          `'${item}' as _stream_name` + queryFieldList,
-        );
-
-        req.query.sql.push(finalQuery);
-      });
+    // BY NAME merges differing columns, ALL keeps duplicate events, and a set operation gets no implicit ORDER BY.
+    req.query.sql =
+      arms.length > 1
+        ? `${arms.join(" UNION ALL BY NAME ")} ORDER BY ${
+            store.state.zoConfig.timestamp_column || "_timestamp"
+          } DESC`
+        : arms[0];
 
     return req;
   };

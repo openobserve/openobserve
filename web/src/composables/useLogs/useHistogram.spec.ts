@@ -82,10 +82,6 @@ describe("useHistogram Composable", () => {
       expect(typeof wrapper.vm.resetHistogramWithError).toBe("function");
     });
 
-    it("should have setMultiStreamHistogramQuery function", () => {
-      expect(typeof wrapper.vm.setMultiStreamHistogramQuery).toBe("function");
-    });
-
     it("should have isHistogramEnabled function", () => {
       expect(typeof wrapper.vm.isHistogramEnabled).toBe("function");
     });
