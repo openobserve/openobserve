@@ -2935,9 +2935,9 @@ describe("Back to Logs control", () => {
     await mountList();
     wrapper.vm.searchObj.data.stream.streamType = "metrics";
     await nextTick();
-    // The button is now an OTag(type="streamType") pill, so its icon/colour
-    // reflect the active stream type itself (see badgeGroups.ts) instead of a
-    // fixed, muted swap glyph — assert via the OIcon `name` prop.
+    // The button itself (outline, bordered square) is unchanged, but its glyph
+    // now resolves from the streamType badge registry (see badgeGroups.ts)
+    // instead of a fixed "swap-horiz" icon — assert via the OIcon `name` prop.
     const icon = wrapper.find(BTN).findComponent({ name: "OIcon" });
     expect(icon.exists()).toBe(true);
     expect(icon.props("name")).toBe("bar-chart");
