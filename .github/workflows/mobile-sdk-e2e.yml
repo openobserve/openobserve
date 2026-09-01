@@ -78,6 +78,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 env:
   # Non-secret defaults for a fresh local OpenObserve (identical to the other test workflows).
@@ -243,17 +244,65 @@ jobs:
           echo "run_ios=$I"     >> "$GITHUB_OUTPUT"
           echo "Decision (event=$EV): run_android=$A  run_ios=$I"
 
+  # Reuse the exact Playwright release-ci Linux binary and frontend when that
+  # workflow has already built this same merge SHA. Mobile-only/manual/SDK-release
+  # runs may not have a matching Playwright artifact, so keep a local build fallback.
+  resolve_oo_linux:
+    name: Find reusable OpenObserve Linux artifact
+    needs: [preflight, decide]
+    if: needs.decide.outputs.run_android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      reuse: ${{ steps.find.outputs.reuse }}
+      run_id: ${{ steps.find.outputs.run_id }}
+    steps:
+      - name: Find exact-SHA Playwright artifacts
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BINARY_ARTIFACT: release-ci-binary-${{ github.sha }}
+          FRONTEND_ARTIFACT: frontend-dist-${{ github.sha }}
+        run: |
+          RUN_ID=$(gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${BINARY_ARTIFACT}&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | last | .workflow_run.id // empty')
+
+          if [ -n "$RUN_ID" ]; then
+            HAS_FRONTEND=$(gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100" \
+              --jq "[.artifacts[] | select(.expired == false and .name == \"${FRONTEND_ARTIFACT}\")] | length")
+          else
+            HAS_FRONTEND=0
+          fi
+
+          if [ -n "$RUN_ID" ] && [ "$HAS_FRONTEND" -gt 0 ]; then
+            echo "reuse=true" >> "$GITHUB_OUTPUT"
+            echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+            echo "Reusing Playwright artifacts from run $RUN_ID for $GITHUB_SHA"
+          else
+            echo "reuse=false" >> "$GITHUB_OUTPUT"
+            echo "run_id=" >> "$GITHUB_OUTPUT"
+            echo "No exact-SHA Playwright artifact found; Mobile will build locally"
+          fi
+
   # -------------------------------------------------------------------------------------------
-  # BUILD OO (linux) — compile OpenObserve from THIS PR's source (like playwright.yml build_binary),
-  # so the mobile suite tests the current code, not a prebuilt image. rust-cache makes reruns fast.
+  # BUILD OO (linux fallback) — only compile when no exact-SHA Playwright artifact exists.
+  # This keeps Mobile standalone for SDK-release/manual runs without duplicating a build when the
+  # normal Playwright workflow has already produced the compatible release-ci binary + frontend.
   # The Android job runs this binary NATIVELY (not Docker): the CI emulator can't reach a Docker-
   # published port via 10.0.2.2 (proven — EMUPROBE UNREACHABLE), but reaches a native host process
   # through the adb-reverse/localhost tunnel.
   # -------------------------------------------------------------------------------------------
   build_oo_linux:
-    name: Build OpenObserve (linux, from source)
-    needs: [preflight, decide]
-    if: needs.decide.outputs.run_android == 'true'
+    name: Build OpenObserve (linux fallback)
+    needs: [preflight, decide, resolve_oo_linux]
+    if: >-
+      needs.decide.outputs.run_android == 'true' &&
+      needs.resolve_oo_linux.outputs.reuse != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -349,8 +398,14 @@ jobs:
     # matrix split was tried for observability but exposed emulator first-render flakiness; revisit only
     # with emulator hardening (disable-animations + app warm-up + launch retries).
     name: Android (rn-android + android-native)
-    needs: [decide, build_oo_linux]
-    if: needs.decide.outputs.run_android == 'true'
+    needs: [decide, resolve_oo_linux, build_oo_linux]
+    if: >-
+      always() &&
+      needs.decide.result == 'success' &&
+      needs.decide.outputs.run_android == 'true' &&
+      needs.resolve_oo_linux.result == 'success' &&
+      (needs.resolve_oo_linux.outputs.reuse == 'true' ||
+       needs.build_oo_linux.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -398,12 +453,32 @@ jobs:
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
-      - name: Download OpenObserve binary (built from PR source)
+      - name: Download shared Playwright OpenObserve binary
+        if: needs.resolve_oo_linux.outputs.reuse == 'true'
+        uses: actions/download-artifact@v5
+        with:
+          name: release-ci-binary-${{ github.sha }}
+          path: oo-bin
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve_oo_linux.outputs.run_id }}
+      - name: Download fallback OpenObserve binary
+        if: needs.resolve_oo_linux.outputs.reuse != 'true'
         uses: actions/download-artifact@v4
         with:
           name: oo-linux-binary
           path: oo-bin
-      - name: Download OpenObserve web UI (so /web serves for the dashboard tests)
+      - name: Download shared Playwright web UI
+        if: needs.resolve_oo_linux.outputs.reuse == 'true'
+        uses: actions/download-artifact@v5
+        with:
+          name: frontend-dist-${{ github.sha }}
+          path: /tmp/dist
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve_oo_linux.outputs.run_id }}
+      - name: Download fallback OpenObserve web UI
+        if: needs.resolve_oo_linux.outputs.reuse != 'true'
         uses: actions/download-artifact@v4
         with:
           name: oo-linux-frontend

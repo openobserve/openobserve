@@ -87,17 +87,24 @@ with `repo`, or fine-grained with Contents:read + Actions:write). The call they 
 
 ## Runners & the OpenObserve build
 
-OpenObserve is **built from this repo's source per-OS** (not Docker, not a prebuilt binary), cached,
-then downloaded and run **natively** by the device jobs so the app posts real RUM to it:
+OpenObserve is downloaded and run **natively** by the device jobs so the app posts real RUM to it.
+The Linux side first looks for the exact merge-SHA `release-ci` binary + frontend already produced
+by `playwright.yml`; when both artifacts exist it reuses them instead of compiling OpenObserve again.
+Mobile-only/manual/SDK-release runs may not have matching Playwright artifacts, so the workflow keeps
+an exact-source local build fallback:
 
-- **`build_oo_linux`** (`ubuntu-latest`) + **`build_oo_macos`** (`macos-15`) compile the binary + web UI.
+- **`resolve_oo_linux`** finds an exact-SHA Playwright artifact; **`build_oo_linux`** (`ubuntu-latest`)
+  builds the Linux binary + UI only when none exists.
+- **`build_oo_macos`** (`macos-15`) still compiles the macOS binary + UI: a Linux binary cannot run
+  on the iOS simulator host, and no other PR workflow produces an exact-SHA Darwin artifact.
 - **Android** → `ubuntu-latest` + KVM emulator, runs the Linux binary; app reaches it at `10.0.2.2`.
 - **iOS** → `macos-15` + simulator (pinned **Xcode 16.4**), runs the macOS binary; app uses `localhost`.
 - **`merge_reports`** combines both platforms into one HTML report (survives a failed device job).
 
-`release-ci` sets `debug-assertions=true`, which puts rust-embed in disk-read mode — so each build job
-also uploads the built web UI (`oo-<os>-frontend`) and the device job extracts it to `/tmp/dist` so
-`/web` serves and the dashboard-UI tests run.
+`release-ci` sets `debug-assertions=true`, which puts rust-embed in disk-read mode. The resolver therefore
+requires the matching Playwright `frontend-dist-<sha>` alongside `release-ci-binary-<sha>`; fallback
+builds upload `oo-<os>-frontend`. Device jobs extract either source to `/tmp/dist` so `/web` serves and
+the dashboard-UI tests run.
 
 ## Status
 
