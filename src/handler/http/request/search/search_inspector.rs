@@ -20,7 +20,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::{
-    get_config,
+    META_ORG_ID, get_config,
     meta::{
         search::{Query as SearchQuery, SearchEventType},
         stream::StreamType,
@@ -40,13 +40,7 @@ use crate::{
             stream::get_settings_max_query_range,
         },
     },
-    handler::http::{
-        extractors::Headers,
-        request::search::{
-            error_utils,
-            utils::{StreamPermissionResourceType, check_stream_permissions},
-        },
-    },
+    handler::http::{extractors::Headers, request::search::error_utils},
     service::{
         search::{inspector::*, sql::visitor::cipher_key::get_cipher_key_names},
         self_reporting::http_report_metrics,
@@ -65,7 +59,8 @@ use crate::{
     description = "Retrieves detailed performance profiling information for search queries executed within a specified time \
                    range. This includes execution timing, node information, component performance metrics, and resource \
                    usage statistics. Use this to analyze and optimize search performance, troubleshoot slow queries, and \
-                   understand query execution patterns across your cluster.",
+                   understand query execution patterns across your cluster. The trace must belong to a search executed in \
+                   the requesting organization; traces of other organizations are answered as not found.",
     security(
         ("Authorization"= [])
     ),
@@ -103,7 +98,7 @@ use crate::{
     )
 )]
 pub async fn get_search_profile(
-    Path(_path): Path<String>,
+    Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
     Headers(user_email): Headers<UserEmail>,
     headers: HeaderMap,
@@ -111,10 +106,12 @@ pub async fn get_search_profile(
     let start = std::time::Instant::now();
     let cfg = get_config();
 
-    let (org_id, stream_name) = ("_meta", "default".to_string());
+    // profiling traces are stored in the _meta org; org ownership is enforced
+    // on the result set below
+    let (meta_org_id, stream_name) = (META_ORG_ID, "default".to_string());
     let mut range_error = String::new();
     let http_span = if cfg.common.should_create_span() {
-        tracing::info_span!("/api/{org_id}/{stream_name}/search/profile")
+        tracing::info_span!("/api/{org_id}/search/profile", org_id = org_id.clone())
     } else {
         Span::none()
     };
@@ -127,6 +124,9 @@ pub async fn get_search_profile(
     let Some(query_trace_id) = query.get("trace_id") else {
         return meta::http::HttpResponse::bad_request("trace_id is required");
     };
+    if !is_valid_trace_id(query_trace_id) {
+        return meta::http::HttpResponse::bad_request("trace_id is invalid");
+    }
     let start_time_from_trace_id =
         config::ider::get_start_time_from_trace_id(query_trace_id).unwrap_or(0);
 
@@ -178,9 +178,12 @@ pub async fn get_search_profile(
     req.use_cache = get_use_cache_from_request(&query);
 
     // get stream settings
-    if let Some(settings) = infra::schema::get_settings(org_id, &stream_name, stream_type).await {
+    if let Some(settings) =
+        infra::schema::get_settings(meta_org_id, &stream_name, stream_type).await
+    {
         let max_query_range =
-            get_settings_max_query_range(settings.max_query_range, org_id, Some(&user_id)).await;
+            get_settings_max_query_range(settings.max_query_range, meta_org_id, Some(&user_id))
+                .await;
         if max_query_range > 0
             && (req.query.end_time - req.query.start_time) > max_query_range * 3600 * 1_000_000
         {
@@ -189,19 +192,6 @@ pub async fn get_search_profile(
                 "Query duration is modified due to query range restriction of {max_query_range} hours"
             );
         }
-    }
-
-    // Check permissions on stream
-    if let Some(res) = check_stream_permissions(
-        &stream_name,
-        org_id,
-        &user_id,
-        &stream_type,
-        StreamPermissionResourceType::Search,
-    )
-    .await
-    {
-        return res;
     }
 
     let keys_used = match get_cipher_key_names(&req.query.sql) {
@@ -273,7 +263,7 @@ pub async fn get_search_profile(
     // run search with cache
     let res = crate::service::search::cache::search(
         &trace_id,
-        org_id,
+        meta_org_id,
         stream_type,
         Some(user_id),
         &req,
@@ -301,6 +291,7 @@ pub async fn get_search_profile(
             let mut search_summary = Vec::new();
             let mut stream_summary = Vec::new();
 
+            let mut org_verified = org_id == meta_org_id;
             for hit in res.hits {
                 if let Some(events_str) = hit.get("events")
                     && let Ok(parsed_events) = serde_json::from_str::<Vec<SearchInspectorEvent>>(
@@ -314,6 +305,9 @@ pub async fn get_search_profile(
                             if let Some(mut fields) =
                                 extract_search_inspector_fields(event.name.as_str())
                             {
+                                if fields.org_id.as_deref() == Some(org_id.as_str()) {
+                                    org_verified = true;
+                                }
                                 if fields.component == Some("summary".to_string()) {
                                     search_summary.push(fields);
                                 } else if fields.component == Some("stream_summary".to_string()) {
@@ -328,6 +322,12 @@ pub async fn get_search_profile(
 
                     events.extend(inspectors);
                 }
+            }
+
+            // a trace not owned by the caller's org gets the same empty answer
+            // as a nonexistent trace, so trace ids can't be probed across orgs
+            if !org_verified {
+                return Json(si).into_response();
             }
 
             if stream_summary.is_empty() {
@@ -373,7 +373,7 @@ pub async fn get_search_profile(
                 .unwrap_or("".to_string());
             http_report_metrics(
                 start,
-                org_id,
+                &org_id,
                 stream_type,
                 "500",
                 "search/profile",
@@ -537,6 +537,15 @@ where
         .collect()
 }
 
+// trace_id is interpolated into the profile SQL, so restrict it to the
+// alphanumeric-and-dash alphabet trace ids are built from
+fn is_valid_trace_id(trace_id: &str) -> bool {
+    !trace_id.is_empty()
+        && trace_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
 fn format_trace_id(trace_id: Option<String>) -> String {
     let Some(trace_id) = trace_id else {
         return "".to_string();
@@ -554,4 +563,20 @@ fn format_trace_id(trace_id: Option<String>) -> String {
         }
     }
     cols.join("-")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_valid_trace_id() {
+        assert!(is_valid_trace_id("684a4e5dac43429a86a0a2ef9adf62c2"));
+        assert!(is_valid_trace_id(
+            "019cae07a3f0740ab34831ba04563200-1-13jPR6A"
+        ));
+        assert!(!is_valid_trace_id(""));
+        assert!(!is_valid_trace_id("abc' OR '1'='1"));
+        assert!(!is_valid_trace_id("abc; drop table default"));
+    }
 }
