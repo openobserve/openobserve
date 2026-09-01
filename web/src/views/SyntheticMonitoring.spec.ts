@@ -414,7 +414,7 @@ describe("SyntheticMonitoring", () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // Conditional #actions slot: New Check vs Setup an agent
+  // Conditional #actions slot: New Check vs Add Variable vs Setup an agent
   // ═══════════════════════════════════════════════════════════════════════
   describe("conditional header action button", () => {
     it("shows New Check button when on Checks tab and hides Setup agent button", () => {
@@ -433,6 +433,20 @@ describe("SyntheticMonitoring", () => {
       expect(wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="synthetic-monitoring-setup-agent-btn"]').exists()).toBe(
         true,
+      );
+    });
+
+    it("shows Add Variable button on the Environments & Variables tab", async () => {
+      wrapper = mountPage();
+      (wrapper.vm as any).activeSection = "variables";
+      await nextTick();
+
+      expect(wrapper.find('[data-test="synthetic-monitoring-add-variable-btn"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetic-monitoring-setup-agent-btn"]').exists()).toBe(
+        false,
       );
     });
 

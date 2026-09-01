@@ -15,8 +15,15 @@
 
 import { describe, expect, it } from "vitest";
 import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
-import { GLOBAL_SCOPE, duplicateNameFor, duplicateSummary, resolveScope } from "./scope";
-import { ENVIRONMENT_NAME_RE } from "./SyntheticsVariableForm.schema";
+import {
+  GLOBAL_SCOPE,
+  duplicateNameFor,
+  duplicateSummary,
+  duplicatePrefill,
+  duplicateVariableNameFor,
+  resolveScope,
+} from "./scope";
+import { ENVIRONMENT_NAME_RE, VARIABLE_NAME_RE } from "./SyntheticsVariableForm.schema";
 
 function variable(over: Partial<SyntheticsVariable> = {}): SyntheticsVariable {
   return {
@@ -99,6 +106,48 @@ describe("duplicateNameFor", () => {
   it("offers a name the server will accept", () => {
     expect(ENVIRONMENT_NAME_RE.test(duplicateNameFor("dev"))).toBe(true);
     expect(ENVIRONMENT_NAME_RE.test(duplicateNameFor("pre-prod"))).toBe(true);
+  });
+});
+
+describe("duplicateVariableNameFor", () => {
+  it("suffixes in upper case, because the server normalizes the name anyway", () => {
+    expect(duplicateVariableNameFor("BASE_URL")).toBe("BASE_URL_COPY");
+  });
+
+  it("offers a name the server will accept", () => {
+    expect(VARIABLE_NAME_RE.test(duplicateVariableNameFor("BASE_URL"))).toBe(true);
+    expect(VARIABLE_NAME_RE.test(duplicateVariableNameFor("_INTERNAL"))).toBe(true);
+  });
+});
+
+describe("duplicatePrefill", () => {
+  it("carries every field except the value, which no client holds", () => {
+    const source = variable({
+      id: "v9",
+      name: "LOGIN_PASSWORD",
+      kind: "secret",
+      description: "the tester account",
+      example: "hunter2",
+      has_value: true,
+    });
+    const prefill = duplicatePrefill(source);
+
+    expect(prefill.name).toBe("LOGIN_PASSWORD_COPY");
+    expect(prefill.description).toBe("the tester account");
+    expect(prefill.example).toBe("hunter2");
+    expect(prefill.kind).toBe("secret");
+  });
+
+  it("clears has_value so the form asks for a value instead of offering Replace", () => {
+    const prefill = duplicatePrefill(variable({ kind: "secret", has_value: true }));
+    expect(prefill.has_value).toBe(false);
+  });
+
+  it("leaves the source untouched", () => {
+    const source = variable({ name: "LOGIN_PASSWORD", kind: "secret", has_value: true });
+    duplicatePrefill(source);
+    expect(source.name).toBe("LOGIN_PASSWORD");
+    expect(source.has_value).toBe(true);
   });
 });
 
