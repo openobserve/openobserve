@@ -517,9 +517,10 @@ pub async fn search_http2_stream(
         }
     }
 
-    // Hack for limit in query
-    if sql.limit != 0 {
-        req.query.size = sql.limit;
+    // Only the outermost LIMIT governs, as on /_search. sql.limit cannot be used as a
+    // fallback: it still absorbs a CTE's LIMIT when the request sets no size.
+    if let Some(size) = sql.sql_limit {
+        req.query.size = size;
     }
 
     let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
