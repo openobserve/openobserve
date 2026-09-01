@@ -22,6 +22,9 @@
 //! Two things are enforced here. A stored `must_reset_password` flag, set by the complexity sweep
 //! when the policy tightened; and password rotation, which stores nothing and is recomputed from
 //! `password_updated_at` on every request, so a change to `rotation_days` takes effect at once.
+//!
+//! Only the block lives here. The advance warning that a password is nearing expiry is handed out
+//! once per session by the sign-in handler (`openobserve_core::password_rotation`).
 
 use axum::{
     body::Body,
@@ -33,7 +36,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use common::infra::config::USERS;
 use config::meta::password_policy::{
-    EnforcementMode, PasswordPolicy, PasswordResetReason, ROTATION_WARNING_HEADER, RotationStatus,
+    EnforcementMode, PasswordPolicy, PasswordResetReason, RotationStatus,
 };
 use infra::table::users::UserRecord;
 
@@ -50,27 +53,10 @@ const USER_ID_HEADER: &str = "user_id";
 #[derive(Debug, PartialEq, Eq)]
 enum PolicyDecision {
     Allow,
-    /// Inside the rotation warning window: the request proceeds and carries a countdown.
-    Warn {
-        days_remaining: i64,
-    },
-    Block {
-        reason: String,
-    },
+    Block { reason: String },
 }
 
-/// [`PolicyDecision`] with the block already rendered.
-enum RequestOutcome {
-    Proceed,
-    Warn {
-        days_remaining: i64,
-    },
-    /// Boxed: a `Response` dwarfs the other variants, and this one is the rare case.
-    Block(Box<Response>),
-}
-
-/// Refuse a request whose user owes the instance a new password, or tag it with how long they have
-/// left before they do.
+/// Refuse a request whose user owes the instance a new password.
 ///
 /// Must be layered *inside* `auth_middleware`: the email comes from the header that authentication
 /// writes, and a request that never authenticated has no user to hold to a policy. A request
@@ -86,19 +72,11 @@ pub async fn password_policy_middleware(request: Request, next: Next) -> Respons
         return next.run(request).await;
     };
 
-    let warning = match check_request(&user_email, request.uri(), request.method()).await {
-        RequestOutcome::Proceed => None,
-        RequestOutcome::Warn { days_remaining } => Some(days_remaining),
-        RequestOutcome::Block(blocked) => return *blocked,
-    };
-
-    let mut response = next.run(request).await;
-    // The deadline is advisory until it passes, so the warning rides on whatever response the
-    // request produced rather than interrupting it.
-    if let Some(days_remaining) = warning {
-        attach_rotation_warning(&mut response, days_remaining);
+    if let Some(blocked) = check_request(&user_email, request.uri(), request.method()).await {
+        return blocked;
     }
-    response
+
+    next.run(request).await
 }
 
 /// Decide whether a request may proceed.
@@ -133,9 +111,9 @@ fn decide(
             .password_updated_at
             .and_then(DateTime::from_timestamp_micros);
         match policy.rotation_status(set_at, now) {
-            RotationStatus::Current => return PolicyDecision::Allow,
-            RotationStatus::Warning { days_remaining } => {
-                return PolicyDecision::Warn { days_remaining };
+            // Warning is the sign-in handler's business; nothing is refused until expiry.
+            RotationStatus::Current | RotationStatus::Warning { .. } => {
+                return PolicyDecision::Allow;
             }
             RotationStatus::Expired => PasswordResetReason::RotationExpired.as_str().to_string(),
         }
@@ -211,40 +189,22 @@ fn is_read_only(method: &Method) -> bool {
     matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS)
 }
 
-/// Look the user up and apply the policy.
-async fn check_request(user_email: &str, uri: &Uri, method: &Method) -> RequestOutcome {
+/// Look the user up and apply the policy, returning the refusal when there is one.
+async fn check_request(user_email: &str, uri: &Uri, method: &Method) -> Option<Response> {
     // Served from the cluster-consistent users cache, so this costs no database round trip on the
     // authenticated hot path.
-    let Some(user) = USERS.get(&user_email.to_lowercase()) else {
-        // Authentication succeeded against something this cache does not hold — a token or an
-        // enterprise identity. Nothing here applies to it.
-        return RequestOutcome::Proceed;
-    };
+    // Authentication succeeding against something this cache does not hold — a token or an
+    // enterprise identity — means there is nothing here that applies to it.
+    let user = USERS.get(&user_email.to_lowercase())?;
 
     if user.is_root {
-        return RequestOutcome::Proceed;
+        return None;
     }
 
     let policy = db::password_policy::get_effective_policy().await;
     match decide(&user, uri, method, &policy, Utc::now()) {
-        PolicyDecision::Allow => RequestOutcome::Proceed,
-        PolicyDecision::Warn { days_remaining } => RequestOutcome::Warn { days_remaining },
-        PolicyDecision::Block { reason } => {
-            RequestOutcome::Block(Box::new(blocked_response(&reason)))
-        }
-    }
-}
-
-/// Attach the rotation countdown to a response that has already been produced.
-///
-/// A warning must not change what the caller asked for, so an unrepresentable value is dropped
-/// rather than turned into an error.
-fn attach_rotation_warning(response: &mut Response, days_remaining: i64) {
-    if let Ok(value) = header::HeaderValue::from_str(&days_remaining.to_string()) {
-        response.headers_mut().insert(
-            header::HeaderName::from_static(ROTATION_WARNING_HEADER),
-            value,
-        );
+        PolicyDecision::Allow => None,
+        PolicyDecision::Block { reason } => Some(blocked_response(&reason)),
     }
 }
 
@@ -501,10 +461,10 @@ mod tests {
         ));
 
         u.password_updated_at = u.password_updated_at.map(|t| t + 1);
-        assert!(matches!(
+        assert_eq!(
             decide(&u, &uri("/default/streams"), &Method::GET, &policy, now()),
-            PolicyDecision::Warn { .. }
-        ));
+            PolicyDecision::Allow
+        );
     }
 
     #[test]
@@ -535,7 +495,8 @@ mod tests {
     }
 
     #[test]
-    fn warning_window_warns_rather_than_blocks() {
+    fn a_password_inside_the_warning_window_is_not_blocked() {
+        // The countdown itself is the sign-in handler's; nothing about it may refuse a request.
         let u = unflagged("a@b.com", 85);
         assert_eq!(
             decide(
@@ -545,22 +506,7 @@ mod tests {
                 &rotating(90, 7),
                 now()
             ),
-            PolicyDecision::Warn { days_remaining: 5 }
-        );
-    }
-
-    #[test]
-    fn a_window_as_long_as_the_period_warns_on_every_request() {
-        let u = unflagged("a@b.com", 1);
-        assert_eq!(
-            decide(
-                &u,
-                &uri("/default/streams"),
-                &Method::GET,
-                &rotating(90, 90),
-                now()
-            ),
-            PolicyDecision::Warn { days_remaining: 89 }
+            PolicyDecision::Allow
         );
     }
 
@@ -644,13 +590,6 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn the_warning_header_carries_the_countdown() {
-        let mut response = Response::new(Body::empty());
-        attach_rotation_warning(&mut response, 3);
-        assert_eq!(response.headers()[ROTATION_WARNING_HEADER], "3");
-    }
-
     /// Layered outside the gate, so the gate sees exactly what `auth_middleware` leaves behind.
     async fn stub_auth(email: &'static str, mut request: Request, next: Next) -> Response {
         request
@@ -681,7 +620,6 @@ mod tests {
             .unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
-        assert!(!response.headers().contains_key(ROTATION_WARNING_HEADER));
     }
 
     /// Authentication succeeded against an identity the users cache does not hold — a token, or an
@@ -711,11 +649,11 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
     }
 
-    /// `decide` returning `Warn` and `attach_rotation_warning` setting the header are each covered
-    /// above, but not the middleware step that joins them: dropping it would leave both green.
-    /// This one runs a real request through the layer and reads the header off the response.
+    /// `decide` blocking an expired password is covered above, but not the middleware step that
+    /// reads the live policy and turns that into a response: dropping it would leave the unit
+    /// tests green. This one runs a real request through the layer.
     #[tokio::test]
-    async fn a_warning_reaches_the_response_the_request_produced() {
+    async fn an_expired_password_is_refused_through_the_layer() {
         use axum::{Router, body::Body, routing::get};
         use common::infra::config::{SYSTEM_SETTINGS, USERS};
         use config::{
@@ -724,22 +662,22 @@ mod tests {
         };
         use tower::ServiceExt;
 
-        let email = "warned@b.com";
+        let email = "expired@b.com";
         let mut user = unflagged(email, 0);
-        // Against the wall clock, not the tests' fixed instant: the middleware reads `Utc::now()`,
-        // so a password dated 2023 is years expired and would be blocked rather than warned.
-        user.password_updated_at = Some((Utc::now() - TimeDelta::days(1)).timestamp_micros());
+        // Against the wall clock, not the tests' fixed instant: the middleware reads `Utc::now()`.
+        user.password_updated_at = Some((Utc::now() - TimeDelta::days(91)).timestamp_micros());
         USERS.insert(email.to_string(), user);
 
         // Seeding the settings cache keeps the policy read off the database. The key format is
         // db::system_settings::cache_key's; a drift there fails this test rather than silencing it,
         // since the read would then fall back to a policy with rotation off.
+        let policy_key = format!("org:{META_ORG_ID}:_:{}", keys::PASSWORD_POLICY);
         SYSTEM_SETTINGS.write().await.insert(
-            format!("org:{META_ORG_ID}:_:{}", keys::PASSWORD_POLICY),
+            policy_key.clone(),
             SystemSetting::new_org(
                 META_ORG_ID,
                 keys::PASSWORD_POLICY,
-                serde_json::to_value(rotating(90, 90)).unwrap(),
+                serde_json::to_value(rotating(90, 7)).unwrap(),
             ),
         );
 
@@ -747,7 +685,7 @@ mod tests {
             .route("/default/streams", get(|| async { "ok" }))
             .layer(axum::middleware::from_fn(password_policy_middleware))
             .layer(axum::middleware::from_fn(|request, next| async move {
-                stub_auth("warned@b.com", request, next).await
+                stub_auth("expired@b.com", request, next).await
             }));
 
         let response = app
@@ -760,10 +698,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(response.status(), StatusCode::OK);
-        assert_eq!(response.headers()[ROTATION_WARNING_HEADER], "89");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
 
         USERS.remove(email);
+        SYSTEM_SETTINGS.write().await.remove(&policy_key);
     }
 
     /// The unit tests above feed `decide` a path string directly, so they cannot catch the case

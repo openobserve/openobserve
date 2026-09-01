@@ -23,13 +23,6 @@ use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// Response header carrying the days left before the caller's password expires.
-///
-/// Advisory: it rides along with the response the caller actually asked for, so a client that
-/// ignores it is never broken by one. Lowercase because `HeaderName::from_static` rejects anything
-/// else.
-pub const ROTATION_WARNING_HEADER: &str = "x-password-rotation-warning";
-
 /// How lockout duration grows with each successive lockout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "lowercase")]
@@ -333,7 +326,7 @@ impl PasswordPolicy {
             whole_days
         };
         // A window as long as the rotation period leaves no password outside it, which is how an
-        // admin asks for the countdown on every response rather than only near the deadline.
+        // admin asks for the countdown on every sign-in rather than only near the deadline.
         if days_remaining <= i64::from(self.rotation_warning_days) {
             RotationStatus::Warning { days_remaining }
         } else {

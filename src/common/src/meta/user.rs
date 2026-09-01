@@ -261,6 +261,10 @@ pub struct SignInUser {
 pub struct SignInResponse {
     pub status: bool,
     pub message: String,
+    /// Days left before the caller's password expires, present only inside the rotation warning
+    /// window. Advisory: a client that ignores it is never broken by one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password_rotation_warning: Option<i64>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]

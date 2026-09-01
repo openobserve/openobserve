@@ -23,7 +23,7 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, patch, post, put},
 };
-use config::{get_config, meta::password_policy::ROTATION_WARNING_HEADER};
+use config::get_config;
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
 use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
 #[cfg(feature = "cloud")]
@@ -107,9 +107,6 @@ pub fn cors_layer() -> CorsLayer {
             header::HeaderName::from_static("x-openobserve-sampled"),
             X_O2_ASSISTANT_SESSION_ID,
         ])
-        // Response headers are invisible to a cross-origin caller unless listed here, and the
-        // rotation countdown is only useful if the console can read it.
-        .expose_headers([header::HeaderName::from_static(ROTATION_WARNING_HEADER)])
         // Restrict CORS to the configured web_url origin, plus any extra origins in
         // ZO_CORS_ALLOWED_ORIGINS (comma-separated).  mirror_request() + allow_credentials(true)
         // allows any origin to make credentialed requests — effectively disabling same-origin

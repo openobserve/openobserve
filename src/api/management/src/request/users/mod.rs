@@ -54,7 +54,7 @@ use crate::{
             UserOrgRole, UserRequest, UserRoleRequest, UserUpdateMode, get_roles,
         },
     },
-    request::{BulkDeleteRequest, BulkDeleteResponse},
+    request::{BulkDeleteRequest, BulkDeleteResponse, password_policy::password_rotation},
 };
 
 pub mod service_accounts;
@@ -639,6 +639,8 @@ pub async fn authentication(
     };
     if resp.status {
         let cfg = get_config();
+
+        resp.password_rotation_warning = password_rotation::warning_days(&auth.name).await;
 
         let access_token = format!(
             "Basic {}",
