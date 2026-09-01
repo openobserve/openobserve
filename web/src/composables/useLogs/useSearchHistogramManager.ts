@@ -36,7 +36,6 @@ export const useSearchHistogramManager = () => {
   const {
     resetHistogramWithError,
     generateHistogramSkeleton,
-    setMultiStreamHistogramQuery,
     isHistogramEnabled,
   } = useHistogram();
 
@@ -49,9 +48,7 @@ export const useSearchHistogramManager = () => {
         (!searchObj.meta.sqlMode ||
           isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
         (isHistogramEnabled(searchObj) && !searchObj.meta.sqlMode)) &&
-      (searchObj.data.stream.selectedStream.length === 1 ||
-        (searchObj.data.stream.selectedStream.length > 1 &&
-          !searchObj.meta.sqlMode))
+      searchObj.data.stream.selectedStream.length === 1
     );
   };
 
@@ -71,13 +68,11 @@ export const useSearchHistogramManager = () => {
   ) => {
     const parsedSQL: any = fnParsedSQL();
 
-    if (
-      searchObj.data.stream.selectedStream.length > 1 &&
-      searchObj.meta.sqlMode == true
-    ) {
-      const errMsg =
-        "Histogram is not available for multi-stream SQL mode search.";
-      resetHistogramWithError(errMsg, 0);
+    if (searchObj.data.stream.selectedStream.length > 1) {
+      resetHistogramWithError(
+        "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
+        -1,
+      );
     }
 
     if (!searchObj.data.queryResults?.hits?.length) {
@@ -119,20 +114,11 @@ export const useSearchHistogramManager = () => {
           payload.onReset = callbacks.onReset;
         }
 
-        if (
-          searchObj.data.stream.selectedStream.length > 1 &&
-          searchObj.meta.sqlMode == false
-        ) {
-          payload.queryReq.query.sql = setMultiStreamHistogramQuery(
-            searchObj.data.histogramQuery.query,
-          );
-        } else {
-          payload.queryReq.query.sql =
+        payload.queryReq.query.sql =
             searchObj.data.histogramQuery.query.sql.replace(
               "[INTERVAL]",
               searchObj.meta.resultGrid.chartInterval,
             );
-        }
 
         payload.meta = {
           isHistogramOnly: searchObj.meta.histogramDirtyFlag,

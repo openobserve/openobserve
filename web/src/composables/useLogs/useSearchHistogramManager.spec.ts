@@ -50,7 +50,6 @@ let mockState: ReturnType<typeof createMockState>;
 const mockHistogramFunctions = {
   resetHistogramWithError: vi.fn(),
   generateHistogramSkeleton: vi.fn(),
-  setMultiStreamHistogramQuery: vi.fn(() => "mocked SQL"),
   isHistogramEnabled: vi.fn(() => true),
 };
 
@@ -94,7 +93,6 @@ describe("useSearchHistogramManager", () => {
     // Reset mock functions
     mockHistogramFunctions.resetHistogramWithError.mockClear();
     mockHistogramFunctions.generateHistogramSkeleton.mockClear();
-    mockHistogramFunctions.setMultiStreamHistogramQuery.mockClear();
     mockHistogramFunctions.isHistogramEnabled.mockReturnValue(true);
     histogramManager = useSearchHistogramManager();
   });
@@ -139,14 +137,14 @@ describe("useSearchHistogramManager", () => {
       expect(result).toBe(true);
     });
 
-    it("should return true for multi-stream non-SQL mode", () => {
+    it("should return false for multi-stream, which has no histogram", () => {
       // Use mockState directly
       mockState.searchObj.data.stream.selectedStream = ["stream1", "stream2"];
       mockState.searchObj.meta.sqlMode = false;
 
       const parsedSQL = {};
       const result = histogramManager.shouldShowHistogram(parsedSQL);
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
   });
 
@@ -329,7 +327,7 @@ describe("useSearchHistogramManager", () => {
       expect(initializeSearchConnection).not.toHaveBeenCalled();
     });
 
-    it("should show error for multi-stream SQL mode", async () => {
+    it("should show the unavailable notice for any multi-stream search", async () => {
       // Use mockState directly
       mockState.searchObj.data.stream.selectedStream = ["stream1", "stream2"];
       mockState.searchObj.meta.sqlMode = true;
@@ -350,8 +348,8 @@ describe("useSearchHistogramManager", () => {
       );
 
       expect(mockHistogramFunctions.resetHistogramWithError).toHaveBeenCalledWith(
-        "Histogram is not available for multi-stream SQL mode search.",
-        0
+        "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
+        -1
       );
     });
 
