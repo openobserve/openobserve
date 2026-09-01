@@ -368,32 +368,5 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     return promise;
   };
 
-  /**
-   * The stream containing `traceId`, else RUM_CORRELATION_TRACES_STREAM.
-   * Never rejects.
-   */
-  const resolveTracesStream = async (
-    traceId: string,
-    startTimeUs: number,
-    endTimeUs: number,
-  ): Promise<string> => (await resolveTraceLocation(traceId, startTimeUs, endTimeUs)).stream;
-
-  /** id → stream for every id found. Never rejects. */
-  const resolveTracesStreamsBulk = async (
-    traceIds: string[],
-    startTimeUs: number,
-    endTimeUs: number,
-  ): Promise<Record<string, string>> => {
-    const locations = await resolveTraceLocationsBulk(traceIds, startTimeUs, endTimeUs);
-    return Object.fromEntries(
-      Object.entries(locations).map(([id, location]) => [id, location.stream]),
-    );
-  };
-
-  return {
-    resolveTraceLocation,
-    resolveTraceLocationsBulk,
-    resolveTracesStream,
-    resolveTracesStreamsBulk,
-  };
+  return { resolveTraceLocation, resolveTraceLocationsBulk };
 }

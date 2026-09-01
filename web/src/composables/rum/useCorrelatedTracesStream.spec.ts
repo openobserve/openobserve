@@ -159,9 +159,9 @@ describe("useCorrelatedTracesStream", () => {
 
   it("① first-ever id: one batch over all streams, default ordered first, seeds knownStreams", async () => {
     mockBatch({ payments_traces: [T1] });
-    const { resolveTracesStream } = useCorrelatedTracesStream(t);
+    const { resolveTraceLocation } = useCorrelatedTracesStream(t);
 
-    expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("payments_traces");
+    expect((await resolveTraceLocation(T1, 1_000, 2_000)).stream).toBe("payments_traces");
     expect(batchCalls()).toEqual([["default", "payments_traces", "checkout_traces"]]);
     expect(mockStoreState.organizationData.correlatedTracesStreams.knownStreams).toEqual([
       "payments_traces",
@@ -170,47 +170,47 @@ describe("useCorrelatedTracesStream", () => {
 
   it("①b second new id probes ONLY knownStreams — no full batch", async () => {
     mockBatch({ payments_traces: [T1, T2] });
-    const { resolveTracesStream } = useCorrelatedTracesStream(t);
-    await resolveTracesStream(T1, 1_000, 2_000);
+    const { resolveTraceLocation } = useCorrelatedTracesStream(t);
+    await resolveTraceLocation(T1, 1_000, 2_000);
     mockFetchQueryDataWithHttpStream.mockClear();
 
-    expect(await resolveTracesStream(T2, 1_000, 2_000)).toBe("payments_traces");
+    expect((await resolveTraceLocation(T2, 1_000, 2_000)).stream).toBe("payments_traces");
     expect(batchCalls()).toEqual([["payments_traces"]]);
   });
 
   it("② single-stream org: that stream is the answer, zero probes", async () => {
     mockGetStreams.mockResolvedValue({ list: [{ name: "only_traces" }] });
-    const { resolveTracesStream } = useCorrelatedTracesStream(t);
+    const { resolveTraceLocation } = useCorrelatedTracesStream(t);
 
-    expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("only_traces");
+    expect((await resolveTraceLocation(T1, 1_000, 2_000)).stream).toBe("only_traces");
     expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
   });
 
   it("③ same id in two streams: first in stream order wins regardless of arrival order", async () => {
     // T1 exists in default AND checkout; chunks arrive reversed (checkout first)
     mockBatch({ default: [T1], checkout_traces: [T1] });
-    const { resolveTracesStream } = useCorrelatedTracesStream(t);
+    const { resolveTraceLocation } = useCorrelatedTracesStream(t);
 
-    expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("default");
+    expect((await resolveTraceLocation(T1, 1_000, 2_000)).stream).toBe("default");
   });
 
   it("④ second resolve of the same id reads the cache: zero queries", async () => {
     mockBatch({ payments_traces: [T1] });
-    const { resolveTracesStream } = useCorrelatedTracesStream(t);
-    await resolveTracesStream(T1, 1_000, 2_000);
+    const { resolveTraceLocation } = useCorrelatedTracesStream(t);
+    await resolveTraceLocation(T1, 1_000, 2_000);
     mockFetchQueryDataWithHttpStream.mockClear();
     mockGetStreams.mockClear();
 
-    expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("payments_traces");
+    expect((await resolveTraceLocation(T1, 1_000, 2_000)).stream).toBe("payments_traces");
     expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
     expect(mockGetStreams).not.toHaveBeenCalled();
   });
 
   it("⑤ all-miss returns default and caches nothing", async () => {
     mockBatch({});
-    const { resolveTracesStream } = useCorrelatedTracesStream(t);
+    const { resolveTraceLocation } = useCorrelatedTracesStream(t);
 
-    expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("default");
+    expect((await resolveTraceLocation(T1, 1_000, 2_000)).stream).toBe("default");
     expect(mockStoreState.organizationData.correlatedTracesStreams.byTraceId).toEqual({});
     expect(mockCommit).not.toHaveBeenCalled();
   });
@@ -220,17 +220,19 @@ describe("useCorrelatedTracesStream", () => {
     mockFetchQueryDataWithHttpStream.mockImplementation(() => {
       throw new Error("boom");
     });
-    const { resolveTracesStream } = useCorrelatedTracesStream(t);
+    const { resolveTraceLocation } = useCorrelatedTracesStream(t);
 
-    await expect(resolveTracesStream(T1, 1_000, 2_000)).resolves.toBe("default");
+    await expect(resolveTraceLocation(T1, 1_000, 2_000)).resolves.toEqual({
+      stream: "default",
+    });
   });
 
   it("⑦ legacy 31-char input probes the padded canonical id", async () => {
     mockBatch({ default: [T1] });
-    const { resolveTracesStream } = useCorrelatedTracesStream(t);
+    const { resolveTraceLocation } = useCorrelatedTracesStream(t);
 
     // T1 minus its leading zero, as SDK 0.4.x stored it
-    expect(await resolveTracesStream(T1.slice(1), 1_000, 2_000)).toBe("default");
+    expect((await resolveTraceLocation(T1.slice(1), 1_000, 2_000)).stream).toBe("default");
     const sql = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq.query.sql[0];
     expect(sql).toContain(`'${T1}'`);
     expect(sql).not.toContain(`'${T1.slice(1)}'`);
@@ -241,29 +243,29 @@ describe("useCorrelatedTracesStream", () => {
 
   it("⑧ two concurrent resolves of one id share a single probe pass", async () => {
     mockBatch({ payments_traces: [T1] });
-    const { resolveTracesStream } = useCorrelatedTracesStream(t);
+    const { resolveTraceLocation } = useCorrelatedTracesStream(t);
 
     const [a, b] = await Promise.all([
-      resolveTracesStream(T1, 1_000, 2_000),
-      resolveTracesStream(T1, 1_000, 2_000),
+      resolveTraceLocation(T1, 1_000, 2_000),
+      resolveTraceLocation(T1, 1_000, 2_000),
     ]);
 
-    expect(a).toBe("payments_traces");
-    expect(b).toBe("payments_traces");
+    expect(a.stream).toBe("payments_traces");
+    expect(b.stream).toBe("payments_traces");
     expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
   });
 
-  describe("resolveTracesStreamsBulk", () => {
+  describe("resolveTraceLocationsBulk", () => {
     it("resolves the whole id-set in one request and returns id→stream pairs", async () => {
       mockBatch({ payments_traces: [T1, T2], checkout_traces: [T3] });
-      const { resolveTracesStreamsBulk } = useCorrelatedTracesStream(t);
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
 
-      const result = await resolveTracesStreamsBulk([T1, T2, T3], 1_000, 2_000);
+      const result = await resolveTraceLocationsBulk([T1, T2, T3], 1_000, 2_000);
 
       expect(result).toEqual({
-        [T1]: "payments_traces",
-        [T2]: "payments_traces",
-        [T3]: "checkout_traces",
+        [T1]: { stream: "payments_traces" },
+        [T2]: { stream: "payments_traces" },
+        [T3]: { stream: "checkout_traces" },
       });
       // cold: knownStreams empty → step 1 covers ALL streams → no second request
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
@@ -271,15 +273,15 @@ describe("useCorrelatedTracesStream", () => {
 
     it("escalates only unresolved ids to unprobed streams (step 2)", async () => {
       mockBatch({ payments_traces: [T1], checkout_traces: [T3] });
-      const { resolveTracesStream, resolveTracesStreamsBulk } = useCorrelatedTracesStream(t);
+      const { resolveTraceLocation, resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
       // learn payments first so step 1 probes only knownStreams
-      await resolveTracesStream(T1, 1_000, 2_000);
+      await resolveTraceLocation(T1, 1_000, 2_000);
       mockFetchQueryDataWithHttpStream.mockClear();
 
-      const result = await resolveTracesStreamsBulk([T2, T3], 1_000, 2_000);
+      const result = await resolveTraceLocationsBulk([T2, T3], 1_000, 2_000);
 
       // T3 found in checkout via escalation; T2 exists nowhere → absent
-      expect(result).toEqual({ [T3]: "checkout_traces" });
+      expect(result).toEqual({ [T3]: { stream: "checkout_traces" } });
       const calls = batchCalls();
       expect(calls[0]).toEqual(["payments_traces"]); // step 1: knownStreams only
       expect(calls[1]).toEqual(["default", "checkout_traces"]); // step 2: the rest
@@ -296,14 +298,14 @@ describe("useCorrelatedTracesStream", () => {
 
     it("merges already-cached ids without probing them", async () => {
       mockBatch({ payments_traces: [T1, T2] });
-      const { resolveTracesStream, resolveTracesStreamsBulk } = useCorrelatedTracesStream(t);
-      await resolveTracesStream(T1, 1_000, 2_000);
+      const { resolveTraceLocation, resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
+      await resolveTraceLocation(T1, 1_000, 2_000);
       mockFetchQueryDataWithHttpStream.mockClear();
 
-      const result = await resolveTracesStreamsBulk([T1, T2], 1_000, 2_000);
+      const result = await resolveTraceLocationsBulk([T1, T2], 1_000, 2_000);
 
-      expect(result[T1]).toBe("payments_traces");
-      expect(result[T2]).toBe("payments_traces");
+      expect(result[T1].stream).toBe("payments_traces");
+      expect(result[T2].stream).toBe("payments_traces");
       const probedIds = mockFetchQueryDataWithHttpStream.mock.calls.flatMap(([args]: any[]) =>
         args.queryReq.query.sql.flatMap(idsOfSql),
       );
@@ -323,9 +325,9 @@ describe("useCorrelatedTracesStream", () => {
           },
         ]),
       );
-      const { resolveTracesStream } = useCorrelatedTracesStream(t);
+      const { resolveTraceLocation } = useCorrelatedTracesStream(t);
 
-      expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("payments_traces");
+      expect((await resolveTraceLocation(T1, 1_000, 2_000)).stream).toBe("payments_traces");
       expect(mockGetTraceTimeRanges).toHaveBeenCalledTimes(1);
       expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
       expect(mockStoreState.organizationData.correlatedTracesStreams.knownStreams).toEqual([
@@ -337,8 +339,8 @@ describe("useCorrelatedTracesStream", () => {
       mockGetTraceTimeRanges.mockResolvedValue(
         indexResponse([{ trace_id: T1, stream: "default", status: "found" }]),
       );
-      const { resolveTracesStream } = useCorrelatedTracesStream(t);
-      await resolveTracesStream(T1, 1_000, 2_000);
+      const { resolveTraceLocation } = useCorrelatedTracesStream(t);
+      await resolveTraceLocation(T1, 1_000, 2_000);
 
       expect(mockGetTraceTimeRanges).toHaveBeenCalledWith("test-org", {
         traceIds: [T1],
@@ -353,9 +355,9 @@ describe("useCorrelatedTracesStream", () => {
       mockGetTraceTimeRanges.mockResolvedValue(
         indexResponse([{ trace_id: T1, status: "not_found" }]),
       );
-      const { resolveTracesStream } = useCorrelatedTracesStream(t);
+      const { resolveTraceLocation } = useCorrelatedTracesStream(t);
 
-      expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("default");
+      expect((await resolveTraceLocation(T1, 1_000, 2_000)).stream).toBe("default");
       expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
       expect(mockStoreState.organizationData.correlatedTracesStreams.byTraceId).toEqual({});
     });
@@ -371,11 +373,14 @@ describe("useCorrelatedTracesStream", () => {
         ),
       );
       mockBatch({ checkout_traces: [T2] });
-      const { resolveTracesStreamsBulk } = useCorrelatedTracesStream(t);
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
 
-      const result = await resolveTracesStreamsBulk([T1, T2], 1_000, 2_000);
+      const result = await resolveTraceLocationsBulk([T1, T2], 1_000, 2_000);
 
-      expect(result).toEqual({ [T1]: "payments_traces", [T2]: "checkout_traces" });
+      expect(result).toEqual({
+        [T1]: { stream: "payments_traces" },
+        [T2]: { stream: "checkout_traces" },
+      });
       const probedIds = mockFetchQueryDataWithHttpStream.mock.calls.flatMap(([args]: any[]) =>
         args.queryReq.query.sql.flatMap(idsOfSql),
       );
@@ -391,11 +396,14 @@ describe("useCorrelatedTracesStream", () => {
         ]),
       );
       mockBatch({ checkout_traces: [T2] });
-      const { resolveTracesStreamsBulk } = useCorrelatedTracesStream(t);
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
 
-      const result = await resolveTracesStreamsBulk([T1, T2], 1_000, 2_000);
+      const result = await resolveTraceLocationsBulk([T1, T2], 1_000, 2_000);
 
-      expect(result).toEqual({ [T1]: "payments_traces", [T2]: "checkout_traces" });
+      expect(result).toEqual({
+        [T1]: { stream: "payments_traces" },
+        [T2]: { stream: "checkout_traces" },
+      });
       const probedIds = mockFetchQueryDataWithHttpStream.mock.calls.flatMap(([args]: any[]) =>
         args.queryReq.query.sql.flatMap(idsOfSql),
       );
@@ -409,9 +417,9 @@ describe("useCorrelatedTracesStream", () => {
           { trace_id: T1, stream: "default", status: "found" },
         ]),
       );
-      const { resolveTracesStream } = useCorrelatedTracesStream(t);
+      const { resolveTraceLocation } = useCorrelatedTracesStream(t);
 
-      expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("default");
+      expect((await resolveTraceLocation(T1, 1_000, 2_000)).stream).toBe("default");
     });
 
     it("chunks past the server's 100-id cap and merges the answers", async () => {
@@ -427,9 +435,9 @@ describe("useCorrelatedTracesStream", () => {
           ),
         ),
       );
-      const { resolveTracesStreamsBulk } = useCorrelatedTracesStream(t);
+      const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
 
-      const result = await resolveTracesStreamsBulk(ids, 1_000, 2_000);
+      const result = await resolveTraceLocationsBulk(ids, 1_000, 2_000);
 
       expect(mockGetTraceTimeRanges).toHaveBeenCalledTimes(3);
       expect(indexedIds(0)).toHaveLength(100);
@@ -441,12 +449,12 @@ describe("useCorrelatedTracesStream", () => {
     it("a transient failure probes and does NOT latch the endpoint off", async () => {
       mockGetTraceTimeRanges.mockRejectedValue({ response: { status: 500 } });
       mockBatch({ payments_traces: [T1, T2] });
-      const { resolveTracesStream } = useCorrelatedTracesStream(t);
+      const { resolveTraceLocation } = useCorrelatedTracesStream(t);
 
-      expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("payments_traces");
+      expect((await resolveTraceLocation(T1, 1_000, 2_000)).stream).toBe("payments_traces");
       expect(mockGetTraceTimeRanges).toHaveBeenCalledTimes(1);
 
-      expect(await resolveTracesStream(T2, 1_000, 2_000)).toBe("payments_traces");
+      expect((await resolveTraceLocation(T2, 1_000, 2_000)).stream).toBe("payments_traces");
       expect(mockGetTraceTimeRanges).toHaveBeenCalledTimes(2);
     });
 
@@ -508,13 +516,13 @@ describe("useCorrelatedTracesStream", () => {
       const freshComposable = (await import("@/composables/rum/useCorrelatedTracesStream")).default;
       mockGetTraceTimeRanges.mockRejectedValue({ response: { status: 404 } });
       mockBatch({ payments_traces: [T1, T2] });
-      const { resolveTracesStream } = freshComposable(t);
+      const { resolveTraceLocation } = freshComposable(t);
 
-      expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("payments_traces");
+      expect((await resolveTraceLocation(T1, 1_000, 2_000)).stream).toBe("payments_traces");
       expect(mockGetTraceTimeRanges).toHaveBeenCalledTimes(1);
 
       mockGetTraceTimeRanges.mockClear();
-      expect(await resolveTracesStream(T2, 1_000, 2_000)).toBe("payments_traces");
+      expect((await resolveTraceLocation(T2, 1_000, 2_000)).stream).toBe("payments_traces");
       expect(mockGetTraceTimeRanges).not.toHaveBeenCalled();
     });
   });
