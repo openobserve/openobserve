@@ -299,6 +299,7 @@ pub async fn search(
                 start.elapsed().as_millis()
             ),
             SearchInspectorFieldsBuilder::new()
+                .org_id(org_id.to_string())
                 .node_name(LOCAL_NODE.name.clone())
                 .component("summary".to_string())
                 .search_role(search_role)
