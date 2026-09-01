@@ -27,7 +27,7 @@
         {{ t("aiObservability.experiments.cancel") }}
       </OButton>
       <OButton
-        v-else-if="failedSlotCount > 0"
+        v-else-if="detail?.experiment.status === 'failed' || failedSlotCount > 0"
         size="sm"
         variant="outline"
         :disabled="acting"
@@ -288,11 +288,10 @@ const detail = ref<ExperimentDetail | null>(null);
 const loading = ref(false);
 const acting = ref(false);
 const comparePickerOpen = ref(false);
-// Meant to fetch the whole run in one request, so the search box and the status
-// filter below cover every slot. Pinned to the server's current
-// MAX_RESULT_PAGE_SIZE until that cap is lifted — while it stands, both controls
-// only see the first page of a longer run.
-const ALL_RESULTS_PAGE_SIZE = 50;
+// The server caps a single page at MAX_RESULT_PAGE_SIZE (100) — refresh()
+// below loops pages until hasMore is false so the search box and status
+// filter still see every slot in a run bigger than one page.
+const RESULTS_PAGE_SIZE = 100;
 const rowSearch = ref("");
 const statusFilter = ref("");
 const rowDrawerOpen = ref(false);
@@ -538,10 +537,27 @@ async function refresh() {
   if (!orgId.value || !experimentId.value) return;
   loading.value = true;
   try {
-    detail.value = await llmExperimentsService.get(orgId.value, experimentId.value, {
+    const first = await llmExperimentsService.get(orgId.value, experimentId.value, {
       resultPage: 1,
-      resultPageSize: ALL_RESULTS_PAGE_SIZE,
+      resultPageSize: RESULTS_PAGE_SIZE,
     });
+    const slots = [...(first.results.slots ?? [])];
+    let page = first.results.pagination?.page ?? 1;
+    let hasMore = first.results.pagination?.hasMore ?? false;
+    // Summary/progress/score fields are already computed over the WHOLE
+    // experiment on every page — only `slots` is page-scoped, so later pages
+    // only need to contribute more slots, not replace `first`.
+    while (hasMore) {
+      page += 1;
+      const next = await llmExperimentsService.get(orgId.value, experimentId.value, {
+        resultPage: page,
+        resultPageSize: RESULTS_PAGE_SIZE,
+      });
+      slots.push(...(next.results.slots ?? []));
+      hasMore = next.results.pagination?.hasMore ?? false;
+    }
+    first.results.slots = slots;
+    detail.value = first;
   } catch (error: any) {
     toast({
       variant: "error",
