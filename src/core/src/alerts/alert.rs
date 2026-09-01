@@ -288,7 +288,10 @@ pub enum AlertError {
     /// and a shared reason would name the wrong fix for one of them.
     #[error("this edit breaks the SLOs measuring from this alert — {breakages}")]
     AlertSourceEditBreaksSlos { breakages: String },
-
+    #[error("Realtime alerts cannot have non-zero pending period")]
+    PendingPeriodOnRealtimeAlert,
+    #[error("Alert pending period must be >= 0")]
+    NegativePendingPeriod,
     #[error("Error in multi alert grouping: {0}")]
     MultiAlertGroupingError(String),
 }
@@ -655,6 +658,14 @@ async fn prepare_alert(
 
     if alert.is_real_time && alert.query_condition.query_type != QueryType::Custom {
         return Err(AlertError::RealtimeMissingCustomQuery);
+    }
+
+    if alert.is_real_time && alert.pending_period_sec != 0 {
+        return Err(AlertError::PendingPeriodOnRealtimeAlert);
+    }
+
+    if alert.pending_period_sec < 0 {
+        return Err(AlertError::NegativePendingPeriod);
     }
 
     // Multi-level thresholds (alerts_2.md Feature 1). Rejected at write time so

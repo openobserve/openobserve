@@ -1233,6 +1233,7 @@ export default defineComponent({
         t("alerts.historyTimeline.error"),
         t("alerts.historyTimeline.skipped"),
         t("alerts.historyTimeline.unknown"),
+        t("alerts.historyTimeline.pending"),
       );
       return raw(at ? `${label} ${t("alerts.asOf")} ${at}` : label);
     };
