@@ -108,6 +108,8 @@ pub enum CompositeServiceError {
     Database(#[from] sea_orm::DbErr),
     #[error(transparent)]
     Scheduler(#[from] anyhow::Error),
+    #[error("Pending period must be >= 0")]
+    NegativePendingPeriod
 }
 
 pub async fn create_composite(
@@ -329,6 +331,9 @@ async fn persist(
 ) -> Result<composite_entity::Model, CompositeServiceError> {
     let parsed = parse_expr(&request.expression)
         .map_err(|error| CompositeServiceError::InvalidExpression(error.to_string()))?;
+    if request.pending_period_sec <0{
+        return Err(CompositeServiceError::NegativePendingPeriod);
+    }
     let references = collect_references(&parsed).map_err(map_expression_error)?;
     validate_children(&references).map_err(map_expression_error)?;
     let expression = canonical_expression(&parsed);

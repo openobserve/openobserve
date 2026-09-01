@@ -590,6 +590,9 @@ fn composite_error_response(
                 error,
             )
         }
+        CompositeServiceError::NegativePendingPeriod => {
+            composite_machine_error(StatusCode::BAD_REQUEST, "negative_pending_period", error)
+        }
     }
 }
 
