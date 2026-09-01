@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Toolbar content rendered inside OTable's toolbar bar -->
           <template #toolbar>
-            <div class="flex min-w-0 flex-1 items-center gap-2">
+            <div class="flex min-w-0 flex-1 items-center gap-2 max-md:flex-wrap">
               <!-- Type tabs -->
               <OToggleGroup :model-value="activeTab" @update:model-value="onTabChange">
                 <OToggleGroupItem
@@ -171,13 +171,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :value="tab.key"
                   size="sm"
                   :icon-left="tab.icon"
+                  :title="tab.label"
                 >
-                  {{ tab.label }}
+                  <span class="max-md:hidden">{{ tab.label }}</span>
                 </OToggleGroupItem>
               </OToggleGroup>
 
               <!-- Search -->
-              <div class="min-w-0 flex-1">
+              <div class="min-w-0 flex-1 max-md:min-w-40">
                 <OInput
                   v-model="search"
                   :placeholder="
@@ -204,16 +205,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="xs"
                         icon-left="folder-outline"
                         data-test="synthetic-monitoring-search-this-folder-btn"
+                        :title="t('synthetics.search.thisFolder')"
                       >
-                        {{ t("synthetics.search.thisFolder") }}
+                        <span class="max-md:hidden">{{ t("synthetics.search.thisFolder") }}</span>
                       </OToggleGroupItem>
                       <OToggleGroupItem
                         value="all"
                         size="xs"
                         icon-left="search"
                         data-test="synthetic-monitoring-search-all-folders-btn"
+                        :title="t('synthetics.search.allFolders')"
                       >
-                        {{ t("synthetics.search.allFolders") }}
+                        <span class="max-md:hidden">{{ t("synthetics.search.allFolders") }}</span>
                       </OToggleGroupItem>
                     </OToggleGroup>
                   </template>

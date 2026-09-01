@@ -157,9 +157,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="tab.value"
                       size="sm"
                       :icon-left="tab.icon"
+                      :title="tab.label"
                       :data-test="`alert-list-tab-${tab.value}`"
                     >
-                      {{ tab.label }}
+                      <span class="max-md:hidden">{{ tab.label }}</span>
                     </OToggleGroupItem>
                   </OToggleGroup>
                   <div class="min-w-0 flex-1 max-md:min-w-40">
