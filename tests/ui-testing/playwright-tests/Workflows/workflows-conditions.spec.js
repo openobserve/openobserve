@@ -13,9 +13,11 @@
  *   - Unary operators REMOVE the value input from the DOM (FilterCondition.vue
  *     wraps it in `v-if="!isUnaryOperator(...)"`), so absence — not an empty
  *     string — is the correct assertion.
- *   - A never-configured Condition is sent as a rule with an EMPTY column, which
- *     the backend short-circuits to always-true (`Condition::evaluate`) before it
- *     reads operator/value. So a dummy Condition must not block Publish.
+ *   - A never-configured Condition BLOCKS Publish. submit() calls
+ *     setNodeIncomplete(node, !complete), which validate() turns into "N steps need
+ *     setup before publishing". The empty-column rule the backend short-circuits to
+ *     always-true (`Condition::evaluate`) is only how such a dummy node is SENT on
+ *     the Draft/Test paths — it is not a licence to publish one.
  *
  * Self-cleaning: every artifact is namespaced `wf_auto_*`; cleanup.spec.js sweeps by prefix.
  */
