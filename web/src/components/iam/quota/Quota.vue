@@ -28,7 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div :style="{ marginTop: 0 }" class="app-table-container flex min-h-0 flex-1 flex-col">
       <div class="bg-card-glass-bg mt-2.5 mb-2.5">
         <div class="px-3 py-2">
-          <div class="mb-2 flex w-full items-center justify-between max-md:flex-wrap max-md:gap-y-1.5">
+          <div
+            class="mb-2 flex w-full items-center justify-between max-md:flex-wrap max-md:gap-y-1.5"
+          >
             <div class="flex items-center max-md:min-w-0 max-md:flex-wrap max-md:gap-y-1.5">
               <OSelect
                 :loading="isOrgLoading"
@@ -67,8 +69,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </div>
-          <div class="mb-2 flex w-full items-center justify-between max-md:flex-wrap max-md:gap-y-1.5">
-            <div v-if="selectedOrganization && activeType == 'table'" class="flex items-center max-md:min-w-0 max-md:flex-wrap max-md:gap-y-1.5">
+          <div
+            class="mb-2 flex w-full items-center justify-between max-md:flex-wrap max-md:gap-y-1.5"
+          >
+            <div
+              v-if="selectedOrganization && activeType == 'table'"
+              class="flex items-center max-md:min-w-0 max-md:flex-wrap max-md:gap-y-1.5"
+            >
               <OSearchInput
                 data-test="pipeline-list-search-input"
                 v-model="searchQuery"
@@ -94,7 +101,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="handleApiCategorySelect"
               />
             </div>
-            <div v-if="selectedOrganization" class="float-right ml-auto flex items-center">
+            <div
+              v-if="selectedOrganization"
+              class="float-right ml-auto flex items-center max-md:flex-wrap max-md:justify-end max-md:gap-y-1.5"
+            >
               <div class="app-tabs-container mr-3 h-9 w-fit">
                 <AppTabs
                   data-test="time-unit-tabs"
