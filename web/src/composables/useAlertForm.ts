@@ -156,8 +156,10 @@ export const defaultAlertValue: any = () => {
       frequency_type: "minutes",
       timezone: "UTC",
     },
-    // Minutes while the form is open (matches the input's display unit);
-    // getAlertPayload converts to seconds on save. 0 = fire immediately.
+    // Minutes while the form is open — the CANONICAL stored value (mirrors
+    // trigger_condition.frequency); `_ui.pendingPeriod` is the DISPLAY value,
+    // which may be in hours. getAlertPayload converts to seconds on save.
+    // 0 = fire immediately.
     pending_period_sec: 0,
     destinations: [],
     // Enterprise-only: workflows linked to this alert (run when it fires).
@@ -289,12 +291,29 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     };
   };
 
+  /** Split the alert's STORED pending period (always MINUTES, mirroring
+   *  `frequencyDisplay`) into the display unit + the number the user actually
+   *  sees. AlertSettings.vue derives its own initial unit the same way — see
+   *  its `initialPendingPeriodMode`, kept in sync by rule, not shared code
+   *  (matching how `frequencyMode` and this helper stay independent). */
+  const pendingPeriodDisplay = (obj: any): { mode: "minutes" | "hours"; value: number } => {
+    const mins = Number(obj?.pending_period_sec ?? 0);
+    const isHours = mins >= 60 && mins % 60 === 0;
+    return {
+      mode: isHours ? "hours" : "minutes",
+      value: isHours ? mins / 60 : mins,
+    };
+  };
+
   const buildDefaultForm = (): any => {
     const base = defaultAlertValue();
     return {
       ...base,
       logGroupBy: [] as string[],
-      _ui: { checkEvery: frequencyDisplay(base).checkEvery },
+      _ui: {
+        checkEvery: frequencyDisplay(base).checkEvery,
+        pendingPeriod: pendingPeriodDisplay(base).value,
+      },
       _meta: defaultAddAlertMeta({
         frequencyMode: frequencyDisplay(base).mode,
         minAutoRefreshInterval: minAutoRefreshInterval(),
@@ -315,7 +334,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return {
       ...obj,
       logGroupBy: groupBy,
-      _ui: obj?._ui ?? { checkEvery: freq.checkEvery },
+      _ui: obj?._ui ?? {
+        checkEvery: freq.checkEvery,
+        pendingPeriod: pendingPeriodDisplay(obj).value,
+      },
       _meta:
         obj?._meta ??
         defaultAddAlertMeta({
@@ -2622,6 +2644,18 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           if ((newVal as any).destinationsFieldRef) {
             focusManager.registerField("destinations", {
               ref: (newVal as any).destinationsFieldRef,
+              onBeforeFocus: () => {
+                if (isAnomalyMode.value) {
+                  activeTab.value = "anomaly-alerting";
+                } else {
+                  activeTab.value = "condition";
+                }
+              },
+            });
+          }
+          if ((newVal as any).pendingPeriodFieldRef) {
+            focusManager.registerField("pending_period", {
+              ref: (newVal as any).pendingPeriodFieldRef,
               onBeforeFocus: () => {
                 if (isAnomalyMode.value) {
                   activeTab.value = "anomaly-alerting";
