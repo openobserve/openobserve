@@ -1172,9 +1172,8 @@
     "failedToFetchFieldValues": "Impossibile recuperare i valori dei campi",
     "fieldMissingInStreams": "Il campo '{field}' non esiste in uno o più stream.\n",
     "fieldStreamCountMismatch": "Il campo '{field}' esiste in un numero diverso di stream.\n",
-    "histogramNotAvailableMultiStream": "L'istogramma non è disponibile per la ricerca in modalità SQL multi-stream.",
     "histogramSearchQueryCancelled": "La query di ricerca dell'istogramma è stata annullata",
-    "histogramUnavailableForQueries": "Istogramma non disponibile per query CTE, DISTINCT, JOIN e LIMIT.",
+    "histogramUnavailableForQueries": "Istogramma non disponibile per query CTE, DISTINCT, UNION, JOIN e LIMIT.",
     "invalidDateFormat": "Formato data non valido.",
     "missingStreamFilterFields": "Uno o più campi filtro non esistono in \"{streams}\", quindi non viene eseguita alcuna ricerca nello stream menzionato.\n",
     "noColumnFoundInStream": "Nessuna colonna trovata nello stream selezionato.",
@@ -12944,8 +12943,6 @@
       "selectStarNotSupportedForVisualization": "La query SELECT * non è supportata per la visualizzazione",
       "errorUpdatingVisualization": "Errore nell'aggiornamento della visualizzazione",
       "queryEmptySelectFieldsToBuild": "La query è vuota, seleziona i campi per costruire la query",
-      "histogramUnavailableCtesDistinctJoinLimit": "Istogramma non disponibile per query CTE, DISTINCT, JOIN e LIMIT.",
-      "histogramNotAvailableMultiStream": "L'istogramma non è disponibile per la ricerca multi-flusso.",
       "histogramUnavailableCtesDistinctLimit": "Istogramma non disponibile per query CTE, DISTINCT e LIMIT."
     },
     "searchSchedulersList": {

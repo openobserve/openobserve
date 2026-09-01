@@ -1172,9 +1172,8 @@
     "failedToFetchFieldValues": "フィールド値の取得に失敗しました",
     "fieldMissingInStreams": "フィールド '{field}' は1つ以上のストリームに存在しません。\n",
     "fieldStreamCountMismatch": "フィールド '{field}' は異なる数のストリームに存在します。\n",
-    "histogramNotAvailableMultiStream": "ヒストグラムはマルチストリームSQLモードの検索では使用できません。",
     "histogramSearchQueryCancelled": "ヒストグラム検索クエリはキャンセルされました",
-    "histogramUnavailableForQueries": "ヒストグラムはCTE、DISTINCT、JOIN、LIMITクエリでは使用できません。",
+    "histogramUnavailableForQueries": "ヒストグラムはCTE、DISTINCT、UNION、JOIN、LIMITクエリでは使用できません。",
     "invalidDateFormat": "日付形式が無効です。",
     "missingStreamFilterFields": "1つ以上のフィルターフィールドが \"{streams}\" に存在しないため、指定されたストリームでは検索は実行されません。\n",
     "noColumnFoundInStream": "選択したストリームに列が見つかりません。",
@@ -12944,8 +12943,6 @@
       "selectStarNotSupportedForVisualization": "可視化では SELECT * クエリはサポートされていません",
       "errorUpdatingVisualization": "可視化の更新中にエラー",
       "queryEmptySelectFieldsToBuild": "クエリが空です。クエリを構築するフィールドを選択してください",
-      "histogramUnavailableCtesDistinctJoinLimit": "CTE、DISTINCT、JOIN、LIMIT クエリではヒストグラムは利用できません。",
-      "histogramNotAvailableMultiStream": "マルチストリーム検索ではヒストグラムは利用できません。",
       "histogramUnavailableCtesDistinctLimit": "CTE、DISTINCT、LIMIT クエリではヒストグラムは利用できません。"
     },
     "searchSchedulersList": {
