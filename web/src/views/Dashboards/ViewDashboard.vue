@@ -1610,9 +1610,7 @@ export default defineComponent({
     };
 
     const onFullscreenChange = () => {
-      if (!document.fullscreenElement) {
-        isFullscreen.value = false;
-      }
+      isFullscreen.value = !!document.fullscreenElement;
     };
 
     const openScheduledReports = () => {
