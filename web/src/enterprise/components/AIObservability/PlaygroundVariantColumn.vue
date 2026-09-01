@@ -75,11 +75,14 @@
                 @click="emit('copy')"
               />
               <OButton
-                v-if="!cell.toolCall"
                 variant="ghost-muted"
                 size="icon-xs"
                 icon-left="chat"
-                :title="t('aiObservability.playground.addToMessagesTooltip')"
+                :title="
+                  cell.toolCall
+                    ? t('aiObservability.playground.toolCallContinueTooltip')
+                    : t('aiObservability.playground.addToMessagesTooltip')
+                "
                 :data-test="`ai-playground-output-add-to-messages-${label}`"
                 @click="emit('add-to-messages')"
               />

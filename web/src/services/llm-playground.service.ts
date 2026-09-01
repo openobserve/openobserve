@@ -21,9 +21,19 @@ import http, { attemptTokenRefresh } from "@/services/http";
 
 export type PlaygroundMessageRole = "system" | "user" | "assistant" | "tool";
 
+export interface PlaygroundRequestToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
 export interface PlaygroundRequestMessage {
   role: PlaygroundMessageRole;
   content: string;
+  /** Assistant role only: calls the model issued before a tool result. */
+  toolCalls?: PlaygroundRequestToolCall[];
+  /** Tool role only: the assistant call this result answers. */
+  toolCallId?: string;
 }
 
 export interface PlaygroundRequestTool {
@@ -57,6 +67,7 @@ export interface PlaygroundRunUsage {
 }
 
 export interface PlaygroundRunToolCall {
+  id: string;
   name: string;
   arguments: string;
 }
@@ -231,6 +242,8 @@ function wireBody(request: PlaygroundRunRequest): Record<string, unknown> {
     messages: request.messages.map((message) => ({
       role: message.role,
       content: message.content,
+      ...(message.toolCalls?.length ? { toolCalls: message.toolCalls } : {}),
+      ...(message.toolCallId ? { toolCallId: message.toolCallId } : {}),
     })),
     params: {
       temperature: request.params.temperature ?? 0,
@@ -324,6 +337,7 @@ async function runLive(
           // The model may emit several; the cell shows one, so the first wins.
           if (!toolCall) {
             toolCall = {
+              id: String(data.id ?? ""),
               name: String(data.name ?? ""),
               arguments: String(data.arguments ?? ""),
             };

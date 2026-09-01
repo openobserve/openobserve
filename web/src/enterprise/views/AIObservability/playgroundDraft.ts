@@ -9,7 +9,10 @@
  */
 
 import type { I18nText } from "@/types/i18n";
-import type { PlaygroundScoreResult } from "@/services/llm-playground.service";
+import type {
+  PlaygroundRequestMessage,
+  PlaygroundScoreResult,
+} from "@/services/llm-playground.service";
 
 /** Golden answers feed scorers only. Binding one into a task prompt would leak
  *  the answer into the question, so this token is never substituted. */
@@ -30,12 +33,12 @@ export interface PlaygroundMessage {
   content: string;
   /** Carried in from a source trace — removable, never editable. */
   readonly?: boolean;
-  /**
-   * `tool` role only: which of the variant's tools this response answers.
-   * Draft-side only — the run request carries `role` + `content` and nothing
-   * else, so this labels the message for the author, not for the provider.
-   */
+  /** `tool` role only: the function this result answers. */
   toolName?: string;
+  /** `tool` role only: stable identity shared by the call and its result. */
+  toolCallId?: string;
+  /** `tool` role only: JSON arguments passed into the function. */
+  toolArguments?: string;
 }
 
 export interface PlaygroundTool {
@@ -95,6 +98,7 @@ export interface PlaygroundUsage {
 }
 
 export interface PlaygroundToolCall {
+  id: string;
   name: string;
   arguments: string;
 }
@@ -306,15 +310,60 @@ export function renderedMessages(
 }
 
 /**
+ * Provider conversation for one variant.
+ *
+ * A Tool row is a compact authoring form for the protocol's two-message
+ * exchange: the assistant call followed by the tool result that answers it.
+ */
+export function requestMessages(
+  variant: PlaygroundVariant,
+  vars: Record<string, string>,
+): PlaygroundRequestMessage[] {
+  const messages: PlaygroundRequestMessage[] = [];
+  for (const message of renderedMessages(variant, vars)) {
+    if (message.role !== "tool") {
+      if (message.content.trim()) messages.push({ role: message.role, content: message.content });
+      continue;
+    }
+
+    const name = message.toolName?.trim();
+    if (!name || !message.content.trim()) continue;
+    const id = message.toolCallId || toolCallId(message.id);
+    messages.push({
+      role: "assistant",
+      content: "",
+      toolCalls: [
+        {
+          id,
+          name,
+          arguments: message.toolArguments?.trim() || "{}",
+        },
+      ],
+    });
+    messages.push({ role: "tool", content: message.content, toolCallId: id });
+  }
+  return messages;
+}
+
+/** Stable across edits, snapshots and retries so a result never changes call. */
+export function toolCallId(messageId: string): string {
+  return `call_${messageId.replace(/[^A-Za-z0-9_-]/g, "_")}`;
+}
+
+/**
  * Retype one message.
  *
- * `toolName` is dropped on the way out of `tool`: it labels which tool a
- * response answers, so on any other role it is invisible state that would come
- * back the moment the row was switched to `tool` again.
+ * Tool protocol fields are dropped on the way out of `tool`; otherwise they
+ * would return as stale invisible state when the row is switched back.
  */
 export function withRole(message: PlaygroundMessage, role: PlaygroundRole): PlaygroundMessage {
   if (role === "tool") return { ...message, role };
-  const { toolName: _dropped, ...rest } = message;
+  const {
+    toolName: _toolName,
+    toolCallId: _toolCallId,
+    toolArguments: _toolArguments,
+    ...rest
+  } = message;
   return { ...rest, role };
 }
 

@@ -98,11 +98,28 @@
         @update:model-value="(value: unknown) => emit('set-tool', message.id, String(value ?? ''))"
       />
 
+      <OTextarea
+        v-if="message.role === 'tool' && !message.readonly"
+        class="mt-0.5 w-32 shrink-0"
+        :model-value="message.toolArguments ?? '{}'"
+        :placeholder="t('aiObservability.playground.toolArgumentsPlaceholder')"
+        :rows="1"
+        :max-rows="5"
+        size="sm"
+        autogrow
+        :data-test="`ai-playground-message-tool-arguments-${message.id}`"
+        @update:model-value="(value: string) => emit('set-tool-arguments', message.id, value)"
+      />
+
       <div v-if="!message.readonly" class="relative min-w-0 flex-1">
         <OTextarea
           :model-value="message.content"
           :placeholder="
-            t('aiObservability.playground.messagePlaceholder', { role: roleLabel(message.role) })
+            message.role === 'tool'
+              ? t('aiObservability.playground.toolResultPlaceholder')
+              : t('aiObservability.playground.messagePlaceholder', {
+                  role: roleLabel(message.role),
+                })
           "
           :rows="1"
           :max-rows="5"
@@ -228,6 +245,8 @@ const emit = defineEmits<{
   add: [role: PlaygroundRole];
   /** Which tool a `tool`-role message answers. */
   "set-tool": [messageId: string, toolName: string];
+  /** JSON arguments sent to that tool. */
+  "set-tool-arguments": [messageId: string, toolArguments: string];
   /** Retype a message in place, keeping whatever was written in it. */
   "set-role": [messageId: string, role: PlaygroundRole];
   move: [from: number, to: number];

@@ -325,7 +325,7 @@ import {
   hasReference as benchHasReference,
   idleCell,
   playgroundId,
-  renderedMessages,
+  requestMessages,
   renderTemplate,
   scorerEvidence,
   settledResults,
@@ -406,7 +406,11 @@ const runningAll = ref(false);
 
 /** Nothing to run against, or nothing to run with. */
 const runDisabled = computed(
-  () => running.value || !providers.value.length || !draft.variants.length,
+  () =>
+    running.value ||
+    !providers.value.length ||
+    !draft.variants.length ||
+    draft.variants.some(hasIncompleteToolResult),
 );
 
 /**
@@ -416,7 +420,21 @@ const runDisabled = computed(
  * providers/variants at all) should disable it.
  */
 function variantRunDisabled(variantId: string) {
-  return !providers.value.length || !draft.variants.length || isVariantRunning(variantId);
+  const variant = draft.variants.find((candidate) => candidate.id === variantId);
+  return (
+    !providers.value.length ||
+    !draft.variants.length ||
+    isVariantRunning(variantId) ||
+    Boolean(variant && hasIncompleteToolResult(variant))
+  );
+}
+
+function hasIncompleteToolResult(variant: PlaygroundVariant): boolean {
+  return variant.messages.some(
+    (message) =>
+      message.role === "tool" &&
+      (!message.toolName?.trim() || !message.toolArguments?.trim() || !message.content.trim()),
+  );
 }
 
 /**
@@ -571,9 +589,7 @@ async function onRunAll() {
   if (runDisabled.value) return;
   runningAll.value = true;
   try {
-    await Promise.allSettled(
-      draft.variants.map((variant) => runVariant(variant.id, true)),
-    );
+    await Promise.allSettled(draft.variants.map((variant) => runVariant(variant.id, true)));
   } finally {
     runningAll.value = false;
   }
@@ -604,9 +620,7 @@ async function runCell(variant: PlaygroundVariant, rowKey: string) {
   });
 
   const vars = { ...draft.vars };
-  const messages = renderedMessages(variant, vars)
-    .filter((message) => message.content.trim().length > 0)
-    .map((message) => ({ role: message.role, content: message.content }));
+  const messages = requestMessages(variant, vars);
   // The provider's type decides how tools and the response schema are shaped
   // for the wire — the server forwards both to the provider untouched.
   const provider = providers.value.find((candidate) => candidate.id === variant.providerId);
@@ -901,21 +915,46 @@ async function copyOutput(variantId: string, rowKey: string) {
   toast({ variant: "success", message: t("aiObservability.playground.copied") });
 }
 
-/** Continue the conversation: the answer becomes context, and an empty user
- *  turn is added so there is somewhere to type the follow-up. */
+/** Continue with text, or open the result field for a returned tool call. */
 function addOutputToMessages(variantId: string) {
   const cell = cellAt(results, variantId, SINGLE_ROW_KEY);
-  if (!cell || cell.status !== "done" || !cell.text) return;
+  if (!cell || cell.status !== "done" || (!cell.text && !cell.toolCall)) return;
   const variant = draft.variants.find((candidate) => candidate.id === variantId);
   if (!variant) return;
 
-  variant.messages = [
-    ...variant.messages,
-    { id: playgroundId("msg"), role: "assistant", content: cell.text },
-    { id: playgroundId("msg"), role: "user", content: "" },
-  ];
-  setCell(variantId, SINGLE_ROW_KEY, { status: "idle", text: "", usage: null });
-  toast({ variant: "info", message: t("aiObservability.playground.addedToMessages") });
+  if (cell.toolCall) {
+    variant.messages = [
+      ...variant.messages,
+      {
+        id: playgroundId("msg"),
+        role: "tool",
+        content: "",
+        toolName: cell.toolCall.name,
+        toolCallId: cell.toolCall.id,
+        toolArguments: cell.toolCall.arguments,
+      },
+    ];
+  } else {
+    variant.messages = [
+      ...variant.messages,
+      { id: playgroundId("msg"), role: "assistant", content: cell.text },
+      { id: playgroundId("msg"), role: "user", content: "" },
+    ];
+  }
+  setCell(variantId, SINGLE_ROW_KEY, {
+    status: "idle",
+    text: "",
+    toolCall: null,
+    usage: null,
+  });
+  toast({
+    variant: "info",
+    message: t(
+      cell.toolCall
+        ? "aiObservability.playground.toolCallAddedToMessages"
+        : "aiObservability.playground.addedToMessages",
+    ),
+  });
 }
 
 // ── sharing ───────────────────────────────────────────────────────

@@ -159,7 +159,11 @@ describe("runPlayground — live adapter", () => {
 
     const result = await runPlayground("org", request(), { onDelta: () => {} });
 
-    expect(result.toolCall).toEqual({ name: "get_weather", arguments: '{"city":"Paris"}' });
+    expect(result.toolCall).toEqual({
+      id: "call_1",
+      name: "get_weather",
+      arguments: '{"city":"Paris"}',
+    });
     expect(result.text).toBe("");
   });
 
@@ -228,6 +232,54 @@ describe("runPlayground — live adapter", () => {
     // The client has already bound every {{token}}; a row would bind them twice.
     expect(body.row).toBeUndefined();
     expect(fetchMock.mock.calls[0][0]).toBe("http://api.test/api/org/playground/run");
+  });
+
+  it("preserves a tool call and its linked result in the request body", async () => {
+    const fetchMock = stubFetch(streamingResponse([]));
+
+    await runPlayground(
+      "org",
+      request({
+        messages: [
+          {
+            role: "assistant",
+            content: "",
+            toolCalls: [
+              {
+                id: "call_1",
+                name: "lookup_order",
+                arguments: '{"order_id":"123"}',
+              },
+            ],
+          },
+          {
+            role: "tool",
+            content: '{"status":"shipped"}',
+            toolCallId: "call_1",
+          },
+        ],
+      } as Partial<PlaygroundRunRequest>),
+      { onDelta: () => {} },
+    );
+
+    expect(sentBody(fetchMock).column.messages).toEqual([
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "call_1",
+            name: "lookup_order",
+            arguments: '{"order_id":"123"}',
+          },
+        ],
+      },
+      {
+        role: "tool",
+        content: '{"status":"shipped"}',
+        toolCallId: "call_1",
+      },
+    ]);
   });
 
   it("omits an empty model so the provider's default stands in", async () => {

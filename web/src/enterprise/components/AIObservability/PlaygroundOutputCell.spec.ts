@@ -143,7 +143,10 @@ describe("PlaygroundOutputCell", () => {
 
   it("renders a tool call as the output, with no answer text", () => {
     const wrapper = mountCell(
-      doneCell({ text: "", toolCall: { name: "lookup_order", arguments: '{ "id": 1 }' } }),
+      doneCell({
+        text: "",
+        toolCall: { id: "call_1", name: "lookup_order", arguments: '{ "id": 1 }' },
+      }),
     );
     const call = wrapper.find('[data-test="ai-playground-output-tool-call"]');
 

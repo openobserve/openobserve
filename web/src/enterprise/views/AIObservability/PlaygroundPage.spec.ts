@@ -120,6 +120,7 @@ function vm(wrapper: Awaited<ReturnType<typeof mountPage>>) {
     expectedRequired: boolean;
     setTools: (tools: import("./playgroundDraft").PlaygroundTool[]) => void;
     scoreAll: () => Promise<void>;
+    addOutputToMessages: (variantId: string) => void;
     totalCells: number;
   };
 }
@@ -199,6 +200,53 @@ describe("PlaygroundPage", () => {
 
     const request = runPlayground.mock.calls[0][1] as { messages: unknown[] };
     expect(request.messages).toEqual([{ role: "user", content: "Hello" }]);
+  });
+
+  it("continues a returned tool call with a linked tool result", async () => {
+    runPlayground.mockResolvedValueOnce({
+      text: "",
+      toolCall: {
+        id: "call_1",
+        name: "lookup_order",
+        arguments: '{"order_id":"123"}',
+      },
+      usage: { promptTokens: 5, completionTokens: 2, costUsd: 0.001, latencyMs: 100 },
+    });
+    const wrapper = await mountPage();
+    const page = vm(wrapper);
+    const variant = page.draft.variants[0];
+    variant.messages[1].content = "Where is order 123?";
+
+    await page.runVariant(variant.id);
+    page.addOutputToMessages(variant.id);
+
+    const resultMessage = variant.messages.at(-1)!;
+    expect(resultMessage).toMatchObject({
+      role: "tool",
+      content: "",
+      toolName: "lookup_order",
+      toolCallId: "call_1",
+      toolArguments: '{"order_id":"123"}',
+    });
+
+    resultMessage.content = '{"status":"shipped"}';
+    await page.runVariant(variant.id);
+
+    expect(runPlayground.mock.calls[1][1].messages).toEqual([
+      { role: "user", content: "Where is order 123?" },
+      {
+        role: "assistant",
+        content: "",
+        toolCalls: [
+          {
+            id: "call_1",
+            name: "lookup_order",
+            arguments: '{"order_id":"123"}',
+          },
+        ],
+      },
+      { role: "tool", content: '{"status":"shipped"}', toolCallId: "call_1" },
+    ]);
   });
 
   it("records a failed run as a retryable error rather than an empty answer", async () => {
