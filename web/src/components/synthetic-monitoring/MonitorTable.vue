@@ -283,6 +283,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip side="bottom" :content="t('synthetics.table.duplicate')" />
         </OButton>
 
+        <!-- Move -->
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="drive-file-move"
+          :data-test="`${dataTest}-move-btn`"
+          @click.stop="emit('move', row)"
+        >
+          <OTooltip side="bottom" :content="t('synthetics.table.move')" />
+        </OButton>
+
         <!-- More menu: Trigger + Delete -->
         <ODropdown>
           <template #trigger>
@@ -306,15 +317,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip side="bottom" :content="t('synthetics.table.more')" />
             </OButton>
           </template>
-
-          <ODropdownItem :data-test="`${dataTest}-move-item`" @select="emit('move', row)">
-            <template #icon-left>
-              <OIcon name="drive-file-move" size="sm" />
-            </template>
-            {{ t("synthetics.table.move") }}
-          </ODropdownItem>
-
-          <ODropdownSeparator />
 
           <ODropdownItem
             variant="destructive"
@@ -734,8 +736,8 @@ const ACTIONS_COL: OTableColumnDef = {
   id: "actions",
   header: raw(""),
   accessorKey: "id",
-  size: 160,
-  minSize: 160,
+  size: 190,
+  minSize: 190,
   sortable: false,
   isAction: true,
 };
