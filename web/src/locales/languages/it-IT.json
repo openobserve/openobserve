@@ -7600,7 +7600,6 @@
   "alert_library": {
     "header": "Libreria di avvisi",
     "subtitle": "Avvisi selezionati, pronti da installare, confrontati con i dati che già ingerisci.",
-    "sectionTab": "Libreria",
     "contribute": "Contribuisci su GitHub",
     "searchPlaceholder": "Cerca per nome, descrizione o stream",
     "searchLabel": "Cerca nella libreria di avvisi",
@@ -7934,7 +7933,6 @@
     "destinationsLoadError": "Errore durante il caricamento delle destinazioni"
   },
   "alert_destinations": {
-    "sectionTab": "Destinazioni",
     "chooseTypeTitle": "Scegli il tipo",
     "selectDestinationType": "Seleziona tipo di destinazione",
     "connectionStepTitle": "Connessione",
@@ -11066,7 +11064,14 @@
           "typeCategorical": "Categorico",
           "typeBoolean": "Booleano",
           "threshold": "Soglia",
-          "measurePerRow": "Media per riga, su tutte le prove"
+          "measurePerRow": "Media per riga, su tutte le prove",
+          "dimensionImproved": "{count} riga migliorata | {count} righe migliorate",
+          "dimensionUnchanged": "{count} riga invariata | {count} righe invariate",
+          "dimensionRegressed": "{count} riga peggiorata | {count} righe peggiorate",
+          "dimensionNotCounted": "Non conteggiata",
+          "dimensionNotCountedHint": "Questo valutatore non ha un criterio di confronto nella sua configurazione del punteggio. I suoi valori vengono riportati ma non vengono mai giudicati come migliorati o peggiorati, e non può influenzare l'esito. Fornisci una direzione e una soglia per farlo conteggiare.",
+          "dimensionNoneCompared": "Nessun confronto",
+          "dimensionNoneComparedHint": "Nessuna riga è stata misurata su entrambi i lati. Una riga eseguita in un solo esperimento non ha un valore di partenza, quindi non viene conteggiata in nessuna direzione."
         },
         "rowDrawer": {
           "fallbackTitle": "Riga di confronto",
@@ -11431,6 +11436,7 @@
         "republishedSuccess": "Descrizione aggiornata. La versione {version} è invariata.",
         "draftSuccess": "Bozza salvata. Testa la connessione per pubblicarla.",
         "draftError": "Impossibile salvare la bozza",
+        "testFailed": "Test di connessione non riuscito",
         "publishFailed": "La connessione di test non è riuscita, quindi non è stato pubblicato nulla. La tua bozza è salvata.",
         "createError": "Impossibile pubblicare l'attività remota",
         "validation": {
@@ -14241,8 +14247,6 @@
       "passwordSetHelp": "Una password è già impostata. Lascia vuoto per mantenerla, oppure digitane una nuova per sostituirla.",
       "showUptimePercent": "Mostra la percentuale di uptime",
       "showTimelineBars": "Mostra barre della timeline",
-      "showResponseTime": "Mostra tempo di risposta",
-      "showResponseTimeHelp": "Disattiva per evitare che la pagina esponga dati sulle prestazioni.",
       "noindex": "Scoraggia l'indicizzazione nei motori di ricerca",
       "noindexHelp": "Aggiunge un tag noindex così i motori di ricerca ignorano la pagina pubblica.",
       "confirmFailures": "Conferma guasti",
@@ -14301,6 +14305,9 @@
       "deleting": "Rimozione dell'aggiornamento...",
       "deleted": "Aggiornamento rimosso",
       "deleteFailed": "Rimozione dell'aggiornamento non riuscita",
+      "affects": "Interessa",
+      "allComponents": "Tutti i componenti",
+      "componentsUnavailable": "Componenti non più presenti in questa pagina",
       "state": {
         "scheduled": "Pianificato",
         "active": "Attivo",

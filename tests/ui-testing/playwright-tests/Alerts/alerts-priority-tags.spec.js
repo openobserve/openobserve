@@ -162,15 +162,17 @@ test.describe('Alerts — priority, tags & additional variables', {
     });
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Columns that were REMOVED must stay removed (list de-cluttering)
+    // State/Level/Look back window/Last Trained At stay removed (list
+    // de-cluttering); Check every was restored (issue #14038) — it has no
+    // other surface in the list-browsing flow.
     // ─────────────────────────────────────────────────────────────────────────
     test('alert list shows Priority and Tags and no longer shows the removed configuration columns', async ({ page }) => {
         await page.goto(`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}`);
         await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
 
         await pm.alertsPage.expectListColumns({
-            present: ['Priority', 'Tags'],
-            absent: ['State', 'Level', 'Look back window', 'Check every', 'Last Trained At'],
+            present: ['Priority', 'Tags', 'Check every'],
+            absent: ['State', 'Level', 'Look back window', 'Last Trained At'],
         });
         testLogger.info('Alert list column set verified');
     });
