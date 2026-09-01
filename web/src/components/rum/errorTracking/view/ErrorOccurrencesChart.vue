@@ -106,7 +106,7 @@ const chartOptions = computed(() => {
   // Read the theme so token colors re-resolve when it flips —
   // getComputedStyle alone is not reactive.
   void store.state.theme;
-  const errorColor = resolveToken("--color-severity-error-color", "#EF5350");
+  const errorColor = resolveToken("--color-severity-error-color", "#ea1a17");
   const labels = props.buckets.map((bucket) =>
     format(new Date(Math.floor(bucket.ts / 1000)), labelFormat.value),
   );

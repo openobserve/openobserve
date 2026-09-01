@@ -168,9 +168,11 @@ mod m20260818_000001_create_llm_idempotency_records;
 mod m20260818_000002_create_llm_remote_tasks;
 mod m20260820_000001_add_icon_to_folders;
 mod m20260820_000003_create_llm_secrets;
+mod m20260822_000001_create_status_pages_tables;
 mod m20260824_000001_create_llm_playground_snapshots;
 mod m20260825_000001_add_alert_pending_period_col;
 mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
+mod m20260825_000001_create_status_page_custom_domains;
 mod m20260827_000001_drop_table_action_scripts;
 
 #[cfg(test)]
@@ -427,6 +429,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260825_000001_add_steps_configured_to_synthetics_jobs::Migration),
             Box::new(m20260825_000001_add_alert_pending_period_col::Migration),
             Box::new(m20260827_000001_drop_table_action_scripts::Migration),
+            Box::new(m20260822_000001_create_status_pages_tables::Migration),
+            Box::new(m20260825_000001_create_status_page_custom_domains::Migration),
         ]
     }
 }
@@ -458,6 +462,10 @@ mod tests {
             .into_iter()
             .map(|migration| migration.name().to_string())
             .collect();
+        assert_eq!(
+            names.last().map(String::as_str),
+            Some("m20260825_000001_create_status_page_custom_domains")
+        );
         assert_eq!(
             names
                 .iter()

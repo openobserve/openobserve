@@ -126,6 +126,17 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
     if (attr.key?.trim() && attr.value?.trim()) payload.context_attributes[attr.key] = attr.value;
   });
 
+  // SQL tab's Simple/Multi choice (no group-by picker): QueryConfig.vue
+  // already builds `aggregation` via the same having.operator/.value fields
+  // Custom's Measure mode uses, plus a value-column dropdown sourced from the
+  // query's resolved output columns (sql_simple_multi_alert_fe_prd.md §11) —
+  // this flag decides whether that object survives the tab-based null below,
+  // and gates the field-pinning required by the backend's SQL multi-alert
+  // schema contract (group_by: [], function: "count"; having.column is
+  // whatever column the user picked).
+  const isSqlMultiAlert =
+    getSelectedTab.value === "sql" && !!formData.query_condition.aggregation?.multi_alert;
+
   payload.trigger_condition.threshold = parseInt(formData.trigger_condition.threshold as any);
 
   // If aggregation is enabled in custom (builder) mode but no group-by fields are set,
@@ -135,6 +146,13 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
     getSelectedTab.value === "custom" &&
     !(formData.query_condition?.aggregation?.group_by || []).filter((g: string) => g?.trim()).length
   ) {
+    payload.trigger_condition.threshold = 1;
+    payload.trigger_condition.operator = ">=";
+  }
+
+  // SQL Multi Alert: the any-group-count gate is always "at least 1" (M-10),
+  // same rule as the Custom group-by case above.
+  if (isSqlMultiAlert) {
     payload.trigger_condition.threshold = 1;
     payload.trigger_condition.operator = ">=";
   }
@@ -155,8 +173,16 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 
   payload.description = raw(formData.description.trim());
 
-  if (!isAggregationEnabled.value || getSelectedTab.value !== "custom") {
+  if (!isSqlMultiAlert && (!isAggregationEnabled.value || getSelectedTab.value !== "custom")) {
     payload.query_condition.aggregation = null;
+  } else if (isSqlMultiAlert) {
+    // Pin the fields this simple flow has no picker for (src/core/src/alerts/alert.rs,
+    // prepare_alert) — group_by is always empty, function is fixed. The value
+    // column is NOT pinned: it's user-chosen via a dropdown sourced from the
+    // query's resolved output columns (sql_simple_multi_alert_fe_prd.md §11),
+    // so `having.column` already carries the user's selection from form state.
+    payload.query_condition.aggregation.group_by = [];
+    payload.query_condition.aggregation.function = "count";
   }
 
   if (getSelectedTab.value === "sql" || getSelectedTab.value === "promql")
@@ -257,7 +283,8 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   // promql_warning_value is meaningless off the promql tab.
   if (
     getSelectedTab.value === "promql" ||
-    (isAggregationEnabled.value && getSelectedTab.value === "custom")
+    (isAggregationEnabled.value && getSelectedTab.value === "custom") ||
+    isSqlMultiAlert
   ) {
     delete (payload.trigger_condition as any).warning_threshold;
   }

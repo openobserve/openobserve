@@ -16,13 +16,13 @@
 use ::datafusion::arrow::datatypes::Schema;
 use chrono::{DateTime, TimeZone, Utc};
 use config::{
-    get_config,
+    cluster, get_config,
     meta::stream::{FileKey, FileListDeleted, MergeStrategy, PartitionTimeLevel, StreamType},
     metrics,
     utils::time::hour_micros,
 };
 use hashbrown::{HashMap, HashSet};
-use infra::{file_list as infra_file_list, schema::get_partition_time_level};
+use infra::{cache::file_data, file_list as infra_file_list, schema::get_partition_time_level};
 use metrics_index::MetricsFileLayout;
 use search::datafusion::merge::MergeMode;
 use search_service::file_list;
@@ -321,6 +321,14 @@ pub async fn merge_by_stream(
                     log::error!("[COMPACTOR] write file list failed: {e}");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                     continue;
+                }
+
+                // drop the merged source files from this node's disk cache;
+                // on nodes that also serve queries they may still be in use
+                if cluster::LOCAL_NODE.is_compactor() && !cluster::LOCAL_NODE.is_querier() {
+                    file_data::delete::add(
+                        delete_file_list.iter().map(|f| f.key.clone()).collect(),
+                    );
                 }
 
                 // collect orphan blooms after writing file list successfully
