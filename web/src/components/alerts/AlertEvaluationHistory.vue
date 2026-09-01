@@ -108,6 +108,12 @@
       </div>
     </template>
 
+    <template #cell-retries="{ row }">
+      <span class="text-compact tabular-nums" data-test="alerts-alertevaluationhistory-retries">
+        {{ row.retries != null ? row.retries : "—" }}
+      </span>
+    </template>
+
     <template #cell-evaluation_time="{ row }">
       <span class="text-compact tabular-nums">
         {{
@@ -277,6 +283,16 @@ const columns = computed<OTableColumnDef[]>(() => [
     cell: " ",
     resizable: true,
     meta: { align: "left", flex: true },
+  },
+  {
+    id: "retries",
+    accessorKey: "retries",
+    header: t("alerts.retries"),
+    cell: " ",
+    size: 90,
+    resizable: true,
+    hideable: true,
+    meta: { align: "left" },
   },
   {
     id: "evaluation_time",
