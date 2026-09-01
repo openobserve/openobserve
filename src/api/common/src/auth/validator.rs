@@ -317,9 +317,10 @@ fn is_org_agnostic_read(path: &str) -> bool {
 /// the lockout check has passed: an attacker is then rejected without the Argon2 work they were
 /// trying to buy, and a locked account rejects in the same time whatever the candidate.
 ///
-/// Root is never locked out — it is the one account with no recovery path, and anyone who knows its
-/// address could otherwise deny it access without guessing the password. External users are out of
-/// scope because their credentials are verified elsewhere.
+/// Root is exempt unless `apply_to_root` says otherwise: it is the one account with no recovery
+/// path from inside the product, and anyone who knows its address can deny it access without ever
+/// guessing the password. External users are out of scope because their credentials are verified
+/// elsewhere, whatever the policy says.
 ///
 /// A lockout is reported as itself rather than as a mismatch, so the caller can tell the user how
 /// long to wait. Only the remaining seconds are disclosed — never the thresholds behind them.
@@ -331,8 +332,10 @@ async fn enforce_lockout_and_compare_password<F>(
 where
     F: FnOnce() -> bool,
 {
-    let lockout = db::password_policy::get_effective_policy().await.lockout;
-    if !lockout.is_enabled() || !is_internal || is_root_user(user_email) {
+    let policy = db::password_policy::get_effective_policy().await;
+    let lockout = policy.lockout;
+    let root_exempt = is_root_user(user_email) && !policy.apply_to_root;
+    if !lockout.is_enabled() || !is_internal || root_exempt {
         return PasswordCheck::from_comparison(compare());
     }
 
@@ -1955,9 +1958,47 @@ mod tests {
             .expect("a locked account is refused even with the right password");
         assert!((1..=60).contains(&refused), "{refused}s is out of range");
 
+        exercise_root_lockout(root_user, root_pwd).await;
+
         db::password_policy::set_policy(&PasswordPolicy::default())
             .await
             .unwrap();
+    }
+
+    /// The same instance with `apply_to_root` on: root loses the exemption it holds above.
+    ///
+    /// Nothing clears the lockout early — a password change does not touch it — so a locked root
+    /// waits out `locked_until` unless an admin clears the row.
+    async fn exercise_root_lockout(root_user: &str, root_pwd: &str) {
+        db::password_policy::set_policy(&PasswordPolicy {
+            lockout: LockoutPolicy {
+                threshold: 2,
+                ..Default::default()
+            },
+            apply_to_root: true,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(refuse(root_user, "Wrongpass#123").await, None);
+        let tripped = refuse(root_user, "Wrongpass#123")
+            .await
+            .expect("root locks like anyone else once the policy applies to it");
+        assert!((1..=60).contains(&tripped), "{tripped}s is out of range");
+        assert!(
+            refuse(root_user, root_pwd).await.is_some(),
+            "a locked root is refused even with the right password"
+        );
+        assert!(
+            infra::table::user_auth_state::get(root_user)
+                .await
+                .unwrap()
+                .is_some_and(|state| state.lockout_level == 1),
+            "root now carries the lockout state it is exempt from by default"
+        );
+
+        let _ = infra::table::user_auth_state::delete(root_user).await;
     }
 
     /// The seconds a refused login is told to wait, or `None` when it was refused as a plain

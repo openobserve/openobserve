@@ -1937,6 +1937,56 @@ mod tests {
         assert!(after.password_updated_at > before.password_updated_at);
     }
 
+    /// The sweep skips root whatever the policy says. `apply_to_root` governs rotation and lockout,
+    /// which are recomputed per request; flagging root would instead store a block that only root
+    /// can clear, on the account that has to be able to repair a bad policy.
+    #[tokio::test]
+    async fn test_the_sweep_never_flags_root() {
+        let _guard = set_up().await;
+
+        let root_email = "sweep-root@zo.dev";
+        let ordinary = "sweep-user@zo.dev";
+        for (email, is_root) in [(root_email, true), (ordinary, false)] {
+            infra_table::users::add(infra_table::users::UserRecord {
+                email: email.to_string(),
+                first_name: "sweep".to_string(),
+                last_name: "".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root,
+                password_ext: None,
+                user_type: UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: Some(1),
+            })
+            .await
+            .unwrap();
+        }
+
+        infra_table::users::flag_all_for_password_reset("policy_tightened")
+            .await
+            .unwrap();
+
+        assert!(
+            !infra_table::users::get(root_email)
+                .await
+                .unwrap()
+                .must_reset_password,
+            "root is out of the sweep's scope"
+        );
+        assert!(
+            infra_table::users::get(ordinary)
+                .await
+                .unwrap()
+                .must_reset_password,
+            "everyone else is in it"
+        );
+    }
+
     /// The reuse check belongs to `update_user`, not to the HTTP layer: the handlers validate
     /// strength only, so a change routed through the CLI or any other caller would otherwise skip
     /// it entirely.

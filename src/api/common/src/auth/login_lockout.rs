@@ -15,10 +15,10 @@
 
 //! Failed-login lockout with escalating backoff.
 //!
-//! **Callers must exempt root.** Nothing in this module checks: it is reached from the credential
-//! path, which is exactly where root's exemption has to hold. Anyone who knows root's address could
-//! otherwise lock the one account with no recovery path out of the instance, without ever guessing
-//! its password.
+//! **Callers decide whether root is in scope**, per the policy's `apply_to_root`. Nothing in this
+//! module checks: it is reached from the credential path, which is where the identity is known.
+//! Getting that gate wrong locks the one account with no recovery path out of the instance, and
+//! anyone who knows root's address can trigger it without ever guessing the password.
 //!
 //! State lives in `user_auth_state`, one row per user, written only after a failure. Every mutation
 //! is a single conditional statement — the counter is incremented by the database and the lockout

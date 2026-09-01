@@ -90,11 +90,8 @@ fn decide(
     policy: &PasswordPolicy,
     now: DateTime<Utc>,
 ) -> PolicyDecision {
-    // Root is never blocked by any policy (design §4, principle 5). It is the only account that can
-    // repair a misconfigured policy or clear another user's flag, and the only one whose lockout
-    // has no remedy. The sweep already skips it; this is the guarantee at the enforcement
-    // point.
-    if user.is_root {
+    // Root is exempt unless the policy says otherwise
+    if user.is_root && !policy.apply_to_root {
         return PolicyDecision::Allow;
     }
 
@@ -197,10 +194,8 @@ async fn check_request(user_email: &str, uri: &Uri, method: &Method) -> Option<R
     // enterprise identity — means there is nothing here that applies to it.
     let user = USERS.get(&user_email.to_lowercase())?;
 
-    if user.is_root {
-        return None;
-    }
-
+    // Root's exemption is settled inside `decide`, which is the only place that holds both the user
+    // and the policy. An early return here could only guess at the policy it has not read yet.
     let policy = db::password_policy::get_effective_policy().await;
     match decide(&user, uri, method, &policy, Utc::now()) {
         PolicyDecision::Allow => None,
@@ -523,6 +518,60 @@ mod tests {
                 now()
             ),
             PolicyDecision::Allow
+        );
+    }
+
+    #[test]
+    fn root_is_blocked_by_rotation_when_the_policy_applies_to_root() {
+        let mut u = unflagged("root@b.com", 10_000);
+        u.is_root = true;
+        let mut policy = rotating(90, 7);
+        policy.apply_to_root = true;
+
+        assert_eq!(
+            decide(&u, &uri("/default/streams"), &Method::POST, &policy, now()),
+            PolicyDecision::Block {
+                reason: "rotation_expired".to_string()
+            }
+        );
+    }
+
+    /// The sweep never flags root, so this column should not be set for it — but the middleware is
+    /// not the place that assumes so. If it ever is set, the block applies like anyone else's.
+    #[test]
+    fn root_is_blocked_by_a_stored_flag_when_the_policy_applies_to_root() {
+        let mut u = user("root@b.com");
+        u.is_root = true;
+        let policy = PasswordPolicy {
+            apply_to_root: true,
+            ..PasswordPolicy::default()
+        };
+
+        assert_eq!(
+            decide(&u, &uri("/default/streams"), &Method::POST, &policy, now()),
+            PolicyDecision::Block {
+                reason: "policy_tightened".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn root_reaches_its_own_password_change_even_when_blocked() {
+        let mut u = unflagged("root@b.com", 10_000);
+        u.is_root = true;
+        let mut policy = rotating(90, 7);
+        policy.apply_to_root = true;
+
+        assert_eq!(
+            decide(
+                &u,
+                &uri("/api/default/users/root@b.com"),
+                &Method::PUT,
+                &policy,
+                now()
+            ),
+            PolicyDecision::Allow,
+            "root must always keep the route that clears its own block"
         );
     }
 

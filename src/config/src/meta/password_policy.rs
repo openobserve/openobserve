@@ -105,6 +105,14 @@ pub struct PasswordPolicy {
     pub history_max_retained: u32,
     pub lockout: LockoutPolicy,
     pub enforcement_mode: EnforcementMode,
+    /// Whether root is held to rotation and lockout like every other native user.
+    ///
+    /// Default `false`, which is the documented exemption: root is the only account that can
+    /// repair a misconfigured policy, and the only one whose lockout has no remedy from inside
+    /// the product. Complexity and reuse already apply to root at password-set time whatever
+    /// this says; the tightening sweep never touches root either way, so root is never
+    /// mass-flagged.
+    pub apply_to_root: bool,
 }
 
 /// The subset of the policy safe to show a non-admin: what a password must look like, and nothing
@@ -279,6 +287,7 @@ impl Default for PasswordPolicy {
             history_max_retained: 30,
             lockout: LockoutPolicy::default(),
             enforcement_mode: EnforcementMode::HardBlock,
+            apply_to_root: false,
         }
     }
 }
@@ -482,8 +491,19 @@ mod tests {
         assert_eq!(p.history_max_retained, 30);
         assert_eq!(p.lockout.threshold, 0);
         assert_eq!(p.enforcement_mode, EnforcementMode::HardBlock);
+        assert!(!p.apply_to_root);
         // Non-zero, but inert while rotation_days is 0.
         assert_eq!(p.rotation_warning_days, 7);
+    }
+
+    /// Turning root enforcement on must not read as a tightening: `is_stricter_than` drives the
+    /// sweep, and a sweep flags every user on the instance for a change that concerns one account.
+    #[test]
+    fn test_applying_to_root_is_not_stricter() {
+        let mut next = base();
+        next.apply_to_root = true;
+        assert!(!next.is_stricter_than(&base()));
+        assert!(!base().is_stricter_than(&next));
     }
 
     #[test]
@@ -821,5 +841,9 @@ mod tests {
         .unwrap();
         assert_eq!(partial.min_length, 10);
         assert_eq!(partial.enforcement_mode, EnforcementMode::HardBlock);
+        assert!(
+            !partial.apply_to_root,
+            "a row predating the field must keep root exempt"
+        );
     }
 }

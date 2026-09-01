@@ -27,12 +27,13 @@ use config::meta::password_policy::RotationStatus;
 /// Days left before `user_email`'s password expires, or `None` when there is nothing to say.
 ///
 /// `None` covers every case the console must not draw a banner for: rotation off, a password too
-/// young to warn about, an identity with no local password, root (exempt per design §4, principle
-/// 5), and an already-expired password — that one is not a warning but a block, delivered by the
+/// young to warn about, an identity with no local password, root unless the policy applies to it,
+/// and an already-expired password — that one is not a warning but a block, delivered by the
 /// enforcement middleware as a `password_reset_required` refusal on the next request.
 pub async fn warning_days(user_email: &str) -> Option<i64> {
     let user = USERS.get(&user_email.to_lowercase())?;
-    if user.is_root {
+    let policy = db::password_policy::get_effective_policy().await;
+    if user.is_root && !policy.apply_to_root {
         return None;
     }
 
@@ -41,7 +42,6 @@ pub async fn warning_days(user_email: &str) -> Option<i64> {
     let set_at = user
         .password_updated_at
         .and_then(DateTime::from_timestamp_micros);
-    let policy = db::password_policy::get_effective_policy().await;
     match policy.rotation_status(set_at, Utc::now()) {
         RotationStatus::Warning { days_remaining } => Some(days_remaining),
         RotationStatus::Current | RotationStatus::Expired => None,
@@ -87,10 +87,11 @@ mod tests {
     /// Seeding the settings cache keeps the policy read off the database. The key format is
     /// db::system_settings::cache_key's; a drift there fails these tests rather than silencing
     /// them, since the read would then fall back to a policy with rotation off.
-    async fn set_policy(rotation_days: u32, rotation_warning_days: u32) {
+    async fn set_policy(rotation_days: u32, rotation_warning_days: u32, apply_to_root: bool) {
         let policy = PasswordPolicy {
             rotation_days,
             rotation_warning_days,
+            apply_to_root,
             ..PasswordPolicy::default()
         };
         SYSTEM_SETTINGS.write().await.insert(
@@ -111,14 +112,18 @@ mod tests {
         let young = "young@b.com";
         let expired = "expired@b.com";
         let root = "root@b.com";
+        let root_inside = "root-inside@b.com";
         USERS.insert(inside.to_string(), user(inside, 85));
         USERS.insert(young.to_string(), user(young, 1));
         USERS.insert(expired.to_string(), user(expired, 91));
         let mut root_user = user(root, 10_000);
         root_user.is_root = true;
         USERS.insert(root.to_string(), root_user);
+        let mut root_inside_user = user(root_inside, 85);
+        root_inside_user.is_root = true;
+        USERS.insert(root_inside.to_string(), root_inside_user);
 
-        set_policy(90, 7).await;
+        set_policy(90, 7, false).await;
 
         assert_eq!(warning_days(inside).await, Some(5));
         assert_eq!(warning_days(young).await, None);
@@ -131,8 +136,32 @@ mod tests {
         // The cache is keyed lowercase, so a sign-in that cased the email differently must still
         // find the row.
         assert_eq!(warning_days("Inside@B.com").await, Some(5));
+        assert_eq!(
+            warning_days(root_inside).await,
+            None,
+            "root is out of scope while the policy exempts it"
+        );
 
-        for email in [inside, young, expired, root] {
+        // The same instance with root in scope. Re-seeded in this test rather than a second one:
+        // the settings cache is process-wide, so two tests holding different policies would race.
+        set_policy(90, 7, true).await;
+        assert_eq!(
+            warning_days(root_inside).await,
+            Some(5),
+            "the exemption was the only thing keeping the countdown from root"
+        );
+        assert_eq!(
+            warning_days(root).await,
+            None,
+            "an expired root password is the middleware's block, not a countdown"
+        );
+        assert_eq!(
+            warning_days(inside).await,
+            Some(5),
+            "unchanged for everyone else"
+        );
+
+        for email in [inside, young, expired, root, root_inside] {
             USERS.remove(email);
         }
         SYSTEM_SETTINGS
