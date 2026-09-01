@@ -1005,7 +1005,7 @@ pub fn plan_group_updates(
                 Some(state) => match (state.last_outcome.as_ref(), state.since.as_ref()) {
                     (None, _) | (Some(RunOutcome::Normal), _) if is_firing => RunOutcome::Pending,
                     (Some(RunOutcome::Pending), Some(last)) => {
-                        if at - last < pending_period_sec * 1_000_000 && is_firing {
+                        if at - last < pending_period_sec.saturating_mul(1_000_000) && is_firing {
                             RunOutcome::Pending
                         } else {
                             base_outcome
@@ -1054,7 +1054,7 @@ pub fn plan_group_updates(
             Some(state) => match (state.last_outcome.as_ref(), state.since.as_ref()) {
                 (None, _) | (Some(RunOutcome::Normal), _) if is_firing => RunOutcome::Pending,
                 (Some(RunOutcome::Pending), Some(last)) => {
-                    if at - last < pending_period_sec * 1_000_000 && is_firing {
+                    if at - last < pending_period_sec.saturating_mul(1_000_000) && is_firing {
                         RunOutcome::Pending
                     } else {
                         base_outcome

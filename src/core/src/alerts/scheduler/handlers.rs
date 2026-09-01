@@ -825,7 +825,12 @@ async fn handle_composite_alert_trigger(
                     RunOutcome::Pending
                 }
                 (Some(RunOutcome::Pending), Some(last)) if evaluated.result => {
-                    if now - last < definition.definition.pending_period_sec * 1_000_000 {
+                    if now - last
+                        < definition
+                            .definition
+                            .pending_period_sec
+                            .saturating_mul(1_000_000)
+                    {
                         RunOutcome::Pending
                     } else {
                         base_outcome
@@ -2205,7 +2210,7 @@ async fn handle_alert_triggers(
                     (Some(RunOutcome::Pending), Some(last)) => {
                         // last state was pending, so check if the the pending state exists for more
                         // than pending seconds or not.
-                        if now - last < alert.pending_period_sec * 1_000_000 {
+                        if now - last < alert.pending_period_sec.saturating_mul(1_000_000) {
                             trigger_data_stream.status = RunOutcome::Pending;
                             trigger_data.period_end_time = if should_store_last_end_time {
                                 Some(trigger_results.end_time)
