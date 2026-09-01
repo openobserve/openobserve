@@ -485,7 +485,7 @@ pub async fn create_variable(
         org_id: org_id.to_string(),
         env: env_id,
         name,
-        value: encrypt_secret(&dek, req.value.as_deref().unwrap_or_default())?,
+        value: store_value(&dek, req.value.as_deref().unwrap_or_default())?,
         kind: kind_str(req.kind).to_string(),
         description: req.description,
         example: req.example,
@@ -520,7 +520,7 @@ pub async fn update_variable(
 
     if let Some(value) = req.value {
         let dek = synthetics_dek(org_id).await?;
-        record.value = encrypt_secret(&dek, &value)?;
+        record.value = store_value(&dek, &value)?;
     }
     record.name = name;
     record.kind = kind_str(req.kind).to_string();
@@ -693,6 +693,9 @@ pub async fn replay_secrets(
     let candidates: Vec<_> = rows
         .iter()
         .filter(|v| v.is_secret() && referenced.contains(&v.name))
+        // An unset secret has nothing to release, and decrypting an empty
+        // column errors — which would fail the whole call, not just this row.
+        .filter(|v| !v.value.is_empty())
         .filter(|v| applies_to(v, check.environments.first().map(String::as_str)))
         .collect();
     if candidates.is_empty() {
@@ -862,7 +865,7 @@ pub async fn split_to_environments(
             org_id: org_id.to_string(),
             env: Some(env.id.clone()),
             name: source.name.clone(),
-            value: encrypt_secret(&dek, &value)?,
+            value: store_value(&dek, &value)?,
             kind: source.kind.clone(),
             description: source.description.clone(),
             example: source.example.clone(),
