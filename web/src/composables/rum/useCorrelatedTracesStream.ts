@@ -17,8 +17,17 @@ import { useStore } from "vuex";
 import type { TranslateFn } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
+import tracesService, { TRACE_TIME_RANGE_MAX_IDS } from "@/services/traces";
+import type { TraceTimeRange } from "@/services/traces";
 import { generateTraceContext } from "@/utils/zincutils";
 import { normalizeTraceId, RUM_CORRELATION_TRACES_STREAM } from "@/utils/rum/fields";
+
+/** Where a trace lives, and when it ran when the index could tell us. */
+export interface TraceLocation {
+  stream: string;
+  /** Absent when the answer came from the probe fallback. */
+  range?: TraceTimeRange;
+}
 
 // Probes look up a trace by id, but the caller's window is event-derived and
 // ingestion can lag it — widen like useRumSpanBuilder's RUM_TIME_BUFFER_US,
@@ -32,6 +41,14 @@ const PROBE_TIME_BUFFER_US = 300_000_000; // ±5 min
 // staleness cannot apply.
 const inFlight = new Map<string, Promise<string>>();
 
+// A 404 means this deployment has no time-range endpoint at all, which no
+// retry can change — latch it off for the session rather than paying a failed
+// request on every resolve. Transient failures (5xx, network) must NOT latch,
+// and neither must partial coverage: that is legitimately per-request.
+// Deliberately outside the store: it describes the backend, not the org, so it
+// has to survive an org switch.
+let indexEndpointAvailable = true;
+
 /**
  * Discovers which traces stream contains a given trace id.
  *
@@ -43,9 +60,12 @@ const inFlight = new Map<string, Promise<string>>();
  *
  * Layers (see the discovery spec):
  * - `byTraceId` (store): per-trace answers, shared across surfaces/remounts.
- * - `knownStreams` (store): the org-level learned fact — probe only streams
- *   that have ever contained a correlated trace; a miss escalates to the full
- *   stream list and the newly found stream is learned.
+ * - `traces/time_range`: the backend's trace time index answers directly, and
+ *   says via `partial_coverage` when it could not look at all.
+ * - `_search_multi_stream` probe: the fallback for exactly that case — an
+ *   older backend, indexing disabled, or data older than index coverage.
+ * - `knownStreams` (store): the org-level learned fact the probe narrows by;
+ *   a miss escalates to the full stream list and the new stream is learned.
  * Every failure path returns RUM_CORRELATION_TRACES_STREAM, reproducing the
  * pre-discovery behavior; misses are never cached so ingestion lag self-heals.
  */
@@ -71,6 +91,78 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       console.error("Failed to get traces streams", err);
       return [];
     }
+  };
+
+  /**
+   * One `traces/time_range` pass over `traceIds`, chunked at the server's id
+   * cap and issued in parallel. Splits the ids into the ones the index
+   * resolved and the ones it could not answer for — a scan timeout, missing
+   * coverage, or a failed request. An authoritative `not_found` counts as
+   * answered, so a trace the org genuinely does not have never reaches the
+   * probe.
+   */
+  const lookupTraceLocations = async (
+    streams: string[],
+    traceIds: string[],
+    startTimeUs: number,
+    endTimeUs: number,
+    narrowTo?: string[],
+  ): Promise<{ found: Record<string, TraceLocation>; unanswered: string[] }> => {
+    const found: Record<string, TraceLocation> = {};
+    const unanswered: string[] = [];
+    if (!traceIds.length) return { found, unanswered };
+
+    const rank = new Map(streams.map((stream, index) => [stream, index]));
+    const rankOf = (stream: string) => rank.get(stream) ?? Number.MAX_SAFE_INTEGER;
+
+    const chunks: string[][] = [];
+    for (let index = 0; index < traceIds.length; index += TRACE_TIME_RANGE_MAX_IDS) {
+      chunks.push(traceIds.slice(index, index + TRACE_TIME_RANGE_MAX_IDS));
+    }
+
+    await Promise.all(
+      chunks.map(async (chunk) => {
+        try {
+          const response = await tracesService.getTraceTimeRanges(
+            store.state.selectedOrganization.identifier,
+            {
+              traceIds: chunk,
+              startTime: startTimeUs,
+              endTime: endTimeUs,
+              // Anchors the server's locate pass, so a typical RUM window is
+              // covered in its first round.
+              hintTs: startTimeUs,
+              streams: narrowTo,
+            },
+          );
+          const data = response?.data;
+          const partialCoverage = Boolean(data?.partial_coverage);
+          const answered = new Set<string>();
+          for (const result of data?.results ?? []) {
+            const id = result?.trace_id;
+            if (!id) continue;
+            if (result.status === "found" && result.stream) {
+              const current = found[id];
+              // The server stops at the first stream that hits, but concurrent
+              // lookups can both report — settle it the way the probe does.
+              if (!current || rankOf(result.stream) < rankOf(current.stream)) {
+                found[id] = { stream: result.stream, range: result.range };
+              }
+              answered.add(id);
+            } else if (result.status === "not_found" && !partialCoverage) {
+              answered.add(id);
+            }
+          }
+          unanswered.push(...chunk.filter((id) => !answered.has(id)));
+        } catch (err: unknown) {
+          const status = (err as { response?: { status?: number } })?.response?.status;
+          if (status === 404 || status === 405) indexEndpointAvailable = false;
+          unanswered.push(...chunk);
+        }
+      }),
+    );
+
+    return { found, unanswered };
   };
 
   /**
@@ -204,16 +296,28 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
         return result;
       }
 
+      // The index answers first; only what it could not cover is probed.
+      let pending = toResolve;
+      if (indexEndpointAvailable) {
+        const lookup = await lookupTraceLocations(allStreams, toResolve, startTimeUs, endTimeUs);
+        for (const [id, location] of Object.entries(lookup.found)) {
+          result[id] = location.stream;
+          record(id, location.stream);
+        }
+        pending = lookup.unanswered;
+      }
+      if (!pending.length) return result;
+
       const known: string[] = cache().knownStreams.filter((s: string) => allStreams.includes(s));
       const step1Streams = known.length ? known : allStreams;
-      const step1 = await probeBatch(step1Streams, toResolve, startTimeUs, endTimeUs);
+      const step1 = await probeBatch(step1Streams, pending, startTimeUs, endTimeUs);
       for (const [id, stream] of Object.entries(step1)) {
         result[id] = stream;
         record(id, stream);
       }
 
       // Step 2: only unresolved ids, only unprobed streams.
-      const unresolved = toResolve.filter((id) => !(id in result));
+      const unresolved = pending.filter((id) => !(id in result));
       const unprobed = allStreams.filter((s) => !step1Streams.includes(s));
       if (unresolved.length && unprobed.length) {
         const step2 = await probeBatch(unprobed, unresolved, startTimeUs, endTimeUs);

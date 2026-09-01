@@ -34,6 +34,15 @@ vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams: mockGetStreams }),
 }));
 
+const mockGetTraceTimeRanges = vi.fn();
+vi.mock("@/services/traces", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    default: { getTraceTimeRanges: (...args: any[]) => mockGetTraceTimeRanges(...args) },
+  };
+});
+
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual: any = await importOriginal();
   return { ...actual, generateTraceContext: () => ({ traceId: "mock-trace-context-id" }) };
@@ -116,6 +125,15 @@ function mockBatch(hitsByStream: Record<string, string[]>) {
   });
 }
 
+/** A `traces/time_range` response body, as the axios wrapper delivers it. */
+function indexResponse(results: any[], partialCoverage = false) {
+  return { data: { results, partial_coverage: partialCoverage } };
+}
+
+function indexedIds(callIndex = 0): string[] {
+  return mockGetTraceTimeRanges.mock.calls[callIndex][1].traceIds;
+}
+
 function batchCalls(): string[][] {
   return mockFetchQueryDataWithHttpStream.mock.calls.map(([args]: any[]) =>
     args.queryReq.query.sql.map(streamOfSql),
@@ -133,6 +151,10 @@ describe("useCorrelatedTracesStream", () => {
     mockGetStreams.mockResolvedValue({
       list: [{ name: "payments_traces" }, { name: "default" }, { name: "checkout_traces" }],
     });
+    // Default: the index has no coverage for these ids, so the probe answers.
+    // Every probe-path expectation below therefore reads exactly as it did
+    // before the index became the primary path.
+    mockGetTraceTimeRanges.mockResolvedValue(indexResponse([], true));
   });
 
   it("① first-ever id: one batch over all streams, default ordered first, seeds knownStreams", async () => {
@@ -286,6 +308,163 @@ describe("useCorrelatedTracesStream", () => {
         args.queryReq.query.sql.flatMap(idsOfSql),
       );
       expect(probedIds).not.toContain(T1);
+    });
+  });
+
+  describe("traces/time_range lookup", () => {
+    it("resolves from the index without probing, and seeds knownStreams", async () => {
+      mockGetTraceTimeRanges.mockResolvedValue(
+        indexResponse([
+          {
+            trace_id: T1,
+            stream: "payments_traces",
+            status: "found",
+            range: { start_time: 5_000, end_time: 9_000 },
+          },
+        ]),
+      );
+      const { resolveTracesStream } = useCorrelatedTracesStream(t);
+
+      expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("payments_traces");
+      expect(mockGetTraceTimeRanges).toHaveBeenCalledTimes(1);
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      expect(mockStoreState.organizationData.correlatedTracesStreams.knownStreams).toEqual([
+        "payments_traces",
+      ]);
+    });
+
+    it("sends the org, the bounds and a locate hint", async () => {
+      mockGetTraceTimeRanges.mockResolvedValue(
+        indexResponse([{ trace_id: T1, stream: "default", status: "found" }]),
+      );
+      const { resolveTracesStream } = useCorrelatedTracesStream(t);
+      await resolveTracesStream(T1, 1_000, 2_000);
+
+      expect(mockGetTraceTimeRanges).toHaveBeenCalledWith("test-org", {
+        traceIds: [T1],
+        startTime: 1_000,
+        endTime: 2_000,
+        hintTs: 1_000,
+        streams: undefined,
+      });
+    });
+
+    it("an authoritative not_found returns default, probes nothing and caches nothing", async () => {
+      mockGetTraceTimeRanges.mockResolvedValue(
+        indexResponse([{ trace_id: T1, status: "not_found" }]),
+      );
+      const { resolveTracesStream } = useCorrelatedTracesStream(t);
+
+      expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("default");
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      expect(mockStoreState.organizationData.correlatedTracesStreams.byTraceId).toEqual({});
+    });
+
+    it("partial coverage escalates only the ids the index could not answer", async () => {
+      mockGetTraceTimeRanges.mockResolvedValue(
+        indexResponse(
+          [
+            { trace_id: T1, stream: "payments_traces", status: "found" },
+            { trace_id: T2, status: "not_found" },
+          ],
+          true,
+        ),
+      );
+      mockBatch({ checkout_traces: [T2] });
+      const { resolveTracesStreamsBulk } = useCorrelatedTracesStream(t);
+
+      const result = await resolveTracesStreamsBulk([T1, T2], 1_000, 2_000);
+
+      expect(result).toEqual({ [T1]: "payments_traces", [T2]: "checkout_traces" });
+      const probedIds = mockFetchQueryDataWithHttpStream.mock.calls.flatMap(([args]: any[]) =>
+        args.queryReq.query.sql.flatMap(idsOfSql),
+      );
+      expect(probedIds).toContain(T2);
+      expect(probedIds).not.toContain(T1);
+    });
+
+    it("a timed-out key is probed — a timeout is not absence", async () => {
+      mockGetTraceTimeRanges.mockResolvedValue(
+        indexResponse([
+          { trace_id: T1, stream: "payments_traces", status: "found" },
+          { trace_id: T2, status: "timeout" },
+        ]),
+      );
+      mockBatch({ checkout_traces: [T2] });
+      const { resolveTracesStreamsBulk } = useCorrelatedTracesStream(t);
+
+      const result = await resolveTracesStreamsBulk([T1, T2], 1_000, 2_000);
+
+      expect(result).toEqual({ [T1]: "payments_traces", [T2]: "checkout_traces" });
+      const probedIds = mockFetchQueryDataWithHttpStream.mock.calls.flatMap(([args]: any[]) =>
+        args.queryReq.query.sql.flatMap(idsOfSql),
+      );
+      expect([...new Set(probedIds)]).toEqual([T2]);
+    });
+
+    it("a duplicate hit resolves to the first stream in client order", async () => {
+      mockGetTraceTimeRanges.mockResolvedValue(
+        indexResponse([
+          { trace_id: T1, stream: "checkout_traces", status: "found" },
+          { trace_id: T1, stream: "default", status: "found" },
+        ]),
+      );
+      const { resolveTracesStream } = useCorrelatedTracesStream(t);
+
+      expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("default");
+    });
+
+    it("chunks past the server's 100-id cap and merges the answers", async () => {
+      const ids = Array.from({ length: 250 }, (_, index) => index.toString(16).padStart(32, "0"));
+      mockGetTraceTimeRanges.mockImplementation((_org: string, options: any) =>
+        Promise.resolve(
+          indexResponse(
+            options.traceIds.map((id: string) => ({
+              trace_id: id,
+              stream: "payments_traces",
+              status: "found",
+            })),
+          ),
+        ),
+      );
+      const { resolveTracesStreamsBulk } = useCorrelatedTracesStream(t);
+
+      const result = await resolveTracesStreamsBulk(ids, 1_000, 2_000);
+
+      expect(mockGetTraceTimeRanges).toHaveBeenCalledTimes(3);
+      expect(indexedIds(0)).toHaveLength(100);
+      expect(indexedIds(2)).toHaveLength(50);
+      expect(Object.keys(result)).toHaveLength(250);
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    it("a transient failure probes and does NOT latch the endpoint off", async () => {
+      mockGetTraceTimeRanges.mockRejectedValue({ response: { status: 500 } });
+      mockBatch({ payments_traces: [T1, T2] });
+      const { resolveTracesStream } = useCorrelatedTracesStream(t);
+
+      expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("payments_traces");
+      expect(mockGetTraceTimeRanges).toHaveBeenCalledTimes(1);
+
+      expect(await resolveTracesStream(T2, 1_000, 2_000)).toBe("payments_traces");
+      expect(mockGetTraceTimeRanges).toHaveBeenCalledTimes(2);
+    });
+
+    it("a 404 latches the endpoint off for the rest of the session", async () => {
+      // A fresh module instance: the latch is module state by design, so this
+      // test must not leave the endpoint disabled for the others.
+      vi.resetModules();
+      const freshComposable = (await import("@/composables/rum/useCorrelatedTracesStream")).default;
+      mockGetTraceTimeRanges.mockRejectedValue({ response: { status: 404 } });
+      mockBatch({ payments_traces: [T1, T2] });
+      const { resolveTracesStream } = freshComposable(t);
+
+      expect(await resolveTracesStream(T1, 1_000, 2_000)).toBe("payments_traces");
+      expect(mockGetTraceTimeRanges).toHaveBeenCalledTimes(1);
+
+      mockGetTraceTimeRanges.mockClear();
+      expect(await resolveTracesStream(T2, 1_000, 2_000)).toBe("payments_traces");
+      expect(mockGetTraceTimeRanges).not.toHaveBeenCalled();
     });
   });
 });
