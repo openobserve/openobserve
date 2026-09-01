@@ -7594,7 +7594,6 @@
   "alert_library": {
     "header": "警示庫",
     "subtitle": "精選且可立即安裝的警示，與您已攝取的資料比對",
-    "sectionTab": "程式庫",
     "contribute": "在 GitHub 上貢獻",
     "searchPlaceholder": "依名稱、說明或串流搜尋",
     "searchLabel": "搜尋警示庫",
@@ -7928,7 +7927,6 @@
     "destinationsLoadError": "載入目標時發生錯誤"
   },
   "alert_destinations": {
-    "sectionTab": "目標",
     "chooseTypeTitle": "選擇類型",
     "selectDestinationType": "選擇目標類型",
     "connectionStepTitle": "連線",
@@ -11060,7 +11058,14 @@
           "typeCategorical": "類別",
           "typeBoolean": "布林值",
           "threshold": "閾值",
-          "measurePerRow": "每列平均值（跨試驗）"
+          "measurePerRow": "每列平均值（跨試驗）",
+          "dimensionImproved": "{count} 行已改善 | {count} 行已改善",
+          "dimensionUnchanged": "{count} 行未變更 | {count} 行未變更",
+          "dimensionRegressed": "{count} 行退步 | {count} 行退步",
+          "dimensionNotCounted": "未計入",
+          "dimensionNotCountedHint": "此評分器在其評分配置中沒有比較策略，因此其值會被報告，但不會被判定為改善或退步——也無法影響結果。為其設定方向和閾值，即可將其納入計算。",
+          "dimensionNoneCompared": "無可比對",
+          "dimensionNoneComparedHint": "沒有任何一行在兩側都被測量。只在一個實驗中執行的行沒有可比較的起點，因此不會計入任何方向。"
         },
         "rowDrawer": {
           "fallbackTitle": "比較列",
@@ -11425,6 +11430,7 @@
         "republishedSuccess": "描述已更新。版本 {version} 未變更。",
         "draftSuccess": "草稿已儲存。請測試連線以發布。",
         "draftError": "無法儲存草稿",
+        "testFailed": "連線測試失敗",
         "publishFailed": "測試連線失敗，因此未發布任何內容。您的草稿已儲存。",
         "createError": "無法發布遠端任務",
         "validation": {
@@ -14234,8 +14240,6 @@
       "passwordSetHelp": "密碼已設定。留空以保留目前密碼，或輸入新密碼取代。",
       "showUptimePercent": "顯示運作時間百分比",
       "showTimelineBars": "顯示時間軸長條",
-      "showResponseTime": "顯示回應時間",
-      "showResponseTimeHelp": "關閉此選項，以免頁面洩漏效能數據。",
       "noindex": "防止搜尋引擎索引",
       "noindexHelp": "加入 noindex 標籤，讓搜尋引擎略過公開頁面。",
       "confirmFailures": "確認失敗次數",
@@ -14294,6 +14298,9 @@
       "deleting": "正在移除更新...",
       "deleted": "更新已移除",
       "deleteFailed": "移除更新失敗",
+      "affects": "影響",
+      "allComponents": "所有元件",
+      "componentsUnavailable": "已從此頁面移除的元件",
       "state": {
         "scheduled": "已排程",
         "active": "進行中",

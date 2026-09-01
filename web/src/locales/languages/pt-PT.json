@@ -7599,7 +7599,6 @@
   "alert_library": {
     "header": "Biblioteca de Alertas",
     "subtitle": "Alertas selecionados, prontos para instalar, correspondentes aos dados que você já ingere",
-    "sectionTab": "Biblioteca",
     "contribute": "Contribua no GitHub",
     "searchPlaceholder": "Pesquisar por nome, descrição ou stream",
     "searchLabel": "Pesquisar na biblioteca de alertas",
@@ -7933,7 +7932,6 @@
     "destinationsLoadError": "Erro ao carregar destinos"
   },
   "alert_destinations": {
-    "sectionTab": "Destinos",
     "chooseTypeTitle": "Escolher tipo",
     "selectDestinationType": "Selecione o Tipo de Destino",
     "connectionStepTitle": "Conexão",
@@ -11065,7 +11063,14 @@
           "typeCategorical": "Categórico",
           "typeBoolean": "Booleano",
           "threshold": "Limite",
-          "measurePerRow": "Média por linha, ao longo das tentativas"
+          "measurePerRow": "Média por linha, ao longo das tentativas",
+          "dimensionImproved": "{count} linha melhorou | {count} linhas melhoraram",
+          "dimensionUnchanged": "{count} linha inalterada | {count} linhas inalteradas",
+          "dimensionRegressed": "{count} linha regrediu | {count} linhas regrediram",
+          "dimensionNotCounted": "Não contado",
+          "dimensionNotCountedHint": "Este avaliador não tem política de comparação na sua Configuração de Pontuação, portanto seus valores são reportados, mas nunca julgados como melhorados ou regredidos — e ele não pode afetar o resultado. Dê a ele uma direção e um limite para que seja contabilizado.",
+          "dimensionNoneCompared": "Nada comparado",
+          "dimensionNoneComparedHint": "Nenhuma linha foi medida em ambos os lados. Uma linha que rodou em apenas um experimento não tem de onde partir, então não conta para nenhuma direção."
         },
         "rowDrawer": {
           "fallbackTitle": "Linha de comparação",
@@ -11430,6 +11435,7 @@
         "republishedSuccess": "Descrição atualizada. A versão {version} permanece inalterada.",
         "draftSuccess": "Rascunho salvo. Teste a conexão para publicá-lo.",
         "draftError": "Não foi possível salvar o rascunho",
+        "testFailed": "Falha no teste de conexão",
         "publishFailed": "A conexão de teste falhou, então nada foi publicado. Seu rascunho está salvo.",
         "createError": "Não foi possível publicar a tarefa remota",
         "validation": {
@@ -14239,8 +14245,6 @@
       "passwordSetHelp": "Uma senha já está definida. Deixe em branco para mantê-la ou digite uma nova para substituí-la.",
       "showUptimePercent": "Mostrar porcentagem de tempo de atividade",
       "showTimelineBars": "Mostrar barras de linha do tempo",
-      "showResponseTime": "Mostrar tempo de resposta",
-      "showResponseTimeHelp": "Desative para que a página não exponha números de desempenho.",
       "noindex": "Desencorajar a indexação de busca",
       "noindexHelp": "Adiciona uma tag noindex para que os mecanismos de busca ignorem a página pública.",
       "confirmFailures": "Confirmar falhas",
@@ -14299,6 +14303,9 @@
       "deleting": "Removendo atualização...",
       "deleted": "Atualização removida",
       "deleteFailed": "Falha ao remover atualização",
+      "affects": "Afeta",
+      "allComponents": "Todos os componentes",
+      "componentsUnavailable": "Componentes que não estão mais nesta página",
       "state": {
         "scheduled": "Agendado",
         "active": "Ativo",

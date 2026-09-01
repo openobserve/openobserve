@@ -7599,7 +7599,6 @@
   "alert_library": {
     "header": "告警库",
     "subtitle": "精选的、可直接安装的告警，与您已摄取的数据相匹配",
-    "sectionTab": "库",
     "contribute": "在 GitHub 上贡献",
     "searchPlaceholder": "按名称、描述或流搜索",
     "searchLabel": "搜索告警库",
@@ -7933,7 +7932,6 @@
     "destinationsLoadError": "加载目标时出错"
   },
   "alert_destinations": {
-    "sectionTab": "目标",
     "chooseTypeTitle": "选择类型",
     "selectDestinationType": "选择目标类型",
     "connectionStepTitle": "连接",
@@ -11065,7 +11063,14 @@
           "typeCategorical": "分类",
           "typeBoolean": "布尔",
           "threshold": "阈值",
-          "measurePerRow": "跨试验的每行均值"
+          "measurePerRow": "跨试验的每行均值",
+          "dimensionImproved": "{count} 行改进 | {count} 行改进",
+          "dimensionUnchanged": "{count} 行无变化 | {count} 行无变化",
+          "dimensionRegressed": "{count} 行变差 | {count} 行变差",
+          "dimensionNotCounted": "未计数",
+          "dimensionNotCountedHint": "此评分器在其评分配置中没有比较策略，因此其值会被报告，但永远不会被评为改进或变差——而且它不能影响结果。为其指定方向和阈值即可将其计入。",
+          "dimensionNoneCompared": "无比较项",
+          "dimensionNoneComparedHint": "没有行在两侧均被测量。仅在单个实验中运行的行没有可比较的基准，因此不计入任何方向。"
         },
         "rowDrawer": {
           "fallbackTitle": "比较行",
@@ -11430,6 +11435,7 @@
         "republishedSuccess": "描述已更新。版本 {version} 未更改。",
         "draftSuccess": "草稿已保存。测试连接以发布它。",
         "draftError": "无法保存草稿",
+        "testFailed": "连接测试失败",
         "publishFailed": "测试连接失败，因此未发布任何内容。你的草稿已保存。",
         "createError": "无法发布远程任务",
         "validation": {
@@ -14239,8 +14245,6 @@
       "passwordSetHelp": "密码已设置。留空以保持不变，或输入新密码进行替换。",
       "showUptimePercent": "显示正常运行时间百分比",
       "showTimelineBars": "显示时间线条",
-      "showResponseTime": "显示响应时间",
-      "showResponseTimeHelp": "关闭此选项，以免页面泄露性能数据。",
       "noindex": "阻止搜索引擎索引",
       "noindexHelp": "添加 noindex 标签，以便搜索引擎跳过该公开页面。",
       "confirmFailures": "确认故障数",
@@ -14299,6 +14303,9 @@
       "deleting": "正在删除更新...",
       "deleted": "更新已删除",
       "deleteFailed": "删除更新失败",
+      "affects": "影响",
+      "allComponents": "所有组件",
+      "componentsUnavailable": "不再显示在此页面上的组件",
       "state": {
         "scheduled": "已计划",
         "active": "进行中",

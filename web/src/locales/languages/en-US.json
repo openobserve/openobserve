@@ -7599,7 +7599,6 @@
   "alert_library": {
     "header": "Alert Library",
     "subtitle": "Curated, ready-to-install alerts, matched against the data you already ingest",
-    "sectionTab": "Library",
     "contribute": "Contribute on GitHub",
     "searchPlaceholder": "Search by name, description or stream",
     "searchLabel": "Search the alert library",
@@ -7933,7 +7932,6 @@
     "destinationsLoadError": "Error loading destinations"
   },
   "alert_destinations": {
-    "sectionTab": "Destinations",
     "chooseTypeTitle": "Choose Type",
     "selectDestinationType": "Select Destination Type",
     "connectionStepTitle": "Connection",
