@@ -81,11 +81,16 @@ export const makeSilenceSchema = (t: Translator) =>
 export const makePeriodSchema = (t: Translator) =>
   z.coerce.number().min(1, t("alerts.validation.periodPositive"));
 
-/** pending period ≥ 0 (optional — blank coerces to 0, which is a valid,
- *  meaningful value: fire immediately). Unlike silence, blank does NOT need to
- *  be told apart from 0, so this can safely `z.coerce.number()` the raw value. */
+/** pending period ≥ 0 (optional — blank OR ABSENT coerces to 0, which is a
+ *  valid, meaningful value: fire immediately). Unlike silence, blank does NOT
+ *  need to be told apart from 0, so this can safely `z.coerce.number()` the
+ *  raw value. `.optional()` covers the key being missing entirely — a form
+ *  built without `withFormExtras`/`buildDefaultForm` (e.g. a hand-built test
+ *  fixture) never seeds `_ui.pendingPeriod`, and `z.coerce.number()` alone
+ *  would reject `undefined` as a required field rather than treating a never
+ *  -configured pending period as 0. */
 export const makePendingPeriodSchema = (t: Translator) =>
-  z.coerce.number().min(0, t("alerts.validation.pendingPeriodNonNegative"));
+  z.coerce.number().min(0, t("alerts.validation.pendingPeriodNonNegative")).optional();
 
 /** destinations: at least one required. Elements are destination NAME strings
  *  (the OSelect options are `formattedDestinations` = array of names). */

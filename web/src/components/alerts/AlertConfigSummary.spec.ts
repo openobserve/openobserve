@@ -234,8 +234,8 @@ describe("AlertConfigSummary — SLO alerts", () => {
 
     // Anchored, so this cannot pass by virtue of the SLO branch not existing.
     expect(field(wrapper, "slo-kind").exists()).toBe(true);
-    expect(value(wrapper, "frequency")).toBe("1");
-    expect(value(wrapper, "silence")).toBe("30");
+    expect(value(wrapper, "frequency")).toBe("1 min");
+    expect(value(wrapper, "silence")).toBe("30 min");
     expect(value(wrapper, "destinations")).toBe("pagerduty");
   });
 });
