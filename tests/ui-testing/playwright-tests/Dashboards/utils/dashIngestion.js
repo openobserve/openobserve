@@ -7,6 +7,9 @@ import sankeyData from "../../../../test-data/sankey_data.json";
 const testLogger = require('../../utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier, refreshCloudConfig } = require('../../utils/cloud-auth.js');
 
+// Streams this worker process has already loaded the fixture into.
+const ingestedStreams = new Set();
+
 // Exported function to remove UTF characters
 const removeUTFCharacters = (text) => {
   // Remove UTF characters using regular expression
@@ -25,6 +28,14 @@ const getAuthToken = async () => {
 export const ingestion = async (page, streamName = "e2e_automate") => {
   if (!process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
+  }
+
+  // Every beforeEach re-posts this fixture, but the rows are identical and the org is
+  // shared, so repeats add nothing observable while costing ~90 s of each test's
+  // 180 s budget on cloud — enough on its own to time out the longer specs.
+  const ingestKey = `${getOrgIdentifier()}:${streamName}`;
+  if (ingestedStreams.has(ingestKey)) {
+    return { skipped: true };
   }
 
   // Resolve headers/org per attempt so a refreshed passcode is picked up on retry.
@@ -76,6 +87,7 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
       );
     }
 
+    ingestedStreams.add(ingestKey);
     return await fetchResponse.json();
   } catch (error) {
     testLogger.error("Ingestion failed", { error });
