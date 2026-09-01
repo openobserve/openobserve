@@ -3,11 +3,14 @@
 <!--
   The Test-connection rail on the register/edit form.
 
-  A test connection is not a preview: it is the ONLY thing that publishes a
-  version, so this panel is the register button's other half rather than an
-  optional extra. It always shows the raw exchange, on success and on failure
-  alike, because "what did we actually send, and what came back" is the only
-  thing that helps when someone else's service says no.
+  It tests the form as it stands, through `POST /tasks/test`, which takes the
+  whole candidate — so nothing is registered, no secret is written and no version
+  is published. Publishing still requires a passing test; that check belongs to
+  the Publish button, which runs its own.
+
+  It always shows the raw exchange, on success and on failure alike, because
+  "what did we actually send, and what came back" is the only thing that helps
+  when someone else's service says no.
 -->
 <template>
   <aside

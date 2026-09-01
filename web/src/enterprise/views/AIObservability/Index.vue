@@ -21,12 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   picks the route the rail/breadcrumb highlight.
 -->
 <template>
-  <OPageLayout bleed :sidebar-width="230">
+  <OPageLayout bleed :sidebar-width="railCollapsed ? RAIL_COLLAPSED_WIDTH : RAIL_WIDTH">
     <template #sidebar>
       <SectionRail
+        v-model:collapsed="railCollapsed"
         :groups="sectionGroups"
         :active-key="activeSection"
         :title="t('aiObservability.title')"
+        :icon="AI_ICON"
+        collapsible
       />
     </template>
 
@@ -37,13 +40,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import type { SectionHubGroup, SectionHubItem } from "@/components/common/SectionHub.vue";
+import { navSection } from "./navSection";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+
+/** The same mark the primary nav uses for this module, so the collapsed rail
+ *  still says which module it belongs to. */
+const AI_ICON: IconName = "auto-awesome";
+
+// Wide enough for one icon plus the pill's own inset; the expanded width is
+// unchanged from before the toggle existed.
+const RAIL_WIDTH = 230;
+const RAIL_COLLAPSED_WIDTH = 52;
+const RAIL_STORAGE_KEY = "o2-ai-rail-collapsed";
+
+// Remembered per browser: a rail you collapsed should not reopen every time you
+// leave the module. Storage can throw (private mode), and the rail opening
+// expanded is a fine outcome when it does.
+function readCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(RAIL_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+const railCollapsed = ref(readCollapsed());
+
+watch(railCollapsed, (value) => {
+  try {
+    window.localStorage.setItem(RAIL_STORAGE_KEY, String(value));
+  } catch {
+    // Unavailable storage keeps the toggle working for this session only.
+  }
+});
 
 defineOptions({ name: "AIObservabilityShell" });
 
@@ -61,33 +97,7 @@ function evalLink(tab: EvalTab) {
   return { name: "aiEvaluations", query: { ...orgQuery.value, tab } };
 }
 
-// Section key for the rail's `active-key`. Evaluations sub-pages share the
-// route name `aiEvaluations`; `?tab=` distinguishes them so we map it down
-// to the rail's per-item keys.
-const activeSection = computed<string>(() => {
-  if (route.name === "aiLLMInsights") return "llmInsights";
-  if (route.name === "aiSessions") return "sessions";
-  if (route.name === "aiAgentGraph") return "agentGraph";
-  if (route.name === "aiAgentBehavior") return "agentBehavior";
-  if (route.name === "aiDiscovery") return "discovery";
-  if (
-    route.name === "aiQueues" ||
-    route.name === "aiQueueDetail" ||
-    route.name === "aiQueueWorkbench"
-  )
-    return "queues";
-  if (route.name === "aiDatasets") return "datasets";
-  // The create form is a route of its own, so the rail must stay lit while it
-  // is open — same shape as the queue sub-routes above.
-  if (route.name === "aiPlayground") return "playground";
-  if (route.name === "aiExperiments" || route.name === "aiExperimentCreate") return "experiments";
-  if (typeof route.name === "string" && route.name.startsWith("aiRemoteTask")) return "remoteTasks";
-  if (route.name === "aiEvaluations") {
-    const tab = (route.query.tab as string) || "quality";
-    return tab;
-  }
-  return "";
-});
+const activeSection = computed<string>(() => navSection(route.name, route.query.tab));
 
 // Single source of truth for the rail items (groups) AND the breadcrumb
 // switcher. Order here is the order shown in the rail.

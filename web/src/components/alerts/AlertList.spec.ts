@@ -482,10 +482,9 @@ describe("AlertList - data fetching and columns", () => {
     expect(wrapper.vm.filteredResults.length).toBe(alertsDB.length);
   });
 
-  // period ("Look back window"), frequency ("Check every"), state, level and
-  // last_trained_at were removed from the list: they are configuration detail
-  // or duplicate a neighbouring column, and the row was too wide to scan.
-  // They remain on the alert detail/edit views.
+  // period, state, level, last_trained_at are intentionally absent (config
+  // detail, or duplicate a neighbouring column); frequency remains — it is
+  // the list's only visible cadence signal for non-realtime alerts.
   it("no longer renders the removed configuration columns on any tab", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -497,10 +496,58 @@ describe("AlertList - data fetching and columns", () => {
       wrapper.vm.activeTab = tab;
       await flushPromises();
       const ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
-      for (const removed of ["period", "frequency", "state", "level", "last_trained_at"]) {
+      for (const removed of ["period", "state", "level", "last_trained_at"]) {
         expect(ids, `tab=${tab} must not show "${removed}"`).not.toContain(removed);
       }
     }
+  });
+
+  it("shows the frequency column on every tab except realTime", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    for (const tab of ["all", "scheduled", "anomalyDetection"]) {
+      wrapper.vm.activeTab = tab;
+      await flushPromises();
+      const ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
+      expect(ids, `tab=${tab} must show "frequency"`).toContain("frequency");
+    }
+
+    wrapper.vm.activeTab = "realTime";
+    await flushPromises();
+    const realTimeIds = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
+    expect(realTimeIds, 'realTime tab must not show "frequency"').not.toContain("frequency");
+  });
+
+  it("renders cadence in the frequency cell: raw cron for cron alerts, minutes for interval alerts, a dash for real-time alerts", async () => {
+    alertsDB = [
+      makeAlert(1, {
+        is_real_time: false,
+        name: "Interval Alert",
+        trigger_condition: { period: 5, frequency: 15, frequency_type: "interval", cron: "" },
+      }),
+      makeAlert(2, {
+        is_real_time: false,
+        name: "Cron Alert",
+        trigger_condition: {
+          period: 0,
+          frequency: 0,
+          frequency_type: "cron",
+          cron: "*/10 * * * *",
+        },
+      }),
+      makeAlert(3, { is_real_time: true, name: "RealTime Alert" }),
+    ];
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    wrapper.vm.activeTab = "all";
+    await flushPromises();
+
+    const texts = wrapper
+      .findAll('[data-test="o2-table-cell-frequency"]')
+      .map((c: any) => c.text());
+    expect(texts).toEqual(["15 Mins", "*/10 * * * *", "--"]);
   });
 
   // Feature 2 (PT-3/PT-6): the columns that REPLACED them.
