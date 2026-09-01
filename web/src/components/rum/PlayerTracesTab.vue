@@ -220,7 +220,10 @@ import {
 } from "@/utils/rum/fields";
 import { formatTimeWithSuffix, formatLargeNumber, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
+import useCorrelatedTracesStream, {
+  traceQueryWindow,
+} from "@/composables/rum/useCorrelatedTracesStream";
+import type { TraceTimeRange } from "@/services/traces";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -233,7 +236,7 @@ import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 const { t } = useI18nTyped();
 const store = useStore();
 const { getStream } = useStreams(t);
-const { resolveTracesStreamsBulk } = useCorrelatedTracesStream(t);
+const { resolveTraceLocationsBulk } = useCorrelatedTracesStream(t);
 
 const props = defineProps({
   sessionId: {
@@ -359,16 +362,40 @@ function traceTimeOffset(startTimeNs: number): string {
 }
 
 // ── Data fetching ───────────────────────────────────────────
+/**
+ * The window covering `ranges`, padded — widened to the caller's window when
+ * any trace has no indexed range, so an unknown trace is never narrowed out.
+ */
+function unionTraceWindow(
+  ranges: (TraceTimeRange | undefined)[],
+  fallbackStartUs: number,
+  fallbackEndUs: number,
+): { startTime: number; endTime: number } {
+  const known = ranges.filter((range): range is TraceTimeRange => Boolean(range));
+  if (!known.length) return { startTime: fallbackStartUs, endTime: fallbackEndUs };
+  const merged = known.reduce((acc, range) => ({
+    start_time: Math.min(acc.start_time, range.start_time),
+    end_time: Math.max(acc.end_time, range.end_time),
+  }));
+  const window = traceQueryWindow(merged, fallbackStartUs, fallbackEndUs);
+  if (known.length === ranges.length) return window;
+  return {
+    startTime: Math.min(window.startTime, fallbackStartUs),
+    endTime: Math.max(window.endTime, fallbackEndUs),
+  };
+}
+
 async function fetchTraceMetadata(
   traceIds: string[],
   streamName: string,
+  window?: { startTime: number; endTime: number },
 ): Promise<Record<string, any>> {
   if (traceIds.length === 0) return {};
 
   const orgId = store.state.selectedOrganization.identifier;
   const nowMs = Date.now();
-  const searchStartTime = (props.startTime || nowMs - 86400000) * 1000;
-  const searchEndTime = (props.endTime || nowMs) * 1000;
+  const searchStartTime = window?.startTime ?? (props.startTime || nowMs - 86400000) * 1000;
+  const searchEndTime = window?.endTime ?? (props.endTime || nowMs) * 1000;
 
   // Build filter for multiple trace IDs
   const safeTraceIds = traceIds.map((id) => id.replace(/'/g, "''"));
@@ -524,25 +551,39 @@ async function fetchTraces() {
         // Every row keeps ITS OWN stream so multi-stream sessions list fully and
         // each click opens against the right stream; unresolved ids fall back to
         // the default correlation stream — today's behavior.
-        const streamById = await resolveTracesStreamsBulk(
+        const locationById = await resolveTraceLocationsBulk(
           views.map((v) => v.traceId),
           searchStartTime,
           searchEndTime,
         );
         for (const view of views as any[]) {
-          view.stream = streamById[view.traceId] ?? RUM_CORRELATION_TRACES_STREAM;
+          const location = locationById[view.traceId];
+          view.stream = location?.stream ?? RUM_CORRELATION_TRACES_STREAM;
+          view.range = location?.range;
         }
 
         // Metadata is fetched per distinct stream (usually one, at most a few).
         const idsByStream = new Map<string, string[]>();
+        const rangeById = new Map<string, TraceTimeRange | undefined>();
         for (const view of views as any[]) {
           const ids = idsByStream.get(view.stream) ?? [];
           ids.push(view.traceId);
           idsByStream.set(view.stream, ids);
+          rangeById.set(view.traceId, view.range);
         }
         const metadata: Record<string, any> = {};
         const metadataPerStream = await Promise.all(
-          [...idsByStream.entries()].map(([stream, ids]) => fetchTraceMetadata(ids, stream)),
+          [...idsByStream.entries()].map(([stream, ids]) =>
+            fetchTraceMetadata(
+              ids,
+              stream,
+              unionTraceWindow(
+                ids.map((id) => rangeById.get(id)),
+                searchStartTime,
+                searchEndTime,
+              ),
+            ),
+          ),
         );
         for (const part of metadataPerStream) Object.assign(metadata, part);
 
@@ -589,8 +630,11 @@ function openTraceDetail(view: any) {
     selectedTraceStartTime.value = Math.floor(meta.start_time / 1000) - ONE_MINUTE_US;
     selectedTraceEndTime.value = Math.ceil(meta.end_time / 1000) + ONE_MINUTE_US;
   } else {
-    selectedTraceStartTime.value = fallbackStart;
-    selectedTraceEndTime.value = fallbackEnd;
+    // The indexed range beats the session window: a trace running past the
+    // session's picker window would otherwise open truncated.
+    const window = traceQueryWindow(view.range, fallbackStart, fallbackEnd);
+    selectedTraceStartTime.value = window.startTime;
+    selectedTraceEndTime.value = window.endTime;
   }
 }
 
