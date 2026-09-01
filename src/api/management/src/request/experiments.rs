@@ -681,29 +681,30 @@ pub async fn compare_experiments(
         }
     };
     let policy = ComparisonPolicy::from_configs(&score_configs);
-    MetaHttpResponse::json(ExperimentComparisonResponseBody::from(compare_experiments(
-        CompareExperimentsInput {
-            baseline_id: baseline.id,
-            candidate_id: candidate.id,
-            dataset_id: baseline.dataset_id,
-            threshold,
-            policy: &policy,
-            scoring: ComparisonScoringState {
-                baseline: baseline_scoring,
-                candidate: candidate_scoring,
-            },
-            baseline: ComparisonEvidence {
-                slots: &baseline_slots,
-                executions: &baseline_results.executions,
-                scores: &baseline_results.scores,
-            },
-            candidate: ComparisonEvidence {
-                slots: &candidate_slots,
-                executions: &candidate_results.executions,
-                scores: &candidate_results.scores,
-            },
+    let comparison = compare_experiments(CompareExperimentsInput {
+        baseline_id: baseline.id,
+        candidate_id: candidate.id,
+        dataset_id: baseline.dataset_id,
+        threshold,
+        policy: &policy,
+        scoring: ComparisonScoringState {
+            baseline: baseline_scoring,
+            candidate: candidate_scoring,
         },
-    )))
+        baseline: ComparisonEvidence {
+            slots: &baseline_slots,
+            executions: &baseline_results.executions,
+            scores: &baseline_results.scores,
+        },
+        candidate: ComparisonEvidence {
+            slots: &candidate_slots,
+            executions: &candidate_results.executions,
+            scores: &candidate_results.scores,
+        },
+    });
+    let response = ExperimentComparisonResponseBody::from(comparison)
+        .with_trial_outputs(&baseline_results.executions, &candidate_results.executions);
+    MetaHttpResponse::json(response)
 }
 
 /// Load one pinned dataset row and every trial's current execution and score evidence.
