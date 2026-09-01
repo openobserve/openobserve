@@ -1,0 +1,19 @@
+{
+  "feature_slug": "alert-list-frequency-retries",
+  "feature_title": "Alert List Frequency & Retries Columns",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "alerts-priority-tags.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-priority-tags.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/AlertList.vue",
+    "web/src/components/alerts/AlertEvaluationHistory.vue",
+    "web/src/components/alerts/AlertSectionTabs.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

@@ -1,0 +1,10 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-priority-tags.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-priority-tags.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-history.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The dev's own diff already edits alerts-priority-tags.spec.js to assert 'Check every' is present on the default 'all' tab (line 174), so the frequency-column header restore is already covered there. The remaining WIRED behaviors — frequency cell rendering (cron/minutes/--), the column's absence on the realTime tab, the evaluation-history 'Retries' column, and the renamed section-tab labels — are not covered anywhere in the suite (grep found no o2-table-cell-frequency / retries / section-tab usage). They all belong to the same single feature area (Alerts) and reuse the same seed fixtures (seedAlertFixtures, simpleAlert, realtimeAlert) already imported by that spec, so appending new test() cases to the same file is the least-duplicative fit. playwright.config.js auto-discovers every spec under testDir, so no registry entry is needed."
+}

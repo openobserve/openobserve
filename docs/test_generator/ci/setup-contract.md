@@ -1,0 +1,86 @@
+# Test Setup Contract: Alert List Frequency & Retries Columns  (area: Alerts)
+
+Feature slug: `alert-list-frequency-retries` — see `docs/test_generator/features/alert-list-frequency-retries-feature.md`.
+
+## Streams / data the spec must establish
+
+Tag each item by SCOPE so the Engineer puts it in the right place:
+- **`[shared/read-only]`** — every test just READS it the same way → set up ONCE / use a pre-seeded stream.
+- **`[per-test]`** — only one test needs it, or a test MUTATES it → set up INSIDE that test, uniquely named.
+
+### Streams (read-only, shared)
+- `alerts_p0_stream` **[shared/read-only]** — a logs stream with fields `city` (string, group key), `latency`
+  (number, the measure), `status` (number). Used by the `simpleAlert`/`multiAlert` fixtures as `stream_name`, and
+  seeded by `seedAlertFixtures` with 3 rows. **Why:** any scheduled alert fixture needs a real stream to reference;
+  the frequency column renders regardless of stream schema, so no FTS/text field is required for THIS feature.
+
+### Alerts (the actual test data)
+- **A minute-interval scheduled alert** **[per-test: frequency cadence — interval]** — `createAlert(page, simpleAlert(name))`
+  produces `is_real_time:false`, `trigger_condition.frequency_type:"minutes"`, `frequency:10`. The list's frequency
+  cell must render **`10 Mins`**. (Helper: `tests/ui-testing/playwright-tests/Alerts/../utils/alerts-api-helpers.js`.)
+- **A cron scheduled alert** **[per-test: frequency cadence — cron]** — `createAlert(page, {...simpleAlert(name),
+  trigger_condition: { ...simpleAlert(name).trigger_condition, frequency_type: "cron", frequency: 1, cron: "*/10 * * * *" }})`.
+  The frequency cell must render the raw cron **`*/10 * * * *`**.
+- **A real-time alert** **[per-test: frequency cadence — realtime]** — `createAlert(page, realtimeAlert(name))`
+  (`is_real_time:true`). Its frequency cell must render **`--`** (and the `realTime` tab hides the whole column).
+- **A scheduled alert that has actually evaluated** **[per-test: retries column]** — create a `simpleAlert(name)`
+  against `alerts_p0_stream` with a low threshold (default `threshold:3`, all seeded `latency` ≥ 890 and
+  `status:500`, so it fires), then poll `waitForAlertOutcome(page, name)` until `last_outcome` is set (helpers
+  already ship this). Then open `alertDetail` → History → the evaluation table renders a **`Retries`** column whose
+  cells are integers (0 for a clean dogfood delivery).
+
+## How to create it (copy these EXACT patterns — do NOT invent setup)
+
+- **Ingest / seed stream + destination + template:** call `await seedAlertFixtures(page)` in `beforeEach`
+  (idempotent; creates the `alerts_p0_stream` rows + dogfood destination `auto_p0_dest` + template `auto_p0_tmpl`).
+  Reference: `tests/ui-testing/playwright-tests/Alerts/alerts-priority-tags.spec.js:62`
+  (`await seedAlertFixtures(page);`) and the helper `tests/ui-testing/playwright-tests/Alerts/../utils/alerts-api-helpers.js`
+  (`seedAlertFixtures`, `simpleAlert`, `realtimeAlert`, `createAlert`, `findAlertId`, `deleteAlerts`, `waitForAlertOutcome`, `DEST`).
+- **Create an alert via API (not the UI wizard) for cadence assertions:** `createAlert(page, payload)` →
+  `tests/ui-testing/playwright-tests/Alerts/../utils/alerts-api-helpers.js` (`api(page,'post', v2/alerts?folder=default, payload)`).
+  Import from `../utils/alerts-api-helpers.js` exactly as `alerts-priority-tags.spec.js:33` does.
+- **Auth/org:** `getOrgIdentifier()` from `../utils/cloud-auth.js`; the worker auth state is already provisioned by
+  `navigateToBase(page)`. Org id goes into every URL query (`?org_identifier=<org>`) and every API path.
+- **Navigation:** `page.goto(\`${logData.alertUrl}?org_identifier=${getOrgIdentifier()}\`)` then
+  `page.waitForLoadState('networkidle')` — same as `alerts-priority-tags.spec.js:170-171`.
+- **Cleanup:** track created names, then `deleteAlerts(page, await Promise.all(names.map(n => findAlertId(page, n))))`
+  in `afterEach` — same pattern as `alerts-priority-tags.spec.js:65-73`.
+- **Retries column navigation:** `await pm.alertsPage.openAlertDetailsDialog(alertName)` then
+  `pm.alertsPage.expectAlertDetailsHistorySectionVisible()` — reference `tests/ui-testing/playwright-tests/Alerts/alerts-scheduled-features.spec.js:301,311`;
+  or use `pm.alertDetailPage.open(id)` (direct `/web/alerts/detail/:id`) — reference `tests/ui-testing/playwright-tests/Alerts/alerts-multialert-ui.spec.js:91`.
+
+## Preconditions / toggles
+
+- Ensure the browser is on a **non-SQL / non-cloud** default: no SQL-mode toggle applies to the alert list; OSS
+  build hides the `anomalyDetection` tab (so do not assert it — it is enterprise/cloud only).
+- The "Check every" column only appears when `activeTab !== "realTime"`. Click `[data-test="alert-list-tab-all"]` /
+  `alert-list-tab-scheduled` to assert presence; `alert-list-tab-realTime` to assert absence.
+- Assert the frequency cell via `[data-test="o2-table-cell-frequency"]` (auto-generated by OTable); there is **no**
+  bespoke `data-test` on that cell. Match text exactly: cron → `*/10 * * * *`, minutes → `10 Mins`, realtime → `--`.
+
+## Gotchas (so the Healer/Engineer don't rediscover them)
+
+- **Alert list data arrives async** and the table paginates at 20 rows client-side; a freshly created alert may sit on
+  a later page. Use `pm.alertsPage.expectAlertVisibleInList(name)` (which searches to narrow the list) or search
+  first, before asserting a specific row's frequency cell. Reference: `alertsPage.js` `expectAlertVisibleInList` (1193).
+- **`expectListColumns` reads `thead` innerText**, so the header text is "Check every" (from `alerts.frequency`), not
+  "frequency". Assert `present: ['Check every']` / `absent: [... ]` accordingly — see `alerts-priority-tags.spec.js:173-176`.
+- **The frequency value lives on `row.frequency` + `row.frequency_type`, NOT on `row.trigger_condition`** — the API
+  response's `trigger_condition` is flattened into these row fields by `getAlertsFn`. Seeding via API still works
+  because the backend stores `trigger_condition` and the list mapping re-derives `frequency`. Do not assert on
+  `trigger_condition` directly in the DOM.
+- **`frequency_type` must be the exact string `"cron"`** for the verbatim-cron branch; `"minutes"` and `"interval"`
+  both fall through to `frequencyMins` ("N Mins"). If a cron alert renders "N Mins", the seed's `frequency_type` is wrong.
+- **Retries > 0 requires a FAILED delivery**, which needs a destination that rejects/errors. The dogfood destination
+  (`auto_p0_dest` → this instance's own ingest) succeeds, so retries will be `0`. Assert the column header + an
+  integer cell (`0`); do **NOT** write an E2E assertion that a specific row shows `>0` (park as `test.fixme` with a
+  comment "requires a failing destination"). The `—` (null) branch is defensive-only and never delivered by the API.
+- **The evaluation history fetch is scoped by time-range** (default `1h`) and `alert_id`. An alert that has not run in
+  the last hour returns `total: 0` → the empty state, not rows. Use `waitForAlertOutcome` first to guarantee a recent
+  evaluation before opening the detail page.
+- **Simple vs composite history layout differs**: simple alerts show a "Evaluations / Level changes" toggle
+  (`[data-test="alerts-alertdetail-history-view"]`) with Evaluations default; composite alerts render
+  `AlertEvaluationHistory` directly. The retries column exists in both, but the composite path has no toggle.
+- **The section-tab strip labels are i18n-driven**; assert the English text ("Notification Destinations",
+  "Alert Library") only when the default locale is en-US. The tabs also render in the nav rail with the SAME labels —
+  do not assert `"Destinations"` / `"Library"` (those `sectionTab` keys were deleted).

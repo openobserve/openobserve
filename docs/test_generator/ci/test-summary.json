@@ -1,0 +1,22 @@
+[
+  {
+    "title": "frequency cell renders the cadence for cron, minute-interval and real-time alerts",
+    "action": "append",
+    "verifies": "the restored Check every cell renders the raw cron string, \"10 Mins\", and \"--\" per alert type"
+  },
+  {
+    "title": "Check every column is present on scheduled and absent on the realTime tab",
+    "action": "append",
+    "verifies": "the frequency column is rendered on the scheduled tab and removed on the realTime tab"
+  },
+  {
+    "title": "evaluation history shows a Retries column with a numeric value",
+    "action": "append",
+    "verifies": "the per-alert evaluation history shows a Retries column with a numeric (0) cell"
+  },
+  {
+    "title": "the alert section tab strip shows the renamed labels",
+    "action": "append",
+    "verifies": "the section tab strip shows Notification Destinations and Alert Library in the expected order"
+  }
+]
