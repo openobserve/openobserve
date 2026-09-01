@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- < md the header wraps into tidy rows instead of truncating the
            count chip against the pager. -->
       <div
-        class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-1"
+        class="border-card-glass-border bg-card-glass-bg flex h-auto min-h-9 shrink-0 flex-wrap items-center gap-y-1 border-b py-0.5"
       >
         <!-- Field panel toggle — same style as add-panel config sidebar.
              < md the field list is a drawer, so this button opens it instead

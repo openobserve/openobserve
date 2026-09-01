@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- < md the toolbar wraps so the mode toggle and the run/date controls each
          get a full row instead of the right group squeezing the left to nothing. -->
     <div
-      class="border-border-default m-0! flex w-full items-center justify-between border-b p-1.5 max-md:flex-wrap max-md:gap-y-1"
+      class="border-border-default m-0! flex w-full flex-wrap items-center justify-between gap-y-1 border-b p-1.5"
     >
       <div
         ref="toolbarLeftRef"
