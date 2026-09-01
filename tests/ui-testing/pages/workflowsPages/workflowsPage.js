@@ -141,12 +141,8 @@ class WorkflowsPage {
     this.destHeaderKeyField = (key = '') => `[data-test="add-destination-header-${key}-key-input-field"]`;
     this.destHeaderValueField = (key = '') => `[data-test="add-destination-header-${key}-value-input-field"]`;
     this.triggerBody = '[data-test="workflow-trigger-body"]';
-    this.triggerStructure = '[data-test="workflow-trigger-structure"]';
     this.triggerVariantTrigger = '[data-test="workflow-trigger-sample-variant-trigger"]';
     this.triggerVariantOption = '[data-test="workflow-trigger-sample-variant-option"]';
-    this.triggerCommonStructure = '[data-test="workflow-trigger-common-structure"]';
-    this.triggerSpecificStructure = '[data-test="workflow-trigger-specific-structure"]';
-    this.triggerNoExtras = '[data-test="workflow-trigger-no-extras"]';
     // Condition node body + the shared ConditionBuilder. OFormSelect/OFormInput
     // bind {...$attrs} onto OSelect/OInput, so the consumer data-test lands on the
     // wrapper and the interactive child is `-trigger` (select) / `-field` (input).
@@ -408,11 +404,6 @@ class WorkflowsPage {
     await this.pickSelectOption(this.triggerVariantTrigger, this.triggerVariantOption, eventType);
   }
 
-  /** Incident kinds split the payload into common + event-specific blocks. */
-  async expectSplitPayloadView() {
-    await expect(this.page.locator(this.triggerCommonStructure)).toBeVisible();
-  }
-
   /**
    * The trigger's payload as TEXT, independent of how it is laid out: main renders
    * a common + event-specific pair, while an in-flight UX branch merges them into a
@@ -437,15 +428,6 @@ class WorkflowsPage {
         .map((ed) => ed.getValue())
         .join('\n');
     });
-  }
-
-  /** An event_type whose `extras` are {} shows the no-extras note instead. */
-  async expectNoExtrasNote() {
-    await expect(this.page.locator(this.triggerNoExtras)).toBeVisible();
-  }
-
-  async expectSpecificStructure() {
-    await expect(this.page.locator(this.triggerSpecificStructure)).toBeVisible();
   }
 
   // ---------- condition node ----------
