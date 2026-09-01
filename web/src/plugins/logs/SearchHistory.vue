@@ -385,8 +385,10 @@ export default defineComponent({
       if (ALLOWED_HISTORY_STREAM_TYPES.includes(fromRoute)) return fromRoute;
       return searchObj.data.stream.streamType || "logs";
     });
-    const activeStreamName = computed(
-      () => (route.query.stream as string) || searchObj.data.stream.selectedStream[0] || "",
+    const activeStreamName = computed(() =>
+      route.query.stream === undefined
+        ? searchObj.data.stream.selectedStream[0] || ""
+        : (route.query.stream as string),
     );
 
     const activeTab = ref("query");
