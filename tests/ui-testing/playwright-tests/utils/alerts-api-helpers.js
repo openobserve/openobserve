@@ -68,6 +68,21 @@ function multiAlert(name) {
   return a;
 }
 
+/** A SQL multi alert: SQL query condition with the per-group opt-in and pinned having shape. */
+function sqlMultiAlert(name) {
+  const a = simpleAlert(name);
+  a.query_condition.type = 'sql';
+  a.query_condition.sql = 'SELECT latency FROM "alerts_p0_stream"';
+  a.query_condition.aggregation = {
+    function: 'count',
+    group_by: [],
+    multi_alert: true,
+    having: { column: 'latency', operator: '>', value: 500 },
+  };
+  a.trigger_condition.threshold = 1;
+  return a;
+}
+
 /** Grouped, but the multi_alert flag is deliberately absent — must stay a simple alert. */
 function groupedSimpleAlert(name) {
   const a = simpleAlert(name);
@@ -228,7 +243,7 @@ function isFiringOutcome(outcome) {
 module.exports = {
   BASE, STREAM, SINK, TMPL, DEST,
   uniq, urls, api,
-  simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert,
+  simpleAlert, multiAlert, sqlMultiAlert, groupedSimpleAlert, realtimeAlert,
   compositeAlert, validateComposite, getCompositeReferences,
   createAlert, listAlerts, findAlertId, getAlert, deleteAlerts, seedAlertFixtures,
   ingest, getAlertGroups, getAlertTransitions,

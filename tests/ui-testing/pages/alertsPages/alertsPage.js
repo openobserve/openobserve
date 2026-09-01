@@ -121,6 +121,16 @@ export class AlertsPage {
             alertDestinationsSelect: '[data-test="alert-destinations-select"]',
             // Alerts 4.0 (multi-alerts) — Simple/Multi toggle choice group
             alertMultiToggleChoice: '[data-test="alerts-alertmultitoggle-choice"]',
+            // Alerts 4.0 — SQL Multi Alert condition block (SQL-tab Simple/Multi)
+            alertSqlAggColumnSelect: '[data-test="alert-sql-agg-column-select"]',
+            alertSqlAggColumnOption: '[data-test="alert-sql-agg-column-select-option"]',
+            alertSqlAggColumnTrigger: '[data-test="alert-sql-agg-column-select-trigger"]',
+            alertSqlAggColumnError: '[data-test="alert-sql-agg-column-select-error"]',
+            alertSqlAggOperatorSelect: '[data-test="alert-sql-agg-operator-select"]',
+            alertSqlAggOperatorOption: '[data-test="alert-sql-agg-operator-select-option"]',
+            alertSqlAggValueInputField: '[data-test="alert-sql-agg-value-input-field"]',
+            alertSqlHavingClauseWarning: '[data-test="alert-sql-having-clause-warning"]',
+            alertTriggerThresholdInput: '[data-test="alert-trigger-threshold-input"]',
             // Alerts 4.0 — priority & tags (Feature 2)
             prioritySelect: '[data-test="alert-priority-select"]',
             tagsInput: '[data-test="alert-tags-input"]',
@@ -1207,6 +1217,110 @@ export class AlertsPage {
         await expect(choice).toBeVisible({ timeout: 15000 });
         await expect(choice.locator('[role="radio"][data-test-value="true"]')).toHaveAttribute('aria-checked', 'true', { timeout: 10000 });
         await expect(choice.locator('[role="radio"][data-test-value="false"]')).toHaveAttribute('aria-checked', 'false');
+    }
+
+    // ==================== SQL MULTI ALERT (SQL-tab Simple/Multi) HELPERS ====================
+
+    /**
+     * Select the "Multi" option of the SQL-tab Simple/Multi toggle and assert it took
+     * effect (Reka-ui radio exposes aria-checked, not input.checked).
+     */
+    async selectMultiAlertMode() {
+        const choice = this.page.locator(this.locators.alertMultiToggleChoice);
+        await expect(choice).toBeVisible({ timeout: 15000 });
+        await choice.locator('[role="radio"][data-test-value="true"]').click();
+        await expect(choice.locator('[role="radio"][data-test-value="true"]')).toHaveAttribute('aria-checked', 'true', { timeout: 10000 });
+        testLogger.info('Selected Multi alert mode (SQL tab)');
+    }
+
+    /** Assert the Simple "No. of events" threshold input is visible (Simple mode active). */
+    async expectSimpleNoOfEventsRowVisible() {
+        await expect(this.page.locator(this.locators.alertTriggerThresholdInput)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Simple "No. of events" row is visible');
+    }
+
+    /** Assert the Simple "No. of events" threshold input is hidden (Multi mode swapped it out). */
+    async expectSimpleNoOfEventsRowHidden() {
+        await expect(this.page.locator(this.locators.alertTriggerThresholdInput)).not.toBeVisible({ timeout: 10000 });
+        testLogger.info('Simple "No. of events" row is hidden');
+    }
+
+    /** Assert the SQL multi value-column dropdown ("Alert if [column]") is visible. */
+    async expectSqlAggColumnSelectVisible() {
+        await expect(this.page.locator(this.locators.alertSqlAggColumnSelect)).toBeVisible({ timeout: 10000 });
+        testLogger.info('SQL multi value-column dropdown is visible');
+    }
+
+    /** Assert the SQL multi value-column dropdown is not rendered (Simple mode). */
+    async expectSqlAggColumnSelectHidden() {
+        await expect(this.page.locator(this.locators.alertSqlAggColumnSelect)).not.toBeVisible({ timeout: 10000 });
+        testLogger.info('SQL multi value-column dropdown is hidden');
+    }
+
+    /**
+     * Pick a value column from the SQL multi column dropdown. Options arrive async
+     * from /result_schema, so the option visibility assertion carries a generous timeout.
+     * @param {string} column - The projection name to select (e.g. "latency").
+     */
+    async selectSqlAggColumn(column) {
+        await openOSelectDropdown(this.page, this.page.locator(this.locators.alertSqlAggColumnSelect));
+        const option = this.page.locator(`${this.locators.alertSqlAggColumnOption}[data-test-value="${column}"]`);
+        await expect(option).toBeVisible({ timeout: 20000 });
+        await option.click();
+        testLogger.info('Selected SQL multi value column', { column });
+    }
+
+    /**
+     * Pick the having operator from the SQL multi operator dropdown.
+     * @param {string} operator - One of "=", "!=", ">=", ">", "<=", "<".
+     */
+    async selectSqlAggOperator(operator) {
+        await openOSelectDropdown(this.page, this.page.locator(this.locators.alertSqlAggOperatorSelect));
+        const option = this.page.locator(`${this.locators.alertSqlAggOperatorOption}[data-test-value="${operator}"]`);
+        await expect(option).toBeVisible({ timeout: 10000 });
+        await option.click();
+        testLogger.info('Selected SQL multi having operator', { operator });
+    }
+
+    /** Fill the SQL multi having value (critical threshold). */
+    async fillSqlAggValue(value) {
+        const input = this.page.locator(this.locators.alertSqlAggValueInputField);
+        await input.waitFor({ state: 'visible', timeout: 5000 });
+        await input.click();
+        await this.page.keyboard.press('Control+a');
+        await this.page.keyboard.press('Backspace');
+        await input.fill(String(value));
+        testLogger.info('Filled SQL multi having value', { value });
+    }
+
+    /** Assert the value-column dropdown shows `column` as the selected value. */
+    async expectSqlAggColumnSelected(column) {
+        const trigger = this.page.locator(this.locators.alertSqlAggColumnTrigger);
+        await expect(trigger).toBeVisible({ timeout: 15000 });
+        await expect(trigger).toHaveAttribute('data-test-selected-value', column, { timeout: 10000 });
+        testLogger.info('SQL multi value column is selected', { column });
+    }
+
+    /** Assert the value-column dropdown selection was cleared (empty selected value). */
+    async expectSqlAggColumnCleared() {
+        const trigger = this.page.locator(this.locators.alertSqlAggColumnTrigger);
+        await expect(trigger).toBeVisible({ timeout: 15000 });
+        await expect(trigger).toHaveAttribute('data-test-selected-value', '', { timeout: 10000 });
+        testLogger.info('SQL multi value column selection is cleared');
+    }
+
+    /** Assert the "value column required" inline error is visible (Multi + no column). */
+    async expectSqlAggColumnRequiredError() {
+        const err = this.page.locator(this.locators.alertSqlAggColumnError);
+        await expect(err).toBeVisible({ timeout: 10000 });
+        await expect(err).toContainText('Column is required', { timeout: 5000 });
+        testLogger.info('SQL multi value-column required error is visible');
+    }
+
+    /** Assert the HAVING-clause warning banner is visible (user SQL carries its own HAVING). */
+    async expectSqlHavingClauseWarningVisible() {
+        await expect(this.page.locator(this.locators.alertSqlHavingClauseWarning)).toBeVisible({ timeout: 15000 });
+        testLogger.info('SQL HAVING-clause warning banner is visible');
     }
 
     // ==================== ALERTS 4.0 (PRIORITY & TAGS) HELPERS ====================
