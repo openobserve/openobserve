@@ -499,8 +499,7 @@ describe("AlertsDestinationList", () => {
     });
   });
 
-  // Email destinations persist recipients in emails[], not url. The URL
-  // column must show those recipients; Method is an HTTP field and stays blank.
+  // Email destinations store recipients in emails[]; URL shows them and Method stays blank.
   describe("email destination URL and method cells", () => {
     const emailDest = makeDestination(4, {
       name: "email-ops",
@@ -535,9 +534,7 @@ describe("AlertsDestinationList", () => {
       expect(wrapper!.find('[data-test="destination-url-destination-1"]').text()).toBe(
         "https://example.com/hook-1",
       );
-      expect(wrapper!.find('[data-test="destination-method-destination-1"]').text()).toBe(
-        "POST",
-      );
+      expect(wrapper!.find('[data-test="destination-method-destination-1"]').text()).toBe("POST");
     });
 
     it("labels the column URL / Recipients, not URL", () => {
