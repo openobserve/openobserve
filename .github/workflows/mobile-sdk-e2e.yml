@@ -170,7 +170,7 @@ jobs:
     name: Decide platforms
     needs: preflight
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 12
     outputs:
       run_android: ${{ steps.d.outputs.run_android }}
       run_ios: ${{ steps.d.outputs.run_ios }}
@@ -266,20 +266,54 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BINARY_ARTIFACT: release-ci-binary-${{ github.sha }}
           FRONTEND_ARTIFACT: frontend-dist-${{ github.sha }}
+          SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
+          artifacts_ready() {
+            local run_id="$1"
+            gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" \
+              --jq "[.artifacts[] | select(.expired == false and (.name == \"${BINARY_ARTIFACT}\" or .name == \"${FRONTEND_ARTIFACT}\"))] | length" \
+              2>/dev/null || echo 0
+          }
+
           RUN_ID=$(gh api --method GET \
             "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${BINARY_ARTIFACT}&per_page=100" \
-            --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | last | .workflow_run.id // empty')
+            --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | last | .workflow_run.id // empty' \
+            2>/dev/null || true)
 
           if [ -n "$RUN_ID" ]; then
-            HAS_FRONTEND=$(gh api --method GET \
-              "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}/artifacts?per_page=100" \
-              --jq "[.artifacts[] | select(.expired == false and .name == \"${FRONTEND_ARTIFACT}\")] | length")
-          else
-            HAS_FRONTEND=0
+            READY=$(artifacts_ready "$RUN_ID")
+            [ "$READY" -ge 2 ] || RUN_ID=''
           fi
 
-          if [ -n "$RUN_ID" ] && [ "$HAS_FRONTEND" -gt 0 ]; then
+          # When both workflows started for the same PR update, Mobile reaches this
+          # resolver before Playwright finishes its ~3-7 minute build. Wait for that
+          # active run instead of immediately starting a duplicate ~35 minute cold build.
+          if [ -z "$RUN_ID" ]; then
+            PLAYWRIGHT_RUN_ID=$(gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/playwright.yml/runs?head_sha=${SOURCE_HEAD_SHA}&per_page=20" \
+              --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | first | .id // empty' \
+              2>/dev/null || true)
+
+            if [ -n "$PLAYWRIGHT_RUN_ID" ]; then
+              echo "Waiting for Playwright run $PLAYWRIGHT_RUN_ID to publish exact-SHA artifacts"
+              for _ in $(seq 1 40); do
+                READY=$(artifacts_ready "$PLAYWRIGHT_RUN_ID")
+                if [ "$READY" -ge 2 ]; then
+                  RUN_ID="$PLAYWRIGHT_RUN_ID"
+                  break
+                fi
+
+                STATUS=$(gh api --method GET \
+                  "repos/${GITHUB_REPOSITORY}/actions/runs/${PLAYWRIGHT_RUN_ID}" \
+                  --jq '.status' 2>/dev/null || true)
+                [ "$STATUS" = "completed" ] && break
+                sleep 15
+              done
+            fi
+          fi
+
+          if [ -n "$RUN_ID" ]; then
             echo "reuse=true" >> "$GITHUB_OUTPUT"
             echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
             echo "Reusing Playwright artifacts from run $RUN_ID for $GITHUB_SHA"
@@ -523,10 +557,13 @@ jobs:
         working-directory: tests/mobile-testing/apps/o2-rum-tester
         run: |
           if [ -n "$O2_RN_SDK_VERSION" ]; then
-            npm install "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
+            npm install --legacy-peer-deps \
+                        "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
                         "@openobserve/mobile-react-native-session-replay@$O2_RN_SDK_VERSION"
           else
-            npm ci || npm install
+            # RN 0.87 declares optional React 19 types while this compatibility
+            # fixture intentionally remains on React 18; honor the committed lock.
+            npm ci --legacy-peer-deps || npm install --legacy-peer-deps
           fi
           # Release build: embeds the JS bundle (Debug loads it from the Metro dev server, which
           # isn't running in CI → blank screen). The release buildType is debug-signed in the RN
@@ -716,10 +753,11 @@ jobs:
         working-directory: tests/mobile-testing/apps/o2-rum-tester
         run: |
           if [ -n "$O2_RN_SDK_VERSION" ]; then
-            npm install "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
+            npm install --legacy-peer-deps \
+                        "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
                         "@openobserve/mobile-react-native-session-replay@$O2_RN_SDK_VERSION"
           else
-            npm ci || npm install
+            npm ci --legacy-peer-deps || npm install --legacy-peer-deps
           fi
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true" ios/O2RumTester/Info.plist || true
           (cd ios && pod install)
