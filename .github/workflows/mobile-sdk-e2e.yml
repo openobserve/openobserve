@@ -292,7 +292,7 @@ jobs:
           if [ -z "$RUN_ID" ]; then
             PLAYWRIGHT_RUN_ID=$(gh api --method GET \
               "repos/${GITHUB_REPOSITORY}/actions/workflows/playwright.yml/runs?head_sha=${SOURCE_HEAD_SHA}&per_page=20" \
-              --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | first | .id // empty' \
+              --jq '[.workflow_runs[] | select(.status != "completed")] | first | .id // empty' \
               2>/dev/null || true)
 
             if [ -n "$PLAYWRIGHT_RUN_ID" ]; then
