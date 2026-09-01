@@ -247,8 +247,8 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         testLogger.info('PASSED: Both streams cross-links visible in UNION ALL SQL query');
     });
 
-    // P1: Network verification — multiple result_schema calls for multi-stream
-    test("should fire separate result_schema calls for each stream in multi-stream mode", {
+    // P1: Network verification — one result_schema call covering every selected stream
+    test("should fire one result_schema call covering both streams in multi-stream mode", {
         tag: ['@crossLinking', '@multiStream', '@functional', '@P1', '@all']
     }, async ({ page }) => {
         testLogger.info('Testing network calls for multi-stream cross-links');
@@ -262,7 +262,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         page.on('request', (request) => {
             const url = request.url();
             if (url.includes('result_schema') && url.includes('cross_linking=true')) {
-                resultSchemaRequests.push(url);
+                resultSchemaRequests.push({ url, payload: request.postData() || '' });
             }
         });
 
@@ -270,17 +270,24 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await pm.logsPage.runQueryAndWaitForResults();
         await page.waitForTimeout(3000);
 
-        // Step 4: Verify multiple result_schema calls were fired
+        // Step 4: Verify the cross-linking call fired for the union query
         testLogger.info('result_schema calls captured', {
             count: resultSchemaRequests.length,
-            urls: resultSchemaRequests
+            urls: resultSchemaRequests.map((r) => r.url)
         });
 
+        // Multi-stream search is one UNION ALL BY NAME query, so cross-linking needs a
+        // single result_schema call — the backend resolves every table in the query and
+        // merges their links (see resolve_stream_names in the cross_linking branch).
         expect(resultSchemaRequests.length,
-            'Should fire at least 2 result_schema calls for 2 streams'
-        ).toBeGreaterThanOrEqual(2);
+            'Should fire exactly one result_schema call for the union query'
+        ).toBe(1);
 
-        testLogger.info('PASSED: Multiple result_schema calls verified for multi-stream');
+        const payload = resultSchemaRequests[0]?.payload || '';
+        expect(payload, `result_schema payload should query ${STREAM_A}`).toContain(STREAM_A);
+        expect(payload, `result_schema payload should query ${STREAM_B}`).toContain(STREAM_B);
+
+        testLogger.info('PASSED: single result_schema call covers both streams');
     });
 
     // P1: Dashboard table panel — single stream cross-link in drilldown menu
