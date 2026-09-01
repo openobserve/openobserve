@@ -7991,6 +7991,7 @@
     "delete": "删除",
     "method": "Method",
     "url": "URL",
+    "urlOrRecipients": "URL / 收件人",
     "api_header": "Header",
     "api_header_value": "Value",
     "skip_tls_verify": "跳过 TLS 验证",

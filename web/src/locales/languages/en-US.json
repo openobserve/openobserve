@@ -7993,6 +7993,7 @@
     "delete": "Delete",
     "method": "Method",
     "url": "URL",
+    "urlOrRecipients": "URL / Recipients",
     "api_header": "Header",
     "api_header_value": "Value",
     "skip_tls_verify": "Skip TLS Verify",

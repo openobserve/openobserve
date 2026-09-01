@@ -7991,6 +7991,7 @@
     "delete": "Xóa",
     "method": "Phương thức",
     "url": "URL",
+    "urlOrRecipients": "URL / Người nhận",
     "api_header": "Tiêu đề",
     "api_header_value": "Giá trị",
     "skip_tls_verify": "Bỏ qua xác thực TLS",

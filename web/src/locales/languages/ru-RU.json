@@ -7991,6 +7991,7 @@
     "delete": "Удалить",
     "method": "Метод",
     "url": "URL",
+    "urlOrRecipients": "URL / Получатели",
     "api_header": "Заголовок",
     "api_header_value": "Значение",
     "skip_tls_verify": "Пропустить проверку TLS",
