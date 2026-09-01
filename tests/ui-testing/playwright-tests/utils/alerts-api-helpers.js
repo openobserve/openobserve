@@ -72,7 +72,7 @@ function multiAlert(name) {
 function sqlMultiAlert(name) {
   const a = simpleAlert(name);
   a.query_condition.type = 'sql';
-  a.query_condition.sql = 'SELECT latency FROM "alerts_p0_stream"';
+  a.query_condition.sql = 'SELECT latency FROM "alerts_p0_stream" GROUP BY latency';
   a.query_condition.aggregation = {
     function: 'count',
     group_by: [],

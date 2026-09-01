@@ -6,9 +6,10 @@
  * Drives the SQL tab's Simple vs Multi choice end-to-end (the surface the
  * grouped `alerts-multialert-ui.spec.js` does not touch): toggle → value-column
  * dropdown (sourced from the query's own /result_schema projections) →
- * operator/value → save. On save the payload pins `function = "count"`,
- * `group_by = []`, and the M-10 any-group-count gate (threshold >= 1); Simple
- * mode drops `aggregation` entirely.
+ * operator/value → save. On save the payload pins `function = "count"`, and the
+ * backend derives `group_by` from the SQL query's own GROUP BY clause (the
+ * M-10 any-group-count gate, threshold >= 1); Simple mode drops `aggregation`
+ * entirely. A SQL multi alert therefore requires a GROUP BY in the query.
  *
  * All headline behaviours are WIRED per the reachability trace, so every
  * scenario is a normal green test. The stream + destination are seeded by
@@ -68,7 +69,7 @@ test.describe('Alerts SQL Multi Alert testcases', {
     await page.goto(`${BASE}/web/alerts?org_identifier=${getOrgIdentifier()}`);
 
     await pm.alertsPage.setupScheduledAlertWizardToStep2(STREAM, name);
-    await pm.alertsPage.runSqlAndCloseEditor(`SELECT latency FROM "${STREAM}"`);
+    await pm.alertsPage.runSqlAndCloseEditor(`SELECT latency FROM "${STREAM}" GROUP BY latency`);
     await pm.alertsPage.removeResidualPortals();
 
     await pm.alertsPage.selectMultiAlertMode();
@@ -90,7 +91,7 @@ test.describe('Alerts SQL Multi Alert testcases', {
     const stored = await getAlert(page, id);
     expect(stored, 'getAlert must return the saved alert').not.toBeNull();
     expect(stored.query_condition.aggregation.function).toBe('count');
-    expect(stored.query_condition.aggregation.group_by).toEqual([]);
+    expect(stored.query_condition.aggregation.group_by).toEqual(['latency']);
     expect(stored.query_condition.aggregation.multi_alert).toBe(true);
     expect(stored.query_condition.aggregation.having.column).toBe('latency');
     expect(stored.trigger_condition.threshold).toBeGreaterThanOrEqual(1);

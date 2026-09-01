@@ -1,9 +1,0 @@
-[
-  { "title": "should create a SQL multi alert end-to-end and pin the payload", "action": "new", "verifies": "the Multi flow saves a SQL multi alert and pins function=count, group_by=[], threshold>=1" },
-  { "title": "should swap the Simple \"No. of events\" row for the \"Alert if [column]\" row when Multi is chosen", "action": "new", "verifies": "the Simple/Multi toggle swaps the SQL condition row deterministically" },
-  { "title": "should show the Multi toggle selected and the stored column when editing a SQL multi alert", "action": "new", "verifies": "edit mode hydrates the Multi radio and pre-populated value column" },
-  { "title": "should save a Simple SQL count alert with aggregation dropped to null", "action": "new", "verifies": "Simple SQL count parity drops aggregation on save" },
-  { "title": "should block save with a required-column error when Multi has no value column", "action": "new", "verifies": "Multi + empty value column blocks save and shows the inline error" },
-  { "title": "should show the HAVING-clause warning banner when the user SQL carries its own HAVING", "action": "new", "verifies": "a query with its own HAVING shows the warning banner" },
-  { "title": "should clear the chosen column when the query edit drops that projection", "action": "new", "verifies": "editing the query to drop a projection clears the stale column selection" }
-]

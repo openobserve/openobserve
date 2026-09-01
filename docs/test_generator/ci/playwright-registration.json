@@ -1,6 +1,0 @@
-{
-  "group": "Alerts",
-  "spec_filename": "alerts-sql-multi-alert.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}

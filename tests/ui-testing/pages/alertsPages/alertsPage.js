@@ -3622,7 +3622,7 @@ export class AlertsPage {
         // Select stream via OSelect popover with deterministic waits (cloud may load streams slowly)
         const popoverSelector = `${this.locators.streamNameDropdown}-popover`;
         const searchSelector = `${this.locators.streamNameDropdown}-search`;
-        const optionByValue = `${this.locators.streamNameDropdown}-option[data-test-value="${streamName}"]`;
+        const optionByValue = `${this.locators.streamNameOption}[data-test-value="${streamName}"]`;
         let streamSelected = false;
         for (let attempt = 0; attempt < 3 && !streamSelected; attempt++) {
             await this.page.locator(this.locators.streamNameDropdown).click();
