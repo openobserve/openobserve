@@ -85,8 +85,12 @@
                 :data-test="`oncall-preset-field-${row.key}-name`"
                 @update:model-value="(v: string) => setField(row, row.titleField, v)"
               />
-              <OText v-else variant="body-strong">{{ row.title }}</OText>
-              <OText v-if="row.help" variant="meta">{{ row.help }}</OText>
+              <span v-else class="flex items-center gap-1">
+                <OText variant="body-strong">{{ row.title }}</OText>
+                <OIcon v-if="row.help" name="info" size="sm" class="text-icon-color cursor-pointer">
+                  <OTooltip :content="row.help" side="right" />
+                </OIcon>
+              </span>
             </span>
 
             <!-- The catch-all is a DEFAULT, not a blank: it already covers the
@@ -236,14 +240,17 @@
               :options="optionsFor(input)"
               :searchable="input.kind === 'timezone'"
               :label="raw(input.label)"
-              :help-text="raw(input.description)"
               :placeholder="t('oncall.presetTimezoneTeamShort')"
               clearable
               size="sm"
               width="md"
               :data-test="`oncall-preset-field-${input.field}`"
               @update:model-value="(v: SelectModelValue) => (model[input.field] = v)"
-            />
+            >
+              <template #tooltip>
+                <OTooltip side="right" :content="raw(input.description)" />
+              </template>
+            </OSelect>
             <OInput
               v-if="anchorInput"
               :key="anchorInput.field"
@@ -251,10 +258,13 @@
               width="md"
               :model-value="anchorLocal"
               :label="raw(anchorInput.label)"
-              :help-text="raw(anchorInput.description)"
               :data-test="`oncall-preset-field-${anchorInput.field}`"
               @update:model-value="setAnchor"
-            />
+            >
+              <template #tooltip>
+                <OTooltip side="right" :content="raw(anchorInput.description)" />
+              </template>
+            </OInput>
           </div>
         </div>
 
@@ -322,6 +332,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue, SelectOption } from "@/lib/forms/Select/OSelect.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import oncallService from "@/services/oncall";
 import type { OnCallTeamMember, PresetDescriptor, PresetInput } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";

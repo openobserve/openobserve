@@ -12622,7 +12622,7 @@
     "presetWhenUntil": "Mon 00:00 up to {day} {time}",
     "presetMembersEmpty": "Nobody yet",
     "presetMembersMore": "{names} +{count}",
-    "presetCatchAllDefault": "Covered by everyone above, in the order they were named",
+    "presetCatchAllDefault": "Covered by everyone above",
     "presetOverride": "Name them instead",
     "presetDefaults": "Defaults",
     "presetDefaultsSentence": "Timezone {zone} · hand over {handover} · first shift {anchor}",
