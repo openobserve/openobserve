@@ -49,6 +49,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("statusPages.newPage") }}
       </OButton>
       <OButton
+        v-else-if="activeSection === 'variables'"
+        size="sm"
+        variant="primary"
+        data-test="synthetic-monitoring-add-variable-btn"
+        @click="variablesTabRef?.addVariable()"
+      >
+        {{ t("synthetics.variables.newButton") }}
+      </OButton>
+      <OButton
         v-else
         size="sm"
         variant="primary"
@@ -105,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- ── VARIABLES TAB ── every scope, selected from its own rail -->
-      <SyntheticsVariablesTab v-if="activeSection === 'variables'" />
+      <SyntheticsVariablesTab v-if="activeSection === 'variables'" ref="variablesTabRef" />
 
       <!-- RIGHT MAIN: filter bar + table -->
       <div v-if="activeSection === 'checks'" class="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -655,6 +664,7 @@ const initialSection = ((): SyntheticsSection => {
   if (s === "variables") return "variables";
   return "checks";
 })();
+const variablesTabRef = ref<InstanceType<typeof SyntheticsVariablesTab> | null>(null);
 const activeSection = ref<SyntheticsSection>(initialSection);
 // Private Locations data is never fetched on initial render (only on manual
 // refresh or after a delete) — load it the first time the tab is actually

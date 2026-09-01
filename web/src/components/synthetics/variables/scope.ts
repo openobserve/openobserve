@@ -65,6 +65,28 @@ export function duplicateNameFor(source: string): string {
 }
 
 /**
+ * The default name offered when duplicating a variable.
+ *
+ * Upper-cased suffix, unlike [`duplicateNameFor`]: the server normalizes every
+ * variable name to upper case, so offering `_copy` would show the user a name
+ * they never get. Environment names are not normalized, hence the two helpers.
+ */
+export function duplicateVariableNameFor(source: string): string {
+  return `${source}_COPY`;
+}
+
+/**
+ * The prefill handed to the create form when duplicating a secret.
+ *
+ * Everything but the value, which no client ever holds. `has_value` is cleared
+ * so the form cannot offer the Replace affordance for a value that is not
+ * being carried over — the copy has to be given one by someone who knows it.
+ */
+export function duplicatePrefill(source: SyntheticsVariable): SyntheticsVariable {
+  return { ...source, name: duplicateVariableNameFor(source.name), has_value: false };
+}
+
+/**
  * What the duplicate dialog promises, given what the source holds.
  *
  * The secret count is called out separately because those arrive unset. Saying

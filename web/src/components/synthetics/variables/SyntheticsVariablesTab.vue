@@ -27,61 +27,13 @@ production - the most frequent movement here - costs no network call.
         :environments="environments"
         :global-count="globals.length"
         @new-environment="openCreateEnvironment"
+        @edit="openEditEnvironment"
+        @duplicate="openDuplicateEnvironment"
+        @delete="removeEnvironment"
       />
     </div>
 
     <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
-      <div
-        class="border-border-default flex items-start justify-between gap-3 border-b px-4 py-3"
-        data-test="synthetics-scope-header"
-      >
-        <div class="min-w-0">
-          <h2 class="text-text-heading m-0 truncate text-lg font-semibold">
-            {{ scope.isGlobal ? t("synthetics.variables.global") : scope.environment?.name }}
-          </h2>
-          <p class="text-text-secondary m-0 text-sm">
-            {{
-              scope.isGlobal
-                ? t("synthetics.variables.globalSubtitle")
-                : t("synthetics.environments.usedByChecks", {
-                    n: scope.environment?.checks_count ?? 0,
-                  })
-            }}
-          </p>
-        </div>
-
-        <!-- Global's actions are ABSENT, not disabled: there is no entity
-             behind it, and a disabled control implies one that exists. -->
-        <div class="flex shrink-0 items-center gap-2">
-          <template v-if="!scope.isGlobal">
-            <OButton
-              variant="outline"
-              size="sm"
-              icon-left="edit"
-              data-test="synthetics-scope-edit-btn"
-              @click="openEditEnvironment"
-              >{{ t("common.edit") }}</OButton
-            >
-            <OButton
-              variant="outline"
-              size="sm"
-              icon-left="content-copy"
-              data-test="synthetics-scope-duplicate-btn"
-              @click="duplicateDialogOpen = true"
-              >{{ t("synthetics.duplicate.action") }}</OButton
-            >
-          </template>
-          <OButton
-            variant="primary"
-            size="sm"
-            icon-left="add"
-            data-test="synthetics-scope-add-variable-btn"
-            @click="addVariable"
-            >{{ t("synthetics.variables.add") }}</OButton
-          >
-        </div>
-      </div>
-
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <SyntheticsVariablesList
           ref="listRef"
@@ -89,6 +41,8 @@ production - the most frequent movement here - costs no network call.
           :loading="loading"
           :environment="scope.isGlobal ? null : (scope.environment?.name ?? null)"
           :environments="environments"
+          :scope-label="scopeLabel"
+          :scope-summary="scopeSummary"
           @refresh="refresh"
         />
       </div>
@@ -103,7 +57,7 @@ production - the most frequent movement here - costs no network call.
 
     <SyntheticsDuplicateEnvironmentDialog
       v-model:open="duplicateDialogOpen"
-      :source="scope.environment"
+      :source="duplicateSource"
       @done="onDuplicated"
     />
   </div>
@@ -113,8 +67,8 @@ production - the most frequent movement here - costs no network call.
 import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
-import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import syntheticsService from "@/services/synthetics";
 import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
 import SyntheticsScopeRail from "./SyntheticsScopeRail.vue";
@@ -122,9 +76,11 @@ import SyntheticsVariablesList from "./SyntheticsVariablesList.vue";
 import SyntheticsEnvironmentForm from "./SyntheticsEnvironmentForm.vue";
 import SyntheticsDuplicateEnvironmentDialog from "./SyntheticsDuplicateEnvironmentDialog.vue";
 import { GLOBAL_SCOPE, resolveScope } from "./scope";
+import { environmentDeleteBlock } from "./usage";
 
 const { t } = useI18nTyped();
 const store = useStore();
+const { confirm } = useConfirmDialog();
 
 const environments = ref<SyntheticsEnvironment[]>([]);
 const globals = ref<SyntheticsVariable[]>([]);
@@ -138,9 +94,23 @@ const environmentDrawer = ref({
   data: null as SyntheticsEnvironment | null,
 });
 const duplicateDialogOpen = ref(false);
+// Held separately from the selection: the row menu acts on its own row, which
+// is not necessarily the scope the pane is showing.
+const duplicateSource = ref<SyntheticsEnvironment | null>(null);
 const listRef = ref<InstanceType<typeof SyntheticsVariablesList> | null>(null);
 
 const scope = computed(() => resolveScope(selectedScope.value, environments.value, globals.value));
+
+// Global has no record behind it, so the line that explains the tier stands in
+// for the usage count an environment carries.
+const scopeLabel = computed(() =>
+  scope.value.isGlobal ? t("synthetics.variables.global") : (scope.value.environment?.name ?? ""),
+);
+const scopeSummary = computed(() => {
+  if (scope.value.isGlobal) return t("synthetics.variables.globalSubtitle");
+  const count = scope.value.environment?.checks_count ?? 0;
+  return t("synthetics.environments.checksCount", { count }, count);
+});
 
 async function refresh() {
   loading.value = true;
@@ -168,12 +138,51 @@ function openCreateEnvironment() {
   environmentDrawer.value = { show: true, isEdit: false, data: null };
 }
 
-function openEditEnvironment() {
-  environmentDrawer.value = { show: true, isEdit: true, data: scope.value.environment };
+// The page header owns the primary action for every tab; adding an environment
+// is the rail's own affordance, the way adding a folder is.
+defineExpose({ addVariable });
+
+function openEditEnvironment(environment: SyntheticsEnvironment) {
+  environmentDrawer.value = { show: true, isEdit: true, data: environment };
+}
+
+function openDuplicateEnvironment(environment: SyntheticsEnvironment) {
+  duplicateSource.value = environment;
+  duplicateDialogOpen.value = true;
 }
 
 function addVariable() {
   listRef.value?.openCreate();
+}
+
+async function removeEnvironment(environment: SyntheticsEnvironment) {
+  if (environmentDeleteBlock(environment.variables, environment.checks_count)) return;
+
+  const count = environment.variables.length;
+  const ok = await confirm({
+    title: t("synthetics.environments.deleteTitle"),
+    // Name what goes with it before asking, not after.
+    message: count
+      ? t("synthetics.environments.deleteWithVariables", { name: environment.name, n: count })
+      : t("synthetics.environments.deleteConfirm", { name: environment.name }),
+  });
+  if (!ok) return;
+
+  try {
+    const org = store.state.selectedOrganization.identifier;
+    // The dialog above IS the confirmation the server's guard asks for, so
+    // force is set once the user has seen the variables going with it.
+    await syntheticsService.deleteEnvironment(org, environment.name, count > 0);
+    // Only the selection needs moving, and only when it was the one deleted.
+    if (selectedScope.value === environment.name) selectedScope.value = GLOBAL_SCOPE;
+    await refresh();
+    toast({ variant: "success", message: t("synthetics.environments.deleted") });
+  } catch (error: any) {
+    toast({
+      variant: "error",
+      message: error?.response?.data?.message || t("synthetics.environments.deleteFailed"),
+    });
+  }
 }
 
 async function onDuplicated(name: string) {

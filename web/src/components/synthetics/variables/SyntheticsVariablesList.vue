@@ -40,6 +40,25 @@ already says which scope you are in, so there is no Environment column.
       :loading="loading"
     >
       <template #toolbar>
+        <!-- Fixed width, not a max: sized to content this block would change
+             width with the environment name, and the flex-1 search beside it
+             would resize on every scope change. -->
+        <OTooltip side="bottom" :content="`${scopeLabel} — ${scopeSummary}`">
+          <div class="flex w-80 shrink-0 items-center gap-2" data-test="synthetics-scope-summary">
+            <!-- The name absorbs the overflow and the count is pinned: sharing
+                 one truncating flow would drop the count first, and it is the
+                 half not shown anywhere else on the page. -->
+            <span class="text-text-heading min-w-0 truncate text-sm font-semibold">{{
+              scopeLabel
+            }}</span>
+            <!-- Global has no count to badge — its summary is the line that
+                 explains the tier, which is prose, not a metric. -->
+            <OBadge v-if="environment" variant="default" size="sm" class="shrink-0">{{
+              scopeSummary
+            }}</OBadge>
+            <span v-else class="text-text-secondary shrink-0 text-sm">{{ scopeSummary }}</span>
+          </div>
+        </OTooltip>
         <OSearchInput
           v-model="filterQuery"
           class="flex-1"
@@ -73,8 +92,8 @@ already says which scope you are in, so there is no Environment column.
         </OBadge>
       </template>
 
-      <!-- A secret has no value to show: the server never sends one. The column
-           carries presence instead, so "Set" is the strongest claim it makes. -->
+      <!-- A secret has no value to show: the server never sends one. The dots
+           carry presence on their own, so only their absence needs a word. -->
       <template #cell-value="{ row }">
         <span
           v-if="row.kind === 'secret'"
@@ -82,7 +101,7 @@ already says which scope you are in, so there is no Environment column.
           data-test="synthetics-variable-secret-value"
         >
           ••••••
-          {{ row.has_value ? t("synthetics.variables.set") : t("synthetics.variables.notSet") }}
+          <span v-if="!row.has_value">{{ t("synthetics.variables.notSet") }}</span>
         </span>
         <span
           v-else
@@ -113,23 +132,43 @@ already says which scope you are in, so there is no Environment column.
           data-test="synthetics-variable-edit-btn"
           @click="openEdit(row)"
         />
-        <!-- A secret is already scoped by construction and its value is
-             write-only, so neither move applies to one. -->
         <OButton
-          v-if="environment && row.kind !== 'secret'"
           variant="ghost"
           size="icon-sm"
-          icon-left="upgrade"
-          data-test="synthetics-variable-promote-btn"
-          @click="promote(row)"
+          icon-left="content-copy"
+          data-test="synthetics-variable-duplicate-btn"
+          @click="openDuplicate(row)"
         >
-          <OTooltip side="bottom" :content="t('synthetics.promote.toGlobal')" />
+          <OTooltip side="bottom" :content="t('synthetics.duplicate.action')" />
         </OButton>
+        <!-- Wrapper mode around a span, not a tooltip inside the button: a
+             disabled button dispatches no mouse events, so the reason would
+             never appear on the row that needs it. -->
+        <OTooltip
+          v-if="environment"
+          side="bottom"
+          :content="
+            row.kind === 'secret'
+              ? t('synthetics.promote.secretBlocked')
+              : t('synthetics.promote.toGlobal')
+          "
+        >
+          <span class="inline-flex">
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              icon-left="drive-file-move"
+              :disabled="row.kind === 'secret'"
+              data-test="synthetics-variable-promote-btn"
+              @click="promote(row)"
+            />
+          </span>
+        </OTooltip>
         <OButton
           v-if="!environment && environments.length > 0"
           variant="ghost"
           size="icon-sm"
-          icon-left="call-split"
+          icon-left="drive-file-move"
           data-test="synthetics-variable-split-btn"
           @click="openSplit(row)"
         >
@@ -156,6 +195,13 @@ already says which scope you are in, so there is no Environment column.
         />
       </template>
     </OTable>
+
+    <SyntheticsDuplicateVariableDialog
+      v-model:open="duplicateDialog.show"
+      :source="duplicateDialog.data"
+      :environment="environment"
+      @done="$emit('refresh')"
+    />
 
     <SyntheticsSplitVariableDialog
       v-model:open="splitDialog.show"
@@ -194,7 +240,9 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { SyntheticsEnvironment } from "@/types/synthetics";
 import SyntheticsVariableForm from "./SyntheticsVariableForm.vue";
 import SyntheticsSplitVariableDialog from "./SyntheticsSplitVariableDialog.vue";
+import SyntheticsDuplicateVariableDialog from "./SyntheticsDuplicateVariableDialog.vue";
 import { filterVariables, relativeTime } from "./usage";
+import { duplicatePrefill } from "./scope";
 
 export default defineComponent({
   name: "SyntheticsVariablesList",
@@ -207,6 +255,7 @@ export default defineComponent({
     OTooltip,
     SyntheticsVariableForm,
     SyntheticsSplitVariableDialog,
+    SyntheticsDuplicateVariableDialog,
   },
   emits: ["refresh"],
   props: {
@@ -216,6 +265,9 @@ export default defineComponent({
     environment: { type: String as PropType<string | null>, default: null },
     /** Split destinations. Empty on the global tab means there is nowhere to split to. */
     environments: { type: Array as PropType<SyntheticsEnvironment[]>, default: () => [] },
+    /** Scope identity, rendered in the toolbar — the pane has no header band. */
+    scopeLabel: { type: String, default: "" },
+    scopeSummary: { type: String, default: "" },
   },
   setup(props, { emit, expose }) {
     const { t } = useI18nTyped();
@@ -224,6 +276,7 @@ export default defineComponent({
     const filterQuery = ref("");
     const drawer = ref({ show: false, isEdit: false, data: null as SyntheticsVariable | null });
     const splitDialog = ref({ show: false, data: null as SyntheticsVariable | null });
+    const duplicateDialog = ref({ show: false, data: null as SyntheticsVariable | null });
 
     const columns: OTableColumnDef[] = [
       {
@@ -282,8 +335,8 @@ export default defineComponent({
         header: raw(""),
         isAction: true,
         pinned: "right",
-        size: 100,
-        minSize: 100,
+        size: 160,
+        minSize: 160,
         sortable: false,
         meta: { align: "center" },
       },
@@ -300,6 +353,17 @@ export default defineComponent({
 
     function openSplit(row: SyntheticsVariable) {
       splitDialog.value = { show: true, data: row };
+    }
+
+    function openDuplicate(row: SyntheticsVariable) {
+      // A secret's value cannot be copied, so a secret is not duplicated — it is
+      // created. The drawer carries every other field and asks for the one thing
+      // only a human can supply, rather than handing back a named empty box.
+      if (row.kind === "secret") {
+        drawer.value = { show: true, isEdit: false, data: duplicatePrefill(row) };
+        return;
+      }
+      duplicateDialog.value = { show: true, data: row };
     }
 
     async function promote(row: SyntheticsVariable) {
@@ -359,8 +423,10 @@ export default defineComponent({
       visibleRows,
       drawer,
       splitDialog,
+      duplicateDialog,
       relativeTime,
       openSplit,
+      openDuplicate,
       promote,
       openCreate,
       openEdit,

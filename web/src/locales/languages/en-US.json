@@ -13105,7 +13105,7 @@
   },
   "synthetics": {
     "variables": {
-      "add": "Add Variable",
+      "newButton": "New Variable",
       "createTitle": "Add Variable",
       "created": "Variable created",
       "deleteConfirm": "Delete {name}?",
@@ -13137,12 +13137,11 @@
       "notSet": "Not set",
       "replace": "Replace",
       "saveFailed": "Could not save the variable",
-      "scope": "Scope",
+      "scope": "Environments",
       "scopeEnvironment": "This variable applies in {env} only.",
       "scopeGlobal": "This variable applies in every environment.",
       "searchPlaceholder": "Search variables",
       "secretNeedsEnvironment": "A secret must belong to an environment. Create it from that environment instead.",
-      "set": "Set",
       "title": "Variables",
       "updated": "Variable updated",
       "usedBy": "Used by",
@@ -13153,9 +13152,10 @@
       "valueSet": "Set · updated {when}"
     },
     "environments": {
-      "add": "Add Environment",
+      "newButton": "New Environment",
       "backToList": "All environments",
       "checks": "Checks",
+      "checksCount": "Unused | {count} check | {count} checks",
       "createTitle": "Add Environment",
       "created": "Environment created",
       "deleteBlockedChecks": "Still used by {n} checks. Remove it from them first.",
@@ -13179,11 +13179,18 @@
       "nameTooLong": "Name is too long (max 64 characters)",
       "renameBlocked": "An environment cannot be renamed — the name is what permissions are granted against.",
       "saveFailed": "Could not save the environment",
+      "searchPlaceholder": "Search environments",
       "subtitle": "Scope variables and secrets, and control who may manage them.",
       "title": "Environments",
       "updated": "Environment updated",
       "usedByChecks": "Used by {n} checks",
       "variables": "Variables"
+    },
+    "duplicateVariable": {
+      "body": "Creates a copy of {name}, including its value, in the same scope.",
+      "done": "Variable duplicated",
+      "failed": "Could not duplicate the variable",
+      "nameLabel": "New variable name"
     },
     "duplicate": {
       "action": "Duplicate",
@@ -13205,6 +13212,7 @@
     "promote": {
       "done": "Variable is now global",
       "failed": "Could not make the variable global",
+      "secretBlocked": "Secrets can't be moved across environments",
       "toGlobal": "Make global"
     },
     "split": {
@@ -14199,7 +14207,7 @@
       "tcp": "TCP",
       "tls": "TLS",
       "private": "Private Locations",
-      "variables": "Variables"
+      "variables": "Environments & Variables"
     },
     "timeline": {
       "failed": "Failed",

@@ -16,8 +16,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer
+  <ODialog
     :open="open"
+    size="sm"
     @update:open="$emit('update:open', $event)"
     :title="
       isEdit ? t('synthetics.environments.editTitle') : t('synthetics.environments.createTitle')
@@ -26,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :secondary-button-label="t('common.cancel')"
     form-id="synthetics-environment-form"
     @click:secondary="handleClose"
-    data-test="synthetics-environment-form-drawer"
+    data-test="synthetics-environment-form-dialog"
   >
     <OForm
       id="synthetics-environment-form"
@@ -55,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="synthetics-environment-description-input"
       />
     </OForm>
-  </ODrawer>
+  </ODialog>
 </template>
 
 <script lang="ts">
@@ -63,7 +64,7 @@ import { computed, defineComponent } from "vue";
 import type { PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
@@ -75,7 +76,7 @@ import { makeSyntheticsEnvironmentFormSchema } from "./SyntheticsVariableForm.sc
 
 export default defineComponent({
   name: "SyntheticsEnvironmentForm",
-  components: { ODrawer, OForm, OFormInput, OFormTextarea, OBanner },
+  components: { ODialog, OForm, OFormInput, OFormTextarea, OBanner },
   emits: ["close", "update:list", "update:open"],
   props: {
     open: { type: Boolean, default: false },
