@@ -57,6 +57,12 @@ that is a bug — it opts out of the org-switch and logout purges.
 
 ## 1. The universal checklist — run this on EVERY cached list
 
+> **Cold-read counts assume an empty cache.** Ctrl+Shift+R clears the HTTP cache but **not**
+> `localStorage`, so persisted queries (templates, destinations, streams, folders, functions,
+> regex patterns, org settings) can survive a hard reload and will not re-request. If a C1
+> count comes out lower than listed, that is usually why — not a fault. For a genuinely cold
+> read, log out and back in, or clear site data.
+
 ### Which sections get C1–C8, and which do not
 
 **C1–C8 applies only to a cached LIST page** — a table of rows with a Refresh button and
@@ -78,7 +84,7 @@ the same checks every time, so they are written out once here.
 | **C2** | Warm revisit — fresh | Navigate away to another module, come straight back (within the freshness window) | Rows appear **instantly, no skeleton**, and **zero requests** in Network |
 | **C3** | Warm revisit — stale | Navigate away, wait past the freshness window, come back | Rows appear **instantly, no skeleton**, then **one** background request; the table updates in place — it must never blank out |
 | **C4** | Refresh button | Click the Refresh icon in the page header | **One** request goes out every single time (even inside the freshness window). Rows stay on screen throughout. The **spinner is on the button**, not a full-table skeleton |
-| **C5** | `r` keyboard shortcut | Click on empty page area (not in an input), press **`r`** | Identical behaviour to C4 — one request, rows stay, button spins. *This was broken on 11 pages before this branch; it is the highest-value check in the list.* **Skip C5 on SLOs (§7), Synthetics (§11) and Workflows (§12)** — those three pages register no keyboard shortcuts at all, so `r` doing nothing there is expected, not a bug (§24 item 10) |
+| **C5** | `r` keyboard shortcut | Click on empty page area (not in an input), press **`r`** | Identical behaviour to C4 — one request, rows stay, button spins. *This was broken on 11 pages before this branch; it is the highest-value check in the list.* **Skip C5 on SLOs (§7), Synthetics (§11), Workflows (§12) and BOTH alert-history surfaces (§6.5)** — these pages register no keyboard shortcuts at all, so `r` doing nothing there is expected, not a bug (§24 item 10). Browser-verified for §6.5 with a real keypress: **0 requests, no repaint**; neither `AlertHistory.vue` nor `AlertEvaluationHistory.vue` imports `useShortcuts`, **on this branch or on `main`** (47 other pages do) |
 | **C6** | Create / Edit | Create or edit a row, save | You return to the list and the new/edited row is **already there**. You should **not** have to press Refresh |
 | **C7** | Delete + navigate back | Delete a row → confirm → then navigate to another module and come **straight back** | The row is gone immediately **and is still gone on return**. A deleted row reappearing is the single most likely regression in this branch |
 | **C8** | Filter/search survives refresh | Type a search term, then press Refresh (or `r`) | The search term and the filtered result set are **preserved**. The list must not reset to unfiltered |
@@ -119,7 +125,7 @@ cold load — count them against this table, not against "one".
 | Home → Overview | §19 | up to **5** | alert history · anomaly configs · anomaly history · incidents · service topology. **Enterprise/cloud only for the services + incidents sections** — a community build fires fewer |
 | AI → Evaluations | §22.1 | **4** | providers · score configs · scorers · eval jobs |
 | IAM → Users | §14.1 | **4** | org users · roles · assignable roles · all user roles |
-| Alerts list | §6.1 | **3** | alerts · destinations · templates. (`alertDetailQuery` is **not** one of them — it fires only when you open a row) |
+| Alerts list | §6.1 | **4** | alerts · destinations · templates · folders. (`alertDetailQuery` is **not** one of them — it fires only when you open a row) |
 | Data sources | §20 | **3** | ingestion tokens · passcode · RUM tokens |
 | Alerts → dependency graph | §6.8 | **3** | alert dependencies · destinations · templates |
 | IAM → Roles → Edit role | §14.2 | **3** | resources · destinations · templates |
@@ -316,7 +322,7 @@ aggressively would stop the "a new version is available" prompt from ever firing
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -525,7 +531,7 @@ pulled from the shared store:
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -568,7 +574,7 @@ pulled from the shared store:
 
 | Check | Expected |
 | --- | --- |
-| Open Add Panel → the stream dropdown | Populated from the cached stream list, no fresh request if you were just on Streams |
+| Open Add Panel → the stream dropdown | **Opening it fires zero requests** — the option list comes from the cached stream list (browser-verified). But **selecting** a stream fires `GET /api/{org}/streams/{name}/schema` every time, including re-selecting the same one. That read is **deliberately un-migrated** (listed as backlog in `api-cache-inventory.md`), so a schema request per selection is expected today — it is not the list being re-fetched |
 | Save a panel, return to the dashboard | The new panel renders; other panels keep their cached results |
 
 ### 5.4 Annotations
@@ -643,7 +649,7 @@ Alerts → dashboard-linked flows · anywhere a "select a dashboard" dropdown is
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -664,11 +670,12 @@ Alerts → dashboard-linked flows · anywhere a "select a dashboard" dropdown is
 
 | Check | Expected |
 | --- | --- |
-| Destination dropdown | Populated from cache — no request if you were recently on the Destinations page |
-| Template dropdown | Same |
-| Stream dropdown | Same, from the cached stream list |
-| Create a **new destination** from inside the alert form | The new destination appears in the alert form's dropdown **immediately** |
-| Save the alert → back on the list | The alert is there without a manual refresh |
+| Opening the form | **2 requests only** — `/folders/alerts` and `/workflows`. Browser-verified. No destinations, templates or streams request: those come from cache. (The `/workflows` call is issue #15 — the workflow dropdown bypasses the cache) |
+| Destination dropdown | **0 requests**, fully populated — browser-verified |
+| Stream dropdown | **0 requests**, populated from the cached stream list — browser-verified |
+| Template dropdown | ⚠️ **There is no template dropdown on the alert form.** Templates are chosen when creating a *destination*, not an alert — test that in §6.3. Skip this row |
+| Create a **new destination** from inside the alert form | ⚠️ **"Add Destination" opens a NEW BROWSER TAB**, not a dialog (`window.open(url, "_blank")` in `AlertDestinationsField.vue`). The new tab has its own query cache, so a destination created there does **not** appear in the original tab by itself. That is what the **↻ Refresh latest Destinations** button beside it is for. Expect: create in the new tab → switch back → click ↻ → it appears |
+| Save the alert → back on the list | The alert is there without a manual refresh — verified via the clone path in §6.1 C6 (`POST` then automatic refetch) |
 
 ### 6.3 Alert destinations
 
@@ -683,7 +690,7 @@ Run **C1–C8** (note C5 `r` — this was one of the broken shortcuts).
 
 | # | Do this | Expect |
 | --- | --- | --- |
-| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **3 (destinations + templates + the dependency-graph alert read)** request(s) |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **2–3 requests** — destinations + the dependency-graph alert read, plus templates *only if its persisted entry has gone stale*. Browser-verified at 2. **Note: a hard reload does NOT clear localStorage**, so persisted queries survive it and the cold count is often lower than a truly empty cache would give. For a genuine cold read, log out first or clear site data |
 | C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
 | C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
@@ -701,7 +708,7 @@ Run **C1–C8** (note C5 `r` — this was one of the broken shortcuts).
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -712,10 +719,17 @@ Run **C1–C8** (note C5 `r` — this was one of the broken shortcuts).
 | Open **Alerts → New Alert** afterwards | The deleted destination is not offered |
 | **Import a destination** — Alerts → Destinations → **Import** → paste/upload JSON → import | The imported destination is in the list **without a manual refresh**, and is offered in the alert form's dropdown |
 
-> ⚠️ **Security check worth doing:** open DevTools → Application → Local Storage and look at
-> the `o2q-` entry for destinations. Destination payloads can carry webhook
+> ✅ **Security check — verified fixed (2026-08-26).** Destination payloads can carry webhook
 > `Authorization` headers, PagerDuty routing keys and Opsgenie/ServiceNow credentials.
-> Confirm with the team whether writing those to disk is acceptable. See §24.
+> `destinationsQuery` is now **memory-only** — no persister — so none of that reaches disk.
+> Confirmed in the browser: with 32 destinations on screen there is **no**
+> `o2q-["org","<org>","alerts","destinations",…]` key in localStorage, and a forced refresh
+> does not create one. Re-check with:
+>
+> ```js
+> Object.keys(localStorage).filter(k => k.startsWith('o2q-') && /destinations/.test(k))
+> // expected: []
+> ```
 
 ### 6.4 Alert templates
 
@@ -730,7 +744,7 @@ Run **C1–C8** (including the `r` shortcut).
 
 | # | Do this | Expect |
 | --- | --- | --- |
-| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **2** — destinations + the dependency-graph alert read (both feed the “Used by” column). **The template list itself is served from localStorage**, so it fires nothing. Browser-verified request(s) |
 | C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
 | C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
@@ -748,7 +762,7 @@ Run **C1–C8** (including the `r` shortcut).
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -761,20 +775,32 @@ Run **C1–C8** (including the `r` shortcut).
 
 ### 6.5 Alert history / evaluation history
 
-**Scope:** run **C1–C5** (cold read, warm revisit, Refresh button, `r` shortcut) plus the rows below. C6–C8 are skipped — this page has no create/edit/delete or search filter.
+**Scope:** run **C1–C4** plus the rows below. **C5 does not apply** — the alert-detail route registers no keyboard shortcuts (no registry entry; neither `AlertEvaluationHistory.vue` nor `AlertHistory.vue` calls `useShortcuts`), so `r` doing nothing there is correct, not a bug. C6–C8 are skipped — no create/edit/delete or search filter on these surfaces.
 
-**UI paths:**
-- Alerts → click an alert → **History** tab
-- Alerts → **Alert History** page
-- Alerts → open an alert → **Evaluation History** drawer
+**UI paths — corrected, browser-verified:**
+- **Alerts → click an alert → the "Alert History" tab.** The tab is labelled *Alert History*, not "History"; the alert detail page has exactly two tabs, *Alert History* and *Configuration*. This is the surface most users reach.
+- **Home → Overview → the Anomalies section → "Investigate" on a row.** The history **drawer** lives on Home Overview, **not** on the alert detail page. The button sits inside `v-for="item in anomalies"`, so the section only renders when `anomalies.length > 0`. ⚠️ **Blocked without anomaly-detection data** — with none configured the Overview shows *"All systems clear"* and there is no row to click, so the drawer cannot be reached. Verify with `GET /api/{org}/anomaly_detection`; an empty `[]` means skip this surface.
+- **Alerts → Alert History page** — ⚠️ **no UI path; URL only:**
+  `http://localhost:8081/web/alerts/history?org_identifier=default`
 
 | Check | Expected |
 | --- | --- |
-| Open the same history from all three surfaces | They **share one cache entry** — the second and third do not re-request |
-| Change the time range | Each range caches separately |
-| Refresh button on each | One request each; rows stay on screen |
+| Open the same history from all three surfaces | ⚠️ **They do NOT share a cache entry — corrected.** The three surfaces request different page sizes (standalone **20**, alert-detail History tab **25**, drawer different again), and `size` is part of the query key, so each keeps its own entry. Browser-verified: the detail tab fires `from=0&size=25` even right after the standalone page has loaded `size=20`. **Expect one request per surface**, not a shared hit |
+| Change the time range | ✅ **Browser-verified — each range keeps its own entry, and returning to a range you already used costs 0 requests.** Measured: pick **15 m** → **2** requests (page 1 + prefetch); pick **1 h** → **2** (new range, cold); switch **back to 15 m** → **0**, the table repaints instantly. The two windows sit in the key as separate entries (`15m@1787814960000000` vs `60m@1787812260000000`), so neither overwrites the other |
+| ⏱️ **Why you may still see requests when you switch back** | **Not a cache miss — the range is quantized to a 60-second bucket.** `alertHistoryQuery` runs `quantizeRange(start, end)` with `bucketMs = 60_000`, because a relative range is anchored to a raw `now` and would otherwise mint a fresh key on every open. Consequence for testing: **do the A → B → A round trip inside the same wall-clock minute.** A minute later the bucket has advanced, the key legitimately changes, and you get 2 requests again. That is correct behaviour |
+| Refresh — **standalone Alert History page** | ✅ **Browser-verified:** exactly **1** request (`from=0&size=20`), and **rows stay on screen** — row count sampled 14× during the fetch never left 20, zero skeleton placeholders. This surface splits the two states correctly: `loading = historyList.isLoading` (skeleton, cold read only) vs `fetching = historyList.isFetching` (button spinner) |
+| Refresh — **alert-detail "Alert History" tab** | ⚠️ **Expect the table to blank to a skeleton — this is normal here, not a cache failure.** Browser-verified: rows drop **25 → 0** with 50 skeleton placeholders for ~300 ms, then repaint. `AlertEvaluationHistory.vue` drives `:loading` from a plain `ref(false)` flipped around *every* fetch, so it cannot tell a cached read from a network one. **Identical on `main`** — the branch did not introduce it. Judge this row by the request count (**1**), not by the skeleton |
+| Return to a page you already visited — **alert-detail tab** | ✅ **Browser-verified: 0 requests AND no skeleton at all.** Page 1 → 2 fires 1 request and blanks; page 2 → back to 1 fires **0** and never blanks (the cached read resolves before Vue paints). This is the cleanest proof the cache is working on this surface |
+| Alert History tab → **Configuration** → back to Alert History | ⏱️ **Depends on how long you take — both answers are correct.** Browser-verified on the alert-detail page: round trip completed while the data is **< 30 s old → 0 requests**; the same round trip after the data is **> 30 s old → 1 request**. This is the **30-second `staleTime`**: `alertHistoryQuery` sets none, so it inherits the global `DEFAULT_STALE_TIME = 30_000`. Reading the Configuration tab normally takes longer than 30 s, which is why it looks like it refetches *every* time. **To test the cache, do the round trip in under 30 s.** |
+| C2 warm revisit — **standalone page** (leave via *Back to Alerts*, return via browser Back) | ✅ **Browser-verified 0 requests** when the return lands in the **same minute bucket as the cold load**. ⚠️ The constraint is the *load* time, not the last refresh: remounting the page recomputes the relative window from `Date.now()`, so if ≥ 60 s has passed since the page first loaded, the remount mints the next bucket and you get **2** requests (page 1 + prefetch). Measured both ways: return at load+5 s → **0**; return after the bucket rolled → **2**, with two keys exactly 60 s apart in the URL |
+| Why the refetch is so visible on this tab but not the standalone page | Both surfaces have the same 30 s `staleTime` and both refetch when stale. The standalone page keeps its rows on screen while it revalidates, so you never notice; the alert-detail tab blanks to a skeleton, so the same refetch is obvious. That difference is the pre-existing loading-flag behaviour, not a difference in caching |
 | Paginate — **standalone Alerts → Alert History page ONLY** | **Cold load fires 2** (page 1 + prefetch of page 2), then **1** per page change — the page you land on is cached, the request warms the page *ahead*. Same pattern as Streams, see §1.1. **Requires more than one page of data in the selected time range**; with ≤ 20 records in range there is no next page, so **1 request is correct** |
 | Paginate — **alert-detail History tab and the History drawer** | These two do **NOT** prefetch. Expect **1** request per page, always. Do not apply the prefetch expectation here |
+
+> ⚠️ **Watch the record total while testing.** If any alert in the org fires on a short
+> frequency, new history rows land continuously and the `of N` total drifts between checks
+> (observed 373 → 719 → 360 across three range switches during verification). A changed
+> total is the data moving, **not** the cache failing — compare request *counts*, not totals.
 
 **Browser-verified** on a live instance (56 history records, 3 pages) — use these as the
 reference numbers. Note the two surfaces even use different page sizes:
@@ -808,9 +834,71 @@ Paging on the standalone page, measured:
 
 ### 6.6 Incidents
 
-**Scope:** run **C1–C5** (cold read, warm revisit, refresh button, `r` shortcut) plus the rows below. C6–C8 are skipped — this page has no create/edit/delete or search filter to test.
+**Scope:** run **C1–C5** plus **C8**, and the rows below. ⚠️ **C6 and C7 do not apply** — incidents are generated by the backend, so the page has no create or delete affordance; status and severity changes are edits (`PATCH …/update`). Browser-verified.
 
-**UI path:** Left sidebar → **Alerts** → **Incidents**
+**UI path:** **Left sidebar → hover Reliability → Incidents.**
+
+> Requires the backend flag **`O2_INCIDENTS_ENABLED=true`** (enterprise config
+> `o2cfg.incidents.enabled`; the frontend reads it as `zoConfig.incidents_enabled`). With it
+> off, `MainLayout.vue:648` never splices the link in and **both Incidents and External Alert
+> Sources (§6.7) vanish from the Reliability flyout** — they share `requires: "incidentList"`.
+> Verify with `store.state.zoConfig.incidents_enabled`, or
+> `curl -su <user> localhost:5080/api/default/config | grep incidents_enabled`.
+> ⚠️ The unauthenticated `/config` no longer carries the flag — use `/api/{org}/config`.
+> Note it is a **flyout child of Reliability**, not a tab under Alerts.
+
+**Seeding data.** Incidents have no create endpoint — the backend mints one when an alert
+with `creates_incident: true` breaches. **One alert produces one incident**, not one per
+dimension value (verified: a single alert matching every service produced a single incident,
+not one per service). So for N rows you need N alerts. Recipe: ingest `level=error` rows for
+N distinct services into a stream, create one alert per service filtered to it, wait ~90 s,
+then **disable the alerts** so the counts stop moving mid-test.
+
+**Browser-verified end to end with 33 incidents (30 Active / 3 Resolved, 2 pages at page
+size 20):**
+
+| # | Check | Result |
+| --- | --- | --- |
+| C1 | Cold read | ✅ **1** — `GET /api/v2/{org}/alerts/incidents?limit=1000&offset=0`, confirmed via CDP after clearing the entry |
+| C2 | Warm revisit < 30 s | ✅ **0** — measured with the entry verified 5 s old |
+| C3 | Stale revisit > 30 s | ✅ **1**, and the table **never blanked** — sampled 16× during the refetch, rows held at 20, zero skeleton placeholders |
+| C4 | Refresh button | ✅ **1** every time, **rows stay on screen** — 14 samples, no blank, no skeleton |
+| C5 | `r` shortcut | ✅ **1** — real keypress. This page *does* register the shortcut (unlike §6.5) |
+| C6 / C7 | Create / edit / delete | ❌ **Not applicable** — no create or delete affordance; incidents are backend-generated. Status changes are edits (`PATCH …/update`) |
+| C8 | Search survives Refresh | ✅ Term preserved after Refresh |
+| — | **Pagination** page 1 → 2 | ✅ **0 requests** |
+| — | **Pagination** page 2 → back to 1 | ✅ **0 requests** |
+| — | Status filters Active / Resolved / All | ✅ **0 requests** each, and the summary tiles recount correctly (Active `30 Total`, All `33 Total`, Resolved `3 Total`) |
+| — | Severity tiles P1 / clear | ✅ **0 requests**; P1 narrowed to 7 rows |
+| — | Search box | ✅ **0 requests** — client-side; `queue` narrowed 20 → 1 |
+| — | Row click → incident detail | **3** requests, all detail-scoped: `…/{id}`, `…/{id}/events`, `…/{id}/rca/history` |
+| — | Detail → back to the list | ✅ **0 requests**, list still cached |
+
+**Why paging and filtering are free:** the query fetches `limit=1000` **once** and the
+component paginates client-side (`:data="visibleIncidents"`, a search → status → severity
+computed chain; no `pagination="server"`). One cache entry backs every page, filter and sort.
+⚠️ The flip side is a **silent cap at 1000** — see §24. Pre-existing: `main`'s
+`IncidentList.vue:550` already had `const limit = 1000`.
+
+**Cache policy** — `staleTime` **30 s**, `gcTime` 5 min, `refetchOnWindowFocus: true`.
+Key: `["org","<org>","incidents","list",{"limit":1000,"offset":0}]` — the status filter is
+**not** in the key, which is why switching tabs costs nothing.
+
+**Persistence: memory-only.** Verified against *both* stores — no `o2q-…incident…` key in
+localStorage **and** none in IndexedDB (`o2Cache/kv`). Closing the tab always yields a cold read.
+
+**Loading states are wired correctly here:** `loading = incidentsList.isPending` (skeleton,
+cold read only) and `fetching = incidentsList.isFetching` (button spinner) — the same correct
+split as the standalone Alert History page, and the opposite of the alert-detail tab in §6.5.
+
+> ⚠️ **Two measurement traps on this page.** (1) `performance.getEntriesByType('resource')`
+> silently drops entries once its 250-entry buffer overflows on this SPA — it reported **0**
+> incident requests on a cold load that CDP showed as **1**. Use the Network panel, not
+> resource timing. (2) A C2 that returns 1 usually means the entry had already aged past 30 s
+> during earlier steps — click **Refresh** immediately before navigating away.
+⚠️ **Ignore the C1–C8 table further down this section** — it is the generic template. The
+table above supersedes it for this page: C6/C7 do not apply, and the C1 count is
+cache-state-dependent.
 
 Run **C1–C5**. Plus:
 
@@ -839,7 +927,7 @@ Run **C1–C5**. Plus:
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -850,9 +938,71 @@ Run **C1–C5**. Plus:
 
 ### 6.7 External alert sources
 
-**Scope:** run **C1–C5** (cold read, warm revisit, refresh button, `r` shortcut) plus the rows below. C6–C8 are skipped — this page has no create/edit/delete or search filter to test.
+**Scope:** run **C1–C8** — ⚠️ **corrected: C6–C8 all apply here.** The page has an **Add source** button (`alert-sources-add-btn`), a per-row **Delete** (`alert-sources-delete-<id>`) and a **search box** (`alert-sources-search-input`), plus per-row Edit, Rotate token, Toggle enabled, Copy token and Reveal URL. The earlier "no create/edit/delete or search filter" scope was wrong.
 
-**UI path:** Left sidebar → **Alerts** → **Sources**
+**UI path:** **Left sidebar → hover Reliability → External Alert Sources.**
+
+> ⚠️ **Not "Alerts → Sources"** — there is no such tab. It is a **flyout child of Reliability**,
+> gated on the same **`O2_INCIDENTS_ENABLED=true`** flag as Incidents (§6.6); with the flag off
+> the entry is absent entirely. Direct URL is **`/web/alert-sources`** — note the **hyphen**;
+> `/web/alert_sources` returns 404.
+
+**Seeding data:** `POST /api/v2/{org}/incidents/integrations` with
+`{"name":"…","source_type":"auto","destinations":[]}`. Every org already has one
+auto-created source named `default`, which **cannot be deleted** (its Delete button is
+disabled and explains why — it is the fallback for senders without their own source).
+
+### ⚠️ Read this before judging any request count on this page
+
+**The list query is cached; the per-row status fan-out is not.** On mount and on every
+refresh the page issues **one `/senders` request per row** on top of the list read.
+Browser-verified with 23 sources:
+
+| Action | List reads | `/senders` reads | **Total** |
+| --- | --- | --- | --- |
+| C1 cold load | 1 | 23 | **24** |
+| C2 warm revisit (entry 6 s old) | **0** | **23** | **23** |
+| C4 Refresh button | 1 | 23 | **24** |
+| C5 `r` shortcut | 1 | 23 | **24** |
+
+So the plan's generic **"C2 → 0 requests"** is **false on this page** — the list is free, but
+23 requests still go out. Judge C2 here by the **list** count only, and expect the fan-out.
+
+**Attribution:** the fan-out is **pre-existing** — `main`'s `ExternalAlertSourcesList.vue`
+calls `listSenders` per row at lines 556/572, identical to the branch at 578/594. What is
+specific to this branch is that `alertSourcesQuery` caches the **single cheap** list call and
+leaves the **N expensive** ones uncached, so migrating this page removed 1 request out of 24
+(~4%). There is no `senders` entry in `alert_sources.querykeys.ts` at all.
+
+**Browser-verified results (23 sources, 2 pages at page size 20):**
+
+| # | Check | Result |
+| --- | --- | --- |
+| C1 | Cold read | ✅ 1 list read (+23 senders — see above) |
+| C2 | Warm revisit < 30 s | ✅ **0 list reads** (+23 senders). Measured with the entry verified 6 s old |
+| C3 | Stale revisit > 30 s | ✅ 1 list read, and the table **never blanked** — 16 samples, rows held at 20, zero skeletons |
+| C4 | Refresh button | ✅ 1 list read, **rows stay on screen**, no skeleton |
+| C5 | `r` shortcut | ✅ Works — real keypress, 1 list read. The shortcut fix holds |
+| C6 | Create → row present without manual refresh | ✅ 1 `POST`, then **1 automatic list refetch**; the new row appears on the list unaided. Toast *"Alert source created"* |
+| C7 | Delete → away → straight back | ⚠️ **The Delete button cannot be clicked — it is clipped off the row.** The Actions cell is a fixed **160px** with `overflow:hidden` but its 5 buttons need **176px**, so Delete (the 5th) is cut off, and the table has no horizontal scroll to reach it. `elementFromPoint` at its centre returns the scroll container, not the button. Root cause: `meta: { actionCount: 4 }` in `SloList.vue:661` while the row renders **5** buttons — **pre-existing, identical on `main`** (introduced by `0cfa518433`), so not filed against this branch. **Workaround:** delete via `DELETE /api/{org}/slos/{id}`, then do the UI half — Refresh, row gone, navigate away, come straight back, **row must still be gone**. The caching half was verified that way: 1 `DELETE`, 1 refetch, gone immediately and still gone on return |
+| C8 | Search then Refresh | ✅ Term **preserved**, filtered rows preserved (`grafana` → 1 row, still 1 after Refresh) |
+| S1 | Sort a column | ✅ **0 requests**. Only **Name** is sortable; cycles asc → desc → unsorted. No blank, **no double-fire**. ⚠️ The sort handle is `o2-table-th-sort-trigger`, **not** the `th` — clicking the header cell itself does nothing |
+| S2 | Page forward, then back | ✅ **0 requests** each way; page 2 shows the remaining 3 rows |
+| S3 | Bulk action | ❌ **N/A** — no row checkboxes and no bulk affordance |
+| S4 | Search with no matches | ✅ Proper empty state: *"No alert sources found"*. Not a spinner, not stale rows |
+| S5 | Clear the search | ✅ Full list returns, **0 requests** |
+| S6 | Export / download | ❌ **N/A** — this page offers no export |
+
+**🔐 Security check — passed.** Every source carries a bearer token (`o2iat_…`) in its webhook
+URL. Verified it never reaches disk: **no** `o2q-…integration…` key in localStorage, **no**
+`o2iat_` string anywhere in localStorage, and **none** in any IndexedDB store (all 4 scanned).
+The table also **masks** the token in the URL column (`o2iat_****abcd`) behind explicit
+*Reveal full URL* / *Copy token* actions. Same standard destinations were held to in issue #10.
+⚠️ When you test Reveal/Copy yourself, do not paste the result anywhere that gets committed.
+
+**Cache policy** — `staleTime` **30 s** (global default), `refetchOnWindowFocus: true`.
+Key: `["org","<org>","alert-sources","list"]`. Persistence: **memory-only**.
+
 
 
 #### What to run on this page
@@ -879,7 +1029,7 @@ Run **C1–C5**. Plus:
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -893,116 +1043,191 @@ Run **C1–C5**. Plus:
 
 **Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
-**UI path:** Alerts → select an alert → **Dependencies** (also reachable from Destinations and Templates when deleting an item that is in use)
+**UI path:** ⚠️ **Corrected — "Alerts → select an alert → Dependencies" does not exist.**
+The Alerts page has **no dependency entry point whatsoever**: browser-verified that it exposes
+no control, tab or `data-test` matching *depend / usage / impact / graph*, and `AlertList.vue`
+imports only `invalidateDependencyGraphCache` — it never calls `useDependencyGraph()`.
 
-| Check | Expected |
+The real paths, both browser-verified:
+
+- **Alerts → Destination Templates → the "Used by" cell on a row** (e.g. `3 destinations · 68 alerts`)
+- **Alerts → Destinations → the "Used by" cell on a row**
+
+Clicking that cell opens the impact dialog. `DependencyImpactDialog.vue` is rendered **only**
+by `DependencyUsageCell.vue`, which those two lists embed — there is no third surface.
+
+⚠️ **The row's Delete button is _not_ the impact dialog.** Deleting an in-use template shows a
+plain *"Are you sure you want to delete template?"* confirm with no dependency list at all
+(verified on `cachetest_tmpl1`, in use by 3 destinations and 68 alerts). Only the **Used by**
+cell shows impact.
+
+| Check | Result |
 | --- | --- |
-| Open the dependency view from the Alerts page, then from Destinations, then from Templates | All three share **one** cached read of the org's alert graph. You should see one request, not three |
-| Delete something with dependencies | The impact dialog lists them; after deleting, the affected lists refresh |
+| Open the dependency view from each surface | ✅ **They share one cached read.** Measured: landing on **Destinations** fires **2** (`alerts?include_dependencies=true` + `alerts/templates`) and **0** for destinations — that list was already cached by the Alerts page. Switching to **Templates** fires **0**. Opening the **impact dialog** fires **0**. So the graph is read once per org and reused everywhere |
+| Delete something with dependencies | ✅ **The dialog lists them in full.** `cachetest_tmpl1` → *"Used by 3 destinations · 68 alerts"* with every dependent named, each row carrying its own **open** and **delete** action (`dependency-impact-open-<name>`, `dependency-impact-delete-<name>`) |
+| After deleting, the affected lists refresh | ✅ Deleting a dependent alert from inside the dialog fired **1 `DELETE`** and **0 graph refetches** — the count updated **68 → 67 live in the open dialog**, and the Templates list cell behind it changed to `3 67` with no request. Returning to the Alerts list refetched once, the row was gone and the total read **67** |
+
+**Why the graph is read once.** `useDependencyGraph` pulls all three lists through the query
+cache rather than the services, so it reuses whatever the page it was opened from already
+fetched:
+
+```ts
+const [alerts, destinations, templates] = await Promise.all([
+  queryClient.fetchQuery(alertDependenciesQuery(org)),
+  queryClient.fetchQuery(destinationsQuery(org, "alert")),
+  queryClient.fetchQuery(templatesQuery(org)),
+]);
+```
+
+On top of that sits a **module-level graph cache** with a 5-minute TTL
+(`GRAPH_TTL_MS = 300_000`), which is why the second and third surfaces cost literally nothing —
+they do not even reach the query cache. Mutations call `invalidateDependencyGraphCache()`, and a
+delete made from the dialog folds itself in via `applyDependencyDeletion()` instead of
+refetching, which is what makes the 68 → 67 update instant.
+
+**Testing note:** because of that 5-minute module cache, a *second* pass through these surfaces
+will show 0 requests even on the first one. To measure the cold path again, hard-reload first.
+
 
 ### 6.9 Anomaly detection
 
 **Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
 
-**UI path:** Left sidebar → **Alerts** → anomaly alert entries
+⚠️ **There are TWO different surfaces here and they use DIFFERENT queries.** The rows below
+describe the Overview one; the UI path in the old text pointed at the other.
 
-| Check | Expected |
+| Surface | UI path | Query it uses |
+| --- | --- | --- |
+| **Anomaly config list + history** ← what these rows test | **Home → Overview** | `anomalyConfigsQuery` + `anomalyHistoryQuery` (`/api/{org}/anomaly_detection[/history]`) |
+| **Anomaly alert rows** | **Reliability → Alerts → Anomalies tab** | `alertsListQuery` with `alert_type=anomaly_detection` — **not** the anomaly endpoints |
+
+Browser-verified: `OverviewTab.vue` is the **only** consumer of both anomaly queries. The
+Anomalies tab fires `GET /v2/{org}/alerts?…&alert_type=anomaly_detection` and never touches
+`/anomaly_detection`.
+
+**Seeding data.** Both surfaces are empty until at least one anomaly config exists, and
+**history is short-circuited when there are none** — `loadAnomalies` does
+`if (!configs.length) { anomalies.value = []; return; }`, so `anomalyHistoryQuery` never runs
+on an empty org. Create one with `POST /api/v2/{org}/alerts` and `alert_type:
+"anomaly_detection"` plus an `anomaly_config` block. ⚠️ `histogram_interval` and
+`schedule_interval` are **strings** (`"5m"`, `"15m"`) — passing integers returns HTTP 422.
+
+**Browser-verified with 3 configs seeded:**
+
+| Check | Result |
 | --- | --- |
-| Open the anomaly config list, navigate away and back | Cached, no re-request within the window |
-| Anomaly history | Cached per limit; refresh forces |
+| Open the anomaly config list, navigate away and back | ✅ **Cached.** Cold read fires **2** — `GET /{org}/anomaly_detection` + `GET /{org}/anomaly_detection/history?limit=20`. Leaving to another module and returning **within the window fires 0**. A return after the 30 s window fires 1 (the config list), which is correct, not a miss |
+| Anomaly history — cached per limit | ✅ The limit is **in the key**: `["org","<org>","anomalyDetection","history",20]`. A different limit is a separate entry. ⚠️ **Not exercisable from the UI** — `OverviewTab` hardcodes `limit: 20`, so there is no control that varies it. Verify by reading the key, not by clicking |
+| Anomaly history — refresh forces | ✅ The **Refresh button** (`data-test="refresh-button"`, top-right of Overview) fires **both** reads every time. Verified by clicking it twice back-to-back: **2 requests each time**, no caching in between |
+| *(bonus)* Anomalies tab caches too | ✅ **Reliability → Alerts → Anomalies**, switch to All and straight back: **0 requests**. Its entry is `["org","<org>","alerts","list","default","anomaly_detection"]` — the alert-type is part of the key, so each tab keeps its own entry |
 
----
+**Cache policy** — both anomaly queries: `staleTime` **30 s**, `gcTime` 5 min,
+`refetchOnWindowFocus: true`. Confirmed at runtime.
+
+> ⚠️ **Testing trap:** on an org with no anomaly configs, this section looks like it passes
+> while proving nothing — the config list returns `[]` and history never fires at all. Confirm
+> with `GET /api/{org}/anomaly_detection`; if it returns `[]`, seed a config first or the
+> history rows are untested.
+
 
 ## 7. SLOs
 
-**UI path:** Left sidebar → **SLOs**
+**UI path:** **Left sidebar → hover Reliability → SLOs.** (Not a top-level rail item — it is a
+flyout child of Reliability, alongside Incidents and External Alert Sources.)
 
-**Scope:** the two check tables below, then this page's own rows.
+**Seeding data:** `POST /api/{org}/slos` — note the path has **no `/v2`**; `/api/v2/{org}/slos`
+returns *"Organization not found"*. Minimum body: `name`, `folder_id`, `sli_type`,
+`config.source.query.{stream,stream_type,good_expr}`, `window_secs`, `slice_interval_secs`,
+`target`. Page size is **25**, so seed 26+ to get two pages.
 
-#### What to run on this page
+### 🔴 Known finding — see issue #20
 
-**Cache checks** — the point of this PR:
+**C1 fires 2 requests, not 1.** Every cold mount issues both:
 
-| # | Do this | Expect |
+```
+GET /api/{org}/slos                  <- fired while readFolder is still undefined; never rendered
+GET /api/{org}/slos?folder=default   <- the one that actually paints the table
+```
+
+`main` fetched once. Reproduced on a cold page load, a stale (>30 s) revisit, and the
+navigation back to the list after a create. **Expect 2 until #20 is fixed** — do not file it
+again.
+
+**Browser-verified with 35 SLOs (2 pages at page size 25):**
+
+| # | Check | Result |
 | --- | --- | --- |
-| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
-| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
-| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
-| C5 | Click empty page area, press **`r`** | ⚠️ **Nothing happens — correct.** This page registers no keyboard shortcuts |
-| C6 | Create or edit a SLO, save | Back on the list, the SLO is **already there** — no manual refresh |
-| C7 | Delete a SLO → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
-| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+| C1 | Cold read | 🔴 **2 requests** — see above. Should be 1 |
+| C2 | Warm revisit < 30 s | ✅ **0** (measured with the entry verified 6 s old) |
+| C3 | Stale revisit > 30 s | ✅ Table **never blanked** — 16 samples, rows held, zero skeletons. Request count is 2, same cause as C1 |
+| C4 | Refresh button (`slos-slolist-refresh`) | ✅ **1** request, rows stay on screen, no skeleton |
+| C5 | `r` shortcut | ✅ **Nothing happens — correct.** Real keypress, 0 requests. This page registers no shortcuts |
+| C6 | Create → back on the list | ✅ 1 `POST`, returns to the list, **new row already present**, total incremented |
+| C7 | Delete → away → straight back | ✅ Confirm dialog (**Delete**), 1 `DELETE`, 1 refetch. Gone immediately **and still gone on return** |
+| C8 | Search then Refresh | ✅ Term **preserved**, filtered rows preserved |
+| S1 | Sort a column | ✅ **0 requests**, no blank, **no double-fire**. Only **Name** sorts |
+| S2 | Page forward, then back | ✅ **0 requests** each way |
+| S3 | Bulk action | ✅ Row checkboxes work → *"Move 3 selected"* appears. **Move only** — there is no bulk delete |
+| S4 | Search with no matches | ✅ Proper empty state: *"No data"*. Not a spinner, not stale rows |
+| S5 | Clear the search | ✅ Full list returns, **0 requests** |
+| S6 | Export | ✅ Per-row export buttons (`slos-slolist-export-<name>`), icon-only in the Actions column |
 
-**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+> ⚠️ **The sort cycle has THREE states and one looks like a no-op.** The Name header goes
+> **descending → ascending → neutral**, and the neutral state renders in ascending order — so
+> one click in every three appears to do nothing. It is not broken: the header **icon** changes
+> even when the row order does not. Judge sorting by the icon, not the first row. (The header is
+> also not exposed as a button and carries no `aria-sort`, so a screen reader cannot tell either
+> — pre-existing in the shared table component.)
 
-| # | Do this | Expect |
-| --- | --- | --- |
-| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
-| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
-| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
-| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
-| S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+> ⚠️ **The sort handle is `o2-table-th-sort-trigger`, not the `th`.** Clicking the header cell
+> itself does nothing.
 
-**This page's own checks** — specific to this module:
-
-| Check | Steps | Expected |
-| --- | --- | --- |
-| **Failed load surfaces an error** | With the backend stopped or the SLO endpoint failing, open SLOs | An **error state** is shown — *not* a silently empty table pretending there are no SLOs. *This was the bug fixed here* |
-| Folder filter | Switch SLO folders | Each folder caches separately |
-| Enable / disable an SLO | Toggle | Row updates in place, no full refetch flicker |
-| Move SLOs between folders | Select rows → Move | Both source and destination folder lists correct afterwards |
-| **Delete an SLO** | Delete → navigate away → return | Gone and stays gone |
-| Open an SLO detail | Click a row, go back, click the same row | ⚠️ **A request on every open is EXPECTED — not a bug.** `sloDetailQuery` is declared but no page reads it (§24 item 8). Only the *list* is cached |
-
----
 
 ## 8. Reports
 
-**UI path:** Left sidebar → **Reports**
+**UI path:** ⚠️ **Corrected — not a top-level sidebar item.** It is **Left sidebar → hover
+Dashboards → Reports** (the Dashboards flyout has exactly two children: *Dashboards* and
+*Reports*). While you are on `/web/reports` the rail highlights **Dashboards**, which is how to
+tell it is a flyout child.
 
-**Scope:** the two check tables below, then this page's own rows.
+**Seeding data:** `POST /api/{org}/reports?folder=default`. Two traps in the payload —
+the org field is **`orgId`** (camelCase, not `org_id`), and `dashboards[].timerange` requires
+**`from` and `to`** even for a relative range. Page size is 20.
 
-#### What to run on this page
+**Browser-verified with 21 reports:**
 
-**Cache checks** — the point of this PR:
-
-| # | Do this | Expect |
+| # | Check | Result |
 | --- | --- | --- |
-| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **2 (folders + reports)** request(s) |
-| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
-| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
-| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
-| C6 | Create or edit a report, save | Back on the list, the report is **already there** — no manual refresh |
-| C7 | Delete a report → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
-| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+| C1 | Cold read | ✅ **2 requests** — `GET /v2/{org}/folders/reports` + `GET /v2/{org}/reports?folder=default&cache=false`. Matches the expected count |
+| C2 | Warm revisit < 30 s | ✅ **0** (measured with the entry verified 8 s old) |
+| C3 | Stale revisit > 30 s | ✅ **1** request, and the table **never blanked** — 14 samples, rows held at 20, zero skeletons |
+| C4 | Refresh button | ✅ **1** request every time, rows stay on screen, no skeleton. Verified twice back-to-back |
+| C5 | `r` shortcut | ✅ **1** request — real keypress. The shortcut works on this page |
+| C6 | Create → back on the list | ✅ 1 `POST`, returns to the list, **new row already present**, total 20 → 21 |
+| C7 | Delete → away → straight back | ✅ Confirm dialog (**OK**), 1 `DELETE`, 1 refetch. Gone immediately, and **still gone on return with 0 requests** |
+| C8 | Search then Refresh | ✅ Term **preserved**, filtered rows preserved. Typing fires **0** requests (client-side) |
+| S2 | Page forward, then back | ✅ **0 requests** each way |
+| S4 | Search with no matches | ✅ Proper empty state: *"No reports found"* |
+| S5 | Clear the search | ✅ Full list returns, **0 requests** |
 
-**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+> ⚠️ **Two measurement traps on this page — both cost me a false "double-fire" reading.**
+>
+> **1 · Refresh can look like 3 requests.** `reportsQuery` sets `refetchOnWindowFocus: true`, and
+> this page keeps **two** entries — `cache=false` (Scheduled tab) and `cache=true` (Cached tab).
+> If the click that hits Refresh is also the click that returns focus to the page, the focus
+> refetch fires for **both** entries on top of the refresh itself. Observed:
+> `cache=false`, `cache=true`, `cache=false`. Click somewhere on the page first, let it settle,
+> **then** click Refresh — it is **1**.
+>
+> **2 · Scripted clicks can double-fire.** Dispatching a full pointer sequence
+> (`pointerdown → mousedown → pointerup → mouseup → click`) triggered the handler twice, giving
+> two identical `cache=false` requests. A plain `.click()` gives one. If you automate this page,
+> verify with a real click before filing a double-fire bug — I very nearly filed one.
 
-| # | Do this | Expect |
-| --- | --- | --- |
-| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
-| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
-| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
-| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
-| S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+**Create-form note (C6):** *Report title* and *Recipients* are required and sit **below** the
+dashboard selectors, so a first Save fails with *"This field is required"* / *"Add valid
+emails!"* while the visible top half looks complete. Fill those two before saving.
 
-**This page's own checks** — specific to this module:
-
-| Check | Steps | Expected |
-| --- | --- | --- |
-| **One request per refresh** | Open Network, clear it, click Refresh | **Exactly one** request. *It used to fire two* |
-| **Search survives refresh** | Type a report name in search → press `r` | Search term and filtered rows preserved. *The `r` shortcut used to drop the search* |
-| **Rows survive refresh** | Click Refresh while reading the table | Rows stay on screen; only the button spins. *It used to blank the table* |
-| Folder and tab filters | Switch folders and the report tabs | Each combination caches separately |
-| Create a report → back to list | — | Present without manual refresh |
-| Open a report for editing, go back, reopen | — | ⚠️ **A request on every open is EXPECTED — not a bug.** `reportDetailQuery` is declared but unread (§24 item 8). Only the *list* is cached |
-| Delete a report → navigate away → return | — | Gone and stays gone |
-
----
 
 ## 9. Pipelines
 
@@ -1010,43 +1235,42 @@ Run **C1–C5**. Plus:
 
 ### 9.1 Pipelines list
 
-**UI path:** Left sidebar → **Pipelines** → **Pipelines**
+**UI path:** **Left sidebar → hover Data → Pipelines** (`/web/pipeline`). The Data flyout holds
+*Streams, Pipelines, Workflows, Functions, Enrichment Tables, Data sources*.
 
-**Scope:** the two check tables below, then this page's own rows.
+**Seeding data:** `POST /api/{org}/pipelines`. ⚠️ **Only one _realtime_ pipeline is allowed per
+source stream** — a second returns *"A realtime pipeline with same source stream already
+exists"*. For bulk seeding use **scheduled** pipelines (`source.source_type: "scheduled"` with a
+`query_condition` + `trigger_condition`), which have no such limit. Page size is 20.
 
-#### What to run on this page
+> ✅ **Issue #21 was found here and is now FIXED on this branch.** The list used to render
+> **completely empty on every cold load** — *"Create your first pipeline"* with 0 rows — while
+> the query cache held every pipeline. Clicking any tab made them appear with 0 requests.
+> `filteredPipelines` is now a computed derived from the query rather than a ref hand-assigned
+> by `updateActiveTab()`. If you see an empty list on a cold load, that regression is back.
 
-**Cache checks** — the point of this PR:
+**Browser-verified with 24 pipelines (3 realtime + 21 scheduled), after the fix:**
 
-| # | Do this | Expect |
+| # | Check | Result |
 | --- | --- | --- |
-| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
-| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
-| C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
-| C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
-| C6 | Create or edit a pipeline, save | Back on the list, the pipeline is **already there** — no manual refresh |
-| C7 | Delete a pipeline → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
-| C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
+| C1 | Cold read | ✅ **1** request — `GET /api/{org}/pipelines`. Rows render immediately, **no tab click needed** (this is the #21 regression check) |
+| C2 | Warm revisit < 30 s | ✅ **0** (measured with the entry verified 8 s old) |
+| C3 | Stale revisit > 30 s | ✅ **1** request, table **never blanked** — 14 samples, rows held at 20, zero skeletons |
+| C4 | Refresh button | ✅ **1** request, rows stay on screen, no skeleton |
+| C5 | `r` shortcut | ✅ **1** request — real keypress |
+| C6 | Create / edit → back on the list | ✅ **Now passes — but only after fixing issue #22, which this row originally missed.** The editor never invalidated the pipelines scope, so a save returned to **stale rows** until you hit Refresh (measured: server 25, list stuck at 24, **0 requests** on the editor→list round trip). Fixed in `PipelineEditor.vue` **and** `ImportPipeline.vue`; re-measured: **1** request on return, total 25 → 26, the new row present. ⚠️ The canvas itself is not automatable, but the invalidation **is** — create via `POST /api/{org}/pipelines`, then do the editor→list route round trip |
+| C7 | Delete → away → straight back | ✅ Delete lives in the row's **⋮ menu** (*Export / Delete / Create Backfill*), then an **OK** confirm. 1 `DELETE` + 1 refetch, gone immediately, **still gone on return with 0 requests** |
+| C8 | Search then Refresh | ✅ Term **preserved**, filtered rows preserved. Typing fires **0** requests (client-side) |
+| S2 | Page forward, then back | ✅ **0 requests** each way |
+| S4 | Search with no matches | ✅ Proper empty state: *"No pipelines found"* |
+| S5 | Clear the search | ✅ Full list returns, **0 requests** |
+| — | Tab filter All / Scheduled / Realtime | ✅ **0 requests** each; counts add up (Realtime **3** + Scheduled **21** = All **24**). Client-side |
 
-**Smoke checks** — did the data-fetching rewrite break anything ordinary:
+> ⚠️ **The tab controls are an `OToggleGroup`, not plain buttons.** Target them by
+> `data-test="tab-all"` / `tab-scheduled` / `tab-realtime`. Selecting them by visible text inside
+> `[data-test="pipeline-list-tabs"]` silently does nothing — which looks exactly like a broken
+> filter. It cost me a false alarm.
 
-| # | Do this | Expect |
-| --- | --- | --- |
-| S1 | Sort a column (click its header) | Rows re-order, table does not blank. **Requests: 0 on most pages** — they fetch the whole list (`page_size: 100000`) and sort in the browser. **Streams is the exception**: it is server-paginated, so expect **2** (re-sorted page + prefetch of the next). Two *identical* requests on any page is the old double-fire bug |
-| S2 | Page forward, then back | Rows correct on every page; no blank flash between pages |
-| S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
-| S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
-| S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
-
-**This page's own checks** — specific to this module:
-
-| Check | Expected |
-| --- | --- |
-| Open a pipeline in the editor, go back, reopen the same one | ⚠️ **A request on every open is EXPECTED — not a bug.** `pipelineDetailQuery` is declared but unread (§24 item 8). Only the *list* is cached |
-| Delete a pipeline → navigate away → return | Gone and stays gone |
-| Import a pipeline | Appears in the list without a manual refresh |
 
 ### 9.2 Pipeline destinations
 
@@ -1078,7 +1302,7 @@ Run **C1–C5**. Plus:
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -1133,7 +1357,7 @@ Run **C1–C5**. Plus:
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -1195,7 +1419,7 @@ Run **C1–C5**. Plus:
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -1254,7 +1478,7 @@ Run **C1–C5**. Plus:
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -1296,7 +1520,7 @@ Run **C1–C5**. Plus:
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -1345,7 +1569,7 @@ Run **C1–C8** (`r` shortcut applies).
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -1385,7 +1609,7 @@ Run **C1–C8** (`r` shortcut applies).
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -1427,7 +1651,7 @@ Run **C1–C8** (`r` shortcut applies).
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -1478,7 +1702,7 @@ Run **C1–C8** (`r` shortcut applies).
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -1586,7 +1810,7 @@ Run **C1–C8** (`r` shortcut applies).
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -1631,7 +1855,7 @@ Run **C1–C8**.
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -1683,7 +1907,7 @@ Run **C1–C8**.
 | S3 | Select several rows → bulk action (delete/move) if the page has one | All selected rows affected; count updates; selection clears |
 | S4 | Search for something with **no** matches | A proper empty state — not a spinner, not stale rows |
 | S5 | Clear the search | Full list returns |
-| S6 | Export / download if the page offers it | Produces a file containing the rows you can see |
+| S6 | Export / download if the page offers it | Produces a file containing the rows you can see. **The control differs per page:** Alerts opens an Export dialog (JSON / Terraform tabs, then Download); **Destinations downloads immediately** from the ⬇ download-arrow icon in the Actions column — no dialog. Both are correct |
 
 **This page's own checks** — specific to this module:
 
@@ -2068,7 +2292,7 @@ worth a decision.
    `setQueryData` write-through is new. Neither exists on `main`.
 
    Affects [`useFavoriteDashboards.ts`](./src/composables/useFavoriteDashboards.ts) and,
-   by the same pattern, [`useHomeDashboard.ts`](./src/composables/useHomeDashboard.ts)
+   and — ⚠️ **by code inspection only, not tested** — [`useHomeDashboard.ts`](./src/composables/useHomeDashboard.ts)
    (home-dashboard pin). Fix: invalidate instead of `setQueryData`, or persist explicitly
    after it the way `usePanelCache` does with `persistQueryByKey`.
 

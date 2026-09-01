@@ -647,7 +647,13 @@ const confirmDialogMeta: any = ref({
   onConfirm: () => {},
 });
 const activeTab = ref("all");
-const filteredPipelines: any = ref([]);
+// Derived, not assigned: a copy written only by updateActiveTab() is empty on a
+// cold mount, because that runs before the query resolves and nothing re-runs it.
+const filteredPipelines = computed<any[]>(() =>
+  activeTab.value === "all"
+    ? pipelines.value
+    : pipelines.value.filter((pipeline: any) => pipeline.source.source_type === activeTab.value),
+);
 const columns: any = ref([]);
 
 const selectedPipelineIds = ref<string[]>([]);
@@ -816,16 +822,6 @@ const summaryStats = computed<StatItem[]>(() => {
 
 const updateActiveTab = () => {
   expandedId.value = [];
-  if (activeTab.value === "all") {
-    columns.value = getColumnsForActiveTab(activeTab.value);
-    filteredPipelines.value = pipelines.value;
-    return;
-  }
-
-  filteredPipelines.value = pipelines.value.filter(
-    (pipeline: any) => pipeline.source.source_type === activeTab.value,
-  );
-
   columns.value = getColumnsForActiveTab(activeTab.value);
 };
 //this is the function to check whether the pipeline is enabled or not

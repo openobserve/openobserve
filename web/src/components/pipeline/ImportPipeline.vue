@@ -407,6 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { queryClient } from "@/composables/query/queryClient";
+import { pipelineKeys } from "@/services/pipelines.querykeys";
 import { defineComponent, ref, onMounted, computed, defineAsyncComponent } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -681,14 +682,23 @@ export default defineComponent({
       }
 
       let allPipelinesCreated = true;
+      let anyPipelineCreated = false;
       isPipelineImporting.value = true;
 
       // Process each object in the array
       for (const [index, jsonObj] of jsonArrayOfObj.value.entries()) {
         const success = await processJsonObject(jsonObj, index + 1);
-        if (!success) {
-          allPipelinesCreated = false;
-        }
+        if (success) anyPipelineCreated = true;
+        else allPipelinesCreated = false;
+      }
+
+      // Once for the whole batch, not per item: the list stays mounted behind
+      // this child route, so an invalidation per pipeline would refetch it N times.
+      // Runs on partial success too — those pipelines still exist.
+      if (anyPipelineCreated) {
+        void queryClient.invalidateQueries({
+          queryKey: pipelineKeys.all(store.state.selectedOrganization.identifier),
+        });
       }
 
       if (allPipelinesCreated) {
