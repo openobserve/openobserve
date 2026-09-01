@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
+import useCorrelatedTracesStream, {
+  traceQueryWindow,
+  TRACE_RANGE_PADDING_US,
+} from "@/composables/rum/useCorrelatedTracesStream";
 import i18nInstance from "@/locales";
 const t = (i18nInstance.global as any).t;
 
@@ -54,7 +57,7 @@ const mockStoreState = {
   selectedOrganization: { identifier: "test-org" },
   organizationData: {
     correlatedTracesStreams: {
-      byTraceId: {} as Record<string, string>,
+      byTraceId: {} as Record<string, { stream: string; range?: any }>,
       knownStreams: [] as string[],
     },
   },
@@ -63,7 +66,7 @@ const mockCommit = vi.fn((type: string, payload: any) => {
   if (type !== "setCorrelatedTracesStream") return;
   const cache = mockStoreState.organizationData.correlatedTracesStreams;
   if (Object.keys(cache.byTraceId).length >= 1000) cache.byTraceId = {};
-  cache.byTraceId[payload.traceId] = payload.stream;
+  cache.byTraceId[payload.traceId] = { stream: payload.stream, range: payload.range };
   if (!cache.knownStreams.includes(payload.stream)) cache.knownStreams.push(payload.stream);
 });
 vi.mock("vuex", () => ({
@@ -450,6 +453,57 @@ describe("useCorrelatedTracesStream", () => {
       expect(mockGetTraceTimeRanges).toHaveBeenCalledTimes(2);
     });
 
+    it("carries the indexed range into the resolved location and the cache", async () => {
+      const range = { start_time: 5_000, end_time: 9_000 };
+      mockGetTraceTimeRanges.mockResolvedValue(
+        indexResponse([{ trace_id: T1, stream: "payments_traces", status: "found", range }]),
+      );
+      const { resolveTraceLocation } = useCorrelatedTracesStream(t);
+
+      expect(await resolveTraceLocation(T1, 1_000, 2_000)).toEqual({
+        stream: "payments_traces",
+        range,
+      });
+      expect(mockStoreState.organizationData.correlatedTracesStreams.byTraceId[T1]).toEqual({
+        stream: "payments_traces",
+        range,
+      });
+    });
+
+    it("a probe-path answer carries no range", async () => {
+      mockBatch({ payments_traces: [T1] });
+      const { resolveTraceLocation } = useCorrelatedTracesStream(t);
+
+      expect(await resolveTraceLocation(T1, 1_000, 2_000)).toEqual({ stream: "payments_traces" });
+    });
+
+    it("a single-stream org looks the range up narrowed to that stream", async () => {
+      mockGetStreams.mockResolvedValue({ list: [{ name: "only_traces" }] });
+      const range = { start_time: 5_000, end_time: 9_000 };
+      mockGetTraceTimeRanges.mockResolvedValue(
+        indexResponse([{ trace_id: T1, stream: "only_traces", status: "found", range }]),
+      );
+      const { resolveTraceLocation } = useCorrelatedTracesStream(t);
+
+      expect(await resolveTraceLocation(T1, 1_000, 2_000)).toEqual({
+        stream: "only_traces",
+        range,
+      });
+      expect(mockGetTraceTimeRanges.mock.calls[0][1].streams).toEqual(["only_traces"]);
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
+    it("a single-stream org still returns its stream when the index cannot answer", async () => {
+      mockGetStreams.mockResolvedValue({ list: [{ name: "only_traces" }] });
+      const { resolveTraceLocation } = useCorrelatedTracesStream(t);
+
+      expect(await resolveTraceLocation(T1, 1_000, 2_000)).toEqual({
+        stream: "only_traces",
+        range: undefined,
+      });
+      expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+    });
+
     it("a 404 latches the endpoint off for the rest of the session", async () => {
       // A fresh module instance: the latch is module state by design, so this
       // test must not leave the endpoint disabled for the others.
@@ -466,5 +520,18 @@ describe("useCorrelatedTracesStream", () => {
       expect(await resolveTracesStream(T2, 1_000, 2_000)).toBe("payments_traces");
       expect(mockGetTraceTimeRanges).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("traceQueryWindow", () => {
+  it("pads an indexed range on both sides", () => {
+    expect(traceQueryWindow({ start_time: 1_000_000, end_time: 2_000_000 }, 7, 8)).toEqual({
+      startTime: 1_000_000 - TRACE_RANGE_PADDING_US,
+      endTime: 2_000_000 + TRACE_RANGE_PADDING_US,
+    });
+  });
+
+  it("falls back to the caller's window when there is no range", () => {
+    expect(traceQueryWindow(undefined, 7, 8)).toEqual({ startTime: 7, endTime: 8 });
   });
 });

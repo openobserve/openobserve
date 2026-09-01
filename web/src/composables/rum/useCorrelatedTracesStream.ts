@@ -29,6 +29,23 @@ export interface TraceLocation {
   range?: TraceTimeRange;
 }
 
+// A found range can be a lower bound (`partial`), and span timestamps sit at
+// its very edges — pad before querying with it.
+export const TRACE_RANGE_PADDING_US = 60_000_000; // ±1 min
+
+/** The window to query a trace over: its indexed range padded, else the caller's. */
+export function traceQueryWindow(
+  range: TraceTimeRange | undefined,
+  fallbackStartUs: number,
+  fallbackEndUs: number,
+): { startTime: number; endTime: number } {
+  if (!range) return { startTime: fallbackStartUs, endTime: fallbackEndUs };
+  return {
+    startTime: range.start_time - TRACE_RANGE_PADDING_US,
+    endTime: range.end_time + TRACE_RANGE_PADDING_US,
+  };
+}
+
 // Probes look up a trace by id, but the caller's window is event-derived and
 // ingestion can lag it — widen like useRumSpanBuilder's RUM_TIME_BUFFER_US,
 // but generously: probes are `limit 1` point lookups, so the wider window is
@@ -39,7 +56,7 @@ const PROBE_TIME_BUFFER_US = 300_000_000; // ±5 min
 // Traces tab racing on page load). Transient in-progress work, deliberately
 // NOT in the Vuex store: entries delete themselves on settle, so org-switch
 // staleness cannot apply.
-const inFlight = new Map<string, Promise<string>>();
+const inFlight = new Map<string, Promise<TraceLocation>>();
 
 // A 404 means this deployment has no time-range endpoint at all, which no
 // retry can change — latch it off for the session rather than paying a failed
@@ -259,23 +276,24 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     return found;
   };
 
-  const record = (traceId: string, stream: string) => {
-    store.commit("setCorrelatedTracesStream", { traceId, stream });
+  const record = (traceId: string, stream: string, range?: TraceTimeRange) => {
+    store.commit("setCorrelatedTracesStream", { traceId, stream, range });
   };
 
   /**
-   * id → stream for every id found (absent = found nowhere; callers fall back
-   * to RUM_CORRELATION_TRACES_STREAM per id). Two-step escalation: probe
-   * `knownStreams` for the whole set first; only unresolved ids go on to the
-   * remaining streams. Never rejects.
+   * id → location for every id found (absent = found nowhere; callers fall
+   * back to RUM_CORRELATION_TRACES_STREAM per id). The index answers first and
+   * carries the trace's real range; only ids it could not cover fall through
+   * to the probe, which escalates `knownStreams` → the remaining streams and
+   * yields a stream but no range. Never rejects.
    */
-  const resolveTracesStreamsBulk = async (
+  const resolveTraceLocationsBulk = async (
     traceIds: string[],
     startTimeUs: number,
     endTimeUs: number,
-  ): Promise<Record<string, string>> => {
+  ): Promise<Record<string, TraceLocation>> => {
     try {
-      const result: Record<string, string> = {};
+      const result: Record<string, TraceLocation> = {};
       const toResolve: string[] = [];
       for (const rawId of traceIds) {
         const canonical = normalizeTraceId(rawId);
@@ -289,9 +307,15 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       const allStreams = await listTracesStreams();
       if (!allStreams.length) return result;
       if (allStreams.length === 1) {
+        // The stream is already known; the lookup is for the range alone, so
+        // an unanswered id still resolves to that stream.
+        const ranges = indexEndpointAvailable
+          ? await lookupTraceLocations(allStreams, toResolve, startTimeUs, endTimeUs, allStreams)
+          : { found: {} as Record<string, TraceLocation> };
         for (const id of toResolve) {
-          result[id] = allStreams[0];
-          record(id, allStreams[0]);
+          const location = { stream: allStreams[0], range: ranges.found[id]?.range };
+          result[id] = location;
+          record(id, location.stream, location.range);
         }
         return result;
       }
@@ -301,8 +325,8 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       if (indexEndpointAvailable) {
         const lookup = await lookupTraceLocations(allStreams, toResolve, startTimeUs, endTimeUs);
         for (const [id, location] of Object.entries(lookup.found)) {
-          result[id] = location.stream;
-          record(id, location.stream);
+          result[id] = location;
+          record(id, location.stream, location.range);
         }
         pending = lookup.unanswered;
       }
@@ -312,7 +336,7 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       const step1Streams = known.length ? known : allStreams;
       const step1 = await probeBatch(step1Streams, pending, startTimeUs, endTimeUs);
       for (const [id, stream] of Object.entries(step1)) {
-        result[id] = stream;
+        result[id] = { stream };
         record(id, stream);
       }
 
@@ -322,7 +346,7 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       if (unresolved.length && unprobed.length) {
         const step2 = await probeBatch(unprobed, unresolved, startTimeUs, endTimeUs);
         for (const [id, stream] of Object.entries(step2)) {
-          result[id] = stream;
+          result[id] = { stream };
           record(id, stream);
         }
       }
@@ -334,16 +358,16 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
   };
 
   /**
-   * The stream containing `traceId`, else RUM_CORRELATION_TRACES_STREAM.
-   * Never rejects.
+   * Where `traceId` lives, falling back to RUM_CORRELATION_TRACES_STREAM with
+   * no range. Never rejects.
    */
-  const resolveTracesStream = async (
+  const resolveTraceLocation = async (
     traceId: string,
     startTimeUs: number,
     endTimeUs: number,
-  ): Promise<string> => {
+  ): Promise<TraceLocation> => {
     const canonical = normalizeTraceId(traceId);
-    if (!canonical) return RUM_CORRELATION_TRACES_STREAM;
+    if (!canonical) return { stream: RUM_CORRELATION_TRACES_STREAM };
 
     const cached = cache().byTraceId[canonical];
     if (cached) return cached;
@@ -352,8 +376,8 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     if (pending) return pending;
 
     const promise = (async () => {
-      const found = await resolveTracesStreamsBulk([canonical], startTimeUs, endTimeUs);
-      return found[canonical] ?? RUM_CORRELATION_TRACES_STREAM;
+      const found = await resolveTraceLocationsBulk([canonical], startTimeUs, endTimeUs);
+      return found[canonical] ?? { stream: RUM_CORRELATION_TRACES_STREAM };
     })().finally(() => {
       inFlight.delete(canonical);
     });
@@ -361,5 +385,32 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     return promise;
   };
 
-  return { resolveTracesStream, resolveTracesStreamsBulk };
+  /**
+   * The stream containing `traceId`, else RUM_CORRELATION_TRACES_STREAM.
+   * Never rejects.
+   */
+  const resolveTracesStream = async (
+    traceId: string,
+    startTimeUs: number,
+    endTimeUs: number,
+  ): Promise<string> => (await resolveTraceLocation(traceId, startTimeUs, endTimeUs)).stream;
+
+  /** id → stream for every id found. Never rejects. */
+  const resolveTracesStreamsBulk = async (
+    traceIds: string[],
+    startTimeUs: number,
+    endTimeUs: number,
+  ): Promise<Record<string, string>> => {
+    const locations = await resolveTraceLocationsBulk(traceIds, startTimeUs, endTimeUs);
+    return Object.fromEntries(
+      Object.entries(locations).map(([id, location]) => [id, location.stream]),
+    );
+  };
+
+  return {
+    resolveTraceLocation,
+    resolveTraceLocationsBulk,
+    resolveTracesStream,
+    resolveTracesStreamsBulk,
+  };
 }
