@@ -124,22 +124,25 @@ impl FlightService for FlightServiceImpl {
         .instrument(span.clone())
         .await;
 
-        log::info!(
-            "{}",
-            search_inspector_fields(
-                format!(
-                    "[trace_id {trace_id}] flight->do_get: get_ctx_and_physical_plan took: {} ms",
-                    _start.elapsed().as_millis(),
-                ),
-                SearchInspectorFieldsBuilder::new()
-                    .trace_id(trace_id.to_string())
-                    .node_name(LOCAL_NODE.name.clone())
-                    .component("flight::do_get get_ctx_and_physical_plan".to_string())
-                    .search_role("follower".to_string())
-                    .duration(_start.elapsed().as_millis() as usize)
-                    .build()
-            )
-        );
+        // runs after the instrumented future: without in_scope the event has no current span
+        span.in_scope(|| {
+            log::info!(
+                "{}",
+                search_inspector_fields(
+                    format!(
+                        "[trace_id {trace_id}] flight->do_get: get_ctx_and_physical_plan took: {} ms",
+                        _start.elapsed().as_millis(),
+                    ),
+                    SearchInspectorFieldsBuilder::new()
+                        .trace_id(trace_id.to_string())
+                        .node_name(LOCAL_NODE.name.clone())
+                        .component("flight::do_get get_ctx_and_physical_plan".to_string())
+                        .search_role("follower".to_string())
+                        .duration(_start.elapsed().as_millis() as usize)
+                        .build()
+                )
+            );
+        });
 
         // prepare dataufion context
         let (ctx, plan, lock, scan_stats) = match result {

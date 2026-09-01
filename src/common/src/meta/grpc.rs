@@ -34,8 +34,7 @@ impl Extractor for MetadataMap<'_> {
     }
 }
 
-/// Attach `parent_cx` to `span`, synthesizing a remote parent from the logical
-/// `trace_id` when the caller propagated no usable trace context.
+/// Attach `parent_cx` to `span`, falling back to a remote parent built from the logical `trace_id`.
 pub fn set_parent_or_trace_id(
     span: &tracing::Span,
     parent_cx: opentelemetry::Context,
