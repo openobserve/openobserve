@@ -7600,7 +7600,6 @@
   "alert_library": {
     "header": "Biblioteca de alertas",
     "subtitle": "Alertas seleccionadas, listas para instalar, que coinciden con los datos que ya ingiere",
-    "sectionTab": "Biblioteca",
     "contribute": "Contribuir en GitHub",
     "searchPlaceholder": "Buscar por nombre, descripción o stream",
     "searchLabel": "Buscar en la biblioteca de alertas",
@@ -7934,7 +7933,6 @@
     "destinationsLoadError": "Error al cargar los destinos"
   },
   "alert_destinations": {
-    "sectionTab": "Destinos",
     "chooseTypeTitle": "Elegir tipo",
     "selectDestinationType": "Selecciona el tipo de destino",
     "connectionStepTitle": "Conexión",
@@ -11066,7 +11064,14 @@
           "typeCategorical": "Categórico",
           "typeBoolean": "Booleano",
           "threshold": "Umbral",
-          "measurePerRow": "Media por fila, entre ensayos"
+          "measurePerRow": "Media por fila, entre ensayos",
+          "dimensionImproved": "{count} fila mejorada | {count} filas mejoradas",
+          "dimensionUnchanged": "{count} fila sin cambios | {count} filas sin cambios",
+          "dimensionRegressed": "{count} fila empeorada | {count} filas empeoradas",
+          "dimensionNotCounted": "No contado",
+          "dimensionNotCountedHint": "Este evaluador no tiene política de comparación en su Configuración de Puntuación, por lo que sus valores se informan pero nunca se juzgan como mejorados o empeorados — y no puede afectar el resultado. Dale una dirección y un umbral para que se tenga en cuenta.",
+          "dimensionNoneCompared": "Nada comparado",
+          "dimensionNoneComparedHint": "Ninguna fila fue medida en ambos lados. Una fila que se ejecutó solo en un experimento no tiene de dónde partir, por lo que no cuenta para ninguna dirección."
         },
         "rowDrawer": {
           "fallbackTitle": "Fila de comparación",
@@ -11431,6 +11436,7 @@
         "republishedSuccess": "Descripción actualizada. La versión {version} no ha cambiado.",
         "draftSuccess": "Borrador guardado. Prueba la conexión para publicarlo.",
         "draftError": "No se pudo guardar el borrador",
+        "testFailed": "La prueba de conexión falló",
         "publishFailed": "La conexión de prueba falló, por lo que no se publicó nada. Tu borrador está guardado.",
         "createError": "No se pudo publicar la tarea remota",
         "validation": {
@@ -14241,8 +14247,6 @@
       "passwordSetHelp": "Ya se ha establecido una contraseña. Déjela en blanco para conservarla, o escriba una nueva para reemplazarla.",
       "showUptimePercent": "Mostrar porcentaje de tiempo de actividad",
       "showTimelineBars": "Mostrar barras de línea de tiempo",
-      "showResponseTime": "Mostrar tiempo de respuesta",
-      "showResponseTimeHelp": "Desactive esta opción para que la página no revele los números de rendimiento.",
       "noindex": "Desalentar la indexación en buscadores",
       "noindexHelp": "Añade una etiqueta noindex para que los motores de búsqueda omitan la página pública.",
       "confirmFailures": "Confirmar fallos",
@@ -14301,6 +14305,9 @@
       "deleting": "Eliminando actualización...",
       "deleted": "Actualización eliminada",
       "deleteFailed": "Error al eliminar la actualización",
+      "affects": "Afecta",
+      "allComponents": "Todos los componentes",
+      "componentsUnavailable": "Componentes que ya no están en esta página",
       "state": {
         "scheduled": "Programado",
         "active": "Activo",
