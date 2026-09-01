@@ -1949,7 +1949,7 @@ mod tests {
         infra_table::user_password_history::delete_all_for_user(email)
             .await
             .unwrap();
-        create_system_settings_table().await;
+        let _ = infra_table::system_settings::create_table().await;
         db::password_policy::set_policy(&PasswordPolicy {
             history_count: 2,
             ..Default::default()
@@ -1998,20 +1998,6 @@ mod tests {
         db::password_policy::set_policy(&PasswordPolicy::default())
             .await
             .unwrap();
-    }
-
-    /// The policy row lives in `system_settings`, whose table only a migration creates — and the
-    /// fixture above builds its tables from the entities instead of migrating.
-    async fn create_system_settings_table() {
-        use sea_orm::{ConnectionTrait, Schema};
-
-        let client = get_orm_client_rw().await;
-        let builder = client.get_database_backend();
-        let stmt = Schema::new(builder)
-            .create_table_from_entity(infra::table::entity::system_settings::Entity)
-            .if_not_exists()
-            .take();
-        let _ = client.execute(builder.build(&stmt)).await;
     }
 
     async fn self_change_password(email: &str, old: &str, new: &str) -> Response {

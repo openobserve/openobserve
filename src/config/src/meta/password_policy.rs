@@ -207,6 +207,43 @@ impl std::str::FromStr for PasswordResetReason {
     }
 }
 
+impl LockoutPolicy {
+    /// Whether lockout is switched on at all. `0` is the default, so an unconfigured instance
+    /// never reads or writes lockout state.
+    pub fn is_enabled(&self) -> bool {
+        self.threshold != 0
+    }
+
+    /// Failed attempts tolerated before the lockout at `level` (0 = not locked out yet) triggers.
+    pub fn bucket(&self, level: u32) -> u32 {
+        if level == 0 || self.bucket_size == 0 {
+            self.threshold
+        } else {
+            self.bucket_size
+        }
+    }
+
+    /// How long the lockout at `level` lasts. `level` is 1-based, so the first lockout is
+    /// `start_secs` under either backoff.
+    ///
+    /// Saturating throughout: an exponential backoff that ran long enough would otherwise wrap and
+    /// hand a serial attacker a *shorter* lockout the deeper they get.
+    pub fn duration_secs(&self, level: u32) -> i64 {
+        if level == 0 {
+            return 0;
+        }
+        let start = u64::from(self.start_secs);
+        let secs = match self.backoff {
+            LockoutBackoff::Linear => start.saturating_mul(u64::from(level)),
+            LockoutBackoff::Exponential => match level - 1 {
+                shift if shift < 63 => start.saturating_mul(1u64 << shift),
+                _ => u64::MAX,
+            },
+        };
+        secs.min(u64::from(self.max_secs)) as i64
+    }
+}
+
 impl Default for LockoutPolicy {
     fn default() -> Self {
         Self {
@@ -336,11 +373,7 @@ impl PasswordPolicy {
 
     /// Failed attempts tolerated before the lockout at `level` (0 = no lockout yet) triggers.
     pub fn lockout_bucket(&self, level: u32) -> u32 {
-        if level == 0 || self.lockout.bucket_size == 0 {
-            self.lockout.threshold
-        } else {
-            self.lockout.bucket_size
-        }
+        self.lockout.bucket(level)
     }
 
     /// Reject combinations that contradict themselves. Errors name the offending field so the API
@@ -522,6 +555,50 @@ mod tests {
         p.lockout.bucket_size = 2;
         assert_eq!(p.lockout_bucket(0), 5);
         assert_eq!(p.lockout_bucket(1), 2);
+    }
+
+    #[test]
+    fn test_lockout_duration_backoff() {
+        let mut lockout = LockoutPolicy {
+            threshold: 3,
+            bucket_size: 0,
+            start_secs: 60,
+            max_secs: 3600,
+            backoff: LockoutBackoff::Linear,
+        };
+        assert_eq!(lockout.duration_secs(0), 0);
+        assert_eq!(lockout.duration_secs(1), 60);
+        assert_eq!(lockout.duration_secs(3), 180);
+        assert_eq!(lockout.duration_secs(100), 3600, "clamped to max_secs");
+
+        lockout.backoff = LockoutBackoff::Exponential;
+        assert_eq!(lockout.duration_secs(1), 60, "first lockout matches linear");
+        assert_eq!(lockout.duration_secs(2), 120);
+        assert_eq!(lockout.duration_secs(3), 240);
+        assert_eq!(lockout.duration_secs(7), 3600, "clamped to max_secs");
+    }
+
+    #[test]
+    fn test_lockout_duration_never_wraps() {
+        let lockout = LockoutPolicy {
+            threshold: 3,
+            bucket_size: 0,
+            start_secs: u32::MAX,
+            max_secs: u32::MAX,
+            backoff: LockoutBackoff::Exponential,
+        };
+        // A level deep enough to overflow must stay clamped at the maximum, never wrap to a
+        // shorter lockout than the level before it.
+        assert_eq!(lockout.duration_secs(64), i64::from(u32::MAX));
+        assert_eq!(lockout.duration_secs(u32::MAX), i64::from(u32::MAX));
+    }
+
+    #[test]
+    fn test_lockout_is_enabled() {
+        let mut lockout = LockoutPolicy::default();
+        assert!(!lockout.is_enabled(), "off by default");
+        lockout.threshold = 1;
+        assert!(lockout.is_enabled());
     }
 
     fn rotating(days: u32, warning_days: u32) -> PasswordPolicy {

@@ -29,7 +29,7 @@ use config::{
     meta::user::UserRole,
     utils::{base64, json, password::validate_password_strength_with_policy},
 };
-use openobserve_api_common::extractors::Headers;
+use openobserve_api_common::{auth::validator::AuthError, extractors::Headers};
 use openobserve_core::{
     auth::{UserEmail, generate_presigned_url, is_valid_email},
     users,
@@ -631,6 +631,11 @@ pub async fn authentication(
                 return unauthorized_error(resp);
             }
         }
+        Err(AuthError::Locked { retry_after_secs }) => {
+            #[cfg(feature = "enterprise")]
+            audit_locked_error(audit_message).await;
+            return locked_error(resp, retry_after_secs);
+        }
         Err(_e) => {
             #[cfg(feature = "enterprise")]
             audit_unauthorized_error(audit_message).await;
@@ -1030,12 +1035,38 @@ fn unauthorized_error(mut resp: SignInResponse) -> Response {
         .unwrap()
 }
 
+/// The lockout refusal, which unlike [`unauthorized_error`] has something to tell the caller: how
+/// long to wait. 429 with `Retry-After` matches what the API path returns for the same state.
+fn locked_error(mut resp: SignInResponse, retry_after_secs: i64) -> Response {
+    resp.status = false;
+    resp.message = openobserve_api_common::auth::validator::lockout_message(retry_after_secs);
+    resp.lockout_retry_after_secs = Some(retry_after_secs);
+    Response::builder()
+        .status(StatusCode::TOO_MANY_REQUESTS)
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::RETRY_AFTER, retry_after_secs)
+        .body(Body::from(serde_json::to_string(&resp).unwrap()))
+        .unwrap()
+}
+
 #[cfg(feature = "enterprise")]
 async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
+    audit_login_failure(audit_message, 401).await;
+}
+
+/// A lockout is audited under its own status code: an audit trail that reported every refused login
+/// as a 401 would hide the difference between a wrong password and an account under attack.
+#[cfg(feature = "enterprise")]
+async fn audit_locked_error(audit_message: AuditMessage) {
+    audit_login_failure(audit_message, 429).await;
+}
+
+#[cfg(feature = "enterprise")]
+async fn audit_login_failure(mut audit_message: AuditMessage, http_response_code: u16) {
     use chrono::Utc;
 
     audit_message._timestamp = Utc::now().timestamp_micros();
-    audit_message.response_meta.http_response_code = 401;
+    audit_message.response_meta.http_response_code = http_response_code;
     // Even if the user_email of audit_message is not set, still the event should be audited
     audit(audit_message).await;
 }

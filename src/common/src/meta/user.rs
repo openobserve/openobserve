@@ -265,6 +265,10 @@ pub struct SignInResponse {
     /// window. Advisory: a client that ignores it is never broken by one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub password_rotation_warning: Option<i64>,
+    /// Seconds until a locked-out account may try again, present only on that refusal. The number
+    /// rather than a sentence, so the console can render it in the viewer's own language.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lockout_retry_after_secs: Option<i64>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, ToSchema)]
