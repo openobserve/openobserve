@@ -703,7 +703,11 @@ export default defineComponent({
       });
     };
     const getCustomRoles = async (options: { silent?: boolean } = {}) => {
-      if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
+      if (
+        (config.isEnterprise !== "true" && config.isCloud !== "true") ||
+        !store.state.zoConfig.rbac_enabled
+      )
+        return;
       try {
         const res = await getCustomRolesApi(store.state.selectedOrganization.identifier);
         customRoles.value = Array.isArray(res.data) ? res.data : [];
@@ -836,7 +840,7 @@ export default defineComponent({
             // fire-and-forget — and re-render the rows when it resolves,
             // keeping the table responsive instead of blocking the whole UI
             // on the role API.
-            if (isEnterpriseOrCloud) {
+            if (isEnterpriseOrCloud && store.state.zoConfig.rbac_enabled) {
               const orgId = store.state.selectedOrganization.identifier;
               // Don't await — let the batched role fetch run in the background.
               usersService

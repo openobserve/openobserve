@@ -107,6 +107,60 @@ class WorkflowsPage {
     // Post-save "link to alerts" dialog (ODialog): Skip = secondary button.
     this.linkAlertsDialog = '[data-test="workflow-link-alerts-dialog"]';
     this.dialogSecondary = '[data-test="o-dialog-secondary-btn"]';
+    // Trigger config panel — a READ-ONLY payload reference, no config to save.
+    // Kinds with `commonMetaKeys` (incidents) render a SPLIT view: a variant
+    // OSelect plus common/event-specific blocks. Kinds without (alerts) render a
+    // single combined block. `no-extras` replaces the specific block when an
+    // event_type adds nothing (e.g. `created`, whose extras are {}).
+    // Canvas chrome + per-node selectors. Node-scoped ones are factories (same
+    // pattern as stepTriggerFor/destTypeCard) because they key on node_type / name.
+    this.dialogOverlay = '[data-test="o-dialog-overlay"]';
+    this.palette = '[data-test="workflow-palette"]';
+    this.paletteCollapseBtn = '[data-test="workflow-palette-collapse-btn"]';
+    this.nodeFor = (t) => `[data-test="workflow-node-${t}"]`;
+    this.nodeTestOkFor = (t) => `[data-test="workflow-node-${t}-test-ok"]`;
+    this.nodeTestErrorFor = (t) => `[data-test="workflow-node-${t}-test-error"]`;
+    this.listRowPrefixFor = (n) => `[data-test^="workflow-list-${n}-"]`;
+    this.listRowActionFor = (n, a) => `[data-test="workflow-list-${n}-${a}"]`;
+    // NDV output pane — on a successful destination send this holds the sink's
+    // response body, which is what makes delivery assertable.
+    this.ndvOutput = '[data-test="workflow-ndv-output"]';
+    // Test-run drawer. Still a real ODrawer (WorkflowTestDialog.vue) — only the NODE
+    // config panel became an ODialog — so its buttons stay `o-drawer-*`.
+    this.testDrawer = '[data-test="workflow-test-drawer"]';
+    this.testDrawerPrimary = '[data-test="workflow-test-drawer"] [data-test="o-drawer-primary-btn"]';
+    // Workflow function code editor (QuickJS/JavaScript), shared with the Functions page.
+    this.functionEditor = '[data-test="logs-vrl-function-editor"]';
+    // Warning toast — how a blocked Publish reports itself, since it never reaches the network.
+    this.warningToast = '[data-test^="o-toast-"][data-test-variant="warning"]';
+    this.anyToast = '[role="alert"], .q-notification__message';
+    this.confirmButton =
+      '[data-test$="-confirm-button"], [data-test="dlg-primary"], button:has-text("OK"), button:has-text("Delete")';
+    // Destination header rows are keyed by the header's CURRENT key, so these are
+    // functions rather than constants — a blank row answers to the empty-key form.
+    this.destHeaderKeyField = (key = '') => `[data-test="add-destination-header-${key}-key-input-field"]`;
+    this.destHeaderValueField = (key = '') => `[data-test="add-destination-header-${key}-value-input-field"]`;
+    this.triggerBody = '[data-test="workflow-trigger-body"]';
+    this.triggerVariantTrigger = '[data-test="workflow-trigger-sample-variant-trigger"]';
+    this.triggerVariantOption = '[data-test="workflow-trigger-sample-variant-option"]';
+    // Condition node body + the shared ConditionBuilder. OFormSelect/OFormInput
+    // bind {...$attrs} onto OSelect/OInput, so the consumer data-test lands on the
+    // wrapper and the interactive child is `-trigger` (select) / `-field` (input).
+    // Options carry data-test-value, so a rule is picked by VALUE, not by label.
+    this.conditionBody = '[data-test="workflow-condition-body"]';
+    this.conditionNote = '[data-test="workflow-condition-note"]';
+    this.conditionNoteDismiss = '[data-test="workflow-condition-note-dismiss"]';
+    this.conditionBuilder = '[data-test="condition-builder"]';
+    this.condColumnTrigger = '[data-test="alert-conditions-select-column-trigger"]';
+    this.condColumnSearch = '[data-test="alert-conditions-select-column-search"]';
+    this.condColumnOption = '[data-test="alert-conditions-select-column-option"]';
+    this.condOperatorTrigger = '[data-test="alert-conditions-operator-select-trigger"]';
+    this.condOperatorOption = '[data-test="alert-conditions-operator-select-option"]';
+    // v-if'd away entirely for unary operators (is_null/is_empty/...) — absence,
+    // not an empty string, is what a unary operator looks like in the DOM.
+    this.condValueField = '[data-test="alert-conditions-value-input-field"]';
+    this.condAddBtn = '[data-test="alert-conditions-add-condition-btn"]';
+    this.condDeleteBtn = '[data-test="alert-conditions-delete-condition-btn"]';
   }
 
   // Workflows is an Enterprise-only feature: on a build without it the API answers 404/403.
@@ -270,7 +324,7 @@ class WorkflowsPage {
     const close = this.page.locator(this.drawerClose);
     if (await close.count()) {
       await close.first().click({ timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
-      await this.page.locator('[data-test="o-dialog-overlay"]')
+      await this.page.locator(this.dialogOverlay)
         .waitFor({ state: 'detached', timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
     }
   }
@@ -280,9 +334,9 @@ class WorkflowsPage {
    * config drawer. The palette is the reliable add path — the on-node hover-`+` is hidden.
    */
   async ensureNodePaletteOpen() {
-    const rail = this.page.locator('[data-test="workflow-palette"]');
+    const rail = this.page.locator(this.palette);
     if (await rail.isVisible().catch(() => false)) return;
-    await this.page.locator('[data-test="workflow-palette-collapse-btn"]').click();
+    await this.page.locator(this.paletteCollapseBtn).click();
     await rail.waitFor({ state: 'visible' });
   }
 
@@ -295,11 +349,148 @@ class WorkflowsPage {
     // does NOT auto-open the config panel. Click the freshly-added node to open
     // its drawer. Multiple nodes of the same type can coexist; last() picks the
     // newest for the caller's follow-up config.
-    const nodeSel = `[data-test="workflow-node-${type}"]`;
+    const nodeSel = this.nodeFor(type);
     const node = this.page.locator(nodeSel).last();
     await node.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
     await node.click({ timeout: DRAWER_TIMEOUT_MS });
     await this.page.locator(this.nodeDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /**
+   * Add one header row to the inline create-destination form. The row's data-test is
+   * keyed by the header's CURRENT key, so the blank row is `...-header--key-input` and
+   * the value input only answers to its final name once the key has been typed.
+   * The backend forwards these on every send (batch_execution.rs applies
+   * `endpoint.headers` to the outbound request), which is what lets a workflow post
+   * into an authenticated endpoint.
+   */
+  async setDestinationHeader(key, value) {
+    await this.page.locator(this.destHeaderKeyField()).fill(key, { timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.destHeaderValueField(key)).fill(value, { timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** Pick an OSelect option by its VALUE (options stamp data-test-value). */
+  async pickSelectOption(triggerSel, optionSel, value) {
+    await this.page.locator(triggerSel).click({ timeout: DRAWER_TIMEOUT_MS });
+    const option = this.page.locator(`${optionSel}[data-test-value="${value}"]`).first();
+    await option.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await option.click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** Values of every option an OSelect currently offers. */
+  async selectOptionValues(triggerSel, optionSel) {
+    await this.page.locator(triggerSel).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(optionSel).first().waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    const values = await this.page.locator(optionSel).evaluateAll((els) =>
+      els.map((e) => e.getAttribute('data-test-value'))
+    );
+    await this.page.keyboard.press('Escape');
+    return values.filter(Boolean);
+  }
+
+  // ---------- trigger config panel ----------
+  /** Open the trigger node's read-only payload reference. */
+  async openTriggerConfig() {
+    await this.page.locator(this.triggerNode).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.nodeDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** The event_type values the incident trigger offers as sample variants. */
+  async triggerVariantValues() {
+    return this.selectOptionValues(this.triggerVariantTrigger, this.triggerVariantOption);
+  }
+
+  async selectTriggerVariant(eventType) {
+    await this.pickSelectOption(this.triggerVariantTrigger, this.triggerVariantOption, eventType);
+  }
+
+  /**
+   * The trigger's payload as TEXT, independent of how it is laid out: main renders
+   * a common + event-specific pair, while an in-flight UX branch merges them into a
+   * single block. Reading every editor under the trigger body keeps assertions about
+   * WHAT the payload contains rather than which box it happens to sit in.
+   *
+   * Read through window.monaco rather than `.view-lines`: Monaco only renders the
+   * lines currently in view, so a scrolled payload would silently lose fields.
+   */
+  async triggerPayloadText() {
+    await this.page.locator(this.triggerBody).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await this.page.waitForFunction(
+      () => Boolean(window.monaco?.editor?.getEditors?.()?.length),
+      null,
+      { timeout: DRAWER_TIMEOUT_MS }
+    );
+    return this.page.evaluate(() => {
+      const body = document.querySelector('[data-test="workflow-trigger-body"]');
+      if (!body) return '';
+      return (window.monaco?.editor?.getEditors?.() || [])
+        .filter((ed) => body.contains(ed.getDomNode()))
+        .map((ed) => ed.getValue())
+        .join('\n');
+    });
+  }
+
+  // ---------- condition node ----------
+  /**
+   * The guidelines box is a FIRST-RUN hint persisted to localStorage. On a fresh
+   * CI profile it renders every time and can sit over the builder, so dismiss it
+   * before driving the rows rather than letting it flake the click.
+   */
+  async dismissConditionGuidelinesIfPresent() {
+    const dismiss = this.page.locator(this.conditionNoteDismiss);
+    if (await dismiss.isVisible().catch(() => false)) {
+      await dismiss.click({ timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
+      await this.page.locator(this.conditionNote)
+        .waitFor({ state: 'detached', timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
+    }
+  }
+
+  /** Column values the condition builder offers — trigger-kind specific. */
+  async conditionColumnValues() {
+    return this.selectOptionValues(this.condColumnTrigger, this.condColumnOption);
+  }
+
+  /**
+   * Fill one condition rule. `value` is omitted for unary operators
+   * (is_null/is_not_null/is_empty/is_not_empty) — the input is not rendered at all.
+   */
+  async setCondition({ column, operator, value }) {
+    await this.page.locator(this.conditionBuilder).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await this.dismissConditionGuidelinesIfPresent();
+    await this.pickSelectOption(this.condColumnTrigger, this.condColumnOption, column);
+    await this.pickSelectOption(this.condOperatorTrigger, this.condOperatorOption, operator);
+    if (value !== undefined) {
+      await this.page.locator(this.condValueField).fill(value);
+    }
+  }
+
+  /**
+   * Change only the operator (and value) of an existing rule. Re-picking the column
+   * each time is needless work and an extra flake surface when a test sweeps a set of
+   * operators against one column.
+   */
+  async setConditionOperator(operator, value) {
+    await this.pickSelectOption(this.condOperatorTrigger, this.condOperatorOption, operator);
+    if (value !== undefined) {
+      await this.page.locator(this.condValueField).fill(value);
+    }
+  }
+
+  /** Unary operators remove the value input from the DOM (v-if), not just clear it. */
+  async expectConditionValueAbsent() {
+    await expect(this.page.locator(this.condValueField)).toHaveCount(0);
+  }
+
+  async expectConditionValueVisible() {
+    await expect(this.page.locator(this.condValueField)).toBeVisible();
+  }
+
+  async expectConditionBuilderVisible() {
+    await expect(this.page.locator(this.conditionBuilder)).toBeVisible();
+  }
+
+  async expectConditionGuidelinesAbsent() {
+    await expect(this.page.locator(this.conditionNote)).toHaveCount(0);
   }
 
   /**
@@ -313,13 +504,16 @@ class WorkflowsPage {
    * (name field present right after toggling create); we do NOT tolerate a type-selection step
    * here — if it reappears, the forced-type contract has changed and this should fail loudly.
    */
-  async createDestinationInline({ name, url }) {
+  async createDestinationInline({ name, url, headers }) {
     await this.page.locator(this.destPickerCreateToggle).click({ timeout: DRAWER_TIMEOUT_MS });
 
     const nameField = this.page.locator(this.destNameField);
     await nameField.waitFor({ state: 'attached', timeout: DRAWER_TIMEOUT_MS });
     await nameField.fill(name);
     await this.page.locator(this.destUrlField).fill(url);
+    for (const [key, value] of Object.entries(headers || {})) {
+      await this.setDestinationHeader(key, value);
+    }
     await this.page.locator(this.destSubmitBtn).click({ timeout: DRAWER_TIMEOUT_MS });
     // onDestinationCreated only STAGES the name (pendingSelection); the select is
     // bound after the refetch resolves. The trigger renders before that value lands,
@@ -337,23 +531,64 @@ class WorkflowsPage {
    */
   async testRunFromEditor() {
     await this.page.locator(this.testBtn).click({ timeout: DRAWER_TIMEOUT_MS });
-    await this.page.locator('[data-test="workflow-test-drawer"]').waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.testDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
     // The Test panel is still a real ODrawer (WorkflowTestDialog.vue) — only the NODE
     // config panel became an ODialog. Its buttons stay `o-drawer-*`.
-    await this.page.locator('[data-test="workflow-test-drawer"] [data-test="o-drawer-primary-btn"]')
-      .click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.testDrawerPrimary).click({ timeout: DRAWER_TIMEOUT_MS });
   }
 
   /** Assert a node painted an error badge after a test run (node_type e.g. 'destination','function').
    *  Generous timeout — on slow CI runners the run + failing send can take a while to resolve. */
   async expectNodeTestError(nodeType, timeout = 60000) {
-    await expect(this.page.locator(`[data-test="workflow-node-${nodeType}-test-error"]`))
+    await expect(this.page.locator(this.nodeTestErrorFor(nodeType)))
       .toBeVisible({ timeout });
+  }
+
+  /**
+   * A node's test-run OUTPUT, as text. On a successful destination send the backend
+   * sets the node's output to the sink's RESPONSE BODY (batch_execution.rs calls
+   * send_output with `body`), so pointing a destination at OpenObserve's own ingest
+   * endpoint makes this the ingest receipt — direct, synchronous proof of delivery
+   * with no polling and no follow-up search.
+   */
+  async nodeTestOutputText(nodeType) {
+    await this.page.locator(this.nodeFor(nodeType)).last()
+      .click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.nodeDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    const panel = this.page.locator(this.ndvOutput);
+    await panel.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await this.page.waitForFunction(
+      () => Boolean(window.monaco?.editor?.getEditors?.()?.length),
+      null,
+      { timeout: DRAWER_TIMEOUT_MS }
+    );
+    return this.page.evaluate(() => {
+      const out = document.querySelector('[data-test="workflow-ndv-output"]');
+      if (!out) return '';
+      return (window.monaco?.editor?.getEditors?.() || [])
+        .filter((ed) => out.contains(ed.getDomNode()))
+        .map((ed) => ed.getValue())
+        .join('\n');
+    });
+  }
+
+  /**
+   * The destination's response parsed into an object. The node output is an ARRAY of
+   * response bodies (one per send), each itself a JSON string, so it needs two parses
+   * — matching a regex against the escaped text is brittle and reads badly.
+   * For a self-ingest sink this resolves to OpenObserve's receipt:
+   *   { code: 200, status: [{ name, successful, failed }] }
+   */
+  async destinationIngestReceipt() {
+    const raw = await this.nodeTestOutputText('destination');
+    const outer = JSON.parse(raw);
+    const first = Array.isArray(outer) ? outer[0] : outer;
+    return typeof first === 'string' ? JSON.parse(first) : first;
   }
 
   /** Assert a node painted a success badge after a test run. */
   async expectNodeTestOk(nodeType, timeout = 60000) {
-    await expect(this.page.locator(`[data-test="workflow-node-${nodeType}-test-ok"]`))
+    await expect(this.page.locator(this.nodeTestOkFor(nodeType)))
       .toBeVisible({ timeout });
   }
 
@@ -385,7 +620,7 @@ class WorkflowsPage {
     // select; no create toggle. Clicking the editor WRAPPER does not focus Monaco —
     // the keystrokes go nowhere and the untouched seed template is what gets saved,
     // so an invalid-code test silently asserts nothing. Drive the real textarea.
-    const editor = this.page.locator('[data-test="logs-vrl-function-editor"]');
+    const editor = this.page.locator(this.functionEditor);
     const monaco = new MonacoEditorHelper(this.page);
     await monaco.focus(editor);
     await this.page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
@@ -408,9 +643,22 @@ class WorkflowsPage {
     await nameInput.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
     await nameInput.fill(name);
     await this.page.locator(this.drawerPrimary).click({ timeout: DRAWER_TIMEOUT_MS });
-    const toast = this.page.locator('[role="alert"], .q-notification__message').first();
+    const toast = this.page.locator(this.anyToast).first();
     await toast.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
     return (await toast.textContent().catch(() => '') || '').trim();
+  }
+
+  /**
+   * The link-alerts prompt is offered ONLY for trigger kinds whose registry entry
+   * sets `linksAlerts` (alert_fired). Incident workflows must go straight back to
+   * the list instead — asserting both halves is what proves the flag is honoured.
+   */
+  async expectLinkAlertsPrompt() {
+    await expect(this.page.locator(this.linkAlertsDialog)).toBeVisible({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async expectNoLinkAlertsPrompt() {
+    await expect(this.page.locator(this.linkAlertsDialog)).toHaveCount(0);
   }
 
   /** After a successful create, the "Link to alerts" dialog appears — Skip it (secondary btn). */
@@ -433,7 +681,7 @@ class WorkflowsPage {
    */
   async publishAndExpectAccepted() {
     await this.clickPublish();
-    const warning = this.page.locator('[data-test^="o-toast-"][data-test-variant="warning"]').first();
+    const warning = this.page.locator(this.warningToast).first();
     const linkDialog = this.page.locator(this.linkAlertsDialog);
     const editor = this.page.locator(this.editorPage);
     await expect
@@ -455,11 +703,23 @@ class WorkflowsPage {
     }
   }
 
-  async buildTriggerToDestinationAndSave({ name, destName, url }) {
-    await this.goToAdd();
+  /**
+   * Publish expecting the app to REFUSE, and return the warning text. The mirror of
+   * publishAndExpectAccepted(): a blocked Publish never reaches the network, so the
+   * only evidence is the toast.
+   */
+  async publishAndCaptureRejection() {
+    await this.clickPublish();
+    const warning = this.page.locator(this.warningToast).first();
+    await warning.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    return ((await warning.getAttribute('data-test-message')) || '').trim();
+  }
+
+  async buildTriggerToDestinationAndSave({ name, destName, url, headers, kind = 'alert_fired' }) {
+    await this.goToAdd(kind);
     await this.setName(name);
     await this.addNodeFromPalette('destination');
-    await this.createDestinationInline({ name: destName, url });
+    await this.createDestinationInline({ name: destName, url, headers });
     await this.saveNodeDrawer();
     await this.publishAndExpectAccepted();
     await this.skipLinkAlerts();
@@ -472,7 +732,7 @@ class WorkflowsPage {
    */
   async saveAndCaptureResult() {
     await this.clickPublish();
-    const toast = this.page.locator('[role="alert"], .q-notification__message').first();
+    const toast = this.page.locator(this.anyToast).first();
     await toast.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
     return (await toast.textContent().catch(() => '') || '').trim();
   }
@@ -486,7 +746,7 @@ class WorkflowsPage {
   // workflow name: workflow-list-<name>-{view,edit,pause-start-action,more-options,delete}.
   // Match on that prefix so row lookup is independent of the table's DOM shape.
   rowByName(name) {
-    return this.page.locator(`[data-test^="workflow-list-${name}-"]`);
+    return this.page.locator(this.listRowPrefixFor(name));
   }
 
   async openEdit(name) {
@@ -494,18 +754,17 @@ class WorkflowsPage {
     // necessarily rendered — filter to it first, exactly as isPresent() does.
     await this.waitForListReady();
     await this.search(name);
-    await this.page.locator(`[data-test="workflow-list-${name}-edit"]`).first().click({ timeout: LIST_TIMEOUT_MS });
+    await this.page.locator(this.listRowActionFor(name, 'edit')).first().click({ timeout: LIST_TIMEOUT_MS });
     await this.page.locator(this.editorPage).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
   }
 
   /** Delete via row action (in the more-options menu). Returns any error toast (delete-protected
    *  when linked to an alert). */
   async deleteByName(name) {
-    await this.page.locator(`[data-test="workflow-list-${name}-more-options"]`).first().click({ timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
-    await this.page.locator(`[data-test="workflow-list-${name}-delete"]`).first().click({ timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
-    await this.page.locator('[data-test$="-confirm-button"], [data-test="dlg-primary"], button:has-text("OK"), button:has-text("Delete")')
-      .first().click({ timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
-    const toast = this.page.locator('[role="alert"], .q-notification__message').first();
+    await this.page.locator(this.listRowActionFor(name, 'more-options')).first().click({ timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
+    await this.page.locator(this.listRowActionFor(name, 'delete')).first().click({ timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
+    await this.page.locator(this.confirmButton).first().click({ timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
+    const toast = this.page.locator(this.anyToast).first();
     await toast.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
     return (await toast.textContent().catch(() => '') || '').trim();
   }
@@ -522,7 +781,7 @@ class WorkflowsPage {
 
   // ---------- enable / disable ----------
   async toggleEnable(name) {
-    await this.page.locator(`[data-test="workflow-list-${name}-pause-start-action"]`).first().click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.listRowActionFor(name, 'pause-start-action')).first().click({ timeout: DRAWER_TIMEOUT_MS });
   }
 }
 
