@@ -7600,7 +7600,6 @@
   "alert_library": {
     "header": "Thư viện cảnh báo",
     "subtitle": "Các cảnh báo được tuyển chọn, sẵn sàng cài đặt, khớp với dữ liệu bạn đã thu thập",
-    "sectionTab": "Thư viện",
     "contribute": "Đóng góp trên GitHub",
     "searchPlaceholder": "Tìm kiếm theo tên, mô tả hoặc stream",
     "searchLabel": "Tìm kiếm thư viện cảnh báo",
@@ -7934,7 +7933,6 @@
     "destinationsLoadError": "Lỗi khi tải các đích"
   },
   "alert_destinations": {
-    "sectionTab": "Đích",
     "chooseTypeTitle": "Chọn Loại",
     "selectDestinationType": "Chọn Loại Đích",
     "connectionStepTitle": "Kết nối",
@@ -11066,7 +11064,14 @@
           "typeCategorical": "Phân loại",
           "typeBoolean": "Boolean",
           "threshold": "Ngưỡng",
-          "measurePerRow": "Giá trị trung bình mỗi hàng, qua các lần thử"
+          "measurePerRow": "Giá trị trung bình mỗi hàng, qua các lần thử",
+          "dimensionImproved": "{count} hàng được cải thiện | {count} hàng được cải thiện",
+          "dimensionUnchanged": "{count} hàng không thay đổi | {count} hàng không thay đổi",
+          "dimensionRegressed": "{count} hàng suy giảm | {count} hàng suy giảm",
+          "dimensionNotCounted": "Không được tính",
+          "dimensionNotCountedHint": "Bộ chấm điểm này không có chính sách so sánh trong Cấu hình Điểm của nó, vì vậy các giá trị của nó được báo cáo nhưng không bao giờ được đánh giá là cải thiện hay suy giảm — và nó không thể ảnh hưởng đến kết quả. Hãy cung cấp cho nó một hướng và một ngưỡng để nó được tính.",
+          "dimensionNoneCompared": "Không có gì được so sánh",
+          "dimensionNoneComparedHint": "Không có hàng nào được đo ở cả hai phía. Một hàng chỉ chạy trong một thử nghiệm thì không có điểm xuất phát để so sánh, nên nó không được tính theo bất kỳ hướng nào."
         },
         "rowDrawer": {
           "fallbackTitle": "Hàng so sánh",
@@ -11431,6 +11436,7 @@
         "republishedSuccess": "Đã cập nhật mô tả. Phiên bản {version} không thay đổi.",
         "draftSuccess": "Đã lưu bản nháp. Kiểm tra kết nối để xuất bản.",
         "draftError": "Không thể lưu bản nháp",
+        "testFailed": "Kiểm tra kết nối không thành công",
         "publishFailed": "Kết nối thử nghiệm thất bại, vì vậy không có gì được xuất bản. Bản nháp của bạn đã được lưu.",
         "createError": "Không thể xuất bản tác vụ từ xa",
         "validation": {
@@ -14241,8 +14247,6 @@
       "passwordSetHelp": "Mật khẩu đã được đặt. Để trống để giữ nguyên, hoặc nhập mật khẩu mới để thay thế.",
       "showUptimePercent": "Hiển thị phần trăm uptime",
       "showTimelineBars": "Hiển thị các thanh thời gian",
-      "showResponseTime": "Hiển thị thời gian phản hồi",
-      "showResponseTimeHelp": "Tắt để trang không tiết lộ số liệu hiệu suất.",
       "noindex": "Hạn chế lập chỉ mục tìm kiếm",
       "noindexHelp": "Thêm thẻ noindex để công cụ tìm kiếm bỏ qua trang công khai.",
       "confirmFailures": "Xác nhận lỗi",
@@ -14301,6 +14305,9 @@
       "deleting": "Đang xóa bản cập nhật...",
       "deleted": "Đã xóa bản cập nhật",
       "deleteFailed": "Không thể xóa bản cập nhật",
+      "affects": "Ảnh hưởng",
+      "allComponents": "Tất cả các thành phần",
+      "componentsUnavailable": "Các thành phần không còn trên trang này",
       "state": {
         "scheduled": "Đã lên lịch",
         "active": "Đang hoạt động",

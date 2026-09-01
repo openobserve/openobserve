@@ -7600,7 +7600,6 @@
   "alert_library": {
     "header": "Meldingenbibliotheek",
     "subtitle": "Samengestelde, kant-en-klare meldingen, afgestemd op de gegevens die u al opneemt.",
-    "sectionTab": "Bibliotheek",
     "contribute": "Bijdragen op GitHub",
     "searchPlaceholder": "Zoeken op naam, beschrijving of stream",
     "searchLabel": "Doorzoek de meldingenbibliotheek",
@@ -7934,7 +7933,6 @@
     "destinationsLoadError": "Fout bij het laden van bestemmingen"
   },
   "alert_destinations": {
-    "sectionTab": "Bestemmingen",
     "chooseTypeTitle": "Kies type",
     "selectDestinationType": "Selecteer bestemmingstype",
     "connectionStepTitle": "Verbinding",
@@ -11066,7 +11064,14 @@
           "typeCategorical": "Categorisch",
           "typeBoolean": "Booleaans",
           "threshold": "Drempelwaarde",
-          "measurePerRow": "Gemiddelde per rij, over trials"
+          "measurePerRow": "Gemiddelde per rij, over trials",
+          "dimensionImproved": "{count} rij verbeterd | {count} rijen verbeterd",
+          "dimensionUnchanged": "{count} rij ongewijzigd | {count} rijen ongewijzigd",
+          "dimensionRegressed": "{count} rij verslechterd | {count} rijen verslechterd",
+          "dimensionNotCounted": "Niet meegeteld",
+          "dimensionNotCountedHint": "Deze scorer heeft geen vergelijkingsbeleid in zijn Score Config, dus de waarden worden gerapporteerd maar nooit beoordeeld als verbeterd of verslechterd — en het kan de uitkomst niet beïnvloeden. Geef het een richting en een drempelwaarde om het mee te laten tellen.",
+          "dimensionNoneCompared": "Niets vergeleken",
+          "dimensionNoneComparedHint": "Geen enkele rij is aan beide zijden gemeten. Een rij die in slechts één experiment liep, heeft niets om van te vertrekken en telt dus voor geen enkele richting mee."
         },
         "rowDrawer": {
           "fallbackTitle": "Vergelijkingsrij",
@@ -11431,6 +11436,7 @@
         "republishedSuccess": "Beschrijving bijgewerkt. Versie {version} is ongewijzigd.",
         "draftSuccess": "Concept opgeslagen. Test de verbinding om het te publiceren.",
         "draftError": "Kan het concept niet opslaan",
+        "testFailed": "Verbindingstest mislukt",
         "publishFailed": "De testverbinding is mislukt, dus er is niets gepubliceerd. Uw concept is opgeslagen.",
         "createError": "Kan de externe taak niet publiceren",
         "validation": {
@@ -14241,8 +14247,6 @@
       "passwordSetHelp": "Er is al een wachtwoord ingesteld. Laat dit veld leeg om het te behouden, of typ een nieuw wachtwoord om het te vervangen.",
       "showUptimePercent": "Toon uptimepercentage",
       "showTimelineBars": "Toon tijdlijnbalken",
-      "showResponseTime": "Toon responstijd",
-      "showResponseTimeHelp": "Schakel dit uit, zodat de pagina geen prestatiecijfers prijsgeeft.",
       "noindex": "Zoekindexering ontmoedigen",
       "noindexHelp": "Voegt een noindex-tag toe, zodat zoekmachines de openbare pagina overslaan.",
       "confirmFailures": "Bevestigen van fouten",
@@ -14301,6 +14305,9 @@
       "deleting": "Update verwijderen...",
       "deleted": "Update verwijderd",
       "deleteFailed": "Update verwijderen mislukt",
+      "affects": "Beïnvloedt",
+      "allComponents": "Alle componenten",
+      "componentsUnavailable": "Componenten niet meer op deze pagina",
       "state": {
         "scheduled": "Gepland",
         "active": "Actief",

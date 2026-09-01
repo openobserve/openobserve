@@ -26,7 +26,7 @@ concurrency:
 
 jobs:
   js-license-check:
-    runs-on: ubicloud-standard-8
+    runs-on: ubicloud-standard-4
     timeout-minutes: 10
     steps:
       - name: Checkout latest code

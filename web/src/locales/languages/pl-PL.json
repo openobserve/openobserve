@@ -7600,7 +7600,6 @@
   "alert_library": {
     "header": "Biblioteka alertów",
     "subtitle": "Wyselekcjonowane, gotowe do instalacji alerty, dopasowane do danych, które już pozyskujesz.",
-    "sectionTab": "Biblioteka",
     "contribute": "Wnieś wkład na GitHub",
     "searchPlaceholder": "Szukaj po nazwie, opisie lub strumieniu",
     "searchLabel": "Przeszukaj bibliotekę alertów",
@@ -7934,7 +7933,6 @@
     "destinationsLoadError": "Błąd podczas ładowania celów"
   },
   "alert_destinations": {
-    "sectionTab": "Cele",
     "chooseTypeTitle": "Wybierz typ",
     "selectDestinationType": "Wybierz typ celu",
     "connectionStepTitle": "Połączenie",
@@ -11066,7 +11064,14 @@
           "typeCategorical": "Kategoryczny",
           "typeBoolean": "Logiczny",
           "threshold": "Próg",
-          "measurePerRow": "Średnia na wiersz, po próbach"
+          "measurePerRow": "Średnia na wiersz, po próbach",
+          "dimensionImproved": "{count} wiersz poprawiony | {count} wiersze poprawione",
+          "dimensionUnchanged": "{count} wiersz niezmieniony | {count} wiersze niezmienione",
+          "dimensionRegressed": "{count} wiersz pogorszony | {count} wiersze pogorszone",
+          "dimensionNotCounted": "Nie uwzględnione",
+          "dimensionNotCountedHint": "Ten moduł oceny nie ma zasad porównania w swojej konfiguracji wyników, więc jego wartości są raportowane, ale nigdy nie są oceniane jako poprawione lub pogorszone — i nie może wpłynąć na wynik. Nadaj mu kierunek i próg, aby był uwzględniany.",
+          "dimensionNoneCompared": "Nic nie porównano",
+          "dimensionNoneComparedHint": "Żaden wiersz nie został zmierzony po obu stronach. Wiersz, który działał tylko w jednym eksperymencie, nie ma punktu wyjścia, więc nie jest zaliczany do żadnego kierunku."
         },
         "rowDrawer": {
           "fallbackTitle": "Wiersz porównania",
@@ -11431,6 +11436,7 @@
         "republishedSuccess": "Opis zaktualizowany. Wersja {version} pozostaje bez zmian.",
         "draftSuccess": "Wersja robocza zapisana. Przetestuj połączenie, aby ją opublikować.",
         "draftError": "Nie można zapisać wersji roboczej",
+        "testFailed": "Test połączenia nie powiódł się",
         "publishFailed": "Połączenie testowe nie powiodło się, więc nic nie zostało opublikowane. Wersja robocza jest zapisana.",
         "createError": "Nie można opublikować zadania zdalnego",
         "validation": {
@@ -14241,8 +14247,6 @@
       "passwordSetHelp": "Hasło jest już ustawione. Pozostaw puste, aby je zachować, lub wpisz nowe, aby je zastąpić.",
       "showUptimePercent": "Pokaż procent dostępności",
       "showTimelineBars": "Pokaż paski osi czasu",
-      "showResponseTime": "Pokaż czas odpowiedzi",
-      "showResponseTimeHelp": "Wyłącz, aby strona nie ujawniała danych o wydajności.",
       "noindex": "Ogranicz indeksowanie przez wyszukiwarki",
       "noindexHelp": "Dodaje tag noindex, aby wyszukiwarki pomijały publiczną stronę.",
       "confirmFailures": "Potwierdzanie awarii",
@@ -14301,6 +14305,9 @@
       "deleting": "Usuwanie aktualizacji...",
       "deleted": "Aktualizacja usunięta",
       "deleteFailed": "Nie udało się usunąć aktualizacji",
+      "affects": "Dotyczy",
+      "allComponents": "Wszystkie komponenty",
+      "componentsUnavailable": "Komponenty, których nie ma już na tej stronie",
       "state": {
         "scheduled": "Zaplanowana",
         "active": "Aktywna",

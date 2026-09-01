@@ -181,14 +181,14 @@ jobs:
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-ci-binary
+          name: release-ci-binary-${{ github.sha }}
           path: target/x86_64-unknown-linux-gnu/release-ci/openobserve
           retention-days: 1
 
       - name: Upload frontend artifact
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-dist
+          name: frontend-dist-${{ github.sha }}
           path: /tmp/dist
           retention-days: 1
           if-no-files-found: error
@@ -254,13 +254,13 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@v5
         with:
-          name: release-ci-binary
+          name: release-ci-binary-${{ github.sha }}
           path: release-ci-binary
 
       - name: Download frontend artifact
         uses: actions/download-artifact@v5
         with:
-          name: frontend-dist
+          name: frontend-dist-${{ github.sha }}
           path: /tmp/dist
 
       - name: Start mail sink (Mailpit)
