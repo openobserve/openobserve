@@ -338,7 +338,6 @@ export const usePanelDataLoader = (
 
       // Create a new AbortController for the new operation
       abortController = new AbortController();
-      window.addEventListener("cancelQuery", cancelQueryAbort);
       // Checking if there are queries to execute
       if (!panelSchema.value.queries?.length || !hasAtLeastOneQuery()) {
         log("loadData: there are no queries to execute");
@@ -734,6 +733,10 @@ export const usePanelDataLoader = (
 
   onMounted(async () => {
     log("PanelSchema/Time Initial: should load the data");
+
+    // Registered here, not in loadData: a late stream callback can call loadData
+    // after onUnmounted removed it, re-adding the listener for good.
+    window.addEventListener("cancelQuery", cancelQueryAbort);
 
     loadData(); // Loading the data
   });
