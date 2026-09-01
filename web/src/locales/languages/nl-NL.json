@@ -1172,9 +1172,8 @@
     "failedToFetchFieldValues": "Kan veldwaarden niet ophalen",
     "fieldMissingInStreams": "Veld '{field}' bestaat niet in een of meer streams.\n",
     "fieldStreamCountMismatch": "Veld '{field}' bestaat in een verschillend aantal streams.\n",
-    "histogramNotAvailableMultiStream": "Histogram is niet beschikbaar voor zoeken in SQL-modus met meerdere streams.",
     "histogramSearchQueryCancelled": "Histogramzoekopdracht is geannuleerd",
-    "histogramUnavailableForQueries": "Histogram niet beschikbaar voor CTE's, DISTINCT-, JOIN- en LIMIT-query's.",
+    "histogramUnavailableForQueries": "Histogram niet beschikbaar voor CTE's, DISTINCT-, UNION-, JOIN- en LIMIT-query's.",
     "invalidDateFormat": "Ongeldige datumnotatie.",
     "missingStreamFilterFields": "Een of meer filtervelden bestaan niet in \"{streams}\", daarom wordt er geen zoekopdracht uitgevoerd in de genoemde stream.\n",
     "noColumnFoundInStream": "Geen kolom gevonden in geselecteerde stream.",
@@ -12943,8 +12942,6 @@
       "selectStarNotSupportedForVisualization": "Select *-query wordt niet ondersteund voor visualisatie",
       "errorUpdatingVisualization": "Fout bij bijwerken van visualisatie",
       "queryEmptySelectFieldsToBuild": "Query is leeg, selecteer velden om query op te bouwen",
-      "histogramUnavailableCtesDistinctJoinLimit": "Histogram niet beschikbaar voor CTE's, DISTINCT, JOIN en LIMIT-query's.",
-      "histogramNotAvailableMultiStream": "Histogram is niet beschikbaar voor zoekopdrachten met meerdere streams.",
       "histogramUnavailableCtesDistinctLimit": "Histogram niet beschikbaar voor CTE's, DISTINCT en LIMIT-query's."
     },
     "searchSchedulersList": {

@@ -1172,9 +1172,8 @@
     "failedToFetchFieldValues": "Échec de la récupération des valeurs de champ",
     "fieldMissingInStreams": "Le champ '{field}' n'existe pas dans le ou les flux.\n",
     "fieldStreamCountMismatch": "Le champ '{field}' existe dans un nombre différent de flux.\n",
-    "histogramNotAvailableMultiStream": "L'histogramme n'est pas disponible pour la recherche en mode SQL multi-flux.",
     "histogramSearchQueryCancelled": "La requête de recherche d'histogramme a été annulée",
-    "histogramUnavailableForQueries": "Histogramme indisponible pour les requêtes CTE, DISTINCT, JOIN et LIMIT.",
+    "histogramUnavailableForQueries": "Histogramme indisponible pour les requêtes CTE, DISTINCT, UNION, JOIN et LIMIT.",
     "invalidDateFormat": "Format de date invalide.",
     "missingStreamFilterFields": "Un ou plusieurs champs de filtre n'existent pas dans \"{streams}\", donc aucune recherche n'est effectuée dans le flux mentionné.\n",
     "noColumnFoundInStream": "Aucune colonne trouvée dans le flux sélectionné.",
@@ -12943,8 +12942,6 @@
       "selectStarNotSupportedForVisualization": "La requête SELECT * n'est pas prise en charge pour la visualisation",
       "errorUpdatingVisualization": "Erreur lors de la mise à jour de la visualisation",
       "queryEmptySelectFieldsToBuild": "La requête est vide, veuillez sélectionner des champs pour construire la requête",
-      "histogramUnavailableCtesDistinctJoinLimit": "Histogramme indisponible pour les requêtes CTE, DISTINCT, JOIN et LIMIT.",
-      "histogramNotAvailableMultiStream": "L'histogramme n'est pas disponible pour la recherche multi-flux.",
       "histogramUnavailableCtesDistinctLimit": "Histogramme indisponible pour les requêtes CTE, DISTINCT et LIMIT."
     },
     "searchSchedulersList": {

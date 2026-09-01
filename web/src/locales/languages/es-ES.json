@@ -1172,9 +1172,8 @@
     "failedToFetchFieldValues": "No se pudieron obtener los valores de los campos",
     "fieldMissingInStreams": "El campo '{field}' no existe en uno o más flujos.\n",
     "fieldStreamCountMismatch": "El campo '{field}' existe en un número diferente de flujos.\n",
-    "histogramNotAvailableMultiStream": "El histograma no está disponible para la búsqueda en modo SQL de múltiples flujos.",
     "histogramSearchQueryCancelled": "La consulta de búsqueda del histograma fue cancelada",
-    "histogramUnavailableForQueries": "Histograma no disponible para consultas con CTE, DISTINCT, JOIN y LIMIT.",
+    "histogramUnavailableForQueries": "Histograma no disponible para consultas con CTE, DISTINCT, UNION, JOIN y LIMIT.",
     "invalidDateFormat": "Formato de fecha no válido.",
     "missingStreamFilterFields": "Uno o más campos de filtro no existen en \"{streams}\", por lo tanto no se realiza ninguna búsqueda en el flujo mencionado.\n",
     "noColumnFoundInStream": "No se encontró ninguna columna en el flujo seleccionado.",
@@ -12943,8 +12942,6 @@
       "selectStarNotSupportedForVisualization": "La consulta SELECT * no es compatible con la visualización",
       "errorUpdatingVisualization": "Error al actualizar la visualización",
       "queryEmptySelectFieldsToBuild": "La consulta está vacía, seleccione campos para construir la consulta",
-      "histogramUnavailableCtesDistinctJoinLimit": "Histograma no disponible para consultas CTE, DISTINCT, JOIN y LIMIT.",
-      "histogramNotAvailableMultiStream": "El histograma no está disponible para búsqueda de múltiples streams.",
       "histogramUnavailableCtesDistinctLimit": "Histograma no disponible para consultas CTE, DISTINCT y LIMIT."
     },
     "searchSchedulersList": {

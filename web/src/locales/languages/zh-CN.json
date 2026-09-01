@@ -1172,9 +1172,8 @@
     "failedToFetchFieldValues": "获取字段值失败",
     "fieldMissingInStreams": "字段 '{field}' 在一个或多个流中不存在。\n",
     "fieldStreamCountMismatch": "字段 '{field}' 存在于不同数量的流中。\n",
-    "histogramNotAvailableMultiStream": "直方图不适用于多流 SQL 模式搜索。",
     "histogramSearchQueryCancelled": "直方图搜索查询已取消",
-    "histogramUnavailableForQueries": "直方图不适用于 CTE、DISTINCT、JOIN 和 LIMIT 查询。",
+    "histogramUnavailableForQueries": "直方图不适用于 CTE、DISTINCT、UNION、JOIN 和 LIMIT 查询。",
     "invalidDateFormat": "无效的日期格式。",
     "missingStreamFilterFields": "一个或多个筛选字段在 \"{streams}\" 中不存在，因此不会在所述流中执行搜索。\n",
     "noColumnFoundInStream": "在选定的流中未找到列。",
@@ -12943,8 +12942,6 @@
       "selectStarNotSupportedForVisualization": "可视化不支持 SELECT * 查询",
       "errorUpdatingVisualization": "更新可视化时出错",
       "queryEmptySelectFieldsToBuild": "查询为空，请选择字段构建查询",
-      "histogramUnavailableCtesDistinctJoinLimit": "对于 CTE、DISTINCT、JOIN 和 LIMIT 查询，直方图不可用。",
-      "histogramNotAvailableMultiStream": "直方图不适用于多流搜索。",
       "histogramUnavailableCtesDistinctLimit": "对于 CTE、DISTINCT 和 LIMIT 查询，直方图不可用。"
     },
     "searchSchedulersList": {
