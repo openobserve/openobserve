@@ -2729,7 +2729,7 @@ export default defineComponent({
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
+            "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
@@ -2738,16 +2738,14 @@ export default defineComponent({
           (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
         ) {
           this.resetHistogramWithError(
-            "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
+            "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
             -1,
           );
           this.searchObj.meta.histogramDirtyFlag = false;
-        } else if (
-          this.searchObj.data.stream.selectedStream.length > 1 &&
-          this.searchObj.meta.sqlMode == true
-        ) {
+        } else if (this.searchObj.data.stream.selectedStream.length > 1) {
           this.resetHistogramWithError(
-            "Histogram is not available for multi stream search.",
+            "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
+            -1,
           );
         } else if (
           this.searchObj.data.queryResults.is_histogram_eligible == false
