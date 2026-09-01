@@ -1172,9 +1172,8 @@
     "failedToFetchFieldValues": "Failed to fetch field values",
     "fieldMissingInStreams": "Field '{field}' does not exist in the one or more stream.\n",
     "fieldStreamCountMismatch": "Field '{field}' exists in different number of streams.\n",
-    "histogramNotAvailableMultiStream": "Histogram is not available for multi-stream SQL mode search.",
     "histogramSearchQueryCancelled": "Histogram search query was cancelled",
-    "histogramUnavailableForQueries": "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
+    "histogramUnavailableForQueries": "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
     "invalidDateFormat": "Invalid date format.",
     "missingStreamFilterFields": "One or more filter fields do not exist in \"{streams}\", hence no search is performed in the mentioned stream.\n",
     "noColumnFoundInStream": "No column found in selected stream.",
@@ -12897,8 +12896,6 @@
       "selectStarNotSupportedForVisualization": "Select * query is not supported for visualization",
       "errorUpdatingVisualization": "Error in updating visualization",
       "queryEmptySelectFieldsToBuild": "Query is empty, please select fields to build query",
-      "histogramUnavailableCtesDistinctJoinLimit": "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
-      "histogramNotAvailableMultiStream": "Histogram is not available for multi stream search.",
       "histogramUnavailableCtesDistinctLimit": "Histogram unavailable for CTEs, DISTINCT and LIMIT queries."
     },
     "searchSchedulersList": {

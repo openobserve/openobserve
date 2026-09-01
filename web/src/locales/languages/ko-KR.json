@@ -1172,9 +1172,8 @@
     "failedToFetchFieldValues": "필드 값을 가져오지 못했습니다.",
     "fieldMissingInStreams": "필드 '{field}'는(은) 하나 이상의 스트림에 존재하지 않습니다.\n",
     "fieldStreamCountMismatch": "필드 '{field}'는(은) 서로 다른 수의 스트림에 존재합니다.\n",
-    "histogramNotAvailableMultiStream": "히스토그램은 다중 스트림 SQL 모드 검색에서 사용할 수 없습니다.",
     "histogramSearchQueryCancelled": "히스토그램 검색 쿼리가 취소되었습니다.",
-    "histogramUnavailableForQueries": "히스토그램은 CTE, DISTINCT, JOIN 및 LIMIT 쿼리에 사용할 수 없습니다.",
+    "histogramUnavailableForQueries": "히스토그램은 CTE, DISTINCT, UNION, JOIN 및 LIMIT 쿼리에 사용할 수 없습니다.",
     "invalidDateFormat": "잘못된 날짜 형식입니다.",
     "missingStreamFilterFields": "하나 이상의 필터 필드가 \"{streams}\"에 존재하지 않으므로 해당 스트림에서 검색이 수행되지 않습니다.\n",
     "noColumnFoundInStream": "선택한 스트림에서 열을 찾을 수 없습니다.",
@@ -12889,8 +12888,6 @@
       "selectStarNotSupportedForVisualization": "SELECT * 쿼리는 시각화에서 지원되지 않습니다.",
       "errorUpdatingVisualization": "시각화 업데이트 중 오류",
       "queryEmptySelectFieldsToBuild": "쿼리가 비어 있습니다. 쿼리를 작성할 필드를 선택하세요.",
-      "histogramUnavailableCtesDistinctJoinLimit": "CTE, DISTINCT, JOIN 및 LIMIT 쿼리에는 히스토그램을 사용할 수 없습니다.",
-      "histogramNotAvailableMultiStream": "다중 스트림 검색에는 히스토그램을 사용할 수 없습니다.",
       "histogramUnavailableCtesDistinctLimit": "CTE, DISTINCT 및 LIMIT 쿼리에는 히스토그램을 사용할 수 없습니다."
     },
     "searchSchedulersList": {

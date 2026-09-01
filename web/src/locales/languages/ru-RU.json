@@ -1172,9 +1172,8 @@
     "failedToFetchFieldValues": "Не удалось получить значения полей",
     "fieldMissingInStreams": "Поле '{field}' не существует в одном или нескольких потоках.\n",
     "fieldStreamCountMismatch": "Поле '{field}' существует в разном количестве потоков.\n",
-    "histogramNotAvailableMultiStream": "Гистограмма недоступна для поиска в режиме SQL по нескольким потокам.",
     "histogramSearchQueryCancelled": "Поисковый запрос гистограммы был отменен.",
-    "histogramUnavailableForQueries": "Гистограмма недоступна для запросов с CTE, DISTINCT, JOIN и LIMIT.",
+    "histogramUnavailableForQueries": "Гистограмма недоступна для запросов с CTE, DISTINCT, UNION, JOIN и LIMIT.",
     "invalidDateFormat": "Неверный формат даты.",
     "missingStreamFilterFields": "Одно или несколько полей фильтра не существуют в \"{streams}\", поэтому поиск в указанном потоке не выполняется.\n",
     "noColumnFoundInStream": "В выбранном потоке не найдено столбцов.",
@@ -12889,8 +12888,6 @@
       "selectStarNotSupportedForVisualization": "Запрос SELECT * не поддерживается для визуализации",
       "errorUpdatingVisualization": "Ошибка при обновлении визуализации",
       "queryEmptySelectFieldsToBuild": "Запрос пуст, пожалуйста, выберите поля для построения запроса",
-      "histogramUnavailableCtesDistinctJoinLimit": "Гистограмма недоступна для CTE, DISTINCT, JOIN и LIMIT запросов.",
-      "histogramNotAvailableMultiStream": "Гистограмма недоступна для поиска по нескольким потокам.",
       "histogramUnavailableCtesDistinctLimit": "Гистограмма недоступна для CTE, DISTINCT и LIMIT запросов."
     },
     "searchSchedulersList": {
