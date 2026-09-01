@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   data-test on each: `${prefix}-cascade-{env|agent|version}`.
 -->
 <template>
-  <div class="flex items-center gap-2">
+  <div class="flex items-center gap-2 max-md:flex-wrap">
     <div class="w-44 flex-shrink-0">
       <OSelect
         :model-value="selectedEnv"

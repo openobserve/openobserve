@@ -227,8 +227,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              text the app's other left rails use. Row = label left, total +
              unhealthy badge right. -->
         <div v-if="!isLoading && services.length > 0" class="catalog-type-filter overflow-y-auto">
+          <!-- < md the rail lies down: horizontal tabs keep the filter to one
+               row above the table instead of a stacked block. -->
           <OTabs
-            orientation="vertical"
+            :orientation="isMobile ? 'horizontal' : 'vertical'"
             dense
             :model-value="typeFilter"
             data-test="services-catalog-type-filter"
@@ -438,6 +440,7 @@ import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import TraceServiceCell from "./components/TraceServiceCell.vue";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
@@ -461,6 +464,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 
 const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("services-catalog");
 const catalogContainerRef = ref<HTMLElement | null>(null);
 const { searchObj } = useTraces();

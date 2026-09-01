@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 pl-2 text-left"
+          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 pl-2 text-left max-md:flex-nowrap max-md:overflow-hidden"
           data-test="logs-search-result-title"
           :data-search-state="
             searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'
@@ -79,11 +79,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="logsResultChip" value="neutral" data-test="logs-result-records-chip">{{
                 recordsChips.records
               }}</OTag>
-              <OTag type="logsResultChip" value="info" data-test="logs-result-time-chip">{{
-                recordsChips.time
-              }}</OTag>
-              <!-- max-md:hidden: the fixed-height toolbar can't fit a third chip
-                   there — it wrapped onto the histogram beneath. -->
+              <!-- max-md:hidden: the fixed-height toolbar fits one chip beside
+                   the pager — extra chips wrapped onto the histogram beneath. -->
+              <OTag
+                type="logsResultChip"
+                value="info"
+                class="max-md:hidden"
+                data-test="logs-result-time-chip"
+                >{{ recordsChips.time }}</OTag
+              >
               <OTag
                 v-if="recordsChips.scan"
                 type="logsResultChip"
@@ -108,7 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="logsResultChip" value="neutral" data-test="logs-result-patterns-chip"
                 >{{ patternChips.patterns }} {{ t("logs.searchResult.patterns") }}</OTag
               >
-              <OTag type="logsResultChip" value="info" data-test="logs-result-pattern-time-chip"
+              <OTag
+                type="logsResultChip"
+                value="info"
+                class="max-md:hidden"
+                data-test="logs-result-pattern-time-chip"
                 >{{ patternChips.time }} {{ t("logs.searchResult.msUnit") }}</OTag
               >
             </template>

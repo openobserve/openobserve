@@ -139,7 +139,7 @@ the Free Software Foundation, either version 3 of the License, or
           <!-- Last-refreshed indicator + labeled primary Refresh button, matching
                the other AI pages' AiPageShell header. -->
           <AiLastRefreshed
-            class="mr-1"
+            class="mr-1 max-md:hidden"
             :last-run-at="qualityLastRunAt"
             :loading="qualityRefreshing"
             data-test="quality-last-refreshed"
@@ -148,6 +148,7 @@ the Free Software Foundation, either version 3 of the License, or
             ref="qualityDatePickerRef"
             v-model="qualitySelectedDate"
             :auto-apply-dashboard="true"
+            class="max-md:[&_.date-time-label]:hidden"
             data-test="quality-time-range-picker"
           />
           <OButton
