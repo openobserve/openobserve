@@ -35,13 +35,9 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 const mockGetTraceTimeRanges = vi.fn();
-vi.mock("@/services/traces", async (importOriginal) => {
-  const actual: any = await importOriginal();
-  return {
-    ...actual,
-    default: { getTraceTimeRanges: (...args: any[]) => mockGetTraceTimeRanges(...args) },
-  };
-});
+vi.mock("@/services/search", () => ({
+  default: { get_trace_time_ranges: (...args: any[]) => mockGetTraceTimeRanges(...args) },
+}));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual: any = await importOriginal();
@@ -131,7 +127,7 @@ function indexResponse(results: any[], partialCoverage = false) {
 }
 
 function indexedIds(callIndex = 0): string[] {
-  return mockGetTraceTimeRanges.mock.calls[callIndex][1].traceIds;
+  return mockGetTraceTimeRanges.mock.calls[callIndex][0].trace_ids;
 }
 
 function batchCalls(): string[][] {
@@ -342,11 +338,12 @@ describe("useCorrelatedTracesStream", () => {
       const { resolveTraceLocation } = useCorrelatedTracesStream(t);
       await resolveTraceLocation(T1, 1_000, 2_000);
 
-      expect(mockGetTraceTimeRanges).toHaveBeenCalledWith("test-org", {
-        traceIds: [T1],
-        startTime: 1_000,
-        endTime: 2_000,
-        hintTs: 1_000,
+      expect(mockGetTraceTimeRanges).toHaveBeenCalledWith({
+        org_identifier: "test-org",
+        trace_ids: [T1],
+        start_time: 1_000,
+        end_time: 2_000,
+        hint_ts: 1_000,
         streams: undefined,
       });
     });
@@ -424,10 +421,10 @@ describe("useCorrelatedTracesStream", () => {
 
     it("chunks past the server's 100-id cap and merges the answers", async () => {
       const ids = Array.from({ length: 250 }, (_, index) => index.toString(16).padStart(32, "0"));
-      mockGetTraceTimeRanges.mockImplementation((_org: string, options: any) =>
+      mockGetTraceTimeRanges.mockImplementation((options: any) =>
         Promise.resolve(
           indexResponse(
-            options.traceIds.map((id: string) => ({
+            options.trace_ids.map((id: string) => ({
               trace_id: id,
               stream: "payments_traces",
               status: "found",
@@ -494,7 +491,7 @@ describe("useCorrelatedTracesStream", () => {
         stream: "only_traces",
         range,
       });
-      expect(mockGetTraceTimeRanges.mock.calls[0][1].streams).toEqual(["only_traces"]);
+      expect(mockGetTraceTimeRanges.mock.calls[0][0].streams).toEqual(["only_traces"]);
       expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
     });
 

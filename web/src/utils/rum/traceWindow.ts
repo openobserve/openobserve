@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { TraceTimeRange } from "@/services/traces";
+import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
 
 // A found range can be a lower bound (`partial`), and span timestamps sit at
 // its very edges — pad before querying with it.

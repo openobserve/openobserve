@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nText } from "@/types/i18n";
-import type { TraceTimeRange } from "@/services/traces";
+import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
 
 import { createStore } from "vuex";
 import { useLocalOrganization, useLocalCurrentUser, useLocalTimezone } from "../utils/zincutils";
@@ -49,9 +49,8 @@ const organizationObj = {
   },
   // Which traces stream contains a given (canonical 32-char) trace id, and the
   // range it ran in when the time index knew — see useCorrelatedTracesStream.
-  // knownStreams is the org-level
-  // fact ("streams that have ever contained a correlated trace") that keeps
-  // steady-state resolution at one point lookup regardless of stream count.
+  // knownStreams is the org-level fact ("streams that have ever contained a
+  // correlated trace") that keeps steady-state resolution at one point lookup.
   // Lives here so resetOrganizationData wipes it on org switch.
   correlatedTracesStreams: {
     byTraceId: {} as Record<string, { stream: string; range?: TraceTimeRange }>,

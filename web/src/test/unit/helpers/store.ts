@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { createStore } from "vuex";
-import type { TraceTimeRange } from "@/services/traces";
+import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
 
 // Mirror of the initial organizationData below; used by resetOrganizationData.
 const organizationObj = {

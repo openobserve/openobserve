@@ -17,8 +17,11 @@ import { useStore } from "vuex";
 import type { TranslateFn } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import tracesService, { TRACE_TIME_RANGE_MAX_IDS } from "@/services/traces";
-import type { TraceTimeRange } from "@/services/traces";
+import searchService from "@/services/search";
+import {
+  TRACE_TIME_RANGE_MAX_IDS,
+  type TraceTimeRange,
+} from "@/ts/interfaces/traces/traceTimeRange.types";
 import { generateTraceContext } from "@/utils/zincutils";
 import { normalizeTraceId, RUM_CORRELATION_TRACES_STREAM } from "@/utils/rum/fields";
 
@@ -123,18 +126,16 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     await Promise.all(
       chunks.map(async (chunk) => {
         try {
-          const response = await tracesService.getTraceTimeRanges(
-            store.state.selectedOrganization.identifier,
-            {
-              traceIds: chunk,
-              startTime: startTimeUs,
-              endTime: endTimeUs,
-              // Anchors the server's locate pass, so a typical RUM window is
-              // covered in its first round.
-              hintTs: startTimeUs,
-              streams: narrowTo,
-            },
-          );
+          const response = await searchService.get_trace_time_ranges({
+            org_identifier: store.state.selectedOrganization.identifier,
+            trace_ids: chunk,
+            start_time: startTimeUs,
+            end_time: endTimeUs,
+            // Anchors the server's locate pass, so a typical RUM window is
+            // covered in its first round.
+            hint_ts: startTimeUs,
+            streams: narrowTo,
+          });
           const data = response?.data;
           const partialCoverage = Boolean(data?.partial_coverage);
           const answered = new Set<string>();

@@ -13,9 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import http from "./http";
-
-// ─── Response contract ───────────────────────────────────────────────────────
 // Mirrors `OrgTraceTimeRangeResponse` in
 // `src/api/search/src/traces/time_index.rs`. Every optional field is omitted
 // by the server rather than nulled, so absence is the normal case.
@@ -57,30 +54,13 @@ export interface OrgTraceTimeRangeResponse {
 }
 
 export interface TraceTimeRangeOptions {
-  traceIds: string[];
-  /** µs; sent only together with `endTime` — the server rejects a lone bound. */
-  startTime?: number;
-  endTime?: number;
+  org_identifier: string;
+  trace_ids: string[];
+  /** µs; sent only together with `end_time` — the server rejects a lone bound. */
+  start_time?: number;
+  end_time?: number;
   /** µs anchor the server's locate pass probes first. */
-  hintTs?: number;
+  hint_ts?: number;
   /** Narrows the search to these trace streams. */
   streams?: string[];
 }
-
-type QueryParams = Record<string, string | number>;
-
-const traces = {
-  /** Which stream holds each trace id, and the time range it actually ran in. */
-  getTraceTimeRanges: (orgId: string, options: TraceTimeRangeOptions) => {
-    const params: QueryParams = { trace_id: options.traceIds.join(",") };
-    if (options.startTime != null && options.endTime != null) {
-      params.start_time = options.startTime;
-      params.end_time = options.endTime;
-    }
-    if (options.hintTs != null) params.hint_ts = options.hintTs;
-    if (options.streams?.length) params.streams = options.streams.join(",");
-    return http().get<OrgTraceTimeRangeResponse>(`/api/${orgId}/traces/time_range`, { params });
-  },
-};
-
-export default traces;

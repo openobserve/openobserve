@@ -222,7 +222,7 @@ import { formatTimeWithSuffix, formatLargeNumber, generateTraceContext } from "@
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
 import { traceQueryWindow } from "@/utils/rum/traceWindow";
-import type { TraceTimeRange } from "@/services/traces";
+import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
