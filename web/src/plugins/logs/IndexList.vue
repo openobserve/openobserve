@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-border-default rounded-default h-8 w-8 shrink-0 border p-0"
         @click="onStreamTypeChange('logs')"
       >
-        <OIcon :name="streamTypeIcon" size="sm" />
+        <OIcon name="swap-horiz" size="sm" />
         <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
       </OButton>
       <div class="min-w-0 flex-1">
@@ -284,9 +284,7 @@ import { searchState } from "@/composables/useLogs/searchState";
 import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -448,15 +446,6 @@ export default defineComponent({
       saveLogsStream(store.state.selectedOrganization.identifier, []);
       await getStreamList(true);
     };
-
-    // The "switch back to Logs" button always performs the same action, but the
-    // glyph itself identifies the type being switched FROM — reuses the same
-    // streamType icon registry as the rest of the app instead of a fixed glyph.
-    const streamTypeIcon = computed(
-      () =>
-        (resolveBadge("streamType", searchObj.data.stream.streamType).icon ??
-          "swap-horiz") as IconName,
-    );
 
     const showUserDefinedSchemaToggle = computed(() => {
       return (
@@ -1818,7 +1807,6 @@ export default defineComponent({
       addSearchTerm,
       fieldValues,
       onStreamTypeChange,
-      streamTypeIcon,
       add: "add",
       "visibility-off": "visibility-off",
       visibility: "visibility",
