@@ -934,6 +934,13 @@ fn build_session_trace_details_sql(
     service_key_expr: &str,
     trace_id_predicate: &str,
 ) -> String {
+    // Trace ingestion normalizes OTEL `user.id` to the stored `user_id`
+    // column. Keep the legacy schema's explicit `llm_user_id` name.
+    let user_id_col = if validated.has_gen_ai {
+        "user_id"
+    } else {
+        validated.columns.user_id
+    };
     let (root_service_name_expr, root_operation_name_expr) = if has_ref_parent_id {
         (
             "max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN service_name END)",
@@ -950,7 +957,9 @@ fn build_session_trace_details_sql(
          {root_service_name_expr} AS root_service_name, \
          {root_operation_name_expr} AS root_operation_name, \
          first_value(service_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_service_name, \
-         first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_operation_name"
+         first_value(operation_name ORDER BY {TIMESTAMP_COL_NAME} ASC) AS first_operation_name, \
+         array_agg(DISTINCT {user_id_col}) \
+             FILTER (WHERE {user_id_col} IS NOT NULL AND {user_id_col} != '') AS user_ids"
     );
 
     if validated.has_gen_ai {
@@ -1054,6 +1063,20 @@ fn build_session_trace_response_item(
     item: &json::Value,
 ) -> Option<(String, i64, SessionTraceResponseItem)> {
     let tid = item.get("trace_id")?.as_str()?.to_string();
+    let mut user_ids = item
+        .get("user_ids")
+        .and_then(json::Value::as_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(json::Value::as_str)
+                .filter(|value| !value.is_empty())
+                .map(String::from)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    user_ids.sort();
+    user_ids.dedup();
     let trace_start_time = json::get_int_value(item.get("trace_start_time").unwrap_or_default());
     let trace_end_time = json::get_int_value(item.get("trace_end_time").unwrap_or_default());
     let span_count = json::get_int_value(item.get("span_count").unwrap_or_default());
@@ -1110,6 +1133,7 @@ fn build_session_trace_response_item(
 
     let hit = SessionTraceResponseItem {
         trace_id: tid.clone(),
+        user_ids,
         start_time: trace_start_time,
         end_time: trace_end_time,
         duration: computed_duration,
@@ -1419,6 +1443,7 @@ fn normalize_latest_session_hits(
 #[derive(Debug, Serialize)]
 struct SessionTraceResponseItem {
     trace_id: String,
+    user_ids: Vec<String>,
     start_time: i64,
     end_time: i64,
     duration: i64,
@@ -1581,6 +1606,7 @@ mod tests {
         assert!(
             sql.contains("sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count")
         );
+        assert!(sql.contains("array_agg(DISTINCT user_id)"));
         assert!(!sql.contains("gen_ai_conversation_id"));
     }
 
@@ -1598,6 +1624,7 @@ mod tests {
             "root_operation_name": "gen_ai.chat.completions",
             "first_service_name": "o2-ai",
             "first_operation_name": "fallback-op",
+            "user_ids": ["user-b", "user-a", "user-b", ""],
             "gen_ai_usage_details_input": 10,
             "gen_ai_usage_details_output": 20,
             "gen_ai_usage_details_total": 30,
@@ -1610,8 +1637,27 @@ mod tests {
 
         assert_eq!(service_count, 1);
         assert_eq!(hit.spans, [3, 1]);
+        assert_eq!(
+            hit.user_ids,
+            vec!["user-a".to_string(), "user-b".to_string()]
+        );
         assert_eq!(hit.service_name[0].service_name, "o2-ai");
         assert_eq!(hit.models, vec!["claude-sonnet-4-6".to_string()]);
+    }
+
+    #[test]
+    fn legacy_session_trace_details_sql_uses_legacy_user_id_column() {
+        let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(false);
+        let sql = build_session_trace_details_sql(
+            "default",
+            &validated,
+            false,
+            "service_name",
+            "\"trace_id\" IN ('trace-1')",
+        );
+
+        assert!(sql.contains("array_agg(DISTINCT llm_user_id)"));
+        assert!(!sql.contains("array_agg(DISTINCT user_id)"));
     }
 
     #[test]
