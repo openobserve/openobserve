@@ -6549,7 +6549,7 @@
     "streamType": "Stream Type",
     "realTime": "Realtime",
     "scheduled": "Scheduled",
-    "anomalyDetection": "Anomalies",
+    "anomalyDetection": "Anomaly",
     "anomalyDetectionConfig": "Detection Config",
     "alerting": "Alerting",
     "saveAndTrain": "Save & Train",

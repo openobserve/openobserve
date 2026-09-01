@@ -98,6 +98,17 @@ const plainAlert = () => ({
   query_condition: { type: "sql", sql: "select 1" },
 });
 
+// What GET /alerts/{id} answers for an anomaly: the handler falls back to the
+// anomaly-detection config and tags it so the caller can discriminate.
+const anomalyAlert = () => ({
+  id: "alert-1",
+  name: "k8s-logs-volume",
+  alert_type: "anomaly_detection",
+  stream_name: "k8s_logs",
+  stream_type: "logs",
+  query_condition: null,
+});
+
 /** Declares `sloName` explicitly: an auto-stub would swallow a missing prop. */
 const ConfigSummaryStub = {
   name: "AlertConfigSummary",
@@ -289,6 +300,36 @@ describe("AlertDetail — SLO alerts", () => {
         expect.objectContaining({
           name: "editAlert",
           params: expect.objectContaining({ alert_id: "alert-1" }),
+        }),
+      );
+    });
+
+    // The anomaly form takes its prefill from the `anomaly_id` route param, so
+    // the generic editor opens blank on an anomaly — no stream, no schedule.
+    it("diverts an anomaly alert to the anomaly editor, which can prefill it", async () => {
+      wrapper = await mountView(anomalyAlert());
+      await clickEdit(wrapper);
+
+      expect(errorToasts()).toEqual([]);
+      expect(mockRouterPush).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "editAnomalyDetection",
+          params: expect.objectContaining({ anomaly_id: "alert-1" }),
+        }),
+      );
+    });
+
+    it("carries the folder through to the anomaly editor", async () => {
+      wrapper = await mountView(anomalyAlert());
+      await clickEdit(wrapper);
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            org_identifier: store.state.selectedOrganization.identifier,
+            folder: "default",
+          }),
         }),
       );
     });

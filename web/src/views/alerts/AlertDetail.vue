@@ -638,6 +638,21 @@ const editAlert = () => {
     toast({ variant: "error", message: t("alerts.sloAlertUnplaceable") });
     return;
   }
+  // Anomaly configs are edited on their own page. The generic editor takes its
+  // anomaly prefill from the `anomaly_id` route param, so without this it opens
+  // blank — no stream, no schedule — and saving would write a different alert.
+  // Same discriminator the GET handler stamps on the config it falls back to.
+  if (alert.value?.alert_type === "anomaly_detection") {
+    router.push({
+      name: "editAnomalyDetection",
+      params: { anomaly_id: alertId.value },
+      query: {
+        org_identifier: orgId.value,
+        folder: route.query.folder || "default",
+      },
+    });
+    return;
+  }
   router.push({
     name: "editAlert",
     params: { alert_id: alertId.value },

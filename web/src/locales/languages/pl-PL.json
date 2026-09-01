@@ -6548,7 +6548,7 @@
     "streamType": "Typ strumienia",
     "realTime": "Czas rzeczywisty",
     "scheduled": "Zaplanowany",
-    "anomalyDetection": "Anomalie",
+    "anomalyDetection": "Anomalia",
     "anomalyDetectionConfig": "Konfiguracja wykrywania",
     "alerting": "Alertowanie",
     "saveAndTrain": "Zapisz i trenuj",

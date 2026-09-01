@@ -6548,7 +6548,7 @@
     "streamType": "Тип потока",
     "realTime": "В реальном времени",
     "scheduled": "По расписанию",
-    "anomalyDetection": "Аномалии",
+    "anomalyDetection": "Аномалия",
     "anomalyDetectionConfig": "Конфигурация обнаружения",
     "alerting": "Оповещение",
     "saveAndTrain": "Сохранить и обучить",
