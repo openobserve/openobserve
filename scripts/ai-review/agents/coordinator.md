@@ -139,7 +139,7 @@ Add a `#### ✅ Previously Flagged (resolved)` section (inside the same `<detail
 ## Rules
 
 - Do NOT include any commentary about how the review was produced
-- Do NOT mention which model generated which finding
+- Do NOT name, hint at, or identify the model or provider behind the review — yours or any other
 - Do NOT include XML tags in your output
 - Keep the review tone direct, professional, and helpful
 - Do NOT flatter the author

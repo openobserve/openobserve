@@ -1,7 +1,22 @@
 # AI Code Review (`scripts/ai-review`)
 
 Automated PR review that posts a single consolidated comment on every pull request. Driven by
-`.github/workflows/ai-code-review.yml` → `run-review.mjs`, using DeepSeek-V4-Pro via `opencode`.
+`.github/workflows/ai-code-review.yml` → `run-review.mjs`, running the reviewer agents via
+`opencode`.
+
+The model provider is **not named anywhere in this repo**. This repo and its Actions logs are
+public, so the opencode provider block, the provider/model ids and the API key all come from
+repository secrets at run time:
+
+| Secret | Holds |
+|---|---|
+| `REVIEW_OPENCODE_CONFIG` | JSON opencode config fragment: the `provider` block (endpoint + model), written to a temp file and merged over `opencode.jsonc` via `OPENCODE_CONFIG`. Reference the key as `{env:REVIEW_API_KEY}` inside it rather than inlining it. |
+| `REVIEW_PROVIDER_ID` | opencode provider id, matching the key in `REVIEW_OPENCODE_CONFIG`. |
+| `REVIEW_MODEL_ID` | model id, matching the model key in `REVIEW_OPENCODE_CONFIG`. |
+| `REVIEW_API_KEY` | provider API key. |
+
+Any of them missing ⇒ the run posts a "not reviewed / CI misconfiguration" comment and exits
+non-zero, rather than passing silently.
 
 The posted comment is branded **OpenObserve Code Reviewer**. Branding is *cosmetic + identity
 only* — it does not change what the reviewer finds or decides.
