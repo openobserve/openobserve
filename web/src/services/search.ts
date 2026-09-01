@@ -383,9 +383,15 @@ const search = {
     const url = `/api/clusters`;
     return http().get(url);
   },
-  get_history: (org_identifier: string, startTime = null, endTime = null) => {
+  get_history: (
+    org_identifier: string,
+    startTime = null,
+    endTime = null,
+    stream_type: string | null = null,
+    stream_name: string | null = null,
+  ) => {
     const payload: any = {
-      stream_type: "logs",
+      stream_type: stream_type || "logs",
       org_identifier,
       user_email: null,
     };
@@ -396,6 +402,10 @@ const search = {
 
     if (endTime) {
       payload.end_time = endTime;
+    }
+
+    if (stream_name) {
+      payload.stream_name = stream_name;
     }
 
     return http().post(

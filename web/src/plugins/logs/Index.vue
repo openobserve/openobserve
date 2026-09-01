@@ -1309,9 +1309,15 @@ export default defineComponent({
     };
     const showSearchHistoryfn = () => {
       // Search History is now its own route (was an `action=history` overlay).
+      // Forward the active stream type/name so the history shown there matches
+      // whichever telemetry type the user was viewing (logs/traces/metrics).
       router.push({
         name: "searchHistory",
-        query: { org_identifier: store.state.selectedOrganization.identifier },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          stream_type: searchObj.data.stream.streamType,
+          stream: searchObj.data.stream.selectedStream[0] || "",
+        },
       });
     };
 

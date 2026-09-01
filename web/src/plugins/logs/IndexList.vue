@@ -22,17 +22,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          list itself deliberately runs flush to the divider so its scrollbar lands
          on the panel edge — only the rows inside it carry the gutter. -->
     <div class="px-page-edge flex max-w-full items-center gap-2">
-      <OButton
+      <OTooltip
         v-if="searchObj.data.stream.streamType && searchObj.data.stream.streamType !== 'logs'"
-        data-test="log-search-index-list-back-to-logs-btn"
-        variant="outline"
-        size="icon-sm"
-        class="border-border-default rounded-default h-8 w-8 shrink-0 border p-0"
-        @click="onStreamTypeChange('logs')"
+        :content="t('search.switchToLogs')"
+        side="bottom"
+        align="center"
       >
-        <OIcon name="swap-horiz" size="sm" />
-        <OTooltip :content="t('search.switchToLogs')" side="bottom" align="center" />
-      </OButton>
+        <OTag
+          data-test="log-search-index-list-back-to-logs-btn"
+          type="streamType"
+          :value="searchObj.data.stream.streamType"
+          clickable
+          class="shrink-0"
+          @click="onStreamTypeChange('logs')"
+        />
+      </OTooltip>
       <div class="min-w-0 flex-1">
         <OSelect
           ref="streamSelect"
@@ -285,6 +289,7 @@ import { useStreamFields } from "@/composables/useLogs/useStreamFields";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -315,6 +320,7 @@ export default defineComponent({
     OSelect,
     OIcon,
     OTooltip,
+    OTag,
     OEmptyState,
     OSkeleton,
   },

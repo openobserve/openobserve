@@ -2931,15 +2931,25 @@ describe("Back to Logs control", () => {
     expect(wrapper.find(BTN).exists()).toBe(true);
   });
 
-  it("uses the switch (swap-horiz) icon, not the stream-type icon", async () => {
+  it("shows the resolved stream-type icon for metrics (strengthened identifier), not a generic glyph", async () => {
     await mountList();
     wrapper.vm.searchObj.data.stream.streamType = "metrics";
     await nextTick();
-    // The glyph is a fixed switcher affordance regardless of stream type —
-    // assert via the OIcon `name` prop (icon renders as an inline SVG, not text).
+    // The button is now an OTag(type="streamType") pill, so its icon/colour
+    // reflect the active stream type itself (see badgeGroups.ts) instead of a
+    // fixed, muted swap glyph — assert via the OIcon `name` prop.
     const icon = wrapper.find(BTN).findComponent({ name: "OIcon" });
     expect(icon.exists()).toBe(true);
-    expect(icon.props("name")).toBe("swap-horiz");
+    expect(icon.props("name")).toBe("bar-chart");
+  });
+
+  it("shows the resolved stream-type icon for traces", async () => {
+    await mountList();
+    wrapper.vm.searchObj.data.stream.streamType = "traces";
+    await nextTick();
+    const icon = wrapper.find(BTN).findComponent({ name: "OIcon" });
+    expect(icon.exists()).toBe(true);
+    expect(icon.props("name")).toBe("account-tree");
   });
 
   it("switches back to logs on click (behavior preserved)", async () => {
