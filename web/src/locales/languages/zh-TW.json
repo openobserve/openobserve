@@ -1172,9 +1172,8 @@
     "failedToFetchFieldValues": "取得欄位值失敗",
     "fieldMissingInStreams": "欄位 '{field}' 不存在於一個或多個串流中。\n",
     "fieldStreamCountMismatch": "欄位 '{field}' 存在於不同數量的串流中。\n",
-    "histogramNotAvailableMultiStream": "直方圖不適用於多串流 SQL 模式搜尋。",
     "histogramSearchQueryCancelled": "直方圖搜尋查詢已取消",
-    "histogramUnavailableForQueries": "直方圖不適用於 CTE、DISTINCT、JOIN 和 LIMIT 查詢。",
+    "histogramUnavailableForQueries": "直方圖不適用於 CTE、DISTINCT、UNION、JOIN 和 LIMIT 查詢。",
     "invalidDateFormat": "無效的日期格式。",
     "missingStreamFilterFields": "一個或多個篩選欄位不存在於 \"{streams}\" 中，因此不會在所述的串流中執行搜尋。\n",
     "noColumnFoundInStream": "在選取的串流中找不到任何欄位。",
@@ -7987,6 +7986,7 @@
     "delete": "刪除",
     "method": "方法",
     "url": "URL",
+    "urlOrRecipients": "URL / 收件人",
     "api_header": "標頭",
     "api_header_value": "值",
     "skip_tls_verify": "略過 TLS 驗證",
@@ -12938,8 +12938,6 @@
       "selectStarNotSupportedForVisualization": "視覺化不支援 SELECT * 查詢",
       "errorUpdatingVisualization": "更新視覺化時發生錯誤",
       "queryEmptySelectFieldsToBuild": "查詢為空，請選取欄位以建立查詢",
-      "histogramUnavailableCtesDistinctJoinLimit": "直方圖不適用於 CTE、DISTINCT、JOIN 和 LIMIT 查詢。",
-      "histogramNotAvailableMultiStream": "多串流搜尋不提供直方圖。",
       "histogramUnavailableCtesDistinctLimit": "直方圖不適用於 CTE、DISTINCT 和 LIMIT 查詢。"
     },
     "searchSchedulersList": {

@@ -1172,9 +1172,8 @@
     "failedToFetchFieldValues": "Alan değerleri alınamadı",
     "fieldMissingInStreams": "Alan '{field}' bir veya daha fazla akışta mevcut değil.\n",
     "fieldStreamCountMismatch": "Alan '{field}' farklı sayıda akışta mevcut.\n",
-    "histogramNotAvailableMultiStream": "Histogram, çok akışlı SQL modu araması için kullanılamaz.",
     "histogramSearchQueryCancelled": "Histogram arama sorgusu iptal edildi",
-    "histogramUnavailableForQueries": "Histogram, CTE, DISTINCT, JOIN ve LIMIT sorguları için kullanılamaz.",
+    "histogramUnavailableForQueries": "Histogram, CTE, DISTINCT, UNION, JOIN ve LIMIT sorguları için kullanılamaz.",
     "invalidDateFormat": "Geçersiz tarih formatı.",
     "missingStreamFilterFields": "Bir veya daha fazla filtre alanı \"{streams}\" içinde mevcut değil, bu nedenle belirtilen akışta arama yapılmadı.\n",
     "noColumnFoundInStream": "Seçilen akışta sütun bulunamadı.",
@@ -7992,6 +7991,7 @@
     "delete": "Sil",
     "method": "Yöntemi",
     "url": "URL",
+    "urlOrRecipients": "URL / Alıcılar",
     "api_header": "Başlık",
     "api_header_value": "Değer",
     "skip_tls_verify": "TLS Doğrulamasını Atla",
@@ -12943,8 +12943,6 @@
       "selectStarNotSupportedForVisualization": "Görselleştirme için SELECT * sorgusu desteklenmiyor",
       "errorUpdatingVisualization": "Görselleştirme güncellenirken hata",
       "queryEmptySelectFieldsToBuild": "Sorgu boş, lütfen sorgu oluşturmak için alanlar seçin",
-      "histogramUnavailableCtesDistinctJoinLimit": "CTE'ler, DISTINCT, JOIN ve LIMIT sorguları için histogram mevcut değil.",
-      "histogramNotAvailableMultiStream": "Çoklu akış araması için histogram mevcut değil.",
       "histogramUnavailableCtesDistinctLimit": "CTE'ler, DISTINCT ve LIMIT sorguları için histogram mevcut değil."
     },
     "searchSchedulersList": {

@@ -1172,9 +1172,8 @@
     "failedToFetchFieldValues": "Fehler beim Abrufen der Feldwerte.",
     "fieldMissingInStreams": "Feld '{field}' existiert nicht in einem oder mehreren Streams.\n",
     "fieldStreamCountMismatch": "Feld '{field}' existiert in einer unterschiedlichen Anzahl von Streams.\n",
-    "histogramNotAvailableMultiStream": "Histogramm ist für die SQL-Modussuche über mehrere Streams nicht verfügbar.",
     "histogramSearchQueryCancelled": "Die Histogramm-Suchabfrage wurde abgebrochen.",
-    "histogramUnavailableForQueries": "Histogramm für CTEs, DISTINCT, JOIN- und LIMIT-Abfragen nicht verfügbar.",
+    "histogramUnavailableForQueries": "Histogramm für CTEs, DISTINCT, UNION, JOIN- und LIMIT-Abfragen nicht verfügbar.",
     "invalidDateFormat": "Ungültiges Datumsformat.",
     "missingStreamFilterFields": "Ein oder mehrere Filterfelder existieren nicht in \"{streams}\", daher wird in dem genannten Stream keine Suche durchgeführt.\n",
     "noColumnFoundInStream": "Keine Spalte im ausgewählten Stream gefunden.",
@@ -7992,6 +7991,7 @@
     "delete": "Löschen",
     "method": "Methode",
     "url": "URL",
+    "urlOrRecipients": "URL / Empfänger",
     "api_header": "Kopfzeile",
     "api_header_value": "Wert",
     "skip_tls_verify": "TLS-Verifizierung überspringen",
@@ -12943,8 +12943,6 @@
       "selectStarNotSupportedForVisualization": "SELECT * Abfrage wird für die Visualisierung nicht unterstützt",
       "errorUpdatingVisualization": "Fehler beim Aktualisieren der Visualisierung",
       "queryEmptySelectFieldsToBuild": "Abfrage ist leer, bitte wählen Sie Felder aus, um die Abfrage zu erstellen",
-      "histogramUnavailableCtesDistinctJoinLimit": "Histogramm nicht verfügbar für CTEs, DISTINCT, JOIN und LIMIT Abfragen.",
-      "histogramNotAvailableMultiStream": "Histogramm ist nicht verfügbar für Multi-Stream-Suche.",
       "histogramUnavailableCtesDistinctLimit": "Histogramm nicht verfügbar für CTEs, DISTINCT und LIMIT Abfragen."
     },
     "searchSchedulersList": {

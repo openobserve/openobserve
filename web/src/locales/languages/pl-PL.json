@@ -1172,9 +1172,8 @@
     "failedToFetchFieldValues": "Nie udało się pobrać wartości pól.",
     "fieldMissingInStreams": "Pole '{field}' nie istnieje w jednym lub więcej strumieniach.\n",
     "fieldStreamCountMismatch": "Pole '{field}' istnieje w różnej liczbie strumieni.\n",
-    "histogramNotAvailableMultiStream": "Histogram nie jest dostępny dla wyszukiwania w trybie SQL dla wielu strumieni.",
     "histogramSearchQueryCancelled": "Zapytanie wyszukiwania histogramu zostało anulowane.",
-    "histogramUnavailableForQueries": "Histogram niedostępny dla zapytań CTE, DISTINCT, JOIN i LIMIT.",
+    "histogramUnavailableForQueries": "Histogram niedostępny dla zapytań CTE, DISTINCT, UNION, JOIN i LIMIT.",
     "invalidDateFormat": "Nieprawidłowy format daty.",
     "missingStreamFilterFields": "Jeden lub więcej pól filtrów nie istnieje w \"{streams}\", dlatego nie przeprowadzono wyszukiwania we wspomnianym strumieniu.\n",
     "noColumnFoundInStream": "Nie znaleziono kolumny w wybranym strumieniu.",
@@ -7992,6 +7991,7 @@
     "delete": "Usuń",
     "method": "Metoda",
     "url": "URL",
+    "urlOrRecipients": "URL / Odbiorcy",
     "api_header": "Nagłówek",
     "api_header_value": "Wartość",
     "skip_tls_verify": "Pomiń weryfikację TLS",
@@ -12943,8 +12943,6 @@
       "selectStarNotSupportedForVisualization": "Zapytanie SELECT * nie jest obsługiwane dla wizualizacji",
       "errorUpdatingVisualization": "Błąd aktualizacji wizualizacji",
       "queryEmptySelectFieldsToBuild": "Zapytanie jest puste, wybierz pola, aby zbudować zapytanie",
-      "histogramUnavailableCtesDistinctJoinLimit": "Histogram niedostępny dla zapytań CTE, DISTINCT, JOIN i LIMIT.",
-      "histogramNotAvailableMultiStream": "Histogram nie jest dostępny dla wyszukiwania w wielu strumieniach.",
       "histogramUnavailableCtesDistinctLimit": "Histogram niedostępny dla zapytań CTE, DISTINCT i LIMIT."
     },
     "searchSchedulersList": {

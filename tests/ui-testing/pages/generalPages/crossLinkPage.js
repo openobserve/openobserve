@@ -608,15 +608,18 @@ export class CrossLinkPage {
      */
     captureCrossLinkRequests() {
         const captured = [];
+        const payloads = [];
         const handler = (req) => {
             const url = req.url();
             if (url.includes('result_schema') && url.includes('cross_linking=true')) {
                 captured.push(url);
+                payloads.push(req.postData() || '');
             }
         };
         this.page.on('request', handler);
         return {
             getUrls: () => captured.slice(),
+            getPayloads: () => payloads.slice(),
             getCount: () => captured.length,
             stop: () => this.page.off('request', handler),
         };
@@ -625,7 +628,8 @@ export class CrossLinkPage {
     /**
      * Begin capturing `result_schema?cross_linking=true` responses so the
      * caller can later assert how many fired. The cross-link dropdown depends
-     * on these responses landing (one per selected stream) before
+     * on these responses landing (one per query, covering every selected
+     * stream) before
      * `searchObj.data.crossLinks` is fully populated.
      *
      * Returns a small handle with `getCount()` + `waitForAtLeast(n)` helpers,
