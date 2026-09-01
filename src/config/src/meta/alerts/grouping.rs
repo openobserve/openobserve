@@ -219,7 +219,8 @@ pub fn validate_multi_alert(
 
     match agg.group_by.as_deref() {
         Some(cols) if !cols.is_empty() => {}
-        _ => return Err(MultiAlertError::NotGrouped),
+        _ if query.query_type != super::QueryType::SQL => return Err(MultiAlertError::NotGrouped),
+        _ => {}
     }
 
     if !matches!(

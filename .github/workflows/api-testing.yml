@@ -63,20 +63,23 @@ jobs:
             echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
 
-  api_integration_tests:
-    name: api_integration_tests
+  # Build the exact PR/merge-group binary once, then fan it out to every API
+  # test shard. The artifact is scoped to this workflow run and SHA; Rust cache
+  # remains an input to this single build, not a substitute for the binary.
+  build_api_binary:
+    name: build_api_binary
     needs: [check_changes]
-    # API-relevant changes are required in every case. On a pull_request the 'e2e'
-    # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
-    # Playwright suite, so a frontend-only PR carries it to run UI tests and must
-    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
     if: >-
       needs.check_changes.outputs.has_changes == 'true' &&
       (github.event_name != 'pull_request' ||
        contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
+    env:
+      # CI executes a stripped binary; omitting dependency debuginfo keeps the
+      # shared compile cache small while preserving dev-profile debug assertions.
+      CARGO_PROFILE_DEV_DEBUG: "0"
     permissions:
-      contents: read  # only need to checkout the repo
+      contents: read
     steps:
       - name: Remove unused tools
         run: |
@@ -98,18 +101,67 @@ jobs:
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          cache-on-failure: true
-          shared-key: backend-debug-mimalloc
-          # Save the shared cache on merge_group runs (the main-ward build now that
-          # push:main is gone); keep the main-ref check for any non-PR fallback.
-          save-if: ${{ github.event_name == 'merge_group' || github.ref == 'refs/heads/main' }}
+          # Share one dependency build cache with the DB main-branch writer. Do
+          # not cache workspace crates: a measured warm cache still rebuilt all
+          # 42 workspace crates while increasing the archive from ~1.1 to 3.1 GiB.
+          shared-key: backend-debug0-mimalloc-deps-v1
+          add-job-id-key: false
+          # The DB workflow's successful push:main build is the only writer.
+          save-if: false
 
       - name: Install Protoc
-        run: |
-          bash ./.github/protoc.sh
+        run: bash ./.github/protoc.sh
 
       - name: Build OpenObserve debug binary
         run: cargo build --features mimalloc
+
+      # The consumers only execute this binary, so remove debug symbols from the
+      # distribution copy before compressing and uploading it once.
+      - name: Package OpenObserve debug binary
+        run: |
+          strip target/debug/openobserve
+          tar -C target/debug -czf openobserve-api-debug.tar.gz openobserve
+
+      - name: Upload OpenObserve debug binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-api-debug-${{ github.sha }}
+          path: openobserve-api-debug.tar.gz
+          if-no-files-found: error
+          retention-days: 3
+          # The payload is already gzip-compressed; avoid a second compression pass.
+          compression-level: 0
+
+  api_integration_tests:
+    name: api_integration_tests
+    needs: [check_changes, build_api_binary]
+    # API-relevant changes are required in every case. On a pull_request the 'e2e'
+    # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
+    # Playwright suite, so a frontend-only PR carries it to run UI tests and must
+    # not drag the whole API suite along with it.
+    if: >-
+      needs.check_changes.outputs.has_changes == 'true' &&
+      (github.event_name != 'pull_request' ||
+       contains(github.event.pull_request.labels.*.name, 'e2e'))
+    runs-on: ubicloud-standard-4
+    permissions:
+      actions: read
+      contents: read  # only need to checkout the repo
+    steps:
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+
+      - name: Download OpenObserve debug binary
+        uses: actions/download-artifact@v5
+        with:
+          name: openobserve-api-debug-${{ github.sha }}
+          path: api-binary-artifact
+
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
 
       - name: Setup Python
         uses: actions/setup-python@v7
@@ -185,11 +237,11 @@ jobs:
   # 2 phases: memtable + parquet) suite doesn't extend CI wall time.
   api_query_agent_tests:
     name: "api_query_agent / ${{ matrix.config.label }}"
-    needs: [check_changes]
+    needs: [check_changes, build_api_binary]
     # API-relevant changes are required in every case. On a pull_request the 'e2e'
     # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
     # Playwright suite, so a frontend-only PR carries it to run UI tests and must
-    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
+    # not drag the whole API suite along with it.
     if: >-
       needs.check_changes.outputs.has_changes == 'true' &&
       (github.event_name != 'pull_request' ||
@@ -214,37 +266,23 @@ jobs:
             env: "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX=false"
             mode: "true"
     permissions:
+      actions: read
       contents: read
     steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Checkout git repo
         uses: actions/checkout@v5
+
+      - name: Download OpenObserve debug binary
+        uses: actions/download-artifact@v5
         with:
-          fetch-depth: 0
+          name: openobserve-api-debug-${{ github.sha }}
+          path: api-binary-artifact
 
-      - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2026-05-20
-
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          shared-key: backend-debug-mimalloc
-          save-if: false  # main api_integration_tests job writes the cache
-
-      - name: Install Protoc
-        run: bash ./.github/protoc.sh
-
-      - name: Build OpenObserve debug binary
-        run: cargo build --features mimalloc
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
 
       - name: Setup Python
         uses: actions/setup-python@v7
@@ -312,21 +350,22 @@ jobs:
 
   # Phase 6.b: regression matrix split. The 4 env-flag-sensitive test
   # configurations now run as 4 parallel jobs instead of 4 sequential
-  # restarts in one job. Each job builds OO once and runs its single
-  # configured pytest target.
+  # restarts in one job. Each job downloads the run-scoped OO binary and
+  # runs its single configured pytest target.
   api_regression_tests:
     name: "api_regression / ${{ matrix.config.label }}"
-    needs: [check_changes]
+    needs: [check_changes, build_api_binary]
     # API-relevant changes are required in every case. On a pull_request the 'e2e'
     # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
     # Playwright suite, so a frontend-only PR carries it to run UI tests and must
-    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
+    # not drag the whole API suite along with it.
     if: >-
       needs.check_changes.outputs.has_changes == 'true' &&
       (github.event_name != 'pull_request' ||
        contains(github.event.pull_request.labels.*.name, 'e2e'))
     runs-on: ubicloud-standard-4
     permissions:
+      actions: read
       contents: read  # only need to checkout the repo
     strategy:
       fail-fast: false
@@ -345,33 +384,19 @@ jobs:
             env: "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED=false"
             target: tests/regression/test_logs_to_logs_join.py
     steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - uses: actions/checkout@v5
-        with: { fetch-depth: 0 }
 
-      - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
+      - name: Download OpenObserve debug binary
+        uses: actions/download-artifact@v5
         with:
-          toolchain: nightly-2026-05-20
+          name: openobserve-api-debug-${{ github.sha }}
+          path: api-binary-artifact
 
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          shared-key: backend-debug-mimalloc
-          save-if: false  # main api_integration_tests job writes the cache
-
-      - name: Install Protoc
-        run: bash ./.github/protoc.sh
-
-      - name: Build OpenObserve debug binary
-        run: cargo build --features mimalloc
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
 
       - uses: actions/setup-python@v7
         id: setup-python
@@ -441,11 +466,11 @@ jobs:
   # can promote it to blocking after the noise floor is understood.
   api_fuzz_tests:
     name: api_fuzz_tests
-    needs: [check_changes]
+    needs: [check_changes, build_api_binary]
     # API-relevant changes are required in every case. On a pull_request the 'e2e'
     # label is an ADDITIONAL opt-in, not a bypass: the label is shared with the
     # Playwright suite, so a frontend-only PR carries it to run UI tests and must
-    # not drag the whole API suite (8 jobs, each a full cargo build) along with it.
+    # not drag the whole API suite along with it.
     if: >-
       needs.check_changes.outputs.has_changes == 'true' &&
       (github.event_name != 'pull_request' ||
@@ -453,37 +478,23 @@ jobs:
     runs-on: ubicloud-standard-4
     continue-on-error: true
     permissions:
+      actions: read
       contents: read  # only need to checkout the repo
     steps:
-      - name: Remove unused tools
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-
       - name: Checkout git repo
         uses: actions/checkout@v5
+
+      - name: Download OpenObserve debug binary
+        uses: actions/download-artifact@v5
         with:
-          fetch-depth: 0
+          name: openobserve-api-debug-${{ github.sha }}
+          path: api-binary-artifact
 
-      - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2026-05-20
-
-      - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          shared-key: backend-debug-mimalloc
-          save-if: false  # don't write cache from this job (the main job does)
-
-      - name: Install Protoc
-        run: bash ./.github/protoc.sh
-
-      - name: Build OpenObserve debug binary
-        run: cargo build --features mimalloc
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
 
       - name: Setup Python
         uses: actions/setup-python@v7
@@ -572,7 +583,7 @@ jobs:
   api_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [check_changes, api_integration_tests, api_query_agent_tests, api_regression_tests]
+    needs: [check_changes, build_api_binary, api_integration_tests, api_query_agent_tests, api_regression_tests]
     if: always()
     steps:
       - name: Check test results
@@ -600,14 +611,16 @@ jobs:
             exit 1
           fi
 
-          # 4. Suite was expected to run — the gating jobs must have succeeded.
-          if [ "${{ needs.api_integration_tests.result }}" == "success" ] && \
+          # 4. Suite was expected to run — the run-scoped binary and all gating
+          #    test jobs must have succeeded.
+          if [ "${{ needs.build_api_binary.result }}" == "success" ] && \
+             [ "${{ needs.api_integration_tests.result }}" == "success" ] && \
              [ "${{ needs.api_query_agent_tests.result }}" == "success" ] && \
              [ "${{ needs.api_regression_tests.result }}" == "success" ]; then
             echo "All API test jobs passed"
             exit 0
           else
-            echo "API tests failed: integration=${{ needs.api_integration_tests.result }}, query_agent=${{ needs.api_query_agent_tests.result }}, regression=${{ needs.api_regression_tests.result }}"
+            echo "API tests failed: build=${{ needs.build_api_binary.result }}, integration=${{ needs.api_integration_tests.result }}, query_agent=${{ needs.api_query_agent_tests.result }}, regression=${{ needs.api_regression_tests.result }}"
             exit 1
           fi
 

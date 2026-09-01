@@ -7600,7 +7600,6 @@
   "alert_library": {
     "header": "Bibliothèque d'alertes",
     "subtitle": "Des alertes sélectionnées, prêtes à installer, correspondant aux données que vous ingérez déjà",
-    "sectionTab": "Bibliothèque",
     "contribute": "Contribuer sur GitHub",
     "searchPlaceholder": "Rechercher par nom, description ou flux",
     "searchLabel": "Rechercher dans la bibliothèque d'alertes",
@@ -7934,7 +7933,6 @@
     "destinationsLoadError": "Erreur lors du chargement des destinations"
   },
   "alert_destinations": {
-    "sectionTab": "Destinations",
     "chooseTypeTitle": "Choisir le type",
     "selectDestinationType": "Sélectionner le type de destination",
     "connectionStepTitle": "Connexion",
@@ -11067,7 +11065,14 @@
           "typeCategorical": "Catégoriel",
           "typeBoolean": "Booléen",
           "threshold": "Seuil",
-          "measurePerRow": "Moyenne par ligne, sur les essais"
+          "measurePerRow": "Moyenne par ligne, sur les essais",
+          "dimensionImproved": "{count} ligne améliorée | {count} lignes améliorées",
+          "dimensionUnchanged": "{count} ligne inchangée | {count} lignes inchangées",
+          "dimensionRegressed": "{count} ligne en régression | {count} lignes en régression",
+          "dimensionNotCounted": "Non compté",
+          "dimensionNotCountedHint": "Cet évaluateur n'a aucune politique de comparaison dans sa configuration de score, donc ses valeurs sont rapportées mais jamais jugées améliorées ou en régression — et il ne peut pas affecter le résultat. Donnez-lui une direction et un seuil pour qu'il soit compté.",
+          "dimensionNoneCompared": "Aucune comparaison",
+          "dimensionNoneComparedHint": "Aucune ligne n'a été mesurée des deux côtés. Une ligne qui n'apparaît que dans une seule expérience n'a pas de point de comparaison, elle ne compte donc dans aucune direction."
         },
         "rowDrawer": {
           "fallbackTitle": "Ligne de comparaison",
@@ -11432,6 +11437,7 @@
         "republishedSuccess": "Description mise à jour. La version {version} est inchangée.",
         "draftSuccess": "Brouillon enregistré. Testez la connexion pour le publier.",
         "draftError": "Impossible d'enregistrer le brouillon",
+        "testFailed": "Le test de connexion a échoué",
         "publishFailed": "La connexion de test a échoué, donc rien n'a été publié. Votre brouillon est enregistré.",
         "createError": "Impossible de publier la tâche distante",
         "validation": {
@@ -14242,8 +14248,6 @@
       "passwordSetHelp": "Un mot de passe est déjà défini. Laissez vide pour le conserver, ou saisissez un nouveau pour le remplacer.",
       "showUptimePercent": "Afficher le pourcentage de disponibilité",
       "showTimelineBars": "Afficher les barres de chronologie",
-      "showResponseTime": "Afficher le temps de réponse",
-      "showResponseTimeHelp": "Désactivez pour que la page ne divulgue pas les chiffres de performance.",
       "noindex": "Décourager l'indexation",
       "noindexHelp": "Ajoute une balise noindex pour que les moteurs de recherche ignorent la page publique.",
       "confirmFailures": "Confirmation des échecs",
@@ -14302,6 +14306,9 @@
       "deleting": "Suppression de la mise à jour...",
       "deleted": "Mise à jour supprimée",
       "deleteFailed": "Échec de la suppression de la mise à jour",
+      "affects": "Concerne",
+      "allComponents": "Tous les composants",
+      "componentsUnavailable": "Composants ne figurant plus sur cette page",
       "state": {
         "scheduled": "Planifiée",
         "active": "Active",

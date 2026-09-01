@@ -7600,7 +7600,6 @@
   "alert_library": {
     "header": "알림 라이브러리",
     "subtitle": "이미 수집 중인 데이터에 맞춰진, 엄선된 즉시 설치 가능한 알림",
-    "sectionTab": "라이브러리",
     "contribute": "GitHub에서 기여하기",
     "searchPlaceholder": "이름, 설명 또는 스트림으로 검색",
     "searchLabel": "알림 라이브러리 검색",
@@ -7934,7 +7933,6 @@
     "destinationsLoadError": "대상 불러오기 오류"
   },
   "alert_destinations": {
-    "sectionTab": "대상",
     "chooseTypeTitle": "유형 선택",
     "selectDestinationType": "대상 유형 선택",
     "connectionStepTitle": "연결",
@@ -11067,7 +11065,14 @@
           "typeCategorical": "범주형",
           "typeBoolean": "불리언",
           "threshold": "임계값",
-          "measurePerRow": "행당 평균 (시행 전체)"
+          "measurePerRow": "행당 평균 (시행 전체)",
+          "dimensionImproved": "{count} 행 개선됨 | {count} 행 개선됨",
+          "dimensionUnchanged": "{count} 행 변경 없음 | {count} 행 변경 없음",
+          "dimensionRegressed": "{count} 행 저하됨 | {count} 행 저하됨",
+          "dimensionNotCounted": "집계되지 않음",
+          "dimensionNotCountedHint": "이 스코어러에는 Score Config에 비교 정책이 없으므로 값은 보고되지만 개선 또는 저하로 판정되지 않으며 결과에 영향을 미칠 수 없습니다. 집계에 포함하려면 방향과 임계값을 설정하세요.",
+          "dimensionNoneCompared": "비교된 항목 없음",
+          "dimensionNoneComparedHint": "양쪽 모두에서 측정된 행이 없습니다. 한 실험에서만 실행된 행은 이동할 기준이 없으므로 어느 방향으로도 집계되지 않습니다."
         },
         "rowDrawer": {
           "fallbackTitle": "비교 행",
@@ -11432,6 +11437,7 @@
         "republishedSuccess": "설명이 업데이트되었습니다. 버전 {version}은(는) 변경되지 않았습니다.",
         "draftSuccess": "초안이 저장되었습니다. 게시하려면 연결을 테스트하세요.",
         "draftError": "초안을 저장할 수 없습니다.",
+        "testFailed": "연결 테스트에 실패했습니다.",
         "publishFailed": "테스트 연결이 실패하여 아무것도 게시되지 않았습니다. 초안은 저장되었습니다.",
         "createError": "원격 작업을 게시할 수 없습니다.",
         "validation": {
@@ -14242,8 +14248,6 @@
       "passwordSetHelp": "비밀번호가 이미 설정되어 있습니다. 유지하려면 비워 두고, 교체하려면 새 비밀번호를 입력하세요.",
       "showUptimePercent": "가동률 표시",
       "showTimelineBars": "타임라인 막대 표시",
-      "showResponseTime": "응답 시간 표시",
-      "showResponseTimeHelp": "페이지가 성능 수치를 노출하지 않도록 끄세요.",
       "noindex": "검색 색인 생성 방지",
       "noindexHelp": "검색 엔진이 공개 페이지를 건너뛰도록 noindex 태그를 추가합니다.",
       "confirmFailures": "실패 확인",
@@ -14302,6 +14306,9 @@
       "deleting": "업데이트 제거 중...",
       "deleted": "업데이트가 제거됨",
       "deleteFailed": "업데이트 제거 실패",
+      "affects": "영향",
+      "allComponents": "모든 구성 요소",
+      "componentsUnavailable": "더 이상 이 페이지에 없는 구성 요소",
       "state": {
         "scheduled": "예약됨",
         "active": "활성",
