@@ -43,9 +43,6 @@ class AnomalyDetectionPage {
             detectionWindowUnit: '[data-test="anomaly-detection-window-unit"]',
             trainingWindow: '[data-test="anomaly-training-window-field"]',
             retrainInterval: '[data-test="anomaly-retrain-interval"]',
-            dataPreviewLoadBtn: '[data-test="anomaly-data-preview-load-btn"]',
-            dataPreviewChart: '[data-test="anomaly-data-preview-chart"]',
-            dataPreviewEmpty: '[data-test="anomaly-data-preview-empty"]',
             sensitivityTier: '[data-test="anomaly-sensitivity-tier"]',
             sensitivityPercentile: '[data-test="anomaly-sensitivity-percentile"] input',
             sensitivityHint: '[data-test="anomaly-sensitivity-hint"]',
@@ -55,6 +52,11 @@ class AnomalyDetectionPage {
             filterRow: '[data-test="anomaly-filter-row"]',
             detectionWindowError: '[data-test="anomaly-detection-window-error"]',
             summaryText: '.anomaly-summary .summary-text',
+
+            // Data preview — the right-hand Preview card, not the config step
+            dataPreviewChart: '[data-test="anomaly-data-preview-chart"]',
+            dataPreviewEmpty: '[data-test="anomaly-data-preview-empty"]',
+            dataPreviewError: '[data-test="panel-schema-renderer-error-message"]',
 
             // Alerting
             alertEnabled: '[data-test="anomaly-alert-enabled"]',
@@ -103,7 +105,6 @@ class AnomalyDetectionPage {
         this.detectionWindowUnit = this.selectors.detectionWindowUnit;
         this.trainingWindow = this.selectors.trainingWindow;
         this.retrainInterval = this.selectors.retrainInterval;
-        this.dataPreviewLoadBtn = this.selectors.dataPreviewLoadBtn;
         this.dataPreviewChart = this.selectors.dataPreviewChart;
         this.alertEnabledToggle = this.selectors.alertEnabled;
         this.destinationSelect = this.selectors.destination;
@@ -525,26 +526,6 @@ class AnomalyDetectionPage {
     }
 
     /**
-     * Load data preview
-     */
-    async loadDataPreview() {
-        const loadBtn = this.page.locator(this.selectors.dataPreviewLoadBtn);
-        if (await loadBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await loadBtn.click();
-            await this.page.waitForTimeout(5000); // Wait for chart to load
-            testLogger.info('Loaded data preview');
-        }
-    }
-
-    /**
-     * Expect chart to be visible
-     */
-    async expectChartVisible() {
-        const chart = this.page.locator(this.selectors.dataPreviewChart);
-        await expect(chart).toBeVisible({ timeout: 10000 });
-    }
-
-    /**
      * Select a sensitivity tier
      * @param {number} percentile - Tier percentile (99, 97 or 95)
      */
@@ -708,14 +689,6 @@ class AnomalyDetectionPage {
     async scrollToSensitivitySection() {
         const tierGroup = this.page.locator(this.selectors.sensitivityTier);
         await tierGroup.scrollIntoViewIfNeeded();
-    }
-
-    /**
-     * Scroll to data preview section
-     */
-    async scrollToDataPreviewSection() {
-        const loadBtn = this.page.locator(this.selectors.dataPreviewLoadBtn);
-        await loadBtn.scrollIntoViewIfNeeded();
     }
 
     /**
@@ -1126,19 +1099,16 @@ class AnomalyDetectionPage {
     }
 
     /**
-     * Load data preview and wait for the chart
+     * Wait for the auto-populated data preview chart
      */
-    async loadAndVerifyDataPreview() {
-        const loadBtn = this.page.locator(this.dataPreviewLoadBtn);
-        if (await loadBtn.isVisible({ timeout: 3000 })) {
-            await loadBtn.click();
-            await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-            await this.page.waitForTimeout(2000);
-
-            // Wait for chart to load
-            await expect(this.page.locator(this.dataPreviewChart)).toBeVisible({ timeout: 10000 });
-            testLogger.info('Loaded data preview');
-        }
+    async waitForDataPreview() {
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        await expect(this.page.locator(this.dataPreviewChart)).toBeVisible({ timeout: 15000 });
+        // The panel root renders for errors too, so a visible chart alone proves nothing
+        const panel = this.page.locator(this.dataPreviewChart);
+        await expect(panel.locator(this.selectors.dataPreviewError)).toHaveCount(0);
+        await expect(panel.locator('canvas').first()).toBeVisible({ timeout: 15000 });
+        testLogger.info('Data preview chart rendered');
     }
 
     /**
@@ -1233,7 +1203,7 @@ class AnomalyDetectionPage {
 
         // Note: Skip data preview loading as it's optional and not required for anomaly creation
         // The data preview can be loaded separately if needed
-        // await this.loadAndVerifyDataPreview();
+        // await this.waitForDataPreview();
 
         // Enable alerting if destination provided, otherwise disable alerting
         if (destinationName) {

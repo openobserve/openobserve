@@ -14,16 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Spec for AnomalyDetectionConfig (the "Detection Config" step of the anomaly
-// wizard). Two layers:
-//   1. SURVIVING BEHAVIOR — the buildPreviewSql / loadPreview logic that the
-//      migration kept unchanged (kept verbatim from the pre-rewrite spec).
-//   2. OFORM BEHAVIOR — the real <OForm> the migration introduced: per-mode
-//      required validation, the two §4-restored rules (training_window_days ≥1,
-//      detection_function required — each only where its control renders),
-//      z.coerce.number typing + write-back egress, the custom_sql bare-Monaco
-//      bridge with submission-gated errors (R3), the filters[] field-array
-//      keying (rendered-inputs delete test), and the exposed validate() surface
-//      the parent (useAlertForm) still calls to gate Next/Save.
+// wizard) —
+// the real <OForm> the migration introduced: per-mode required validation, the
+// two §4-restored rules (training_window_days ≥1, detection_function required —
+// each only where its control renders), z.coerce.number typing + write-back
+// egress, the custom_sql bare-Monaco bridge with submission-gated errors (R3),
+// the filters[] field-array keying (rendered-inputs delete test), and the
+// exposed validate() surface the parent (useAlertForm) still calls to gate
+// Next/Save. The data-preview chart lives in AnomalyDataPreview.spec.ts.
 //
 // The step OWNS its <OForm> (Rule ③ useOForm owner) and returns `form` from
 // setup(), so the TanStack form is reachable as `(wrapper.vm as any).form`.
@@ -54,10 +52,6 @@ const { getFieldValuesForSuggestion } = vi.hoisted(() => ({
   getFieldValuesForSuggestion: vi.fn(async () => ["ERROR", "INFO"]),
 }));
 vi.mock("@/composables/fieldValueStore", () => ({ getFieldValuesForSuggestion }));
-
-vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
-  default: { template: '<div data-test="panel-schema-renderer" />' },
-}));
 
 vi.mock("@/components/QueryEditor.vue", () => ({
   default: {
@@ -96,7 +90,6 @@ const mountOptions = {
   global: {
     plugins: [store, i18n],
     stubs: {
-      PanelSchemaRenderer: true,
       QueryEditor: true,
     },
   },
@@ -158,15 +151,6 @@ const sensitivityHintText = (w: VueWrapper): string | undefined => {
   return hint.exists() ? hint.text() : undefined;
 };
 
-// ---------------------------------------------------------------------------
-// Helper: call loadPreview() and return the normalised SQL string
-// ---------------------------------------------------------------------------
-async function getSqlFromPreview(wrapper: VueWrapper): Promise<string> {
-  (wrapper.vm as any).loadPreview();
-  await flushPromises();
-  return (wrapper.vm as any).previewPanelSchema?.queries?.[0]?.query ?? "";
-}
-
 // A valid custom SQL query (aliases time_bucket, NOT the timestamp column).
 const VALID_CUSTOM_SQL =
   "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \"events\" GROUP BY time_bucket ORDER BY time_bucket";
@@ -181,355 +165,6 @@ describe("AnomalyDetectionConfig", () => {
   });
 
   // =========================================================================
-  describe("filters mode — detection function", () => {
-    it("should use count(*) AS value when detection_function is count", async () => {
-      wrapper = mountConfig({ detection_function: "count" });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("count(*) AS value");
-    });
-
-    it("should use count(*) AS value when detection_function is not set", async () => {
-      wrapper = mountConfig({ detection_function: "" });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("count(*) AS value");
-    });
-
-    it("should use avg(response_time) AS value when detection_function is avg", async () => {
-      wrapper = mountConfig({
-        detection_function: "avg",
-        detection_function_field: "response_time",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("avg(response_time) AS value");
-    });
-
-    it("should use sum(bytes) AS value when detection_function is sum", async () => {
-      wrapper = mountConfig({
-        detection_function: "sum",
-        detection_function_field: "bytes",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("sum(bytes) AS value");
-    });
-
-    it("should use approx_percentile_cont(latency, 0.95) AS value when detection_function is p95", async () => {
-      wrapper = mountConfig({
-        detection_function: "p95",
-        detection_function_field: "latency",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("approx_percentile_cont(latency, 0.95) AS value");
-    });
-
-    it("should use approx_percentile_cont(latency, 0.99) AS value when detection_function is p99", async () => {
-      wrapper = mountConfig({
-        detection_function: "p99",
-        detection_function_field: "latency",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("approx_percentile_cont(latency, 0.99) AS value");
-    });
-
-    it("should include the stream name in FROM clause", async () => {
-      wrapper = mountConfig({ stream_name: "my_stream" });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain('FROM "my_stream"');
-    });
-
-    it("should include GROUP BY and ORDER BY time_bucket", async () => {
-      wrapper = mountConfig();
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("GROUP BY time_bucket");
-      expect(sql).toContain("ORDER BY time_bucket");
-    });
-
-    it("should produce a full default count query with no filters", async () => {
-      wrapper = mountConfig();
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(
-        "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \"my_stream\" GROUP BY time_bucket ORDER BY time_bucket",
-      );
-    });
-  });
-
-  // =========================================================================
-  describe("filters mode — histogram interval", () => {
-    it("should embed 15m interval when histogram_interval_value is 15 and unit is m", async () => {
-      wrapper = mountConfig({
-        histogram_interval_value: 15,
-        histogram_interval_unit: "m",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("histogram(_timestamp, '15m')");
-    });
-
-    it("should embed 1h interval when histogram_interval_value is 1 and unit is h", async () => {
-      wrapper = mountConfig({
-        histogram_interval_value: 1,
-        histogram_interval_unit: "h",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("histogram(_timestamp, '1h')");
-    });
-
-    it("should leave previewPanelSchema null when stream_name is empty", async () => {
-      wrapper = mountConfig({ stream_name: "" });
-      (wrapper.vm as any).loadPreview();
-      await flushPromises();
-      expect((wrapper.vm as any).previewPanelSchema).toBeNull();
-    });
-  });
-
-  // =========================================================================
-  describe("filters mode — WHERE clause from filters", () => {
-    it("should not include WHERE clause when filters array is empty", async () => {
-      wrapper = mountConfig({ filters: [] });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).not.toContain("WHERE");
-    });
-
-    it("should include WHERE status = '200' for a single equality filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "status", operator: "=", value: "200" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status = '200'");
-    });
-
-    it("should chain additional filters with AND for multiple filters", async () => {
-      wrapper = mountConfig({
-        filters: [
-          { field: "status", operator: "=", value: "200" },
-          { field: "env", operator: "=", value: "prod" },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status = '200'");
-      expect(sql).toContain("AND env = 'prod'");
-    });
-
-    it("should include field IS NULL for an Is Null filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "error_msg", operator: "Is Null", value: "" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE error_msg IS NULL");
-    });
-
-    it("should include field IS NOT NULL for an Is Not Null filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "error_msg", operator: "Is Not Null", value: "" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE error_msg IS NOT NULL");
-    });
-
-    it("should include field IN (values) for an IN filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "status", operator: "IN", value: "200,404,500" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status IN (200,404,500)");
-    });
-
-    it("should include field NOT IN (values) for a NOT IN filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "status", operator: "NOT IN", value: "500,503" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status NOT IN (500,503)");
-    });
-
-    it("should use str_match for a Contains filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "message", operator: "Contains", value: "error" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE str_match(message, 'error')");
-    });
-
-    it("should use str_match for a str_match filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "message", operator: "str_match", value: "timeout" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE str_match(message, 'timeout')");
-    });
-
-    it("should use str_match_ignore_case for a str_match_ignore_case filter", async () => {
-      wrapper = mountConfig({
-        filters: [
-          {
-            field: "message",
-            operator: "str_match_ignore_case",
-            value: "ERROR",
-          },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE str_match_ignore_case(message, 'ERROR')");
-    });
-
-    it("should use re_match for a re_match filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "level", operator: "re_match", value: "^(error|warn)$" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE re_match(level, '^(error|warn)$')");
-    });
-
-    it("should use match_all for a match_all filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "message", operator: "match_all", value: "critical" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE match_all('critical')");
-    });
-
-    it("should use LIKE pattern for a Starts With filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "path", operator: "Starts With", value: "/api" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE path LIKE '/api%'");
-    });
-
-    it("should use LIKE pattern for an Ends With filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "path", operator: "Ends With", value: ".json" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE path LIKE '%.json'");
-    });
-
-    it("should use NOT LIKE pattern for a Not Contains filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "message", operator: "Not Contains", value: "debug" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE message NOT LIKE '%debug%'");
-    });
-
-    it("should skip a filter whose field is empty", async () => {
-      wrapper = mountConfig({
-        filters: [
-          { field: "", operator: "=", value: "200" },
-          { field: "env", operator: "=", value: "prod" },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      // The empty-field filter must not produce a stray fragment
-      expect(sql).not.toContain("= '200'");
-      // The valid filter must still appear
-      expect(sql).toContain("WHERE env = 'prod'");
-    });
-
-    it("should skip a filter whose value is empty and operator needs a value", async () => {
-      wrapper = mountConfig({
-        filters: [
-          { field: "status", operator: "=", value: "" },
-          { field: "env", operator: "=", value: "prod" },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      // The valueless filter (= '') should be skipped
-      expect(sql).not.toContain("status =");
-      expect(sql).toContain("WHERE env = 'prod'");
-    });
-
-    it("should produce a complete WHERE clause with three filters", async () => {
-      wrapper = mountConfig({
-        filters: [
-          { field: "status", operator: "=", value: "200" },
-          { field: "env", operator: "=", value: "prod" },
-          { field: "region", operator: "=", value: "us-east" },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status = '200'");
-      expect(sql).toContain("AND env = 'prod'");
-      expect(sql).toContain("AND region = 'us-east'");
-    });
-  });
-
-  // =========================================================================
-  describe("custom_sql mode — query passed through as-is (normalized)", () => {
-    it("should use custom SQL directly when query_mode is custom_sql", async () => {
-      const customSql =
-        "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \"events\" GROUP BY time_bucket ORDER BY time_bucket";
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "events",
-        custom_sql: customSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(customSql);
-    });
-
-    it("should pass through a JOIN query unchanged after normalization", async () => {
-      const rawSql =
-        'SELECT histogram(_timestamp, \'5m\') AS time_bucket, count(*) AS value FROM "events" e JOIN "users" u ON e.user_id = u.id GROUP BY time_bucket ORDER BY time_bucket';
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "events",
-        custom_sql: rawSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(rawSql);
-    });
-
-    it("should pass through a subquery unchanged after normalization", async () => {
-      const rawSql =
-        "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM (SELECT * FROM \"raw_events\" WHERE env = 'prod') sub GROUP BY time_bucket ORDER BY time_bucket";
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "raw_events",
-        custom_sql: rawSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(rawSql);
-    });
-
-    it("should pass through a CTE query unchanged after normalization", async () => {
-      const rawSql =
-        "WITH filtered AS (SELECT * FROM \"events\" WHERE level = 'error') SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM filtered GROUP BY time_bucket ORDER BY time_bucket";
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "events",
-        custom_sql: rawSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(rawSql);
-    });
-
-    it("should collapse multiline SQL to a single line", async () => {
-      const multilineSql =
-        "SELECT histogram(_timestamp, '5m') AS time_bucket,\n       count(*) AS value\nFROM \"events\"\nGROUP BY time_bucket\nORDER BY time_bucket";
-      const expectedSql =
-        "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \"events\" GROUP BY time_bucket ORDER BY time_bucket";
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "events",
-        custom_sql: multilineSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(expectedSql);
-    });
-
-    it("should leave previewPanelSchema null when custom_sql is empty and stream_name is empty", async () => {
-      // stream_name must also be empty — the immediate watcher seeds custom_sql
-      // from buildDefaultSql() when stream_name is set and custom_sql is blank.
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "",
-        custom_sql: "",
-      });
-      (wrapper.vm as any).loadPreview();
-      await flushPromises();
-      expect((wrapper.vm as any).previewPanelSchema).toBeNull();
-    });
-  });
-
   // =========================================================================
   // OForm behavior — the real <OForm> the migration introduced
   // =========================================================================
@@ -1148,7 +783,7 @@ describe("AnomalyDetectionConfig", () => {
   // Without these an additive implementation that leaves the old control in
   // place would pass every test above.
   // =========================================================================
-  describe("sensitivity — the removed slider and mark lines", () => {
+  describe("sensitivity — the removed slider and the relocated chart", () => {
     it("no longer declares a threshold_range form field or renders the slider", async () => {
       wrapper = mountConfig();
       await flushPromises();
@@ -1158,33 +793,42 @@ describe("AnomalyDetectionConfig", () => {
       expect(wrapper.find('[data-test="anomaly-threshold-range-label"]').exists()).toBe(false);
     });
 
-    it("builds the preview panel with no mark lines", async () => {
+    // The chart moved to AnomalyDataPreview in the right-hand Preview card; this
+    // step now shows the generated SQL in its place.
+    it("shows the SQL preview row and no data-preview chart", async () => {
       wrapper = mountConfig();
       await flushPromises();
 
-      await getSqlFromPreview(wrapper);
-
-      // The old lines were drawn at (percentile/100) * max(y) — a percentile
-      // multiplied by a bucket count, which nothing in the system computes.
-      expect((wrapper.vm as any).previewPanelSchema?.config?.mark_line).toEqual([]);
+      expect(wrapper.find('[data-test="anomaly-sql-preview"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-data-preview-load-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-data-preview-empty"]').exists()).toBe(false);
     });
 
-    // The chart moves OUT of the sensitivity row into its own labelled row; it
-    // is not deleted. The 34 SQL tests call loadPreview() directly, so they
-    // would all stay green even if the markup vanished.
-    it("still renders the load-data button and the chart placeholder", async () => {
-      wrapper = mountConfig();
+    // In custom_sql mode the user's own editor is on this form already, so a
+    // read-only copy of the same query below it is noise.
+    it("hides the SQL preview row in custom_sql mode", async () => {
+      wrapper = mountConfig({ query_mode: "custom_sql", custom_sql: VALID_CUSTOM_SQL });
       await flushPromises();
 
-      expect(wrapper.find('[data-test="anomaly-data-preview-load-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="anomaly-data-preview-empty"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-sql-preview"]').exists()).toBe(false);
+    });
+
+    it("renders the previewSql prop the parent passes down", async () => {
+      const sql = 'SELECT 1 AS value FROM "my_stream"';
+      wrapper = mount(AnomalyDetectionConfig, {
+        ...mountOptions,
+        props: { config: buildConfig(), previewSql: sql },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-sql-preview"]').attributes("query")).toBe(sql);
     });
 
     it("labels the preview row and drops the score-range framing", async () => {
       wrapper = mountConfig();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Data preview");
+      expect(wrapper.text()).toContain("SQL Preview");
       expect(wrapper.text()).not.toContain("Anomaly Score Range");
     });
 

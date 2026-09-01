@@ -516,7 +516,7 @@ test.describe("Anomaly Detection Alerts", () => {
 
   test.describe("Sensitivity and Preview", () => {
 
-    test("Load data preview chart", {
+    test("Data preview chart populates automatically", {
       tag: ['@functional', '@anomaly', '@P1', '@all']
     }, async ({ page }) => {
       testLogger.info('Testing data preview');
@@ -524,6 +524,9 @@ test.describe("Anomaly Detection Alerts", () => {
       const anomalyName = testAnomalyName('Preview');
 
       await pm.anomalyDetectionPage.clickAddAnomaly();
+
+      // Nothing to query yet, so the Preview card sits in its empty state
+      await pm.anomalyDetectionPage.expectDataPreviewEmptyState();
 
       await pm.anomalyDetectionPage.fillBasicSetup(anomalyName, 'logs', testStreamName);
 
@@ -536,17 +539,8 @@ test.describe("Anomaly Detection Alerts", () => {
       await pm.anomalyDetectionPage.setLookBackWindow(30, 'm');
       await pm.anomalyDetectionPage.setTrainingWindow(1);
 
-      // Scroll to data preview section
-      await pm.anomalyDetectionPage.scrollToDataPreviewSection();
-
-      // Verify empty state initially
-      await pm.anomalyDetectionPage.expectDataPreviewEmptyState();
-
-      // Load preview
-      await pm.anomalyDetectionPage.loadDataPreview();
-
-      // Verify chart appears
-      await pm.anomalyDetectionPage.expectChartVisible();
+      // The chart populates itself once a stream is selected — no Load data button
+      await pm.anomalyDetectionPage.waitForDataPreview();
 
       // Cancel without saving
       await pm.anomalyDetectionPage.clickBack();

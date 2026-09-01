@@ -545,58 +545,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <!-- Data preview -->
-        <div class="mb-4! flex flex-row items-start gap-2 pb-0!">
+        <!-- SQL preview — in custom_sql mode the user's own editor is already on this form -->
+        <div v-if="queryMode !== 'custom_sql'" class="mb-4! flex flex-row items-start gap-2 pb-0!">
           <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
-            {{ t("alerts.anomaly.dataPreview") }}
+            {{ t("alerts.sqlPreview") }}
           </div>
-          <div class="flex flex-1 flex-col gap-2">
-            <div class="flex justify-end">
-              <OButton
-                variant="outline"
-                size="sm-action"
-                :disabled="!config.stream_name || (queryMode === 'custom_sql' && !customSql)"
-                data-test="anomaly-data-preview-load-btn"
-                @click="loadPreview"
-              >
-                {{ t("alerts.anomaly.loadData") }}
-                <OTooltip
-                  v-if="!config.stream_name"
-                  :content="t('alerts.anomaly.selectStreamFirstTooltip')"
-                />
-                <OTooltip
-                  v-else-if="queryMode === 'custom_sql' && !customSql"
-                  :content="t('alerts.anomaly.enterSqlFirst')"
-                />
-              </OButton>
-            </div>
-            <div class="relative min-h-45">
-              <div
-                v-if="!previewActive"
-                class="rounded-default border-border-default flex h-45 w-full flex-col items-center justify-center border border-dashed"
-                :class="'text-text-secondary'"
-                data-test="anomaly-data-preview-empty"
-              >
-                <OIcon name="bar-chart" size="lg" class="mb-2 opacity-40" />
-                <span class="text-xs">{{
-                  !config.stream_name
-                    ? t("alerts.anomaly.selectStreamFirst")
-                    : t("alerts.anomaly.clickLoadDataHint")
-                }}</span>
-              </div>
-              <PanelSchemaRenderer
-                v-else
-                :key="previewKey"
-                :panelSchema="previewPanelSchema"
-                :selectedTimeObj="previewTimeObj"
-                :variablesData="{}"
-                :forceLoad="true"
-                searchType="ui"
-                class="w-full"
-                style="height: 11.25rem"
-                data-test="anomaly-data-preview-chart"
-              />
-            </div>
+          <div class="border-border-default rounded-default h-45 flex-1 overflow-hidden border">
+            <QueryEditor
+              data-test-prefix="anomaly-sql-preview"
+              :read-only="true"
+              :show-auto-complete="false"
+              :hide-nl-toggle="true"
+              :query="previewSql"
+              editor-height="100%"
+              data-test="anomaly-sql-preview"
+            />
           </div>
         </div>
       </OForm>
@@ -612,12 +575,9 @@ import { useStore } from "vuex";
 import streamService from "@/services/stream";
 import {
   ANOMALY_FILTER_OPERATORS,
-  buildAnomalyFilterExpression,
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
-import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import QueryEditor from "@/components/QueryEditor.vue";
-import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -642,7 +602,6 @@ export default defineComponent({
 
   components: {
     QueryEditor,
-    PanelSchemaRenderer,
     OButton,
     OToggleGroupItem,
     OFormToggleGroup,
@@ -657,6 +616,10 @@ export default defineComponent({
     config: {
       type: Object as PropType<any>,
       required: true,
+    },
+    previewSql: {
+      type: String,
+      default: "",
     },
   },
 
@@ -673,7 +636,7 @@ export default defineComponent({
     ]);
 
     // The array itself stays English: each entry IS the persisted operator and
-    // is matched by identity (operatorNeedsValue, buildAnomalyFilterExpression).
+    // is matched by identity (operatorNeedsValue, the SQL builders).
     // Split label from value so the dropdown reads in the user's language, the
     // same way AddCondition.vue does — the keys are already shared.
     const OPERATOR_LABEL_KEYS: Record<string, string> = {
@@ -777,10 +740,7 @@ export default defineComponent({
       );
     });
 
-    // Write-back watch (form → props.config): the parent reads props.config
-    // directly (live anomalyPreviewSql computed + saveAnomalyDetection payload),
-    // so the form writes back into the parent-owned object. Numeric fields are
-    // re-coerced so the parent payload keeps number types.
+    // The save payload, the SQL preview and the chart all read props.config, so the form writes back into it
     const toModelNumber = (v: unknown) => {
       if (v === "" || v === null || v === undefined) return v;
       const n = Number(v);
@@ -794,8 +754,8 @@ export default defineComponent({
         const cfg = props.config;
         if (!cfg || !v) return;
         cfg.query_mode = v.query_mode;
-        // Replace the array only when its contents changed, so the deep
-        // preview watcher below doesn't refire on unrelated field edits.
+        // Replace the array only when its contents changed, so the preview's
+        // deep refresh watcher doesn't refire on unrelated field edits.
         if (JSON.stringify(cfg.filters ?? []) !== JSON.stringify(v.filters ?? [])) {
           cfg.filters = (v.filters ?? []).map((f: any) => ({ ...f }));
         }
@@ -1028,181 +988,6 @@ export default defineComponent({
       return form.state.isValid;
     };
 
-    // ── Data Preview chart ──────────────────────────────────────────────────
-    const previewActive = ref(false);
-    const previewKey = ref(0);
-    const previewPanelSchema = ref<any>(null);
-    const previewTimeObj = ref<any>(null);
-
-    // Reads props.config, which the write-back watch above keeps in sync with
-    // the form — same values the parent's own preview/save read.
-    const buildPreviewSql = () => {
-      let sql: string;
-      if (props.config.query_mode === "custom_sql") {
-        sql = props.config.custom_sql || "";
-      } else {
-        const streamName = props.config.stream_name;
-        if (!streamName) {
-          sql = "";
-        } else {
-          const intervalValue = props.config.histogram_interval_value ?? 5;
-          const intervalUnit = props.config.histogram_interval_unit ?? "m";
-          const interval = `${intervalValue}${intervalUnit}`;
-          const fn = toDetectionFunctionSql(
-            props.config.detection_function || "count",
-            props.config.detection_function_field || "*",
-          );
-          const filterLines = (props.config.filters || [])
-            .filter((f: any) => f.field && (operatorNeedsValue(f.operator) ? f.value : true))
-            .map((f: any) => `  AND ${buildAnomalyFilterExpression(f.field, f.operator, f.value)}`);
-          const where = filterLines.length
-            ? [
-                "WHERE",
-                ...filterLines.map((l: string, i: number) =>
-                  i === 0 ? l.replace(/^\s+AND /, "  ") : l,
-                ),
-              ].join("\n")
-            : "";
-          sql = [
-            `SELECT histogram(_timestamp, '${interval}') AS time_bucket,`,
-            `       ${fn} AS value`,
-            `FROM "${streamName}"`,
-            where,
-            `GROUP BY time_bucket`,
-            `ORDER BY time_bucket`,
-          ]
-            .filter(Boolean)
-            .join("\n");
-        }
-      }
-      // Normalize multiline SQL to a single line — the dashboard panel
-      // query executor can truncate at newlines in some code paths
-      return sql.replace(/\s+/g, " ").trim();
-    };
-
-    const loadPreview = () => {
-      const sql = buildPreviewSql();
-      if (!sql || !props.config.stream_name) return;
-
-      const windowValue = props.config.detection_window_value ?? 30;
-      const windowUnit = props.config.detection_window_unit ?? "m";
-      const windowMs = windowValue * (windowUnit === "h" ? 3600000 : 60000);
-      // The dashboard DateTime picker returns microseconds (ms * 1000).
-      // viewDashboard wraps those with new Date(microseconds), so the Date
-      // object's internal value IS the microsecond number.
-      // usePanelDataLoader then calls .getTime() which returns the microsecond
-      // value unchanged. We must replicate that convention here.
-      const endMicros = new Date().getTime() * 1000;
-      const startMicros = endMicros - windowMs * 1000;
-
-      previewTimeObj.value = {
-        start_time: new Date(startMicros),
-        end_time: new Date(endMicros),
-      };
-      // PanelSchemaRenderer expects the inner data object directly (not wrapped)
-      previewPanelSchema.value = {
-        version: 2,
-        id: "anomaly-preview",
-        type: "line",
-        title: "",
-        description: "",
-        config: {
-          show_legends: false,
-          legends_position: "bottom",
-          unit: "short",
-          unit_custom: "",
-          promql_legend: "",
-          axis_border_show: false,
-          connect_nulls: true,
-          no_value_replacement: "",
-          wrap_table_cells: false,
-          table_transpose: false,
-          table_dynamic_columns: false,
-          base_map: { type: "osm" },
-          map_view: { zoom: 1, lat: 0, lng: 0 },
-          custom_chart_options: {
-            tooltip: { appendToBody: true, confine: false },
-          },
-          mark_line: [],
-        },
-        queryType: "sql",
-        queries: [
-          {
-            query: sql,
-            customQuery: true,
-            vrlFunctionQuery: null,
-            query_fn: null,
-            fields: {
-              stream: props.config.stream_name,
-              stream_type: props.config.stream_type || "logs",
-              x: [
-                {
-                  alias: "time_bucket",
-                  column: "time_bucket",
-                  label: "",
-                  color: null,
-                },
-              ],
-              y: [
-                {
-                  alias: "value",
-                  column: "value",
-                  label: "",
-                  color: "#5960b2",
-                },
-              ],
-              z: [],
-              breakdown: [],
-              filter: {
-                filterType: "group",
-                logicalOperator: "AND",
-                conditions: [],
-              },
-              latitude: null,
-              longitude: null,
-              weight: null,
-            },
-            config: {
-              promql_legend: "",
-              layer_type: "scatter",
-              weight_fixed: 1,
-              limit: 0,
-              min: 0,
-              max: 100,
-              time_shift: [],
-            },
-          },
-        ],
-      };
-      previewKey.value++;
-      previewActive.value = true;
-    };
-
-    // Auto-refresh when Look Back Window, Detection Resolution, filters, or
-    // detection function changes (props.config stays in sync via write-back)
-    let previewRefreshTimer: ReturnType<typeof setTimeout> | null = null;
-    watch(
-      () => [
-        props.config.detection_window_value,
-        props.config.detection_window_unit,
-        props.config.histogram_interval_value,
-        props.config.histogram_interval_unit,
-        props.config.query_mode,
-        props.config.custom_sql,
-        props.config.detection_function,
-        props.config.detection_function_field,
-        props.config.filters,
-      ],
-      () => {
-        if (!previewActive.value) return;
-        if (previewRefreshTimer) clearTimeout(previewRefreshTimer);
-        previewRefreshTimer = setTimeout(() => {
-          loadPreview();
-        }, 600);
-      },
-      { deep: true },
-    );
-
     return {
       raw,
       t,
@@ -1242,11 +1027,6 @@ export default defineComponent({
       sensitivityTiers,
       sensitivityHint,
       onCustomSqlChange,
-      previewActive,
-      previewKey,
-      previewPanelSchema,
-      previewTimeObj,
-      loadPreview,
     };
   },
 });

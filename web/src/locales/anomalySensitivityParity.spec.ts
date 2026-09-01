@@ -53,17 +53,22 @@ const ADDED = [
   "alerts.anomaly.sensitivityBalanced",
   "alerts.anomaly.sensitivityAggressive",
   "alerts.anomaly.percentile",
-  "alerts.anomaly.dataPreview",
   "alerts.anomaly.sensitivityRange",
   "alerts.anomaly.sensitivityHintPerDay",
   "alerts.anomaly.sensitivityHintEveryNDays",
 ];
 
-// Orphaned with the slider and its mark lines.
+// Orphaned with the slider and its mark lines, then with the Load data button
+// when the chart moved to the right-hand Preview card and became automatic.
 const REMOVED = [
   "alerts.anomaly.anomalyScoreRange",
   "alerts.anomaly.maxThresholdMarkLine",
   "alerts.anomaly.minThresholdMarkLine",
+  "alerts.anomaly.dataPreview",
+  "alerts.anomaly.loadData",
+  "alerts.anomaly.clickLoadDataHint",
+  "alerts.anomaly.selectStreamFirstTooltip",
+  "alerts.anomaly.enterSqlFirst",
 ];
 
 // Still read by AlertConfigSummary.vue — it sits one paragraph from the
