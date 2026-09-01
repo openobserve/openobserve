@@ -26,6 +26,7 @@
         :can-duplicate="canDuplicate"
         @change="(next) => emit('change', next)"
         @duplicate="emit('duplicate')"
+        @reset="emit('reset')"
         @remove="emit('remove')"
         @create-experiment="emit('create-experiment')"
       />
@@ -109,10 +110,20 @@
          off the bottom of the column. -->
     <div class="border-border-default shrink-0 border-t px-2.5 py-2.5">
       <OButton
+        v-if="running"
+        variant="primary"
+        size="sm-action"
+        class="bg-cancel-query-bg! text-button-primary-foreground! w-full"
+        :data-test="`ai-playground-variant-cancel-${label}`"
+        @click="emit('cancel')"
+      >
+        {{ t("common.cancel") }}
+      </OButton>
+      <OButton
+        v-else
         variant="primary"
         size="sm-action"
         class="w-full"
-        :loading="running"
         :disabled="runDisabled"
         :data-test="`ai-playground-variant-submit-${label}`"
         @click="emit('run')"
@@ -172,7 +183,9 @@ const split = ref(60);
 const emit = defineEmits<{
   change: [variant: PlaygroundVariant];
   run: [];
+  cancel: [];
   duplicate: [];
+  reset: [];
   remove: [];
   copy: [];
   "add-to-messages": [];

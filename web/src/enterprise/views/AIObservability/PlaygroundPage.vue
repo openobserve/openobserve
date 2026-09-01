@@ -97,18 +97,26 @@
         {{ t("aiObservability.playground.share") }}
       </OButton>
       <OButton
+        v-if="runningAll"
         variant="primary"
         size="sm-action"
-        :loading="running"
+        class="bg-cancel-query-bg! text-button-primary-foreground!"
+        :title="t('common.cancel')"
+        data-test="ai-playground-run-all-cancel-btn"
+        @click="stopAll()"
+      >
+        {{ t("common.cancel") }}
+      </OButton>
+      <OButton
+        v-else
+        variant="primary"
+        size="sm-action"
         :disabled="runDisabled"
         :title="t('aiObservability.playground.runAllTooltip')"
         data-test="ai-playground-run-all-btn"
         @click="onRunAll()"
       >
-        <template v-if="running">
-          {{ t("aiObservability.playground.running", { done: completedCount, total: totalCells }) }}
-        </template>
-        <template v-else>{{ t("aiObservability.playground.runAll") }}</template>
+        {{ t("aiObservability.playground.runAll") }}
       </OButton>
     </template>
 
@@ -230,12 +238,14 @@
             :vars="draft.vars"
             :solo="draft.variants.length === 1"
             :running="isVariantRunning(variant.id)"
-            :run-disabled="runDisabled"
+            :run-disabled="variantRunDisabled(variant.id)"
             :can-remove="draft.variants.length > 1"
             :can-duplicate="draft.variants.length < MAX_VARIANTS"
             @change="updateVariant"
             @run="runVariant(variant.id)"
+            @cancel="cancelVariant(variant.id)"
             @duplicate="duplicate(variant.id)"
+            @reset="resetVariant(variant.id)"
             @remove="removeVariant(variant.id)"
             @copy="copyOutput(variant.id, SINGLE_ROW_KEY)"
             @add-to-messages="addOutputToMessages(variant.id)"
@@ -383,8 +393,6 @@ const varNames = computed(() => {
 /** Referenced by a message somewhere; the rest are declared and never read. */
 const usedVarNames = computed(() => extractVars(draft.variants));
 
-const totalCells = computed(() => draft.variants.length);
-
 const streamingVariants = computed(() =>
   draft.variants
     .filter((variant) => cellAt(results, variant.id, SINGLE_ROW_KEY)?.status === "streaming")
@@ -392,20 +400,24 @@ const streamingVariants = computed(() =>
 );
 
 const running = computed(() => streamingVariants.value.length > 0);
-
-const completedCount = computed(() => {
-  let done = 0;
-  for (const variant of draft.variants) {
-    const status = cellAt(results, variant.id, SINGLE_ROW_KEY)?.status;
-    if (status === "done" || status === "error") done += 1;
-  }
-  return done;
-});
+/** True only while an actual Run All is in flight — a single bench's own Run
+ *  streaming must not make the Run All button look like it started the work. */
+const runningAll = ref(false);
 
 /** Nothing to run against, or nothing to run with. */
 const runDisabled = computed(
   () => running.value || !providers.value.length || !draft.variants.length,
 );
+
+/**
+ * A single bench's own Run button. Unlike Run All, one variant streaming must
+ * not block the others — runCell() already keys state per variant id, so
+ * running two at once is safe; only this variant's own in-flight run (or no
+ * providers/variants at all) should disable it.
+ */
+function variantRunDisabled(variantId: string) {
+  return !providers.value.length || !draft.variants.length || isVariantRunning(variantId);
+}
 
 /**
  * Back to an empty bench. Confirmed because the draft is the only copy of the
@@ -555,16 +567,23 @@ function setCell(variantId: string, rowKey: string, changes: Partial<PlaygroundC
   byRow[rowKey] = { ...(byRow[rowKey] ?? idleCell()), ...changes };
 }
 
-function onRunAll() {
+async function onRunAll() {
   if (runDisabled.value) return;
-  for (const variant of draft.variants) runVariant(variant.id, true);
+  runningAll.value = true;
+  try {
+    await Promise.allSettled(
+      draft.variants.map((variant) => runVariant(variant.id, true)),
+    );
+  } finally {
+    runningAll.value = false;
+  }
 }
 
 function runVariant(variantId: string, skipGate = false) {
-  if (!skipGate && runDisabled.value) return;
+  if (!skipGate && variantRunDisabled(variantId)) return Promise.resolve();
   const variant = draft.variants.find((candidate) => candidate.id === variantId);
-  if (!variant) return;
-  runCell(variant, SINGLE_ROW_KEY);
+  if (!variant) return Promise.resolve();
+  return runCell(variant, SINGLE_ROW_KEY);
 }
 
 async function runCell(variant: PlaygroundVariant, rowKey: string) {
@@ -650,6 +669,17 @@ function stopAll() {
     if (cellAt(results, variant.id, SINGLE_ROW_KEY)?.status === "streaming") {
       setCell(variant.id, SINGLE_ROW_KEY, { status: "idle" });
     }
+  }
+}
+
+/** One bench's own Cancel — mirrors stopAll() but only for that variant, so
+ *  cancelling one run does not touch the others. */
+function cancelVariant(variantId: string) {
+  const key = `${variantId}:${SINGLE_ROW_KEY}`;
+  controllers.get(key)?.abort();
+  controllers.delete(key);
+  if (cellAt(results, variantId, SINGLE_ROW_KEY)?.status === "streaming") {
+    setCell(variantId, SINGLE_ROW_KEY, { status: "idle" });
   }
 }
 
@@ -806,6 +836,27 @@ function removeVariant(variantId: string) {
   if (draft.variants.length <= 1) return;
   draft.variants = draft.variants.filter((variant) => variant.id !== variantId);
   delete results[variantId];
+}
+
+/** One bench back to blank — the scoped alternative to Reset, which wipes
+ *  every bench and confirms first. Keeps the variant's id so it stays the
+ *  same column (same label, same position) rather than reflowing the bench. */
+async function resetVariant(variantId: string) {
+  const index = draft.variants.findIndex((variant) => variant.id === variantId);
+  if (index === -1) return;
+  const ok = await confirm({
+    title: t("aiObservability.playground.resetVariantTitle"),
+    message: t("aiObservability.playground.resetVariantMessage"),
+    confirmLabel: t("aiObservability.playground.reset"),
+    cancelLabel: t("common.cancel"),
+  });
+  if (!ok) return;
+  cancelVariant(variantId);
+  const fresh = emptyVariant();
+  fresh.id = variantId;
+  draft.variants[index] = fresh;
+  delete results[variantId];
+  seedDefaultProvider();
 }
 
 function applySample(sample: PlaygroundSample, item: LlmDatasetItem) {

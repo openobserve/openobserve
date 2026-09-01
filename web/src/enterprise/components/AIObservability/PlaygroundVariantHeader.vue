@@ -119,6 +119,18 @@
       :data-test="`ai-playground-variant-experiment-${label}`"
       @click="emit('create-experiment')"
     />
+    <!-- Scoped to this bench alone: the page-level Reset wipes every bench and
+         confirms first, because there is nothing left to recover from. This one
+         only throws away one column's own edits, so it stays a single click. -->
+    <OButton
+      variant="ghost-muted"
+      size="icon-xs"
+      class="shrink-0"
+      icon-left="refresh"
+      :title="t('aiObservability.playground.resetVariant')"
+      :data-test="`ai-playground-variant-reset-${label}`"
+      @click="emit('reset')"
+    />
     <OButton
       variant="ghost-muted"
       size="icon-xs"
@@ -175,6 +187,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   change: [variant: PlaygroundVariant];
   duplicate: [];
+  reset: [];
   remove: [];
   "create-experiment": [];
 }>();
