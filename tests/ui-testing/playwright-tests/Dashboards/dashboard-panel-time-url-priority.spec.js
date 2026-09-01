@@ -242,7 +242,10 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
 
     // Step 6: Load with URL override for Panel A
     const dashboardId = getDashboardIdFromURL(page);
-    const urlWithParams = `${page.url().split('?')[0]}?dashboard=${dashboardId}&pt-period.${panelAId}=1m`;
+    // org_identifier must survive the rebuild: without it the app loads the account's
+    // default org (_meta), fails the dashboard GET there and bounces to the list.
+    const orgId = new URL(page.url()).searchParams.get('org_identifier');
+    const urlWithParams = `${page.url().split('?')[0]}?org_identifier=${orgId}&dashboard=${dashboardId}&folder=default&pt-period.${panelAId}=1m`;
     await page.goto(urlWithParams);
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
@@ -288,7 +291,8 @@ test.describe("Dashboard Panel Time - Part 2: URL Synchronization and Priority",
     // Step 3: Load with URL param for Panel A
     // v4.0: URL still has highest priority even when panel_time_range is null
     const dashboardId = getDashboardIdFromURL(page);
-    const urlWithParams = `${page.url().split('?')[0]}?dashboard=${dashboardId}&pt-period.${panelAId}=1d`;
+    const orgId = new URL(page.url()).searchParams.get('org_identifier');
+    const urlWithParams = `${page.url().split('?')[0]}?org_identifier=${orgId}&dashboard=${dashboardId}&folder=default&pt-period.${panelAId}=1d`;
     await page.goto(urlWithParams);
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
