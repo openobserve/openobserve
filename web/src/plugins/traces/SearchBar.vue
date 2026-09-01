@@ -113,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="xs"
               icon-left="more-horiz"
+              class="max-md:ml-auto"
             >
               {{ t("search.menuMore") }}
             </OButton>
@@ -135,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.meta.searchMode !== 'service-graph' &&
             searchObj.meta.searchMode !== 'services-catalog'
           "
-          class="flex items-center gap-1.5"
+          class="flex items-center gap-1.5 max-md:w-full"
         >
           <DateTime
             ref="dateTimeRef"
@@ -150,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-date-time-dropdown"
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
-            class="h-8"
+            class="h-8 max-md:mr-auto"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />

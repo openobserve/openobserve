@@ -20,8 +20,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex h-full max-h-full flex-col overflow-hidden">
     <div class="flex h-full max-h-full w-full flex-col overflow-hidden" ref="searchListContainer">
       <!-- Section header: static at top -->
+      <!-- < md the header wraps into tidy rows instead of truncating the
+           count chip against the pager. -->
       <div
-        class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b"
+        class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-1"
       >
         <!-- Field panel toggle — same style as add-panel config sidebar.
              < md the field list is a drawer, so this button opens it instead
@@ -66,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 pl-2 text-left max-md:flex-nowrap max-md:overflow-hidden"
+          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 pl-2 text-left max-md:min-w-32"
           data-test="logs-search-result-title"
           :data-search-state="
             searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'
@@ -138,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="flex flex-none items-center justify-end gap-1 pr-2">
+        <div class="flex flex-none items-center justify-end gap-1 pr-2 max-md:ml-auto">
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
@@ -1201,7 +1203,8 @@ export default defineComponent({
       if (!parts) return null;
 
       return {
-        records: t("search.recordsChip", {
+        // < md the long form collides with the pager cluster beside it.
+        records: t(isMobile.value ? "search.recordsChipShort" : "search.recordsChip", {
           start: parts.start,
           end: parts.end,
           total: parts.total,

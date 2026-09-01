@@ -186,7 +186,9 @@ export function useTableCore<TData>(
     // land on the same right-edge grid line as everything else (no over-width).
     const cellPad = hasTrailingSpacer.value ? 16 : 8 + PAGE_EDGE_PX;
     const content = n * ACTION_ICON_BTN + (n - 1) * ACTION_BTN_GAP + cellPad;
-    return Math.max(content, ACTIONS_HEADER_MIN);
+    // < md the column holds one kebab — the "Actions" header floor would leave
+    // it mostly dead width, so the header truncates instead.
+    return Math.max(content, isMobile.value ? 0 : ACTIONS_HEADER_MIN);
   };
 
   // Track column order for drag-reorder
@@ -262,12 +264,16 @@ export function useTableCore<TData>(
       // DETERMINISTICALLY from its icon count (not DOM-measured at runtime) so
       // the loading skeleton and the loaded table render it at the exact same
       // width — no flash when data arrives.
+      // < md the page's own action size (sized for its inline icon row) would
+      // defeat the one-kebab width, so the computed width alone decides.
       const size = isActionCol
-        ? Math.max(col.size ?? 0, actionColumnWidth((col.meta as any)?.actionCount))
+        ? isMobile.value
+          ? actionColumnWidth((col.meta as any)?.actionCount)
+          : Math.max(col.size ?? 0, actionColumnWidth((col.meta as any)?.actionCount))
         : (col.size ?? 150);
       const columnDef: ColumnDef<TData> = {
         id: col.id,
-        header: col.header as any,
+        header: isActionCol && isMobile.value ? "" : (col.header as any),
         accessorKey: col.accessorKey ?? col.id,
         accessorFn: col.accessorFn as any,
         cell: col.cell

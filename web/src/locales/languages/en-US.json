@@ -1143,6 +1143,7 @@
     "histogramTitle": "Showing {start} to {end} out of {total} events in {took} ms.",
     "histogramTitleWithScan": "Showing {start} to {end} out of {total} events in {took} ms. ({scanLabel}: {scanSize})",
     "recordsChip": "{start} to {end} out of {total} events",
+    "recordsChipShort": "{start}–{end} of {total}",
     "tookChip": "{took} ms",
     "scanSize": "Scan Size",
     "deltaScanSize": "Delta Scan Size",
