@@ -361,7 +361,25 @@ probe now tracks its `probeTraceId` in a set (added before fetch, deleted in
 `EventDetailDrawerContent`, and (via `useTraceCorrelation.cancelTracesStream`)
 `TraceCorrelationCard` on unmount.
 
-**Total: 17 leaks fixed** (7 committed in `21b78c96f4` + fixes #8–#17).
+**Total: 18 leaks fixed** (7 committed in `21b78c96f4` + fixes #8–#18).
+
+## Traces page deep-dive (`/traces` + sub-routes)
+
+Routes: `traces` (Index.vue, keepAlive:true), `traces/services` (ServicesCatalog),
+`traces/service-graph` (ServiceGraph), `traces/trace-details` (TraceDetails), plus
+LLM Insights. All ~35 components scanned for every leak class.
+
+| Component / area | Verdict |
+|---|---|
+| **`IndexList.vue`** (field list) | **FIX #18** — `useFieldValuesStream` streams field values by trace id but the component had **no unmount hook**, so navigating away stranded in-flight field-value streams (same class as logs #7). Fixed once at the composable: `cancelAllFieldStreams()` + `onScopeDispose` — auto-cancels for every consumer (traces `IndexList`, traces `SearchBar`, `SearchFieldList`) on unmount. |
+| `useVersionCompare` / `LLMInsightsDashboard` | already fixed (#8) |
+| `LLMErrorTable` | already fixed (#9) |
+| correlated-trace probe (`useCorrelatedTracesStream`) | already fixed (#16) |
+| `ServiceGraph.vue` | clean — hover/build debounce `setTimeout`s are one-shot; `pendingTooltipSetup` cleared in `onBeforeUnmount` |
+| `TraceDAG.vue` | clean — `useVueFlow()` id-less (library-managed store); `setTimeout(fitView, 50)` is one-shot |
+| `SearchResult.vue` | clean — `headerResizeObserver.disconnect()` in `onBeforeUnmount` |
+| `TraceDetailsSidebar` / `SpanBlock` | clean — window listeners balanced, observers disconnected on unmount |
+| metrics dashboards (`TracesMetricsDashboard` etc.) | clean |
 
 ## Metrics page deep-dive (`/metrics`)
 
@@ -779,3 +797,31 @@ wizard, a pipeline node form, a dashboard panel dialog); fix 5 is the one
 app-wide static find; fix 6 is defensive hardening. All lint- and type-clean.
 "Zero leaks" cannot be *proven* for an app this size, but no leak survives the
 route sweep, the retainer analysis, or the full-tree static audit.
+
+## All fixed memory leaks — route-wise summary (17 total)
+
+| # | Route / Area | File | Leak (short) |
+|---|---|---|---|
+| 1 | Synthetics | `composables/useSyntheticsRecorder.ts` | window `message` listener not removed on cleanup |
+| 2 | Synthetics | `views/synthetics/CreateBrowserTest.vue` | `recorder.cleanup()` never called on unmount |
+| 3 | Pipelines | `pipeline/NodeForm/ScheduledPipeline.vue` | `contextRegistry` entry not unregistered on unmount |
+| 4 | Dashboards | `dashboards/QueryInspector.vue` | required `metaData` prop retained; made optional/null |
+| 5 | App-wide (dialogs) | `QueryPlanDialog.vue` | `keydown` listener not removed on unmount |
+| 6 | App-wide (AI chat) | `O2AIChat.vue` | "analyzing" rotation timer not stopped on unmount |
+| 7 | Logs | `plugins/logs/IndexList.vue` | field-value stream trace ids not cancelled on unmount (~20/visit) |
+| 8 | Traces (LLM) | `traces/composables/useVersionCompare.ts` + `LLMInsightsDashboard.vue` | version-compare sample streams not cancelled on unmount |
+| 9 | Traces (LLM) | `plugins/traces/LLMErrorTable.vue` | error-table stream query not cancelled on unmount |
+| 10 | Correlation | `correlation/TelemetryCorrelationDashboard.vue` | traces stream trace id not cancelled on unmount |
+| 11 | RUM | `components/rum/PlayerTracesTab.vue` | correlated-trace metadata stream not cancelled on unmount |
+| 12 | IAM | `components/iam/quota/Quota.vue` | download `<a>` left in DOM + Blob URL not revoked |
+| 13 | Dependency | `web/package.json` + lock + `sbom.json` | removed dead `vue-drag-resize` (Vue-3 `beforeDestroy` never fires) |
+| 14 | Logs (patterns) | `logs/patterns/useWildcardHover.ts` + `PatternList.vue` | hover show/hide timers + detached anchor not cleared on unmount |
+| 15 | Logs (patterns) | `plugins/logs/Index.vue` | in-flight pattern extraction not cancelled on unmount |
+| 16 | RUM / Traces correlation | `composables/rum/useCorrelatedTracesStream.ts` (+ `useTraceCorrelation`, `PlayerTracesTab`, `EventDetailDrawerContent`, `TraceCorrelationCard`) | cache-miss probe stream trace id not cancelled on unmount |
+| 17 | Metrics (+7 shared consumers) | `components/AutoRefreshInterval.vue` | auto-refresh `setInterval` orphaned on `keepAlive:false` unmount (only cleared on `onDeactivated`) |
+
+| 18 | Traces (+ shared field list) | `composables/useFieldValuesStream.ts` (fixes traces `IndexList`, `SearchBar`, `SearchFieldList`) | in-flight field-value streams not cancelled on unmount; added `onScopeDispose → cancelAllFieldStreams()` |
+
+**By route:** Logs (#7, #14, #15) · Traces/LLM (#8, #9, #18) · RUM & correlation (#10, #11, #16) · Metrics (#17) · IAM (#12) · Pipelines (#3) · Synthetics (#1, #2) · Dashboards & app-wide dialogs/chat (#4, #5, #6) · Dependency hygiene (#13).
+
+**Dominant class:** streaming/timer/listener not cancelled on unmount (#7–#11, #15, #16, #17, #18). **Verification:** all lint- + type-clean; 10 pages/views live-benchmarked (roDetached 0, DOM flat); #17 live-verified (interval cleared on `/metrics` unmount).
