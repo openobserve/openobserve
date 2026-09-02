@@ -45,6 +45,8 @@ export interface FieldValueRecord {
 // Cached IDB connection — opened once and reused across all calls.
 // null means not yet opened (or was closed and needs to be reopened).
 let _db: IDBDatabase | null = null;
+// In-flight open, so a burst of concurrent first calls shares one connection.
+let _openPromise: Promise<IDBDatabase> | null = null;
 
 /**
  * Opens the database lazily — returns the cached connection on subsequent calls.
@@ -58,7 +60,8 @@ let _db: IDBDatabase | null = null;
  */
 export const openDB = (): Promise<IDBDatabase> => {
   if (_db) return Promise.resolve(_db);
-  return new Promise((resolve, reject) => {
+  if (_openPromise) return _openPromise;
+  _openPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = (e) => {
       const db = (e.target as IDBOpenDBRequest).result;
@@ -76,15 +79,26 @@ export const openDB = (): Promise<IDBDatabase> => {
       // (e.g. another tab opens a newer DB version triggering a versionchange).
       _db.onclose = () => {
         _db = null;
+        _openPromise = null;
       };
       _db.onversionchange = () => {
         _db?.close();
         _db = null;
+        _openPromise = null;
       };
       resolve(_db!);
     };
-    req.onerror = () => reject(req.error);
+    req.onerror = () => {
+      _openPromise = null;
+      reject(req.error);
+    };
   });
+  // A failed open (including indexedDB being unavailable, which throws before
+  // onerror exists) must not be cached, otherwise every later call rejects.
+  _openPromise.catch(() => {
+    _openPromise = null;
+  });
+  return _openPromise;
 };
 
 /**
