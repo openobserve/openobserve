@@ -100,12 +100,13 @@
 
       <OTextarea
         v-if="message.role === 'tool' && !message.readonly"
-        class="mt-0.5 w-32 shrink-0"
+        class="mt-0.5 shrink-0"
         :model-value="message.toolArguments ?? '{}'"
         :placeholder="t('aiObservability.playground.toolArgumentsPlaceholder')"
         :rows="1"
         :max-rows="5"
         size="sm"
+        width="xs"
         autogrow
         :data-test="`ai-playground-message-tool-arguments-${message.id}`"
         @update:model-value="(value: string) => emit('set-tool-arguments', message.id, value)"
