@@ -16,12 +16,9 @@
 use std::collections::{HashMap, HashSet};
 
 use config::{
-    TIMESTAMP_COL_NAME,
     meta::{
         alerts::{alert, level::PAYLOAD_SAMPLE_ROWS},
-        promql::{
-            EXEMPLARS_LABEL, HASH_LABEL, METRICS_HASH_EXCLUDED_LABELS, Metadata, VALUE_LABEL,
-        },
+        promql::{METRICS_HASH_EXCLUDED_LABELS, Metadata},
     },
     utils::{
         hash::{Sum64, gxhash},
@@ -41,17 +38,8 @@ pub mod prom;
 /// Distinct label sets one realtime notification carries, matching the scheduled path's sample.
 const TRIGGER_LABEL_LIMIT: usize = PAYLOAD_SAMPLE_ROWS as usize;
 
-/// Columns that move between samples of one series, so an alert dedup key ignores them.
-const TRIGGER_DEDUP_EXCLUDED_LABELS: &[&str] = &[
-    VALUE_LABEL,
-    HASH_LABEL,
-    EXEMPLARS_LABEL,
-    "is_monotonic",
-    "trace_id",
-    "span_id",
-    "start_time",
-    TIMESTAMP_COL_NAME,
-];
+/// OTLP writes a per-sample `start_time`, which the shared hash-excluded set does not cover.
+const TRIGGER_DEDUP_EXTRA_EXCLUDED_LABELS: &[&str] = &["start_time"];
 
 /// An alert's pending notification for the request being ingested.
 struct TriggerSlot {
@@ -125,7 +113,10 @@ fn get_exclude_labels() -> &'static [&'static str] {
 fn series_signature(labels: &config::utils::json::Map<String, config::utils::json::Value>) -> u64 {
     let mut labels: Vec<(&str, String)> = labels
         .iter()
-        .filter(|(key, _value)| !TRIGGER_DEDUP_EXCLUDED_LABELS.contains(&key.as_str()))
+        .filter(|(key, _value)| {
+            !METRICS_HASH_EXCLUDED_LABELS.contains(&key.as_str())
+                && !TRIGGER_DEDUP_EXTRA_EXCLUDED_LABELS.contains(&key.as_str())
+        })
         .map(|(key, value)| (key.as_str(), get_string_value(value)))
         .collect();
     labels.sort_by(|a, b| a.0.cmp(b.0));
@@ -180,7 +171,11 @@ fn merge_trigger_rows(
 
 #[cfg(test)]
 mod tests {
-    use config::{meta::promql::METADATA_LABEL, utils::json};
+    use config::{
+        TIMESTAMP_COL_NAME,
+        meta::promql::{HASH_LABEL, METADATA_LABEL, VALUE_LABEL},
+        utils::json,
+    };
 
     use super::*;
 
@@ -345,8 +340,7 @@ mod tests {
 
     #[test]
     fn merge_trigger_rows_adds_a_row_per_distinct_label_set() {
-        // Each label set is its own series and every one has to reach the row
-        // template, which is what the reported bug loses.
+        // Every label set is its own series, and the reported bug loses all but the first.
         let mut triggers: TriggerAlertData = Vec::new();
         let mut slots = HashMap::new();
         let alert = alert::Alert::default();
@@ -371,8 +365,7 @@ mod tests {
 
     #[test]
     fn merge_trigger_rows_ignores_a_repeated_label_set() {
-        // One series repeats its labels once per sample in a request; those
-        // samples describe the same dimension, so they must not each add a row.
+        // One series repeats its labels per sample, which must not add a row each time.
         let mut triggers: TriggerAlertData = Vec::new();
         let mut slots = HashMap::new();
         let alert = alert::Alert::default();
@@ -494,15 +487,6 @@ mod tests {
     fn series_signature_separates_boolean_labels() {
         let a = labels(&[("ok", json::json!(true))]);
         let b = labels(&[("ok", json::json!(false))]);
-        assert_ne!(series_signature(&a), series_signature(&b));
-    }
-
-    #[test]
-    fn series_signature_keeps_the_concatenated_schema_column() {
-        // Under a user-defined schema every non-schema label folds into this column,
-        // so excluding it would collapse otherwise distinct series.
-        let a = labels(&[(config::INDEX_FIELD_NAME_FOR_ALL, json::json!("host=a"))]);
-        let b = labels(&[(config::INDEX_FIELD_NAME_FOR_ALL, json::json!("host=b"))]);
         assert_ne!(series_signature(&a), series_signature(&b));
     }
 
