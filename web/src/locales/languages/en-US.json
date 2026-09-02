@@ -11751,6 +11751,8 @@
       "schemaToggle": "Constrain output to a JSON schema",
       "schemaHelp": "Output renders with JSON formatting when a schema is set.",
       "schemaInvalidJson": "Schema must be valid JSON.",
+      "schemaIgnored": "Schema · Ignored by this provider",
+      "schemaUnsupported": "This provider has no structured-output field. The schema is kept on this column, but it is not sent and the model answers with plain text.",
       "outputPlaceholder": "Output appears here — press Run.",
       "outputNotRun": "Not run",
       "retry": "Retry",

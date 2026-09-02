@@ -11723,6 +11723,8 @@
       "schemaToggle": "将输出限制为 JSON 模式",
       "schemaHelp": "设置模式后，输出将使用 JSON 格式呈现。",
       "schemaInvalidJson": "模式必须是有效的 JSON。",
+      "schemaIgnored": "模式 · 此提供商已忽略",
+      "schemaUnsupported": "此提供商没有结构化输出字段。模式会保留在此列中，但不会发送，模型将以纯文本回答。",
       "outputPlaceholder": "输出将显示在此处 — 点击运行。",
       "outputNotRun": "未运行",
       "retry": "重试",

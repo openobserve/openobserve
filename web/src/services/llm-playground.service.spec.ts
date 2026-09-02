@@ -7,6 +7,8 @@ vi.mock("@/services/http", () => ({ attemptTokenRefresh: vi.fn() }));
 
 import {
   PlaygroundRunError,
+  dropsResponseSchema,
+  providerDropsResponseSchema,
   runPlayground,
   type PlaygroundRunRequest,
 } from "./llm-playground.service";
@@ -367,6 +369,26 @@ describe("runPlayground — live adapter", () => {
       { name: "lookup", description: "Find it", input_schema: { type: "object" } },
     ]);
     expect(column.responseFormat).toBeUndefined();
+  });
+
+  // The UI reads this to warn while the schema is being written, so it has to
+  // answer for a provider type alone — before there is a request to inspect.
+  it("names the provider kinds whose request cannot carry a schema", () => {
+    expect(providerDropsResponseSchema("Anthropic")).toBe(true);
+    expect(providerDropsResponseSchema(" anthropic ")).toBe(true);
+    expect(providerDropsResponseSchema("openai")).toBe(false);
+    expect(providerDropsResponseSchema(undefined)).toBe(false);
+  });
+
+  it("reports a drop only when a schema was asked for", () => {
+    const anthropic = { providerType: "anthropic" };
+    expect(dropsResponseSchema(request({ ...anthropic, responseSchema: { type: "object" } }))).toBe(
+      true,
+    );
+    expect(dropsResponseSchema(request({ ...anthropic, responseSchema: null }))).toBe(false);
+    expect(
+      dropsResponseSchema(request({ providerType: "openai", responseSchema: { type: "object" } })),
+    ).toBe(false);
   });
 
   it("sends no tools key at all when the bench defines none", async () => {

@@ -11723,6 +11723,8 @@
       "schemaToggle": "출력을 JSON 스키마로 제한",
       "schemaHelp": "스키마가 설정되면 출력이 JSON 형식으로 렌더링됩니다.",
       "schemaInvalidJson": "스키마는 유효한 JSON이어야 합니다.",
+      "schemaIgnored": "스키마 · 이 공급자가 무시함",
+      "schemaUnsupported": "이 공급자에는 구조화 출력 필드가 없습니다. 스키마는 이 열에 유지되지만 전송되지 않으며 모델은 일반 텍스트로 응답합니다.",
       "outputPlaceholder": "출력이 여기에 표시됩니다 — 실행을 누르세요.",
       "outputNotRun": "실행되지 않음",
       "retry": "재시도",

@@ -180,6 +180,17 @@ function providerKind(request: PlaygroundRunRequest): string {
 }
 
 /**
+ * True when a provider of this kind carries no response schema at all.
+ *
+ * Exported because the UI has to say so BEFORE a run: a schema set against such
+ * a provider never leaves the client, and the only other evidence is an answer
+ * that comes back as prose for no stated reason.
+ */
+export function providerDropsResponseSchema(providerType?: string): boolean {
+  return (providerType ?? "").trim().toLowerCase() === ANTHROPIC_KIND;
+}
+
+/**
  * Tool definitions in the provider's own shape.
  *
  * The server merges this straight into the provider request body, so the shape
@@ -216,7 +227,8 @@ function wireTools(request: PlaygroundRunRequest): unknown[] | undefined {
  */
 function wireResponseFormat(request: PlaygroundRunRequest): unknown | undefined {
   if (!request.responseSchema) return undefined;
-  if (providerKind(request) === ANTHROPIC_KIND) return undefined;
+  // The same predicate the UI warns from, so the warning cannot outlive the drop.
+  if (providerDropsResponseSchema(request.providerType)) return undefined;
   return {
     type: "json_schema",
     json_schema: {
@@ -229,7 +241,7 @@ function wireResponseFormat(request: PlaygroundRunRequest): unknown | undefined 
 
 /** True when a response schema was asked for but this provider cannot carry it. */
 export function dropsResponseSchema(request: PlaygroundRunRequest): boolean {
-  return Boolean(request.responseSchema) && providerKind(request) === ANTHROPIC_KIND;
+  return Boolean(request.responseSchema) && providerDropsResponseSchema(request.providerType);
 }
 
 /**

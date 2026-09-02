@@ -11723,6 +11723,8 @@
       "schemaToggle": "Çıktıyı JSON şemasıyla sınırla",
       "schemaHelp": "Şema ayarlandığında çıktı JSON biçiminde oluşturulur.",
       "schemaInvalidJson": "Şema geçerli JSON olmalıdır.",
+      "schemaIgnored": "Şema · Bu sağlayıcı tarafından yok sayılıyor",
+      "schemaUnsupported": "Bu sağlayıcının yapılandırılmış çıktı alanı yok. Şema bu sütunda saklanır ancak gönderilmez ve model düz metinle yanıt verir.",
       "outputPlaceholder": "Çıktı burada görünür — Çalıştır'a basın.",
       "outputNotRun": "Çalıştırılmadı",
       "retry": "Yeniden Dene",

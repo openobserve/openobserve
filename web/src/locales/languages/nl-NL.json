@@ -11723,6 +11723,8 @@
       "schemaToggle": "Beperk uitvoer tot een JSON-schema",
       "schemaHelp": "De uitvoer wordt met JSON-opmaak weergegeven wanneer een schema is ingesteld.",
       "schemaInvalidJson": "Schema moet geldige JSON zijn.",
+      "schemaIgnored": "Schema · Genegeerd door deze provider",
+      "schemaUnsupported": "Deze provider heeft geen veld voor gestructureerde uitvoer. Het schema blijft in deze kolom bewaard, maar wordt niet verzonden en het model antwoordt met platte tekst.",
       "outputPlaceholder": "Uitvoer verschijnt hier — druk op Uitvoeren.",
       "outputNotRun": "Niet uitgevoerd",
       "retry": "Opnieuw proberen",

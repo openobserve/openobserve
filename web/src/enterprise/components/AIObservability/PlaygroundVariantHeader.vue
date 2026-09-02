@@ -80,16 +80,12 @@
          property resolve by stylesheet order, so an unmarked background loses
          to it silently. -->
     <OButton
-      :variant="variant.responseSchema ? 'ghost-primary' : 'ghost-muted'"
+      :variant="schemaButton.variant"
       size="icon-xs"
       icon-left="data-object"
       class="shrink-0"
-      :class="variant.responseSchema ? 'bg-accent/12!' : ''"
-      :title="
-        variant.responseSchema
-          ? t('aiObservability.playground.schemaOn')
-          : t('aiObservability.playground.schema')
-      "
+      :class="schemaButton.tint"
+      :title="schemaButton.title"
       :data-test="`ai-playground-schema-btn-${variant.id}`"
       @click="schemaOpen = true"
     />
@@ -145,6 +141,7 @@
     <PlaygroundSchemaDialog
       v-model:open="schemaOpen"
       :schema="variant.responseSchema"
+      :dropped="schemaDropped"
       @apply="(responseSchema) => patch({ responseSchema })"
     />
   </div>
@@ -164,6 +161,7 @@ import {
   type PlaygroundVariant,
 } from "@/enterprise/views/AIObservability/playgroundDraft";
 import type { Provider } from "@/services/online-evals.service";
+import { providerDropsResponseSchema } from "@/services/llm-playground.service";
 
 /** Provider id and model travel as one select value but stay two fields on the
  *  variant — the run request, the experiment handoff and the draft titles all
@@ -248,9 +246,46 @@ const modelOptions = computed<SelectOption[]>(() => {
   return options;
 });
 
-const providerName = computed(
-  () => props.providers.find((candidate) => candidate.id === props.variant.providerId)?.name ?? "",
+const selectedProvider = computed(() =>
+  props.providers.find((candidate) => candidate.id === props.variant.providerId),
 );
+
+const providerName = computed(() => selectedProvider.value?.name ?? "");
+
+/** Whether the schema this variant carries actually reaches the model. Unknown
+ *  to the provider list — a draft restored from another org — is treated as
+ *  carrying it: the run is what finds out, and a warning on every unresolved
+ *  provider would cry wolf. */
+const schemaDropped = computed(() => {
+  const provider = selectedProvider.value;
+  return providerDropsResponseSchema(provider?.providerType ?? provider?.provider_type);
+});
+
+/** Icon-only, so variant, tint and tooltip are the whole message and move as
+ *  one. Three states, not two: an accent tint on a provider that drops the
+ *  schema claims "in force" about something the request never carries, and the
+ *  only other evidence is an answer that arrives as prose. */
+const schemaButton = computed(() => {
+  if (!props.variant.responseSchema) {
+    return {
+      variant: "ghost-muted" as const,
+      tint: "",
+      title: t("aiObservability.playground.schema"),
+    };
+  }
+  if (schemaDropped.value) {
+    return {
+      variant: "ghost-warning" as const,
+      tint: "bg-banner-warning-bg!",
+      title: t("aiObservability.playground.schemaIgnored"),
+    };
+  }
+  return {
+    variant: "ghost-primary" as const,
+    tint: "bg-accent/12!",
+    title: t("aiObservability.playground.schemaOn"),
+  };
+});
 
 function keyFor(providerId: string, model: string): string {
   return `${providerId}${KEY_SEPARATOR}${model}`;
