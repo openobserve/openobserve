@@ -14,6 +14,14 @@ export const PIVOT_TABLE_SEPARATOR = "\x00";
 export const PIVOT_TABLE_ROW_KEY_SEPARATOR = "\x00";
 export const PIVOT_TABLE_TOTAL_LABEL = "Total";
 export const PIVOT_TABLE_OTHERS_LABEL = "Others";
+// Machine key for breakdown values that are null, undefined or "". A control
+// character keeps it out of the user-data namespace, so a genuine "(empty)"
+// string value stays a separate column instead of merging into this bucket.
+// It must not contain PIVOT_TABLE_SEPARATOR: per-level values are joined and
+// re-split on that character.
+export const PIVOT_TABLE_EMPTY_KEY = "\x01__empty__";
+// Display label for the empty bucket — applied only when rendering headers.
+export const PIVOT_TABLE_EMPTY_LABEL = "(empty)";
 export const PIVOT_TABLE_HEADER_ROW_HEIGHT = 28;
 export const PIVOT_TABLE_DEFAULT_HEADER_HEIGHT = 48;
 export const PIVOT_TABLE_TOTAL_COLUMN_WIDTH = 150;

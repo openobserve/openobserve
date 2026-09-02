@@ -293,6 +293,15 @@ function getPivotRowColStyle(colId: string): Record<string, any> {
   };
 }
 
+// A pivot header cell sits on the header's bottom edge when its rowspan
+// reaches the last level — leaf-row cells trivially, and the synthetic
+// Others/Total cells whenever a single y field leaves them spanning all rows.
+// Bottom-edge cells own the header/body divider and the sort indicator, since
+// no leaf cell renders beneath them.
+function isBottomEdgeCell(levelIdx: number, cell: any): boolean {
+  return levelIdx + (cell.rowspan || 1) === (props.pivotHeaderLevels?.length ?? 0);
+}
+
 function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
   if (!props.stickyColTotals || !cell._isTotalHeader) return {};
   const rightOffset = (cell._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
@@ -349,9 +358,9 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
       :key="'pivot-hl-' + levelIdx"
       class="bg-table-header-bg h-7"
     >
-      <!-- Row-field column headers: first row only, rowspan all levels. Raw
-           pivot row-field columns carry `name`/`field` but no `id`, so key, sort
-           and style must all use `name`. -->
+      <!-- Row-field column headers: first row only, rowspan all levels. Pivot
+           row-field columns keep name === field === id (the field alias), so
+           name-keyed access here matches the pinned column ids. -->
       <th
         v-for="col in levelIdx === 0 ? pivotRowColumns : []"
         :key="'pivot-rh-' + (col.name ?? col.id)"
@@ -396,7 +405,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             // Bottom divider on the cells along the header's bottom edge, since
             // the <thead> border-b doesn't paint in border-separate mode. Uses
             // the directional border-b color so it doesn't clash with border-l.
-            'border-b-table-header-border border-b': level.isLeaf || cell._isTotalHeader,
+            'border-b-table-header-border border-b':
+              level.isLeaf || cell._isTotalHeader || isBottomEdgeCell(levelIdx, cell),
           },
           {
             'cursor-pointer': cell._sortColumn,
@@ -415,21 +425,27 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         >
           <span class="truncate" :title="String(cell.label ?? '')">{{ cell.label }}</span>
           <OIcon
-            v-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'asc'"
+            v-if="
+              isBottomEdgeCell(levelIdx, cell) &&
+              cell._sortColumn &&
+              getSortIcon?.(cell._sortColumn) === 'asc'
+            "
             name="arrow-upward"
             size="sm"
             class="text-table-sort-icon-active shrink-0"
           />
           <OIcon
             v-else-if="
-              level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'desc'
+              isBottomEdgeCell(levelIdx, cell) &&
+              cell._sortColumn &&
+              getSortIcon?.(cell._sortColumn) === 'desc'
             "
             name="arrow-downward"
             size="sm"
             class="text-table-sort-icon-active shrink-0"
           />
           <OIcon
-            v-else-if="level.isLeaf && cell._sortColumn"
+            v-else-if="isBottomEdgeCell(levelIdx, cell) && cell._sortColumn"
             name="unfold-more"
             size="sm"
             class="shrink-0 opacity-40"
