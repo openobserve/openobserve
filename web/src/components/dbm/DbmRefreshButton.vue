@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   "stale" means.
 -->
 <template>
-  <div class="inline-flex items-center gap-1.5" :class="shrink ? 'shrink-0' : undefined">
+  <div class="inline-flex shrink-0 items-center gap-1.5">
     <!-- Rendered only after a successful load: a grey dot on first paint would read
          as a verdict rather than the absence of one. -->
     <span
@@ -67,7 +67,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="icon-sm"
       icon-left="refresh"
       :loading="loading"
-      :class="shrink ? 'shrink-0' : undefined"
       :data-test="dataTest"
       @click="emit('refresh')"
     >
@@ -90,12 +89,6 @@ const props = withDefaults(
     loading?: boolean;
     dataTest: string;
     /**
-     * `shrink-0` pins the button's width inside the flex toolbar. Table health
-     * puts a bare search input in the slot rather than a flex row, so it never
-     * carried the class and opts out here.
-     */
-    shrink?: boolean;
-    /**
      * Epoch milliseconds of the page's last SUCCESSFUL load. Optional: a page
      * that does not track one renders exactly what this button always did, so
      * adopting the timestamp is per-page rather than a flag day.
@@ -104,7 +97,7 @@ const props = withDefaults(
     /** Which halves to render: `full` (dot + age + button), `status` (dot + age), or `button` (just the reload). */
     mode?: "full" | "status" | "button";
   }>(),
-  { loading: false, shrink: true, lastRunAt: null, mode: "full" },
+  { loading: false, lastRunAt: null, mode: "full" },
 );
 
 const emit = defineEmits<{ refresh: [] }>();

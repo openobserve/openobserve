@@ -196,6 +196,10 @@ pub struct Alert {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(read_only)]
     pub scheduler_job_present: Option<bool>,
+
+    #[serde(default)]
+    #[schema(example = 10)]
+    pub pending_period_sec: i64,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -582,6 +586,7 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             priority: alert.priority,
             tags: alert.tags,
             scheduler_job_present: None,
+            pending_period_sec: alert.pending_period_sec,
         }
     }
 }
@@ -778,6 +783,7 @@ impl From<Alert> for meta_alerts::alert::Alert {
         alert.workflows = value.workflows;
         alert.priority = value.priority;
         alert.tags = value.tags;
+        alert.pending_period_sec = value.pending_period_sec;
 
         alert
     }

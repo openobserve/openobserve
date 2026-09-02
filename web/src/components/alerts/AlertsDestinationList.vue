@@ -413,6 +413,12 @@ export default defineComponent({
 
     const { detectPrebuiltType, availableTypes } = usePrebuiltDestinations();
 
+    // Email destinations store recipients in emails[], not url. Method is HTTP-only.
+    const destinationUrl = (row: DestinationPayload): string =>
+      row.type === "email" ? (row.emails ?? []).join(", ") : (row.url ?? "");
+    const destinationMethod = (row: DestinationPayload): string =>
+      row.type === "email" ? "" : (row.method ?? "");
+
     const columns: OTableColumnDef[] = [
       {
         id: "name",
@@ -439,8 +445,8 @@ export default defineComponent({
       {
         id: "url",
         hideBelowMd: true,
-        header: t("alert_destinations.url"),
-        accessorKey: "url",
+        header: t("alert_destinations.urlOrRecipients"),
+        accessorFn: destinationUrl,
         resizable: true,
         hideable: true,
         size: COL.url,
@@ -461,7 +467,7 @@ export default defineComponent({
         id: "method",
         hideBelowMd: true,
         header: t("alert_destinations.method"),
-        accessorKey: "method",
+        accessorFn: destinationMethod,
         sortable: true,
         resizable: true,
         hideable: true,

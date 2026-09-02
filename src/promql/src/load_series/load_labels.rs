@@ -116,13 +116,13 @@ impl LabelInterner {
     }
 }
 
-enum LabelColumn<'a> {
+pub enum LabelColumn<'a> {
     Utf8(&'a StringArray),
     Utf8View(&'a StringViewArray),
 }
 
 impl<'a> LabelColumn<'a> {
-    fn try_from_array(column: &'a dyn Array) -> Option<Self> {
+    pub fn try_from_array(column: &'a dyn Array) -> Option<Self> {
         match column.data_type() {
             DataType::Utf8 => column
                 .as_any()
@@ -136,14 +136,14 @@ impl<'a> LabelColumn<'a> {
         }
     }
 
-    fn is_null(&self, row: usize) -> bool {
+    pub fn is_null(&self, row: usize) -> bool {
         match self {
             Self::Utf8(values) => values.is_null(row),
             Self::Utf8View(values) => values.is_null(row),
         }
     }
 
-    fn value(&self, row: usize) -> &str {
+    pub fn value(&self, row: usize) -> &str {
         match self {
             Self::Utf8(values) => values.value(row),
             Self::Utf8View(values) => values.value(row),

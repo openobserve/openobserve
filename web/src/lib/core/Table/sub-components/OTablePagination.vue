@@ -106,7 +106,10 @@ const pageSizeSelectOptions = computed(() => {
         {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }}
         {{ totalCount.toLocaleString() }}{{ totalCountExact ? "" : "+" }}
       </span>
-      <div class="bg-border-default h-4 w-px shrink-0 max-md:hidden" v-if="pageSizeOptions.length > 0" />
+      <div
+        class="bg-border-default h-4 w-px shrink-0 max-md:hidden"
+        v-if="pageSizeOptions.length > 0"
+      />
       <div v-if="pageSizeOptions.length > 0" class="text-primary flex items-center gap-1.5 text-xs">
         <span class="whitespace-nowrap max-md:hidden">{{ t("search.recordsPerPage") }}</span>
         <OSelect

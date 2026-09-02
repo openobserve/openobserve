@@ -704,13 +704,6 @@ export default defineComponent({
       chart?.dispose();
       chart = null;
 
-      // Clean up intersection observer
-      if (chartRef.value && isChartVisibleObserver) {
-        isChartVisibleObserver.unobserve(chartRef.value);
-        isChartVisibleObserver.disconnect();
-        isChartVisibleObserver = null;
-      }
-
       // Clear chart reference
       if (chartRef.value) {
         chartRef.value = null;
@@ -744,11 +737,9 @@ export default defineComponent({
     });
 
     onUnmounted(() => {
-      if (chartRef.value) {
-        // unobserve chart
-        isChartVisibleObserver?.unobserve(chartRef.value);
-        isChartVisibleObserver?.disconnect();
-      }
+      // Never guard on chartRef: Vue nulls template refs before unmounted hooks run.
+      isChartVisibleObserver?.disconnect();
+      isChartVisibleObserver = null;
 
       cleanupChart();
     });

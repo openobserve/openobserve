@@ -78,79 +78,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="folders-tabs flex-1 overflow-y-auto px-1.5">
-      <OTabs
-        orientation="vertical"
-        dense
-        v-model="activeFolderId"
-        data-test="dashboards-folder-tabs"
-      >
-        <OTab
-          v-for="tab in filteredTabs"
-          :key="tab.folderId"
-          :name="tab.folderId"
-          class="test-class min-h-6"
-          :data-test="`dashboard-folder-tab-${tab.folderId}`"
-          @click="onTabClick(tab.folderId)"
-        >
-          <div
-            class="folder-item group/row flex min-h-6 w-full flex-nowrap items-center gap-1.5"
-            :data-test="`dashboard-folder-tab-name-${tab.name}`"
+          <OTabs
+            orientation="vertical"
+            dense
+            v-model="activeFolderId"
+            data-test="dashboards-folder-tabs"
           >
-            <!-- Fixed-width icon slot. Always rendered, so every folder name
-                 starts on the same x-position whether or not it has an icon. -->
-            <FolderIcon
-              :token="iconFor(tab)"
-              :favorite="tab.folderId === FAVORITES_FOLDER_ID"
-              :data-test="`dashboard-folder-icon-${tab.name}`"
-            />
-            <span
-              class="folder-name min-w-0 flex-1 truncate text-left"
-              :title="tab.name"
-              :data-test="`dashboard-folder-name-${tab.name}`"
-              >{{ tab.name }}</span
+            <OTab
+              v-for="tab in filteredTabs"
+              :key="tab.folderId"
+              :name="tab.folderId"
+              class="test-class min-h-6"
+              :data-test="`dashboard-folder-tab-${tab.folderId}`"
+              @click="onTabClick(tab.folderId)"
             >
-            <!-- Kept in flow rather than overlaid: an overlay needs a backdrop
+              <div
+                class="folder-item group/row flex min-h-6 w-full flex-nowrap items-center gap-1.5"
+                :data-test="`dashboard-folder-tab-name-${tab.name}`"
+              >
+                <!-- Fixed-width icon slot. Always rendered, so every folder name
+                 starts on the same x-position whether or not it has an icon. -->
+                <FolderIcon
+                  :token="iconFor(tab)"
+                  :favorite="tab.folderId === FAVORITES_FOLDER_ID"
+                  :data-test="`dashboard-folder-icon-${tab.name}`"
+                />
+                <span
+                  class="folder-name min-w-0 flex-1 truncate text-left"
+                  :title="tab.name"
+                  :data-test="`dashboard-folder-name-${tab.name}`"
+                  >{{ tab.name }}</span
+                >
+                <!-- Kept in flow rather than overlaid: an overlay needs a backdrop
                  matching the row, and OTab only paints a hover background on
                  INACTIVE tabs, so it would read wrong on the open folder. -->
-            <div
-              v-if="tab.folderId.toLowerCase() != 'default' && tab.folderId !== FAVORITES_FOLDER_ID"
-              class="hidden shrink-0 items-center group-hover/row:flex has-[[data-state=open]]:flex max-md:flex"
-              @click.stop
-            >
-              <ODropdown side="bottom" align="start">
-                <template #trigger>
-                  <OButton
-                    size="icon"
-                    variant="ghost"
-                    icon-left="more-vert"
-                    class="h-5 w-5"
-                    data-test="dashboard-more-icon"
-                  />
-                </template>
-                <ODropdownItem
-                  data-test="dashboard-edit-folder-icon"
-                  @select="editFolder(tab.folderId)"
+                <div
+                  v-if="
+                    tab.folderId.toLowerCase() != 'default' && tab.folderId !== FAVORITES_FOLDER_ID
+                  "
+                  class="hidden shrink-0 items-center group-hover/row:flex has-[[data-state=open]]:flex max-md:flex"
+                  @click.stop
                 >
-                  <template #icon-left>
-                    <OIcon name="edit" size="xs" />
-                  </template>
-                  {{ t("common.edit") }}
-                </ODropdownItem>
-                <ODropdownItem
-                  variant="destructive"
-                  data-test="dashboard-delete-folder-icon"
-                  @select="showDeleteFolderDialogFn(tab.folderId)"
-                >
-                  <template #icon-left>
-                    <OIcon name="delete" size="xs" />
-                  </template>
-                  {{ t("common.delete") }}
-                </ODropdownItem>
-              </ODropdown>
-            </div>
-          </div>
-        </OTab>
-      </OTabs>
+                  <ODropdown side="bottom" align="start">
+                    <template #trigger>
+                      <OButton
+                        size="icon"
+                        variant="ghost"
+                        icon-left="more-vert"
+                        class="h-5 w-5"
+                        data-test="dashboard-more-icon"
+                      />
+                    </template>
+                    <ODropdownItem
+                      data-test="dashboard-edit-folder-icon"
+                      @select="editFolder(tab.folderId)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="edit" size="xs" />
+                      </template>
+                      {{ t("common.edit") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      variant="destructive"
+                      data-test="dashboard-delete-folder-icon"
+                      @select="showDeleteFolderDialogFn(tab.folderId)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="delete" size="xs" />
+                      </template>
+                      {{ t("common.delete") }}
+                    </ODropdownItem>
+                  </ODropdown>
+                </div>
+              </div>
+            </OTab>
+          </OTabs>
         </div>
       </div>
     </component>

@@ -210,6 +210,20 @@ describe("FieldValuesPanel.vue", () => {
       });
       expect(wrapper.text()).toContain("Custom Label");
     });
+
+    it("renders multiline value with whitespace-pre-wrap and break-words classes to preserve newlines", () => {
+      wrapper = createWrapper({
+        fieldValues: {
+          isLoading: false,
+          values: [{ key: "k1\nwith\nnewlines", count: 5 }],
+        },
+      });
+      const el = wrapper.find(".text-field-list-label-text");
+      expect(el.exists()).toBe(true);
+      expect(el.classes()).toContain("whitespace-pre-wrap");
+      expect(el.classes()).toContain("break-words");
+      expect(el.text()).toContain("k1\nwith\nnewlines");
+    });
   });
 
   // ─── Multi-select controls ───────────────────────────────────────────────────

@@ -65,11 +65,16 @@ const measure = (animated: boolean) => {
   if (!indicator || !track) return;
 
   const active = track.querySelector<HTMLElement>('[data-state="on"]');
+  // A value matching no item: hide the pill rather than leave it on the last choice.
+  if (!active) {
+    indicatorVisible.value = false;
+    return;
+  }
   // Skip while the group (or an ancestor) is hidden / not laid out — e.g. a tab
   // panel that isn't the visible one. Measuring here would store a bogus
   // 0-position, and revealing later would slide the pill in from the corner
   // (the "random animation" bug). Keep the last valid position instead.
-  if (!active || active.offsetParent === null) return;
+  if (active.offsetParent === null) return;
 
   // Position relative to the track's padding box (where an absolute left:0/top:0
   // child originates), subtracting the track border so the bordered variant lines

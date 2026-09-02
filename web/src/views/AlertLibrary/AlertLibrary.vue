@@ -22,9 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   severity) and the STAT STRIP filters (ready / needs data / all). Mixing them
   overflowed the rail and pushed a facet group below the fold.
 
-  No bulk selection in the GALLERY. Install is entered per-alert from the
-  drawer, and the wizard it opens offers the whole visible set from there — so
-  a second selection model here would be a checkbox competing with that one.
+  ONE selection state, several surfaces: the card checkbox, the group heading
+  and the toolbar control all write `selectedIds`. Add freezes it into
+  `pendingBatch`; the drawer's own Add ignores it, so reading one alert never
+  drags in whatever else is ticked behind it.
 -->
 <template>
   <div data-test="alert-library-page" class="flex h-full flex-col">
@@ -112,9 +113,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <template v-else>
+            <!-- Selection shares the search row, which has the slack for it. Its own
+                 row would push the grid down; the stat strip would re-flow its tiles.
+                 Here the only thing that resizes is an empty text field. -->
             <div
-              class="border-border-default px-page-edge flex shrink-0 items-center gap-2 border-b py-2"
+              class="border-border-default px-page-edge flex shrink-0 items-center gap-3 border-b py-2"
+              data-test="alert-library-toolbar"
             >
+              <!-- < md the facet rail is a drawer, so its trigger leads this row. -->
               <OButton
                 variant="outline"
                 size="icon-toolbar"
@@ -133,6 +139,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="t('alert_library.searchPlaceholder')"
                 data-test="alert-library-search"
               />
+
+              <!-- The tri-state is LAST and always present, so it never moves: the
+                   selection controls grow leftward into the search field's width. -->
+              <div
+                class="flex shrink-0 items-center gap-3"
+                data-test="alert-library-toolbar-actions"
+              >
+                <div
+                  v-if="selectedCount > 0"
+                  class="border-border-default flex shrink-0 items-center gap-2 border-r pr-3"
+                  data-test="alert-library-selection-bar"
+                  :data-selected="selectedCount"
+                  :data-offscreen="offscreenCount"
+                >
+                  <!-- Only the counts are live: wrapping the buttons too would re-read every label. -->
+                  <span role="status" class="text-text-heading text-sm font-medium">
+                    {{ t("alert_library.selectionCount", { count: selectedCount }, selectedCount) }}
+                  </span>
+                  <span v-if="offscreenCount > 0" role="status" class="text-text-secondary text-xs">
+                    &middot;
+                    {{
+                      t(
+                        "alert_library.selectionOffscreen",
+                        { count: offscreenCount },
+                        offscreenCount,
+                      )
+                    }}
+                  </span>
+                  <OButton
+                    variant="outline"
+                    size="sm"
+                    data-test="alert-library-clear-selection"
+                    @click="clearSelection"
+                  >
+                    {{ t("alert_library.clearSelection") }}
+                  </OButton>
+                  <OButton
+                    variant="primary"
+                    size="sm"
+                    data-test="alert-library-add-selected"
+                    @click="addSelected"
+                  >
+                    {{ t("alert_library.addSelected", { count: selectedCount }, selectedCount) }}
+                  </OButton>
+                </div>
+
+                <!-- Hidden over an empty view: that set is neither none nor all. -->
+                <OCheckbox
+                  v-if="!isBusy && visibleEntries.length > 0"
+                  ref="selectAllBox"
+                  size="sm"
+                  :model-value="viewSelectionState"
+                  :label="t('alert_library.selectAllInView')"
+                  :aria-label="t('alert_library.selectAllInView')"
+                  class="shrink-0"
+                  data-test="alert-library-select-all-in-view"
+                  @update:model-value="toggleViewSelection"
+                />
+              </div>
             </div>
 
             <div class="px-page-edge shrink-0 py-2">
@@ -140,6 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :items="statItems"
                 selectable
                 :selected-key="facet"
+                default-key="all"
                 data-test="alert-library-strip"
                 @select="onStatSelect"
               />
@@ -200,23 +266,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template v-else>
                 <section v-for="group in groupedEntries" :key="group.id" class="pt-3">
-                  <h2
-                    class="text-text-secondary flex items-center gap-2 pb-2 text-xs font-semibold"
-                    :data-test="`alert-library-group-${group.id}`"
-                  >
-                    <span v-if="group.packLabel" class="opacity-70"
-                      >{{ group.packLabel }} &middot;</span
+                  <!-- A sibling of the heading: inside it, it would rename the heading. -->
+                  <div class="flex items-center gap-2 pb-2">
+                    <h2
+                      :id="`alert-library-group-heading-${group.id}`"
+                      class="text-text-secondary flex items-center gap-2 text-xs font-semibold"
+                      :data-test="`alert-library-group-${group.id}`"
                     >
-                    <span>{{ group.label }}</span>
-                    <span class="tabular-nums opacity-70">{{ group.entries.length }}</span>
-                  </h2>
+                      <span v-if="group.packLabel" class="opacity-70"
+                        >{{ group.packLabel }} &middot;</span
+                      >
+                      <span>{{ group.label }}</span>
+                      <span class="tabular-nums opacity-70">{{ group.entries.length }}</span>
+                    </h2>
+                    <!-- Suppressed at one group, where it duplicates the toolbar control. -->
+                    <OButton
+                      v-if="groupedEntries.length > 1"
+                      :id="`alert-library-select-group-id-${group.id}`"
+                      variant="ghost"
+                      size="xs"
+                      class="ml-auto"
+                      :aria-labelledby="`alert-library-select-group-id-${group.id} alert-library-group-heading-${group.id}`"
+                      :data-test="`alert-library-select-group-${group.id}`"
+                      @click="toggleGroup(group.entries)"
+                    >
+                      {{ groupToggleLabel(group.entries) }}
+                    </OButton>
+                  </div>
                   <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     <LibraryCard
                       v-for="entry in group.entries"
                       :key="entry.id"
                       :entry="entry"
                       :ready="entryReady(entry)"
+                      :selected="selectedIds.has(entry.id)"
                       @open="openEntry(entry)"
+                      @update:selected="setSelected(entry.id, $event)"
                     />
                   </div>
                 </section>
@@ -236,19 +321,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @install="onInstall"
     />
 
-    <!-- `installed` is deliberately unlistened here: Phase 5 consumes it to mark
-         gallery entries as installed. Do not delete it as dead code. -->
+    <!-- `installed` fires mid-run, so its handler must not touch `pendingBatch`. -->
     <LibraryInstallDialog
       :open="installOpen"
       :entries="visibleEntries"
       :seed="installSeed"
+      :preselect="pendingBatch"
       @update:open="onInstallOpenChange"
+      @installed="onInstalled"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
@@ -274,6 +360,7 @@ import {
 import type { AlertLibraryErrorCode } from "@/composables/alerts/useAlertLibrary";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -314,6 +401,11 @@ const drawerOpen = ref(false);
 
 const installOpen = ref(false);
 const installSeed = ref<{ entry: AlertLibraryEntry; file: AlertLibraryFile } | null>(null);
+// Frozen at Add: `installed` fires mid-run, so a live binding would rewrite the wizard's own list.
+const pendingBatch = ref<AlertLibraryEntry[]>([]);
+
+/** A Set, not an array: every card asks this on every render. */
+const selectedIds = ref<Set<string>>(new Set());
 
 const streamsByType = ref<StreamsByType>({});
 const streamsPending = ref(true);
@@ -445,7 +537,7 @@ const showCollectorBanner = computed(
     soleCategoryLabel.value !== null &&
     scopedEntries.value.length > 0 &&
     readyCount.value === 0 &&
-    // Not over an empty grid. With the "Ready to install" tile active and
+    // Not over an empty grid. With the "Ready to use" tile active and
     // nothing ready, this banner and the no-results state both rendered — two
     // different explanations for one blank area, and this one citing a count of
     // alerts that were not on screen.
@@ -510,7 +602,7 @@ const severityFacets = computed<LibraryFacet[]>(() => {
  * we have no claim to make. The cards deliberately stay undimmed — refusing to
  * say "none of your data matches" — but the strip was making the OPPOSITE
  * assertion just as loudly: `entryReady` answers true while readiness is
- * unknown, so a failed /streams call read as "Ready to install 42 / Not
+ * unknown, so a failed /streams call read as "Ready to use 42 / Not
  * ingested 0". An em dash says the honest thing.
  */
 const statItems = computed<StatItem[]>(() => [
@@ -546,14 +638,12 @@ const statItems = computed<StatItem[]>(() => [
 ]);
 
 // ── visible set ────────────────────────────────────────────────────────────
+// One order for the grid and for the batch handed to the wizard, so step 2 reads as the grid did.
+const byGridOrder = (a: AlertLibraryEntry, b: AlertLibraryEntry) =>
+  severityRank(a.severity) - severityRank(b.severity) || text(a.title).localeCompare(text(b.title));
+
 /** Every filter has already been applied by `availableEntries`; this orders it. */
-const visibleEntries = computed(() =>
-  [...availableEntries.value].sort(
-    (a, b) =>
-      severityRank(a.severity) - severityRank(b.severity) ||
-      text(a.title).localeCompare(text(b.title)),
-  ),
-);
+const visibleEntries = computed(() => [...availableEntries.value].sort(byGridOrder));
 
 /**
  * Grouped by pack AND category, never category alone: category names are
@@ -583,6 +673,95 @@ const groupedEntries = computed(() => {
         entries: entriesInGroup,
       };
     });
+});
+
+// ── selection ──────────────────────────────────────────────────────────────
+const selectedCount = computed(() => selectedIds.value.size);
+
+/** What the batch holds that the current filters do not show. */
+const offscreenCount = computed(() => {
+  const onScreen = new Set(visibleEntries.value.map((entry) => entry.id));
+  return [...selectedIds.value].filter((id) => !onScreen.has(id)).length;
+});
+
+const viewSelectionState = computed<boolean | "indeterminate">(() => {
+  const ticked = visibleEntries.value.filter((entry) => selectedIds.value.has(entry.id)).length;
+  if (ticked === 0) return false;
+  return ticked === visibleEntries.value.length ? true : "indeterminate";
+});
+
+const groupFullySelected = (groupEntries: AlertLibraryEntry[]) =>
+  groupEntries.every((entry) => selectedIds.value.has(entry.id));
+
+const groupToggleLabel = (groupEntries: AlertLibraryEntry[]) =>
+  groupFullySelected(groupEntries)
+    ? t("alert_library.clearGroupSelection", { count: groupEntries.length }, groupEntries.length)
+    : t("alert_library.selectAllInGroup", { count: groupEntries.length }, groupEntries.length);
+
+const setSelected = (id: string, selected: boolean) => {
+  const next = new Set(selectedIds.value);
+  if (selected) next.add(id);
+  else next.delete(id);
+  selectedIds.value = next;
+};
+
+const selectAllBox = ref<{ $el: HTMLElement } | null>(null);
+
+// Clearing unmounts the button that was clicked, so focus would fall to <body>
+// and a keyboard user would restart above the whole grid.
+const clearSelection = async () => {
+  selectedIds.value = new Set();
+  await nextTick();
+  selectAllBox.value?.$el?.querySelector<HTMLElement>('[role="checkbox"]')?.focus();
+};
+
+// Writes only the visible set: dropping a cross-filter batch is what the action row's Clear is for.
+const toggleViewSelection = () => {
+  const next = new Set(selectedIds.value);
+  const selectAll = viewSelectionState.value !== true;
+  for (const entry of visibleEntries.value) {
+    if (selectAll) next.add(entry.id);
+    else next.delete(entry.id);
+  }
+  selectedIds.value = next;
+};
+
+/** Additive: a partly-selected group gains the rest rather than starting over. */
+const toggleGroup = (groupEntries: AlertLibraryEntry[]) => {
+  const next = new Set(selectedIds.value);
+  const clearing = groupFullySelected(groupEntries);
+  for (const entry of groupEntries) {
+    if (clearing) next.delete(entry.id);
+    else next.add(entry.id);
+  }
+  selectedIds.value = next;
+};
+
+// Resolved against the whole manifest: the off-screen part of the batch must survive the hand-off.
+const addSelected = () => {
+  pendingBatch.value = entries.value
+    .filter((entry) => selectedIds.value.has(entry.id))
+    .sort(byGridOrder);
+  installSeed.value = null;
+  installOpen.value = true;
+};
+
+const onInstalled = ({ entryIds }: { entryIds: string[] }) => {
+  const added = new Set(entryIds);
+  selectedIds.value = new Set([...selectedIds.value].filter((id) => !added.has(id)));
+};
+
+// A dropped alert would fail its row for a reason nobody can act on; pruning nothing is a no-op.
+watch(entries, (available) => {
+  const live = new Set(available.map((entry) => entry.id));
+  if (selectedIds.value.size > 0) {
+    const kept = [...selectedIds.value].filter((id) => live.has(id));
+    if (kept.length !== selectedIds.value.size) selectedIds.value = new Set(kept);
+  }
+  // The open wizard must not be left listing an alert the catalog just dropped.
+  if (pendingBatch.value.some((entry) => !live.has(entry.id))) {
+    pendingBatch.value = pendingBatch.value.filter((entry) => live.has(entry.id));
+  }
 });
 
 const hasActiveFilters = computed(
@@ -621,6 +800,7 @@ const openEntry = (entry: AlertLibraryEntry) => {
  * the whole visible set, so the single-alert view behind it is finished.
  */
 const onInstall = (payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }) => {
+  pendingBatch.value = [];
   installSeed.value = payload;
   drawerOpen.value = false;
   installOpen.value = true;
@@ -628,8 +808,11 @@ const onInstall = (payload: { entry: AlertLibraryEntry; file: AlertLibraryFile }
 
 const onInstallOpenChange = (open: boolean) => {
   installOpen.value = open;
-  // Drop the tuned file on close so a later open cannot reuse a stale one.
-  if (!open) installSeed.value = null;
+  // Batch and file are per-open; the selection survives, because rebuilding it is manual work.
+  if (!open) {
+    installSeed.value = null;
+    pendingBatch.value = [];
+  }
 };
 
 const openContribute = () => {

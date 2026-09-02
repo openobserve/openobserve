@@ -92,9 +92,7 @@ const props = withDefaults(
   { actions: () => [], dataTest: "dbm-row-actions" },
 );
 
-const moreTest = computed(
-  () => `${props.dataTest.replace(/-row-actions$/, "")}-row-more-actions`,
-);
+const moreTest = computed(() => `${props.dataTest.replace(/-row-actions$/, "")}-row-more-actions`);
 
 const emit = defineEmits<{ (e: "action", id: string): void }>();
 </script>

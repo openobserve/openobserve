@@ -136,19 +136,26 @@ export async function assertPanelDataRefreshed(page, timeout = 5000) {
 export async function assertPanelDataNotRefreshed(page, waitTime = 2000) {
   testLogger.info('Asserting panel data NOT refreshed');
 
-  let apiCallDetected = false;
+  // Match on the REQUEST, not the response: a search fired during the panel's initial
+  // load can resolve inside this window and would be miscounted as a refresh the
+  // just-performed selection caused.
+  const started = [];
+  const onRequest = (request) => {
+    const url = request.url();
+    if (url.includes('/query') || url.includes('/_search')) {
+      started.push(url);
+      testLogger.debug('Unexpected API call detected', { url });
+    }
+  };
 
-  await page.waitForResponse(
-    response => response.url().includes('/query') || response.url().includes('/_search'),
-    { timeout: waitTime }
-  ).then(() => {
-    apiCallDetected = true;
-    testLogger.debug('Unexpected API call detected');
-  }).catch(() => {
-    // Timeout — no calls made within waitTime, as expected
-  });
+  page.on('request', onRequest);
+  try {
+    await page.waitForTimeout(waitTime);
+  } finally {
+    page.off('request', onRequest);
+  }
 
-  expect(apiCallDetected).toBe(false);
+  expect(started).toEqual([]);
 
   testLogger.info('Panel data NOT refreshed (as expected)');
   return true;

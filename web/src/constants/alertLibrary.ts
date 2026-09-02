@@ -22,7 +22,7 @@
 // gallery. GitHub is the authoring surface; S3 is the serving surface.
 //
 // Two GETs are the entire client surface: `manifest.json` renders the whole
-// gallery, then one alert file per drawer-open or install. There is no
+// gallery, then one alert file per drawer-open or add. There is no
 // ListObjects call — the manifest IS the index.
 //
 // Everything here is derived from ALERT_LIBRARY_S3_BASE. Naming the bucket at a

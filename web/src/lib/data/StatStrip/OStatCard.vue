@@ -143,6 +143,7 @@ const trendClass = computed(() =>
   <component
     :is="clickable ? 'button' : 'div'"
     :type="clickable ? 'button' : undefined"
+    :aria-pressed="clickable ? String(selected) : undefined"
     class="rounded-default bg-surface-base flex min-w-0 flex-col justify-center gap-1 overflow-hidden border px-2.5 py-1 text-left transition-colors max-md:px-1.5"
     :class="[
       selected ? 'border-accent' : 'border-border-default',
@@ -167,10 +168,7 @@ const trendClass = computed(() =>
         <span v-if="label" class="text-text-secondary truncate text-xs font-medium max-md:hidden">{{
           label
         }}</span>
-        <span
-          v-if="trend"
-          class="text-2xs shrink-0 font-semibold max-md:hidden"
-          :class="trendClass"
+        <span v-if="trend" class="text-2xs shrink-0 font-semibold max-md:hidden" :class="trendClass"
           >{{ trendArrow }} {{ trend.label }}</span
         >
         <!-- A QUALIFIER on the value, not a second metric: it says what the

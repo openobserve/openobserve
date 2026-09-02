@@ -155,6 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="loading"
                 selectable
                 :selected-key="statusFilter === 'all' ? null : statusFilter"
+                default-key="all"
                 @select="onStatSelect"
               />
             </div>

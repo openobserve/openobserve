@@ -76,8 +76,7 @@ export function useTableCore<TData>(
     if (!isMobile.value) return props.columns;
     return props.columns.map((c) => {
       if (c.isAction || c.id === "actions") return c;
-      if ((c.size ?? 0) <= MOBILE_MAX_COL_SIZE && (c.minSize ?? 0) <= MOBILE_MAX_COL_SIZE)
-        return c;
+      if ((c.size ?? 0) <= MOBILE_MAX_COL_SIZE && (c.minSize ?? 0) <= MOBILE_MAX_COL_SIZE) return c;
       return {
         ...c,
         size: Math.min(c.size ?? MOBILE_MAX_COL_SIZE, MOBILE_MAX_COL_SIZE),
