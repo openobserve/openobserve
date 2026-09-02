@@ -7593,7 +7593,6 @@
   "alert_library": {
     "header": "アラートライブラリ",
     "subtitle": "厳選された、すぐにインストールできるアラート。すでに取り込んでいるデータと照合されます。",
-    "sectionTab": "ライブラリ",
     "contribute": "GitHub で貢献",
     "searchPlaceholder": "名前、説明、ストリームで検索",
     "searchLabel": "アラートライブラリを検索",
@@ -7927,7 +7926,6 @@
     "destinationsLoadError": "宛先の読み込み中にエラーが発生しました"
   },
   "alert_destinations": {
-    "sectionTab": "宛先",
     "chooseTypeTitle": "タイプを選択",
     "selectDestinationType": "宛先タイプを選択",
     "connectionStepTitle": "接続",

@@ -7593,7 +7593,6 @@
   "alert_library": {
     "header": "Libreria di avvisi",
     "subtitle": "Avvisi selezionati, pronti da installare, confrontati con i dati che già ingerisci.",
-    "sectionTab": "Libreria",
     "contribute": "Contribuisci su GitHub",
     "searchPlaceholder": "Cerca per nome, descrizione o stream",
     "searchLabel": "Cerca nella libreria di avvisi",
@@ -7927,7 +7926,6 @@
     "destinationsLoadError": "Errore durante il caricamento delle destinazioni"
   },
   "alert_destinations": {
-    "sectionTab": "Destinazioni",
     "chooseTypeTitle": "Scegli il tipo",
     "selectDestinationType": "Seleziona tipo di destinazione",
     "connectionStepTitle": "Connessione",

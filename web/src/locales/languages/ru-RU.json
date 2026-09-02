@@ -7593,7 +7593,6 @@
   "alert_library": {
     "header": "Библиотека оповещений",
     "subtitle": "Курируемые, готовые к установке оповещения, сопоставленные с данными, которые вы уже принимаете.",
-    "sectionTab": "Библиотека",
     "contribute": "Внести вклад на GitHub",
     "searchPlaceholder": "Поиск по названию, описанию или потоку",
     "searchLabel": "Поиск в библиотеке оповещений",
@@ -7927,7 +7926,6 @@
     "destinationsLoadError": "Ошибка загрузки получателей"
   },
   "alert_destinations": {
-    "sectionTab": "Получатели",
     "chooseTypeTitle": "Выберите тип",
     "selectDestinationType": "Выберите тип получателя",
     "connectionStepTitle": "Подключение",
