@@ -58,6 +58,7 @@ import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
 import { DatabaseMonitoringPage } from "./dbmPages/databaseMonitoringPage.js";
+import { AIObservabilityPage } from "./aiObservabilityPages/aiObservabilityPage.js";
 import { RumPage } from "./rumPages/rumPage.js";
 import { RumSessionsPage } from "./rumPages/rumSessionsPage.js";
 import { RumPerformancePage } from "./rumPages/rumPerformancePage.js";
@@ -195,6 +196,7 @@ class PageManager {
     this.serviceGraphPage = new ServiceGraphPage(page);
     this.servicesCatalogPage = new ServicesCatalogPage(page);
     this.databaseMonitoringPage = new DatabaseMonitoringPage(page);
+    this.aiObservabilityPage = new AIObservabilityPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);
     this.reportFoldersPage = new ReportFoldersPage(page);

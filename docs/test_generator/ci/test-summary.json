@@ -1,0 +1,37 @@
+[
+  {
+    "title": "should load the AI Observability module shell with secondary navigation",
+    "action": "new",
+    "verifies": "the AI Observability shell mounts its secondary section rail with the Experiments, Playground, and Datasets nav items"
+  },
+  {
+    "title": "should load the Experiments page with header and New Experiment button",
+    "action": "new",
+    "verifies": "the Experiments page renders its header and the New Experiment button"
+  },
+  {
+    "title": "should open the New Experiment create form from the Experiments page",
+    "action": "new",
+    "verifies": "clicking New Experiment navigates to and renders the experiment create form"
+  },
+  {
+    "title": "should load the Datasets page with header and New Dataset button",
+    "action": "new",
+    "verifies": "the Datasets page renders its header and the New Dataset button"
+  },
+  {
+    "title": "should open and dismiss the New Dataset create drawer",
+    "action": "new",
+    "verifies": "the New Dataset button opens the create drawer and the close button dismisses it"
+  },
+  {
+    "title": "should load the Playground page with Run All button",
+    "action": "new",
+    "verifies": "the Playground page renders with its Run All button"
+  },
+  {
+    "title": "should load the Quality page in the online evaluations section",
+    "action": "new",
+    "verifies": "the online evaluations Quality page renders"
+  }
+]
