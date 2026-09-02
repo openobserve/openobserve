@@ -1833,7 +1833,7 @@ mod tests {
         components::BranchCase {
             handle: handle.to_string(),
             label: None,
-            conditions: components::ConditionParams::V1 {
+            conditions: Some(components::ConditionParams::V1 {
                 conditions: crate::meta::alerts::ConditionList::EndCondition(
                     crate::meta::alerts::Condition {
                         column: column.to_string(),
@@ -1842,7 +1842,7 @@ mod tests {
                         ignore_case: false,
                     },
                 ),
-            },
+            }),
         }
     }
 

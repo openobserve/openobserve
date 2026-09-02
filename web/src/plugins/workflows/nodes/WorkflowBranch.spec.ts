@@ -514,5 +514,13 @@ describe("WorkflowBranch", () => {
       expect(payload.cases[0].handle).toBe("case-0");
       expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBe("true");
     });
+
+    it("emits a rule-less arm as plain null — the {version, conditions: null} envelope 422s serde", async () => {
+      workflowObj.currentSelectedNodeData = { id: "b1", data: { node_type: "branch" } } as any;
+      const wrapper = createWrapper();
+      queueBuilders(null);
+      const payload = await (wrapper.vm as any).submit();
+      expect(payload.cases[0].conditions).toBeNull();
+    });
   });
 });

@@ -2479,12 +2479,14 @@ async fn process_branch_node(
         let mut matched_handle: Option<&str> = None;
         for case in &branch_params.cases {
             let passes = match &case.conditions {
-                config::meta::pipeline::components::ConditionParams::V1 { conditions } => {
+                Some(config::meta::pipeline::components::ConditionParams::V1 { conditions }) => {
                     conditions.evaluate(record.as_object().unwrap()).await
                 }
-                config::meta::pipeline::components::ConditionParams::V2 { conditions } => {
+                Some(config::meta::pipeline::components::ConditionParams::V2 { conditions }) => {
                     conditions.evaluate(record.as_object().unwrap()).await
                 }
+                // a rule-less draft arm matches nothing, or it would starve every arm below it
+                None => false,
             };
             if passes {
                 matched_handle = Some(case.handle.as_str());
@@ -4169,7 +4171,7 @@ mod tests {
         config::meta::pipeline::components::BranchCase {
             handle: handle.to_string(),
             label: None,
-            conditions: config::meta::pipeline::components::ConditionParams::V1 {
+            conditions: Some(config::meta::pipeline::components::ConditionParams::V1 {
                 conditions: config::meta::alerts::ConditionList::EndCondition(
                     config::meta::alerts::Condition {
                         column: column.to_string(),
@@ -4178,7 +4180,7 @@ mod tests {
                         ignore_case: false,
                     },
                 ),
-            },
+            }),
         }
     }
 
@@ -4275,6 +4277,74 @@ mod tests {
         assert!(
             c2_rx.try_recv().is_err(),
             "later matching case must not also receive it"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_branch_rule_less_arm_matches_nothing_and_does_not_starve_later_arms() {
+        let params = config::meta::pipeline::components::BranchParams {
+            cases: vec![
+                config::meta::pipeline::components::BranchCase {
+                    handle: "case_0".to_string(),
+                    label: None,
+                    conditions: None,
+                },
+                eq_case("case_1", "severity", "high"),
+            ],
+            else_handle: None,
+        };
+        let node = branch_exec_node(
+            "b1",
+            params.clone(),
+            vec!["c0".to_string(), "c1".to_string()],
+        );
+
+        let (input_tx, input_rx) = tokio::sync::mpsc::channel(1);
+        let (c0_tx, mut c0_rx) = tokio::sync::mpsc::channel(1);
+        let (c1_tx, mut c1_rx) = tokio::sync::mpsc::channel(1);
+        let (error_tx, _error_rx) = tokio::sync::mpsc::channel(1);
+
+        input_tx
+            .send(PipelineItem {
+                idx: 0,
+                record: json::json!({"severity": "high"}),
+                flattened: true,
+            })
+            .await
+            .unwrap();
+        drop(input_tx);
+
+        let handle_routes = vec![
+            ("case_0".to_string(), vec![c0_tx]),
+            ("case_1".to_string(), vec![c1_tx]),
+        ];
+
+        let mut busy = Duration::ZERO;
+        let outcome = process_branch_node(
+            &params,
+            branch_metadata(),
+            &node,
+            ProcessChannels {
+                receiver: input_rx,
+                child_senders: vec![],
+                result_sender: None,
+                error_sender: error_tx,
+                inputs_sender: None,
+                outputs_sender: None,
+            },
+            handle_routes,
+            &mut busy,
+        )
+        .await;
+
+        assert_eq!(outcome.routed, 1);
+        assert!(
+            c0_rx.try_recv().is_err(),
+            "a rule-less draft arm must not swallow records"
+        );
+        assert!(
+            c1_rx.try_recv().is_ok(),
+            "the configured arm below must still receive the record"
         );
     }
 
@@ -4877,7 +4947,7 @@ mod tests {
         config::meta::pipeline::components::BranchCase {
             handle: handle.to_string(),
             label: None,
-            conditions: config::meta::pipeline::components::ConditionParams::V1 {
+            conditions: Some(config::meta::pipeline::components::ConditionParams::V1 {
                 conditions: config::meta::alerts::ConditionList::EndCondition(
                     config::meta::alerts::Condition {
                         column: column.to_string(),
@@ -4886,7 +4956,7 @@ mod tests {
                         ignore_case: false,
                     },
                 ),
-            },
+            }),
         }
     }
 

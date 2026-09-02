@@ -244,7 +244,7 @@ const submit = async () => {
     } else {
       entry.conditions = row.initialConditions
         ? { version: 2, conditions: row.initialConditions }
-        : { version: 2, conditions: null };
+        : null;
     }
     out.push(entry);
   }

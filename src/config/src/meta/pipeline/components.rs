@@ -490,7 +490,13 @@ pub struct BranchCase {
     pub handle: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    pub conditions: ConditionParams,
+    // None = a draft arm with no rule yet; keeping it required made drafts unsaveable
+    #[serde(
+        default,
+        deserialize_with = "branch_case_conditions",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub conditions: Option<ConditionParams>,
 }
 
 impl MemorySize for BranchCase {
@@ -631,6 +637,23 @@ impl MemorySize for NodeStyle {
     fn mem_size(&self) -> usize {
         std::mem::size_of::<NodeStyle>() + self.background_color.mem_size()
     }
+}
+
+// Old drawers emitted a rule-less arm as `{version, conditions: null}`; map it to None too.
+fn branch_case_conditions<'de, D>(deserializer: D) -> Result<Option<ConditionParams>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    use serde_json::Value;
+
+    let value = Value::deserialize(deserializer)?;
+    if value.is_null() || value.get("conditions").is_some_and(Value::is_null) {
+        return Ok(None);
+    }
+    serde_json::from_value(value)
+        .map(Some)
+        .map_err(D::Error::custom)
 }
 
 #[cfg(test)]
@@ -1301,9 +1324,9 @@ mod tests {
             cases: vec![BranchCase {
                 handle: "case_0".to_string(),
                 label: None,
-                conditions: ConditionParams::V1 {
+                conditions: Some(ConditionParams::V1 {
                     conditions: ConditionList::LegacyConditions(vec![]),
-                },
+                }),
             }],
             else_handle: Some("else".to_string()),
         });
@@ -1335,6 +1358,42 @@ mod tests {
         assert_eq!(params.cases[0].handle, "case_0");
         assert_eq!(params.cases[0].label.as_deref(), Some("high severity"));
         assert_eq!(params.else_handle.as_deref(), Some("else"));
+    }
+
+    #[test]
+    fn branch_case_without_rule_deserializes_so_drafts_can_save() {
+        // The canvas mints new arms as `conditions: null`; a draft must round-trip them.
+        for case_json in [
+            json::json!({ "handle": "case-0", "conditions": null }),
+            json::json!({ "handle": "case-0" }),
+            json::json!({ "handle": "case-0", "conditions": { "version": 2, "conditions": null } }),
+        ] {
+            let data = json::json!({
+                "node_type": "branch",
+                "cases": [case_json],
+                "else_handle": "else",
+            });
+            let node: NodeData = json::from_value(data.clone())
+                .unwrap_or_else(|e| panic!("must accept a rule-less arm: {e} — {data}"));
+            let NodeData::Branch(params) = node else {
+                panic!("must deserialize as NodeData::Branch");
+            };
+            assert!(params.cases[0].conditions.is_none(), "no rule yet: {data}");
+        }
+    }
+
+    #[test]
+    fn branch_case_without_rule_serializes_without_a_conditions_key() {
+        let params = BranchParams {
+            cases: vec![BranchCase {
+                handle: "case-0".to_string(),
+                label: None,
+                conditions: None,
+            }],
+            else_handle: Some("else".to_string()),
+        };
+        let value = json::to_value(NodeData::Branch(params)).unwrap();
+        assert!(value["cases"][0].get("conditions").is_none());
     }
 
     #[test]
