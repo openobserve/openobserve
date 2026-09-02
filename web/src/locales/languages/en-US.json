@@ -11798,6 +11798,7 @@
       "variantSettings": "Model Settings",
       "messageToolPlaceholder": "Select Tool",
       "variablesCount": "Variables · {count}",
+      "newValueTag": "New",
       "variableUsed": "Referenced by this variant",
       "variableUnused": "Not referenced by this variant — renders empty here",
       "addVariable": "Add Variable",

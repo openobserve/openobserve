@@ -169,6 +169,7 @@
       </OBanner>
 
       <PlaygroundVariableBar
+        ref="variableBarRef"
         class="shrink-0"
         :var-names="varNames"
         :vars="draft.vars"
@@ -708,7 +709,8 @@ function onKeydown(event: KeyboardEvent) {
 
 const hasReference = computed(() => benchHasReference(draft.expectedSingle));
 
-const expectedBarRef = ref<{ focus: () => void } | null>(null);
+const expectedBarRef = ref<{ focus: () => void; flash: () => void } | null>(null);
+const variableBarRef = ref<{ flash: () => void } | null>(null);
 
 /** A selected scorer reads `{{expected_output}}` and the bench has none, so the
  *  field has to be on screen for the Score panel's notice to point at. */
@@ -885,6 +887,13 @@ function applySample(sample: PlaygroundSample, item: LlmDatasetItem, notify = tr
         token: "{{input}}",
       }),
     });
+    // The toast fades; the flash on the two fields the values actually landed
+    // in — Variables and Expected Output — is what still says so a moment
+    // later, without the user having to already know to look there. flash(),
+    // not focus() — a sample can land while the cursor is anywhere else on
+    // the page, and it must stay there.
+    variableBarRef.value?.flash();
+    expectedBarRef.value?.flash();
   }
 }
 
