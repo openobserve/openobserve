@@ -12081,8 +12081,6 @@
       "remoteCta": "Configure Endpoint"
     },
     "provider": {
-      "sectionStep1": "01",
-      "sectionStep2": "02",
       "backTo": "Back to Providers",
       "createTitle": "Create LLM Provider",
       "editTitle": "Edit LLM Provider",
