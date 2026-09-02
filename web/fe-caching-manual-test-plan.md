@@ -1545,6 +1545,47 @@ was `/status`.
 | C7 | Delete a monitor → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
 | C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
 
+#### Measured results — 2026-09-01, `feat/fe-caching`, local dev
+
+This section was **Blocked** in the first campaign (Synthetics disabled on that build). It is
+now enabled and fully exercised. Every number below is a measured request count, taken with an
+in-page XHR/fetch recorder installed **once** — re-installing it stacks wrappers and
+double-counts — and cross-checked against the CDP network panel.
+
+⚠️ Read this together with **Issue 24**: before that fix the table rendered its onboarding
+empty state on every load, so nothing in this section could be exercised at all.
+
+| # | Expect | Measured | Verdict |
+| --- | --- | --- | --- |
+| C1 | Skeleton, then rows. **1** request | 10 rows render. **2** list requests — `GET /synthetics` *and* `GET /synthetics?folder=default` | ⚠️ **Issue 20** (2nd instance) |
+| C2 | Instant rows, no skeleton, **0** requests | **0** list requests against provably fresh cache (age 0.5 s); rows instant. Plus 1 uncached `/synthetics/locations` — see note | ✅ |
+| C3 | Instant rows, 1 background request, never blanks | **Never blanks** — 45 samples over 4.5 s, min = max = 10 rows, 0 blank frames. 2 list requests (Issue 20) | ✅ / ⚠️ count |
+| C4 | **1** request, rows stay, spinner on the button | Exactly **1** (`?folder=default`). Rows constant at 10, **0 visible skeletons** | ✅ |
+| C5 | Nothing happens | Nothing. No keyboard listener in the component, and **no global `r` handler anywhere in `src/`** | ✅ |
+| C6 | Already on the list, no manual refresh | Renamed a check → `PUT … 200` → landed on the list showing the **new** name, old name gone. `invalidates: [syntheticsKeys.all(org)]` refetched **both** monitor keys | ✅ |
+| C7 | Gone immediately and still gone on return | Gone on screen; the away-and-back round trip caught **0 / 40 frames** showing the deleted check; final list correct | ✅ (latent caveat — see Issue 20) |
+| C8 | Term and filtered rows preserved | Term `cart` preserved, the 1 filtered row preserved identically, **1** request | ✅ |
+
+**C2 note — the `/locations` request is not a branch defect.** `loadLocations()` calls
+`syntheticsService.getLocations()` directly on every mount instead of going through a query, so
+it costs one request per visit. That code is **byte-identical on `main`** (`loadLocations`,
+same direct call), so it is pre-existing rather than a regression — an opportunity this PR did
+not take, not something it broke. Not filed as an issue.
+
+**Methodology note — a stale-cache reading that looked like a bug.** An early C2 run showed 3
+requests and looked like a cache miss. It was not: the cached entries were 57 s old, genuinely
+past the 30 s window, because my own snapshotting between steps outlasted the freshness window.
+Re-run with the entries force-refreshed to an age of 0.5 s immediately before the round trip,
+the list cost **0** requests. **A C2 measurement whose round trip is not provably inside
+`staleTime` proves nothing** — record the cache *age*, not just the elapsed timer.
+
+**Verification notes.** C6 was confirmed by **response status** (`PUT … 200`), not merely by
+observing that a request fired — an earlier round of this campaign wrongly reported a function
+as created when its `POST` had failed. C7 was confirmed against the query-cache contents on
+both keys, not just against the screen. Row-action buttons were hit-tested with
+`elementFromPoint` before clicking, because the §7 SLO round produced a false pass by
+"clicking" a button that was actually clipped and unclickable.
+
 **Smoke checks** — did the data-fetching rewrite break anything ordinary:
 
 | # | Do this | Expect |
@@ -1568,6 +1609,51 @@ was `/status`.
 | Delete a monitor → navigate away → return | — | Gone and stays gone |
 | Folder filter | — | Each folder caches separately |
 
+#### Smoke + own checks — measured 2026-09-01
+
+Same method as the C-checks above: request counts from an in-page recorder cross-checked
+against CDP, writes confirmed by **response status**, and every control hit-tested before
+clicking. Pagination and the folder test needed data that did not exist, so checks were seeded
+first: **45 checks `cachetest_pg_001`–`cachetest_pg_045`** (45/45 created, 0 failed, giving 55 in
+`default` = 3 pages at the default page size), plus a second folder `cachetest_folder2` with 2
+checks. An earlier 7-check batch was used for a page-size-10 run and then removed.
+
+| # | Expect | Measured | Verdict |
+| --- | --- | --- | --- |
+| S1 | Re-orders, no blank, 0 requests | Second click produced the **exact reverse** order. 20 samples, never blank. **0 requests** — sorted in the browser | ✅ |
+| S2 | Rows correct per page, no blank flash | **Re-run on 55 checks / 3 pages** (20 + 20 + 15). Boundaries contiguous (`pg_010`→`pg_011`, `pg_030`→`pg_031`), **55 rows across the pages, 55 unique, 0 duplicates, none dropped**. next→prev and first/last return trips reproduced each page **byte-identically**. 16 samples per hop, **never blank** (min rows = full page every time). **0 requests** on all 6 hops | ✅ |
+| S3 | All selected affected, count updates, selection clears | Selected 3 of 7, bulk-deleted: cache went **15 → 12**, none of the three remained, bulk bar gone. Exactly **one** refetch | ✅ |
+| S4 | Proper empty state | **0 rows**, "No checks found.", **0 visible spinners**, no stale rows, 0 requests | ✅ |
+| S5 | Full list returns | Full list restored, 0 requests | ✅ |
+| S6 | Export/download if offered | **N/A — this page has no export control**, confirmed in both the DOM and `MonitorTable.vue` / `SyntheticMonitoring.vue` | — |
+
+⚠️ **A "double-fire" that was not one.** The bulk delete first appeared to issue *two identical*
+`/synthetics?folder=default` requests — the exact signature S1 calls "the old double-fire bug".
+It is not. The recorder logged URLs **without methods**, and `bulkDelete` is
+`http().delete('/api/{org}/synthetics?folder=default')` — the *same URL as the list GET*. With
+methods captured the pair reads `DELETE … 200` + `GET … 200`: exactly **one** refetch, which is
+correct. A TanStack cache subscription confirmed a single `fetch` action. **Never count list
+requests by URL alone on this page.**
+
+| Own check | Measured | Verdict |
+| --- | --- | --- |
+| Create a **Browser Test** | Journey wizard (Navigate step + locator + location) → `POST … 200` → landed on the list with the check **already present**, typed "Browser". No manual refresh | ✅ |
+| Create a **Protocol Check** | `POST … 200` → list showed it immediately, no manual refresh | ✅ |
+| Destination dropdown from cache | Opening the create form a second time issued **0** `/alerts/destinations` requests — served from the entry the first open populated | ✅ |
+| Edit a monitor, save, return | Covered by **C6**: `PUT … 200`, new name on the list immediately, both monitor keys refetched by `invalidates: [syntheticsKeys.all(org)]` | ✅ |
+| Open detail, go back, reopen | **1 `GET /synthetics/{id}` per open, 3 opens → 3 requests (all 200)** — matches the plan's stated expectation. Confirmed in code: `monitorDetailQuery` is declared in `synthetics.queries.ts` and **read nowhere**; every detail surface calls `syntheticsService.get()` directly | ✅ as documented |
+| Monitor results / runs, paginate | ⛔ **NOT TESTABLE** — every check reports "No runs in this time range" (nothing executes them on this instance), so there are no runs to paginate. The results page also **exposes no Refresh control**, so "refresh forces one request" does not apply as written | ⛔ |
+| Delete → away → return | Covered by **C7**: gone immediately, **0 / 40 frames** showed it after the round trip | ✅ |
+| Folder filter caches separately | Created `cachetest_folder2` + 2 checks. Switching folders created a **distinct key per folder** (`…"monitors","default"` n=8 vs `…"monitors","<folderId>"` n=2). With both entries fresh, switching back cost **0 requests** | ✅ |
+
+**A create failure that was also not a bug.** Four `POST … 400 "name: must not be empty"` were
+reproduced with the name field visibly filled, and the sent payload really did carry
+`"name":""` while `"target"` was correct. That was **my harness**, not the app: the fills
+targeted element uids captured *before* a re-render, so they wrote to detached nodes and the
+component model never saw them. A clean run — fresh page, type into current references — sent
+the correct name and succeeded. **Recorded because the failure was convincing and reproducible
+and still wrong**: on this form, re-snapshot for fresh uids after any click that re-renders.
+
 ### 11.1 Synthetics agent tokens
 
 **Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
@@ -1580,6 +1666,41 @@ was `/status`.
 | `r` shortcut | Same as the button |
 | Create / rotate / enable / disable a token | List updates without a manual refresh |
 | **Tokens are never written to disk** | DevTools → Application → Local Storage: **no** `o2q-` entry contains an agent token. IndexedDB likewise |
+
+
+#### Measured results — 2026-09-01
+
+Previously the last unrun part of §11. All four rows pass.
+
+| Check | Measured | Verdict |
+| --- | --- | --- |
+| **Refresh button works** | 3 consecutive clicks, each taken while the entry was **provably fresh** (`isStale() === false`, ages 25.9 s / 2.2 s / 2.2 s against a 30 s `staleTime`) — each fired **exactly one** `GET /synthetics/agent-tokens`. This is precisely the "used to do nothing while the entry was fresh" regression, and it is fixed | ✅ |
+| **`r` shortcut** | Real key event with focus on `body` → **exactly one** `GET /synthetics/agent-tokens`, same as the button | ✅ |
+| **Create / rotate / enable / disable** | All four update the list with **no manual refresh**, each write followed by exactly one invalidation refetch (see table below) | ✅ |
+| **Tokens are never written to disk** | **0 leaks.** Scanned every store for the 3 live token values *and* the bare `o2syn_` prefix: 34 localStorage keys (20 of them `o2q-`) → 0 hits; sessionStorage empty; IndexedDB `PanelCache` (416 entries), `o2Cache` (21), `o2ChatDB` (6) → 0 hits. Corroborated structurally: the agent-tokens entry exists **in memory** (3 rows) but has **no `o2q-` key** — the only persisted synthetics key is the harmless folder list | ✅ |
+
+Write paths, each measured end to end:
+
+| Action | Requests | List updated without manual refresh |
+| --- | --- | --- |
+| Create | `POST /synthetics/agent-tokens` + **1** `GET` | ✅ rows 1 → 2, new token present |
+| Disable | `PATCH /synthetics/agent-tokens/{name}` + **1** `GET` | ✅ Enabled → Disabled |
+| Enable | `PATCH /synthetics/agent-tokens/{name}` + **1** `GET` | ✅ Disabled → Enabled |
+| Rotate | `POST /synthetics/agent-tokens/rotate` + **1** `GET` | ✅ rows 2 → 3 |
+
+**Rotate semantics — the extra row is correct, not a defect.** "Rotate default" **mints a new
+token** (`agent-token-<timestamp>`) which takes over the *Default* badge, and leaves the
+previous one in place rather than overwriting it. So the row count rises by one and the old
+token's own value is unchanged. An initial reading of "token value did not change" was the
+check looking at the wrong row.
+
+**Handling note.** This page renders live token values in plaintext in the table, so every
+value here is reported as a hash or as `o2syn_<redacted>` — no token, current or rotated, is
+written into these documents.
+
+**Test-data left behind:** one token `cachetest-agent-token`, plus `agent-token-<timestamp>`
+created by the rotate test (now the Default). The UI offers no delete for agent tokens — only
+copy and enable/disable — so neither can be removed from this screen.
 
 ---
 
@@ -1604,6 +1725,60 @@ was `/status`.
 | C7 | Delete a workflow → go to another module → come **straight** back | Gone immediately **and still gone on return** ← most likely regression |
 | C8 | Type in the search box, then press Refresh | Search term **and** filtered rows preserved |
 
+#### Measured results — 2026-09-01, `feat/fe-caching`, local dev
+
+**All eight cache checks pass. No issues found on this page.** Counts come from an in-page
+XHR recorder that captures the **method** as well as the URL (see the §11 warning about
+method-blind counting) and were cross-checked against CDP on the cold load.
+
+The org had **0 workflows**, so 15 were seeded first — see the recipe at the end.
+
+| # | Expect | Measured | Verdict |
+| --- | --- | --- | --- |
+| C1 | Skeleton then rows, **1** request | **Exactly 1** `GET /api/default/workflows` (CDP-verified: the only app request besides `config`, `announcements`, `organizations`). 15 rows rendered | ✅ |
+| C2 | Instant rows, no skeleton, **0** requests | **0 requests**, with the entry provably fresh (**age 0.4 s**). 25 samples, `everBlank: false`, min rows 15 | ✅ |
+| C3 | Instant rows, then **1** background request, never blanks | **Exactly 1** background request. 45 samples: **min = max = 15 rows**, `everBlank: false` — first sample already showed all 15 | ✅ |
+| C4 | **1** request, rows stay, spinner on the button | **Exactly 1**. Rows constant at 15, **0 visible skeletons** | ✅ |
+| C5 | Nothing happens | **0 requests.** Confirmed in code too — `WorkflowsList.vue` registers no key listener, and there is no global `r` handler in `src/` | ✅ |
+| C6 | Already on the list, no manual refresh | Edited and saved → `PUT /workflows/{id}?draft=true → 200` + **1** `GET`. Landed on the list; the row's **`updated_at` advanced** (…264360 → …553726) and the new time was on screen with no manual refresh | ✅ |
+| C7 | Gone immediately and still gone on return | `DELETE → 200` + **1** `GET`. Gone from screen *and* from the cache immediately, rows 15 → 14. On return: **0 / 35 frames** showed it, **0 requests**, 14 rows | ✅ |
+| C8 | Term and filtered rows preserved | Term `wf_007` preserved, the single filtered row preserved identically, **1** request | ✅ |
+
+**Why C7 is solid here.** Unlike the synthetics delete (which splices one key — see Issue 20),
+`WorkflowsList.vue` does both: an optimistic splice across the **whole scope** and then a forced
+reload.
+
+```ts
+queryClient.setQueriesData({ queryKey: workflowKeys.all(orgId.value) }, (list: any) =>
+  Array.isArray(list) ? list.filter((w: any) => w.id !== row.id) : list);
+await getWorkflows(true);
+```
+
+Because the splice matches the scope rather than a single folder-scoped key, no stale sibling
+entry can survive it.
+
+**Not a bug — the workflow Destination picker showing "No options found".** With 32 alert and 9
+pipeline destinations on the org, the picker offered none. That is correct: a workflow
+destination node can only execute **custom webhooks**, and the picker filters on
+`isCustomDestination` (`destination_type === "custom"`, `utils/destinationType.ts`). Every
+seeded pipeline destination is a prebuilt provider (Datadog, Elastic, Kafka, Loki, New Relic)
+and carries no `destination_type` at all, so none qualify. The empty picker is the filter
+working, not a cache miss.
+
+**Seeding recipe (workflows).** The create body is `{ workflow: <serialized graph>, trigger_type }`,
+and the server is strict in two ways worth recording:
+
+- `trigger_type` must be one of `AlertFired` · `IncidentEvent` · `Webhook` — the API names, not
+  the UI labels (`alert`/`manual`/`scheduled` are all rejected with 422).
+- The `workflow` object must **contain** `id`, `org_id`, `created_at`, `updated_at`,
+  `created_by` — *deleting* them is a 422 (`missing field \`id\``). The UI sends them present
+  but empty (`id: ""`, `created_at: 0`), so clone a saved workflow and blank those fields rather
+  than stripping them.
+
+Fastest path: build one workflow in the UI, **Save as Draft** (a draft needs no configured
+destination node, and drafts do appear in the main list), capture its POST body, then clone it
+via `workflows.createWorkflow` with `draft: true`. 14/14 clones succeeded this way.
+
 **Smoke checks** — did the data-fetching rewrite break anything ordinary:
 
 | # | Do this | Expect |
@@ -1622,6 +1797,57 @@ was `/status`.
 | Create a workflow → back to list | Present without manual refresh |
 | Delete a workflow → navigate away → return | Gone and stays gone |
 | Workflow runs → paginate | Table keeps rows between pages |
+
+
+#### Smoke + own checks — measured 2026-09-01
+
+Seeded to **39 workflows** first so pagination had two pages (page size 20).
+
+| # | Expect | Measured | Verdict |
+| --- | --- | --- | --- |
+| S1 | Re-orders, no blank, 0 requests | Sorting by **Name** re-ordered the page (first row `wf_001` → `wf_040`). 18 samples, never blank, min rows 20. **0 requests** — sorted in the browser | ✅ |
+| S2 | Rows correct per page, no blank flash | Page 1 = 20 (`wf_001`…`wf_021`), page 2 = 19 (`wf_022`…`wf_040`). **39 across the pages, 39 unique, 0 duplicates.** prev / first / last jumps each reproduced their page **byte-identically**. No blank flash on any of 4 hops (min rows = full page). **0 requests** every hop | ✅ |
+| S3 | Bulk action if the page has one | **N/A — this page has no bulk action.** No row checkboxes and no select-all in the DOM | — |
+| S4 | Proper empty state | **0 rows**, "No workflows found — No workflows match your current filters or search.", **0 visible spinners**, no stale rows, footer "Showing 0 - 0 of 0". 0 requests | ✅ |
+| S5 | Full list returns | 20 rows restored, "Showing 1 - 20 of 39", 0 requests | ✅ |
+| S6 | Export/download if offered | **N/A — no export control**, confirmed in the DOM | — |
+
+⚠️ **S1's "reverse order" check does not apply across pages.** With 39 rows over 2 pages, page 1
+ascending and page 1 descending are different *sets*, so an exact-reverse assertion fails
+legitimately. Judge S1 on "order changed + never blank + 0 requests", not on set reversal.
+
+| Own check | Measured | Verdict |
+| --- | --- | --- |
+| Create a workflow → back to list | Built one in the UI (trigger + name → Save as Draft): `POST /workflows?draft=true → 200` + **1** `GET`. Landed on the list, count **39 → 40**, and the row (`cachetest_wf_ui_created`, row 40) was present with **no manual refresh** | ✅ |
+| Delete → navigate away → return | Covered by **C7**: `DELETE → 200` + 1 `GET`, gone from screen *and* cache immediately, **0 / 35 frames** showed it on return, **0 requests** | ✅ |
+| Workflow runs → paginate | ⛔ **NOT TESTABLE** — see below | ⛔ |
+
+**Why the runs check could not be run.** Two independent blockers:
+
+1. **Drafts have no run history by design.** `WorkflowsList.vue` routes a draft row to the editor
+   instead of the Runs view (`openRuns`: `if (row.is_draft) { editWorkflow(row); return; }`), so
+   the seeded drafts can never reach it.
+2. **A published workflow still has zero runs.** One workflow *was* published to get past (1) —
+   `POST /workflows/promote/{id}?trigger_type=AlertFired → 201` — and its Runs view loads
+   correctly (`GET /workflows/{id}/history?start_time=…&end_time=…`) but reports **"No data
+   available · 0 Runs · Showing 0 - 0 of 0"**. Runs only exist once an alert actually fires and
+   executes the workflow, which nothing on this instance does.
+
+Not a defect — no data, same category as the synthetics results table.
+
+**Publishing needs a *custom webhook* destination — worth recording.** A workflow cannot be
+published while its Destination node is unconfigured, and the picker only offers destinations
+where `destination_type_name === "custom"`. Creating one via the API needs the right field name:
+`destination_type_name` (**not** `destination_type`, which the server silently drops) and
+`?module=pipeline` as a **query parameter** (a `module` key in the body is ignored and the
+destination lands in the *alert* module). With that, the picker offered it immediately.
+
+**Run history is not on the query layer at all — and that is not a branch regression.**
+`loadRunsHistory` calls `workflowService.getWorkflowHistory` directly into a plain reactive
+store (`workflowObj.runsHistory`) with its own `fetchedAt` stamp. Its request carries raw
+microsecond `start_time`/`end_time`, but because there is **no cache key**, this is *not* another
+instance of the raw-timestamp key issue. The function is **byte-identical on `main`**, so it is
+pre-existing rather than something this PR broke. Not filed.
 
 ---
 
@@ -1714,6 +1940,77 @@ Run **C1–C8** (`r` shortcut applies).
 | Invite a user → the pending-invites list | The invite appears without a manual refresh. Note: `pendingInvitesQuery` is declared but unread (§24 item 8), so this list is **not** cache-backed — a request per visit is expected |
 | Change a user's role → navigate away → return | The new role persists |
 
+
+#### Measured results — 2026-09-01, `feat/fe-caching`, local dev
+
+**No branch-caused defect on this page.** The org had 1 user, so 12 were seeded first
+(`cachetest_*@example.com`, created with a generated password that is deliberately not recorded
+here).
+
+⚠️ **Two of the three role lists 500 on this build** — `GET /users/roles/all` and `GET /roles`
+both return **500 "OpenFGA store not initialized yet"** (the long-standing B2 blocker). An
+errored query is *always* stale, so those two re-request on every visit and each retries twice
+(3 attempts). **Judge this page on the `users` query**; the role-request counts below are that
+backend fault surfacing, not a caching defect.
+
+| # | Expect | Measured | Verdict |
+| --- | --- | --- | --- |
+| C1 | Skeleton then rows, **4** (users + 3 role lists) | **4 distinct reads exactly as specified** — `users` 200, `users/roles` 200, `users/roles/all` **500**, `roles` **500**. The two failures each retry twice (8 HTTP calls total), which is the client's documented 5xx policy | ✅ (reads) / ⚠️ backend |
+| C2 | Instant rows, no skeleton, **0** requests | **users: 0 requests**, with the entry provably fresh (age 3.6 s). 13 rows, 25 samples, `everBlank: false`. (4 role requests — the errored pair) | ✅ |
+| C3 | Instant rows, then **1** background request, never blanks | **users: exactly 1.** 45 samples: **min = max = 13**, `everBlank: false` — first sample already had all 13 | ✅ |
+| C4 | **1** request, rows stay, spinner on the button | **users: exactly 1.** Rows constant at 13, **0 visible skeletons** | ✅ |
+| C5 | Same as C4 — 1 request, rows stay | Real keypress on `body` → **exactly 1** `GET /users` (200), rows stay 13 | ✅ |
+| C6 | Already on the list, no manual refresh | `POST /users → 200` + **1** `GET /users`. Dialog closed, rows **13 → 14**, footer "Showing 1 - 14 of 14", new user on the list with no manual refresh | ✅ |
+| C7 | Gone immediately and still gone on return | `DELETE /users/{email} → 200` + **1** `GET`. Gone from screen *and* cache, rows 14 → 13. On return: **0 / 35 frames** showed it, **0 user requests**, 13 rows | ✅ |
+| C8 | Term and filtered rows preserved | Term `charlie` preserved, the single filtered row preserved identically, **users: 1** request | ✅ |
+
+**The C6 "422" is part of the flow, not a failure.** Saving email + role first issues
+`POST /users/{email}` which returns **422 "User not found"**; the dialog then *expands* to reveal
+Password / First Name / Last Name, and the second Save issues `POST /users → 200`. A run that
+stops at the 422 will look like a broken create when it is the intended existing-user probe.
+
+**Pre-existing, not filed — the footer ignores the active filter.** Searching `charlie` renders
+**1 row** while the footer still reads **"Showing 1 - 13 of 13"** (it should read 1 of 1;
+Workflows §12 correctly shows "Showing 0 - 0 of 0" when filtered to none). Reproduced from a
+clean reload using real typing only. **Not caused by this branch**: `User.vue`'s filter wiring
+(`:data="displayedRows"`, `v-model:global-filter`, `filter-mode="client"`) is unchanged between
+`main` and the branch, and `OTable.vue` / `OTablePagination.vue` — which render the footer — are
+**untouched by this PR** (`git diff --stat main...HEAD` is empty for both).
+
+**Harness note.** Writing the search box via the native value setter did **not** reach the
+component model and left the list filtered with an empty box — a stale-model artifact, not app
+behaviour. The page's own clear (×) button restored all 13 rows correctly. Use real typing (or
+the clear button) on this page.
+
+
+#### Smoke + own checks — measured 2026-09-01
+
+Seeded to **28 users** first so pagination had two pages (page size 20).
+
+| # | Expect | Measured | Verdict |
+| --- | --- | --- | --- |
+| S1 | Re-orders, no blank, 0 requests | Sorting by **Email** re-ordered (first row `…_zulu` → `…_alpha` asc → `root@` desc). 18 samples, never blank, min rows 20. **0 requests** | ✅ |
+| S2 | Rows correct per page, no blank flash | Page 1 = 20, page 2 = 8 ("Showing 21 - 28 of 28"). **28 across the pages, 28 unique, 0 duplicates.** prev / first / last jumps each reproduced their page **byte-identically**. No blank flash on any of 4 hops. **0 requests** every hop | ✅ |
+| S3 | All selected affected, count updates, selection clears | Selected 3 rows → `DELETE /users/bulk → 200` + **1** `GET /users`. All 3 gone from the cache, count **28 → 25**, footer "Showing 1 - 20 of 25", **selection cleared**, bulk button gone | ✅ |
+| S4 | Proper empty state | **0 rows**, "No users found", **0 visible spinners**, no stale rows | ✅ |
+| S5 | Full list returns | Full list restored via the page's clear (×) button, box empty, **0 requests** | ✅ |
+| S6 | Export/download if offered | **N/A — no export control**, confirmed in the DOM | — |
+
+**S4 corroborates the pre-existing footer bug.** With 0 rows rendered the footer still read
+**"Showing 1 - 20 of 28"**. Same defect recorded in the C-check block above, and on the same
+evidence it is **not caused by this branch**.
+
+| Own check | Measured | Verdict |
+| --- | --- | --- |
+| Role dropdown populated from cache | Opening **New user** *and* its Role dropdown issued **0 requests** — options came entirely from the cached `assignableRoles` entry | ✅ |
+| Invite a user → pending-invites list | ⛔ **NOT TESTABLE — cloud-only.** `getInvitedMembers()` runs only under `if (config.isCloud == "true")` (`User.vue:852`); this build reports `isCloud: "false"`, and **0** `/invites` requests were observed all session. The plan's note is confirmed exactly: `pendingInvitesQuery` is declared in `users.queries.ts` and **read nowhere** | ⛔ |
+| Change a user's role → away → return | ⛔ **NOT TESTABLE — only one role exists.** `assignableRoles` returns a single entry (`Admin`), and custom roles are unavailable because `GET /roles` **500s** (OpenFGA). There is no second role to switch to | ⛔ |
+
+**The role-dropdown check can only be half-verified.** Its wording — "the same cached role list
+the Roles page uses" — cannot be confirmed on this build, because the Roles page's own endpoint
+(`GET /roles`) returns **500**. What *is* verified is the substantive half: the dropdown is
+cache-populated and costs **zero** extra requests.
+
 ### 14.2 Roles
 
 **UI path:** IAM → **Roles**
@@ -1755,6 +2052,52 @@ Run **C1–C8** (`r` shortcut applies).
 | Resource list | | The permission resource list is persisted (it is enum-like) — it survives a reload with no request |
 | Create / edit / delete a role | | List updates without manual refresh; deleted role stays gone |
 | Bulk-delete roles | | All selected gone; still gone after navigating away |
+
+
+#### Measured results — 2026-09-01: ⛔ BLOCKED (backend), one behaviour still verified
+
+**This page cannot be tested on this build.** Every roles endpoint fails, reads *and* writes:
+
+| Endpoint | Result |
+| --- | --- |
+| `GET /api/default/roles` | **500** — "OpenFGA store not initialized yet" |
+| `POST /api/default/roles` (create) | **500** — "Something went wrong" |
+| `GET /api/default/users/roles/all` | **500** — "OpenFGA store not initialized yet" |
+| `GET /api/default/groups` (§14.3) | **500** — "OpenFGA store not initialized yet" |
+
+Cold load issues **3** `/roles` calls (1 + 2 retries, all 500) and the second expected read,
+`all-user-roles`, **never fires at all** — so the plan's "2 requests" cannot be observed. The
+query settles in `error` state and the table renders **0 rows**.
+
+| # | Status |
+| --- | --- |
+| C1 | ⛔ Cannot verify "2 requests" — read 1 fails, read 2 never fires |
+| C2 | ⚠️ **Verified, and correct**: a warm revisit still issues **3** `/roles` calls. An errored query is *always* stale, so "0 requests" can never hold here. This is TanStack behaving correctly for a failed read, **not** a caching defect |
+| C3–C5 | ⛔ Not runnable — no rows, every refetch 500s |
+| C6, C7 | ⛔ Not runnable — `POST /roles` also 500s, so no role can be created or deleted |
+| C8 | ⛔ Not runnable — no rows to filter |
+
+**Retry policy confirmed as a side-effect.** Each failing read produced exactly **3** attempts
+(1 + 2 retries), matching the client's `failureCount < 2` rule for 5xx. 4xx endpoints elsewhere
+in this campaign produced exactly 1. The retry configuration is correct.
+
+**Pre-existing, not filed — a 500 renders as an empty state.** With the backend down the page
+shows **"No roles yet — Roles define what actions users can perform"** and **no error
+indication** (`anyErrorShownToUser: false`); a user cannot distinguish "no roles" from "roles
+are broken". This is **not** a branch regression — the handling is equally silent on `main`:
+
+```ts
+// main: AppRoles.vue
+.catch((err) => { console.log(err); })
+
+// branch: AppRoles.vue
+watch(rolesList.error, (err: any) => { if (err) console.log(err); });
+```
+
+Both only log to the console. The branch preserved main's behaviour while moving it onto the
+query layer. Worth fixing some day; out of scope for this PR.
+
+**§14.3 Groups is blocked by the same fault** (`GET /groups` → 500).
 
 ### 14.3 Groups
 
@@ -1848,6 +2191,51 @@ Run **C1–C8** (`r` shortcut applies).
 | **Tokens never persisted** | | Local Storage has **no** `o2q-` entry containing a service-account token |
 | Delete → navigate away → return | | Gone and stays gone |
 
+
+#### Measured results — 2026-09-01, `feat/fe-caching`, local dev
+
+**All eight cache checks pass. No defect on this page.** Seeded to 23 accounts before testing.
+
+| # | Expect | Measured | Verdict |
+| --- | --- | --- | --- |
+| C1 | Skeleton then rows, **1** request | **Exactly 1** `GET /service_accounts` (CDP-verified: the only app request besides `config`, `announcements`, `organizations`) | ✅ |
+| C2 | Instant rows, no skeleton, **0** requests | **0 requests**, entry provably fresh (age 0.5 s), 20 rows, 25 samples `everBlank: false` | ✅ |
+| C3 | Instant rows, then **1** background request, never blanks | **Exactly 1.** 45 samples: **min = max = 20**, `everBlank: false` | ✅ |
+| C4 | **1** request, rows stay, spinner on the button | **Exactly 1.** Rows constant at 20, **0 visible skeletons** | ✅ |
+| C5 | Same as C4 | Real keypress on `body` → **exactly 1** `GET /service_accounts` (200), rows stay | ✅ |
+| C6 | Already on the list, no manual refresh | `POST → 200`, count **28 → 29** immediately. Away and straight back with the entry still fresh: **0 requests**, footer "Showing 21 - 29 of 29", and the new account **present** on the last page | ✅ |
+| C7 | Gone immediately and still gone on return | `DELETE → 200` **+ `GET /service_accounts → 200`**. Gone from screen *and* cache. On return with a fresh entry: **0 requests**, **0 / 30 frames** showed it | ✅ |
+| C8 | Term and filtered rows preserved | Term `charlie` preserved, the single filtered row preserved identically, **1** request | ✅ |
+
+**Create and delete keep the list correct by two different mechanisms — both work.** Delete forces
+a reload (`await getServiceAccountsUsers(true)` → `serviceAccountsList.refetch()`), so the row
+leaves the query cache. Create instead appends to `serviceAccountsState.service_accounts_users`,
+a **module-level `reactive()` singleton** in `usePermissions.ts` that outlives the route change;
+`onBeforeMount` then calls `getServiceAccountsUsers()` **unforced** (a no-op), so nothing
+re-derives from the query and the appended row stays on screen.
+
+⚠️ **A retracted finding, kept as a warning.** This was first written up as a defect ("created
+account vanishes on the next visit"). It was wrong, twice over:
+
+1. The reproduction created the account through `service_accounts.ts` **directly**, bypassing the
+   dialog's `addMember` handler — so the singleton never received the row and its absence proved
+   nothing about the UI flow.
+2. The check for the row read only **page 1**. With 29 accounts at 20 per page the new account
+   sorts onto **page 2**, so "not on screen" was pagination, not loss.
+
+The mistake underneath both was reasoning from a **code comment** ("a service-account write
+invalidates the scope") plus the shape of the create handler, instead of tracing what actually
+renders on remount. The query cache genuinely does diverge from the singleton after a create —
+`queryCacheHasNew: false` while the list shows the row — but that divergence is **not
+user-visible**, because the list renders from the singleton until a refetch replaces the query
+data, and any refetch reconciles to the server, which has the row. Verify a "missing row" claim by
+searching the full list or checking the last page, never by scanning page 1.
+
+**Footer ignores the active filter here too** — searching `charlie` showed 1 row while the footer
+read "Showing 1 - 20 of 23". Same pre-existing shared-table behaviour recorded under §14.1; the
+table components are untouched by this branch, so it is not filed.
+
+
 ### 14.6 Ingestion tokens
 
 **Scope:** run **C1–C5** (cold read, warm revisit, Refresh button, `r` shortcut) and **C8** (search survives refresh), plus the rows below. C6/C7 are covered by this section's own rows where they apply.
@@ -1861,6 +2249,41 @@ Run **C1–C8** (`r` shortcut applies).
 | Create a token / enable / disable | List updates without a manual refresh |
 | **Never persisted** | No `o2q-` localStorage entry contains an ingestion token; nothing in IndexedDB either |
 
+
+#### Measured results — 2026-09-01, `feat/fe-caching`, local dev
+
+**Everything in scope passes. No defect on this page.** The org had 1 token, so 6 were seeded
+first (`cachetest_token_*`).
+
+| # | Expect | Measured | Verdict |
+| --- | --- | --- | --- |
+| C1 | Skeleton then rows, **1** request | **Exactly 1** `GET /ingestion-tokens` (CDP-verified: the only app request besides `config`, `announcements`, `organizations`) | ✅ |
+| C2 | Instant rows, no skeleton, **0** requests | **0 requests**, entry provably fresh (age 0.4 s), 7 rows, 25 samples `everBlank: false` | ✅ |
+| C4 | **1** request every click, rows stay | **Exactly 1**, taken while the entry was fresh. Rows constant at 7, **0 visible skeletons** | ✅ |
+| C5 | Same as C4 | Real keypress on `body` → **exactly 1** `GET /ingestion-tokens` (200), rows stay | ✅ |
+| C8 | Term and filtered rows preserved | Term `charlie` preserved, the single filtered row preserved identically, **1** request | ✅ |
+
+| Own check | Measured | Verdict |
+| --- | --- | --- |
+| **Refresh button works** | Clicked while the entry was **fresh** — still issued **exactly one** request. This is the documented "used to do nothing while the entry was fresh" regression, and it is fixed | ✅ |
+| **`r` shortcut** | Same: one request, rows stay | ✅ |
+| **Create a token / enable / disable** | Create: `POST /ingestion-tokens → 200` **+ 1** `GET`; rows 7 → 8 and the new token present **on screen *and* in the query cache**, no manual refresh. Disable: `PATCH …/{name} → 200` **+ 1** `GET`, Enabled → Disabled. Enable: same, Disabled → Enabled | ✅ |
+| **Never persisted** | **0 leaks.** Held all 8 live token secrets in memory and searched every store for them: 34 localStorage keys (20 `o2q-`) → 0 hits and **no `o2q-` key for the ingestion-tokens scope at all**; sessionStorage empty; IndexedDB `PanelCache` (416 entries), `o2Cache` (21), `o2ChatDB` (6) → 0 hits | ✅ |
+
+**Writes here use the invalidation pattern, and it works.** Create and both toggle directions each
+issue their write followed by exactly one `GET /ingestion-tokens`, so the query cache — not just a
+local copy — carries the new state. (Contrast §14.5, where create updates a module-level singleton
+instead; that also works, but by a different mechanism.)
+
+**Route note.** Navigating straight to `/web/iam/ingestionTokens` on a cold load **redirects to
+Home** — the route guard runs before the org store is hydrated. Reaching the page via IAM → the
+**Ingestion Tokens** tab works, and once the store is warm the direct URL (and a hard reload on it)
+works too. Worth knowing when scripting: a cold deep-link to this route silently lands on Home.
+
+**Seeding note.** `api_keys.ts` (`/api/usertoken`) **404s on this build** and is not what this page
+uses. The page reads `organizations.list_org_ingestion_tokens` →
+`GET /api/{org}/ingestion-tokens`; seed with `organizations.create_org_ingestion_token(org, { name })`.
+
 ### 14.7 Organizations
 
 **Scope:** run **C1–C5** (cold read, warm revisit, Refresh button, `r` shortcut) and **C8** (search survives refresh), plus the rows below. C6/C7 are covered by this section's own rows where they apply.
@@ -1872,6 +2295,38 @@ Run **C1–C8** (`r` shortcut applies).
 | Run C1–C5 | Standard cache behaviour |
 | **Org cleanup tasks dialog** — IAM → Organizations → open an org's cleanup tasks | The dialog **polls every 5 seconds** while open, and **stops polling when closed** (confirm the requests stop in Network) |
 
+
+#### Measured results — 2026-09-01, `feat/fe-caching`, local dev
+
+**Everything runnable passes. No defect.** One row is partly blocked — see the cleanup dialog note.
+
+| # | Expect | Measured | Verdict |
+| --- | --- | --- | --- |
+| C1 | Standard cold read | Cold load issues **2** `/api/organizations` calls, but they are **different reads**: the app-shell list (`sort_by=id`, fired on every page) and this page's own list (`sort_by=name`). This page's own read is **1** | ✅ |
+| C2 | Warm revisit | **1** request for this page's list — **expected, not a defect** (see below). The **shell's** org list was **0** on the revisit, i.e. that one *is* cached. 2 rows, 25 samples `everBlank: false` | ✅ as documented |
+| C4 | **1** request, rows stay | **Exactly 1.** Rows constant at 2, **0 visible skeletons** | ✅ |
+| C5 | Same as C4 | Real keypress on `body` → **exactly 1** request, rows stay | ✅ |
+| C8 | Term and filtered rows preserved | Term `default` preserved, the single filtered row preserved identically, **1** request | ✅ |
+
+**Why C2 costs a request, and why that is correct.** The Organizations list is **not on the query
+layer**: `ListOrganizations.vue` calls `organizationsService.list(0, 1000000, "name", false, "")`
+directly, and the query cache holds **no key** for it (only `settings` and `cleanupTasks`).
+`orgListQuery` is declared in `organizations.queries.ts` and **read nowhere** — the declared-but-
+unread case the plan already records as §24 item 8. It is also **not a branch regression**: the
+same direct call sits at the same place on `main`.
+
+| Own check | Measured | Verdict |
+| --- | --- | --- |
+| Cleanup dialog **stops** polling when closed | **Verified live.** With the dialog closed the cached query carries **`refetchInterval: false`**, and a 13-second watch recorded **0** cleanup requests (0 requests of any kind) | ✅ |
+| Cleanup dialog **polls every 5 s** while open | ⛔ **UNREACHABLE ON ANY SELF-HOSTED BUILD — cloud-only, not merely untested.** Verified by attempting it: a throwaway org was created and every delete route refused (`DELETE /api/{id}/organizations` **404**, `/api/organizations/{id}` **404**, `/api/_meta/organizations/{id}` **404**, `?org_identifier=` **405**) — org deletion is not implemented in this OSS build. The UI agrees: `canDeleteOrg()` returns **false** on its first line when `config.isCloud !== "true"` (`ListOrganizations.vue`), and this build reports `isCloud: "false"`. With no way to delete an org, none can reach `status: 'deleting'`, so the cleanup button (`v-if="row.status === 'deleting'"`) can never render. Correct **by construction**: `refetchInterval: props.open && !isComplete.value ? 5000 : false` (`OrgCleanupTasksDialog.vue:404`) arms the interval only while `open` | ⛔ |
+
+**Attempted, and it cannot be done here.** A throwaway org (`cachetest_cleanup_org`) was created
+specifically to reach this state — `default` and `_meta` were never touched. Every delete route
+returned 404/405, so the org could not be deleted and **could not be removed afterwards either**:
+it remains on the instance as a leftover, and clearing it needs an enterprise/cloud build or
+direct backend access. Anyone repeating this should not bother — the feature is cloud-gated at
+both the API and the UI.
+
 ### 14.8 MCP Server
 
 **Scope:** run the rows in this section only — the C1–C8 checklist does not apply here.
@@ -1882,6 +2337,24 @@ Run **C1–C8** (`r` shortcut applies).
 | --- | --- |
 | Open, navigate away, return | Org data read from cache |
 | Any token shown here is **not** in localStorage | Confirm in the Application tab |
+
+
+#### Measured results — 2026-09-01, `feat/fe-caching`, local dev
+
+**Both rows pass.**
+
+| Check | Measured | Verdict |
+| --- | --- | --- |
+| Open, navigate away, return → org data from cache | Cold open reads `GET /api/default/passcode → 200`. Away and straight back with the entry provably fresh (age 0.4 s): **0 passcode requests**, page fully rendered ("MCP endpoint" present) | ✅ |
+| Any token shown here is not in localStorage | **Not persisted.** The passcode value (37 chars) appears in **no** localStorage key, and IndexedDB `PanelCache` (416 entries), `o2Cache` (21), `o2ChatDB` (6) hold **0** matches. No `o2q-` key exists for the passcode scope | ✅ |
+
+⚠️ **A false positive worth recording.** A first pass flagged two "leaks" —
+`currentuser` and the `favorite_dashboards` cache key. Both were the matcher hitting the
+**user's email address** (16 chars, collected because the scan swept every string ≥ 8 chars out of
+the passcode payload), not the secret. Classifying the candidates showed the real passcode is
+37 characters and present in **zero** storage keys, while the email is legitimately stored.
+**When scanning for secrets, exclude identifier-shaped values** (emails, org ids) or every scan
+will report leaks that are not.
 
 ---
 

@@ -972,7 +972,7 @@ to localStorage or IndexedDB.
 
 ---
 
-### 20. SLO list double-fetches on every mount — the reactive key fires before the folder is resolved
+### 20. Folder-scoped lists double-fetch on every mount — the reactive key fires before the folder is resolved (SLOs **and** Synthetics)
 
 ```
 Module:            SLOs (§7)
@@ -1043,6 +1043,80 @@ on the org —
 — and set `readFolder` from `activeFolderId` at setup rather than leaving it `undefined`.
 Either alone removes the wasted request; both together also stop the `"all"` entry from ever
 being created.
+
+**Second instance — Synthetics (§11): same root cause, but the fix above must NOT be reused.**
+
+`SyntheticMonitoring.vue` repeats the pattern exactly:
+
+```ts
+const readFolder = ref<string | undefined>(undefined);            // SyntheticMonitoring.vue:495
+
+const monitorsList = useQuery(() =>
+  Object.assign(syntheticsMonitorsQuery(orgIdentifier.value, readFolder.value), {
+    enabled: !!orgIdentifier.value,
+  }),
+);                                                                // :497
+```
+
+Measured on a cold load of `/web/synthetics` — the same two-request shape as SLOs:
+
+```
+GET /api/default/synthetics                  <- fired while readFolder is undefined
+GET /api/default/synthetics?folder=default   <- fired again once initPage() resolves the folder
+```
+
+⚠️ **Do not apply `readFolder.value !== undefined` here.** On this page `undefined` is a
+*meaningful* value, not merely an unresolved one: it is the "All folders" search mode.
+
+```ts
+const targetFolder =
+  folderId !== undefined
+    ? folderId
+    : searchAcrossFolders.value
+      ? undefined                 // <- deliberate: "every folder"
+      : activeFolderId.value;
+readFolder.value = targetFolder;                                  // :525-530
+```
+
+Gating on `readFolder.value !== undefined` would leave the query permanently disabled
+whenever the user selects **All folders**, so the table would stop loading in that mode
+entirely. SLOs have no such mode — `readFolder.value = folderId ?? activeFolderId.value`
+(`SloList.vue:813`) can never be deliberately `undefined` — which is exactly why the one-line
+gate is safe there and unsafe here.
+
+**Fix for Synthetics:** distinguish "not resolved yet" from "deliberately all folders" with an
+explicit flag instead of overloading `undefined`:
+
+```ts
+const folderResolved = ref(false);
+// in loadMonitors(), alongside `readFolder.value = targetFolder`:
+folderResolved.value = true;
+// on the query:
+{ enabled: !!orgIdentifier.value && folderResolved.value }
+```
+
+**Knock-on effect — latent, not user-visible today.** On Synthetics the wasted `"all"` entry
+is not merely wasted: the single-monitor delete splices only the *scoped* key, so the `"all"`
+entry keeps the deleted monitor.
+
+```ts
+queryClient.setQueryData<any[]>(
+  syntheticsKeys.monitors(orgIdentifier.value, readFolder.value),  // :1322 - the "default" key only
+  (old) => (old ?? []).filter((mon: any) => String(mon.id) !== String(m.id)),
+);
+```
+
+Measured directly against the query cache, immediately after deleting a check through the UI:
+
+```
+key "default":  8 monitors, deleted row absent      <- correct
+key "all":      9 monitors, deleted row PRESENT, fresh (age 4 s, not stale)
+```
+
+It does not surface today: on remount the folder-scoped read overtakes it inside 100 ms, and a
+40-sample sweep across 4 s caught **0 frames** showing the deleted row (C7 passes). But only
+timing hides it — a slower folder resolution would paint the deleted check. Removing the
+double-fetch removes the bad entry and this latent risk together.
 
 **Everything else in §7 passed** — C2/C4/C6/C7/C8 all green, sort/paging/search client-side at
 0 requests, the table never blanks, and `r` correctly does nothing (this page registers no
@@ -1303,6 +1377,162 @@ question applies to the pipeline writers in #22.
 
 ---
 
+### 24. Synthetics list could never render — the query unwrapped the wrong response field — ✅ FIXED
+
+```
+Module:            Synthetics (§11)
+UI path:           Left sidebar -> hover Reliability -> Synthetics
+What to check:     The checks table on any load
+What to expect:    The seeded checks listed
+What you get:      "Create your first Check / No checks found" - always, with data present
+```
+
+**Severity: High.** The page was unusable. The list endpoint returned `200` with the full set
+of checks and the table still rendered its onboarding empty state, so no check could be seen,
+edited, deleted, moved or run from the UI at all.
+
+**Cause.** The cached read unwrapped `.monitors`, but the endpoint returns `.checks`:
+
+```ts
+queryFn: async (): Promise<any[]> =>
+  ((await syntheticsService.listByFolderId(org, folderId)).data as any)?.monitors ?? [],
+```
+
+`data.monitors` is `undefined`, so the `?? []` fired on every response and the query resolved
+to an empty array. That is a *successful* empty read — which is why nothing errored, no retry
+ran, and the page looked like a legitimately empty account.
+
+**Caused by this branch.** `main` reads the field correctly, and has since `f16e8e53ff`:
+
+```ts
+const rows = (res.data as any).checks ?? (res.data as any).monitors ?? [];   // main
+```
+
+Introduced by `58d0a35905` ("refactor(query): declare cached reads beside the endpoints they
+call"), which dropped the `.checks` half while moving the read onto the query layer, and
+carried verbatim into `web/src/services/synthetics.queries.ts` by `4defa00ce3`
+("refactor(web): replace the defineQuery facade with plain TanStack options"). Both commits
+exist only on `feat/fe-caching`.
+
+**Fix applied** — restores `main`'s order, keeping `monitors` as the fallback:
+
+```ts
+// The list endpoint returns `checks`; `monitors` is the older name kept as a fallback.
+queryFn: async (): Promise<any[]> => {
+  const data = (await syntheticsService.listByFolderId(org, folderId)).data as any;
+  return data?.checks ?? data?.monitors ?? [];
+},
+```
+
+The `??` chain means a response carrying either field still works, and a missing/empty
+response still yields `[]`, so the change is strictly more permissive than what it replaced.
+
+**Verified:** `vue-tsc --noEmit -p tsconfig.app.json --composite false` exit 0 ·
+`SyntheticMonitoring.spec.ts` + `synthetics.spec.ts` **72/72 pass** · the live page went from
+the empty state to **10 rows**, pager reading "10 Checks".
+
+⚠️ Those 72 specs passed *before* the fix as well — nothing in the suite covers the unwrap,
+which is how this shipped. A regression here would still not be caught by tests.
+
+---
+
+### 25. Saved org settings silently revert on the next org switch — the write never invalidates the cached read — ✅ FIXED
+
+```
+Module:            Settings -> General / Organization (§15.1)
+UI path:           Settings -> General -> change Scrape Interval -> Save -> switch org -> switch back
+What to check:     The saved value is still there
+What to expect:    It is (main always re-read from the server)
+What you get:      The setting REVERTS to its pre-save value for up to 5 minutes.
+                   The server has the new value; the UI shows the old one.
+```
+
+**Severity: High.** Silent data-looking loss. The save genuinely succeeded server-side, the toast
+says so, and then the UI quietly shows the old value again — so the user believes the setting did
+not stick, and may "fix" it repeatedly. It affects everything `organizationSettings` feeds:
+scrape interval, span/trace id field names, theme colours, streaming/websocket toggles.
+
+**Measured** (browser, values read from server, Vuex and the query cache at each step):
+
+```
+baseline     cached 33   vuex 33   server 33     (all agree)
+after save   cached 33   vuex 44   server 44     cache NOT invalidated, and NOT stale by time
+MainLayout re-read (its own line, verbatim)
+             vuex 33               server 44     <- reverted
+```
+
+**Cause.** This PR turned a direct read into a cached one and did not add an invalidation on the
+write. `MainLayout.getOrganizationSettings()` — which its own comment says runs "on every org
+switch" — now serves from a 5-minute entry:
+
+```ts
+// branch: MainLayout.vue:1073
+const orgSettings: any = {
+  data: await queryClient.fetchQuery(orgSettingsQuery(store.state?.selectedOrganization?.identifier)),
+};
+store.dispatch("setOrganizationSettings", { ... });   // stale value lands in Vuex
+```
+
+`orgSettingsQuery` carries `CONFIG_STALE_TIME` (5 min), so within that window `fetchQuery` returns
+the **pre-save** payload and dispatches it straight into Vuex, overwriting the value the save just
+put there. The settings pages read Vuex, so the UI reverts.
+
+Nothing repairs it: the only references to the settings key in the whole app are the import and
+that one `fetchQuery`. `General.vue`'s save handler POSTs and shows a toast — no
+`invalidateQueries`, no `setQueryData`, no refetch. Same for `OrganizationSettings.vue` and
+`DomainManagement.vue`.
+
+**Caused by this branch.** `main` re-read from the server every time, so a stale value was
+impossible:
+
+```ts
+// main: MainLayout.vue:1070
+const orgSettings: any = await organizations.get_organization_settings(
+  store.state?.selectedOrganization?.identifier,
+);
+```
+
+**Fix applied** — the settings scope is dropped at **all four** `post_organization_settings` call
+sites, restoring the invariant `main` got for free:
+
+```ts
+await organizations.post_organization_settings(orgId, payload);
+
+// MainLayout re-reads this scope on every org switch and would serve the pre-save payload back.
+await queryClient.invalidateQueries({ queryKey: organizationKeys.settings(orgId) });
+```
+
+| File | Scope invalidated | Verified |
+| --- | --- | --- |
+| `settings/General.vue` | current org | **Live** — click path + org switch |
+| `settings/OrganizationSettings.vue` | current org | **Live** — click path + org switch |
+| `enterprise/components/billings/usage.vue` | current org | **Live** — click path + org switch |
+| `settings/DomainManagement.vue` | **meta org** (that is what it writes) | **Spec** — writes live SSO config, deliberately not exercised |
+
+**Each site was proven defective before the fix, not pattern-matched.** `General.vue` and
+`OrganizationSettings.vue` reverted through the real UI (`44`→`45`, `trace_id_probe`→`trace_id`).
+`DomainManagement.vue` and `usage.vue` were proven by spying on `queryClient.invalidateQueries`
+inside their **existing** specs while driving their real save handlers — **0 calls** at `HEAD`,
+passing with the fix. That temporary spec instrumentation was reverted and is **not** shipped.
+
+⚠️ **`usage.vue` is reachable on self-hosted after all.** An earlier note in this campaign called
+billing "cloud-only, untestable" — wrong. Only the **sidebar link** is gated
+(`v-if="config.isCloud === true"`); the route is registered unconditionally, so
+`/web/billings/usage?org_identifier=<org>` loads fine. The enable flow writes
+`post_organization_settings`, not a billing endpoint, so the 404s on billing data are irrelevant
+to it. Measured live: `cacheInvalidated: true`, and after an org round trip `REVERTED: false`.
+
+**Verification:** `vue-tsc --noEmit` exit 0 · settings + billings specs **43 files / 1632 tests
+passing** · live before-and-after on three of the four pages. Note the suite passed *before* the
+fix too — nothing covers this path, which is how it shipped.
+
+**Why the visible §15.1 checks still pass.** "Change a setting and save → reflected everywhere
+without a reload" passes on its own, because the save also dispatches the new value into Vuex and
+every consumer reads Vuex. The revert only appears once something re-runs
+`getOrganizationSettings()` — an org switch — which that row does not exercise.
+
+---
+
 ### Verified fixed — not filed
 
 - **AI -> Evaluations force-refetching on every visit** (originally #2 in the parallel run)
@@ -1425,8 +1655,8 @@ test it. Anything not listed here has been tested and passes (or is a filed find
 
 | Surface | Plan § | What it needs | Notes |
 | --- | --- | --- | --- |
-| Synthetics list + monitor CRUD + results | §11 | `ZO_SYNTHETICS_ENABLED=true` | route guard redirects to Home while off |
-| Synthetics agent tokens | §11.1 | same flag | includes the tokens-never-persisted check |
+| ~~Synthetics list + monitor CRUD + results~~ | §11 | — | ✅ **UNBLOCKED and tested 2026-09-01** — flag enabled, C1–C8 all measured (plan §11). Surfaced **Issue 24** (list could never render) and a 2nd instance of **Issue 20** |
+| ~~Synthetics agent tokens~~ | §11.1 | — | ✅ **TESTED 2026-09-01** — all 4 rows pass, incl. the tokens-never-persisted check (**0 leaks** across localStorage/sessionStorage/3 IndexedDB stores). See plan §11.1 |
 | Actions list caching + CRUD + Logs menu | §13 | `ZO_ACTIONS_ENABLED=true` | page renders; `getAllActions` correctly no-ops while off — the `r` fix and cache path are unexercised |
 | Alert-form workflow dropdown (form flow) | §6.2 / finding #15 | `workflows_enabled=true` | the fix is in and verified at the query layer; the actual dropdown flow never runs while off |
 
@@ -1484,7 +1714,7 @@ test it. Anything not listed here has been tested and passes (or is a filed find
 | ~~§10.2 Enrichment tables~~ | ~~org has none~~ **now verified in `_meta` — PASS** |
 | §16 Trace DAG cache | pentest: no `/traces/{id}/details` endpoint. o2latestmain: details works, but `/traces/{id}/dag` itself 404s for every trace (driven directly through `traceDagQuery` — the component's own path), and no org holds spans with populated `gen_ai_*` columns, so the DAG tab cannot appear. Verified meanwhile: the 404 is not cached and not retried (one call per fetch). Needs a backend with the /dag endpoint and LLM-instrumented traces |
 | §21 RUM, §22.3a LLM Insights, §22.4 Billing | no RUM/LLM/billing data on either env (RUM page loads clean on o2latestmain, zero sessions). ~~§22.1 Online Evals~~ **tested on o2latestmain — PASS**: cold visit fetches score_configs+scorers+eval_jobs+providers once; scorers/jobs tab revisits fire zero requests |
-| §11 Synthetics, §13 Actions | server flags off on every reachable env: synthetics routes redirect to Home by guard; the Actions page renders via direct URL but `getAllActions` correctly returns `[]` without a request while `actions_enabled` is unset — no caching to exercise, and no wasted traffic |
+| ~~§11 Synthetics~~, §13 Actions | **Synthetics is no longer blocked** — enabled and fully tested on 2026-09-01, see plan §11; §11.1 agent tokens also tested and passing. Actions remains off on every reachable env: the page renders via direct URL but `getAllActions` correctly returns `[]` without a request while `actions_enabled` is unset — no caching to exercise, and no wasted traffic |
 | ~~§15.2 Nodes~~ | **now verified — PASS** (the page needs the `_meta` org selected, not just the URL param): cold 1 request/7 nodes, revisit 0, `r` forces 1, the node filter survives refresh with its filtered rows, and no `o2q-` key is written (memory-only by design) |
 | §23 offline / quota-full / multi-tab | not reproducible in the in-app browser harness |
 | Pagination/prefetch checks (§3, §6.5, §9.3) | no surface had >1 page of data |
