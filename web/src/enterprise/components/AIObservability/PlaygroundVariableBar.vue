@@ -139,6 +139,7 @@
     </div>
 
     <PlaygroundVariablesMenu
+      ref="variablesMenuRef"
       class="self-center"
       :var-names="varNames"
       :vars="vars"
@@ -239,4 +240,13 @@ const { t } = useI18nTyped();
 const expectedToken = `{{${EXPECTED_OUTPUT_TOKEN}}}`;
 
 const usesExpectedToken = computed(() => props.varNames.includes(EXPECTED_OUTPUT_TOKEN));
+
+/** Forwarded to the Variables menu inside — PlaygroundPage only holds a ref on
+ *  the bar, not on everything nested inside it. */
+const variablesMenuRef = ref<{ flash: () => void } | null>(null);
+function flash() {
+  variablesMenuRef.value?.flash();
+}
+
+defineExpose({ flash });
 </script>

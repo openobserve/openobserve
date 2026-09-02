@@ -30,6 +30,14 @@ interface Props {
    */
   role?: "status" | "alert" | "banner";
   dataTest?: string;
+  /**
+   * Wrap the content instead of overflowing — preserves newlines/spaces and
+   * lets a long unbroken run (a raw error message, JSON) break. Off by
+   * default: every existing caller keeps its current layout unless it opts
+   * in, since forcing this everywhere would change banners that intentionally
+   * stay on one line.
+   */
+  preserveWhitespace?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -38,6 +46,7 @@ const props = withDefaults(defineProps<Props>(), {
   inlineActions: false,
   bar: false,
   center: false,
+  preserveWhitespace: false,
 });
 
 const slots = useSlots();
@@ -119,7 +128,13 @@ const barVariantClass = computed(() => {
     <div
       :class="[
         'flex flex-row gap-3',
-        bar ? (center ? 'min-w-0 items-center' : 'min-w-0 flex-1 items-center') : 'items-start',
+        bar
+          ? center
+            ? 'min-w-0 items-center'
+            : 'min-w-0 flex-1 items-center'
+          : preserveWhitespace
+            ? 'min-w-0 items-start'
+            : 'items-start',
         inlineActions && !bar ? 'flex-1' : '',
       ]"
     >
@@ -129,7 +144,12 @@ const barVariantClass = computed(() => {
         </slot>
       </div>
 
-      <div :class="bar ? 'text-compact' : 'flex-1 text-sm'">
+      <div
+        :class="[
+          bar ? 'text-compact' : 'flex-1 text-sm',
+          preserveWhitespace ? 'min-w-0 wrap-break-word whitespace-pre-wrap' : '',
+        ]"
+      >
         <slot />
         <template v-if="showContentProp">{{ content }}</template>
       </div>

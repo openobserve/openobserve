@@ -11,6 +11,9 @@
         :page-size="20"
         :default-columns="false"
         :show-global-filter="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="ai-experiment-comparison-rows"
         data-test="ai-experiment-comparison-rows"
         @row-click="(row: ExperimentComparisonRow) => $emit('inspect', row, visibleRows)"
       >
@@ -55,7 +58,8 @@
 
         <template #cell-input="{ row }">
           <span
-            class="text-text-body max-w-[32rem] text-xs break-words whitespace-pre-wrap"
+            class="text-text-body block truncate text-xs"
+            :title="raw(displayRowInput(row.input))"
             data-test="ai-experiment-comparison-row-input"
           >
             {{ displayRowInput(row.input) }}
@@ -251,6 +255,11 @@ const comparisonColumns = computed<OTableColumnDef<ExperimentComparisonRow>[]>((
     header: t("aiObservability.experiments.comparePage.panel.input"),
     accessorFn: (row) => displayRowInput(row.input),
     sortable: true,
+    // Starting width the previous max-w-[32rem] cap implied — the resize
+    // handle (enable-column-resize on the table, below) now owns going wider
+    // or narrower than this.
+    size: 512,
+    minSize: 160,
   },
   {
     id: "bucket",

@@ -11195,7 +11195,7 @@
             "item": "項目",
             "versions": "版本"
           },
-          "versionPill": "v{version} · {count} 版本 | v{version} · {count} 版本",
+          "versionPill": "{count} 版本 | {count} 版本",
           "sourceSection": "來源",
           "sourceTrace": "追蹤",
           "sourceSpan": "Span",
@@ -11718,6 +11718,8 @@
       "schemaToggle": "將輸出限制為 JSON 結構描述",
       "schemaHelp": "設定結構描述後，輸出將以 JSON 格式呈現。",
       "schemaInvalidJson": "結構描述必須是有效的 JSON。",
+      "schemaIgnored": "結構描述 · 此提供者已忽略",
+      "schemaUnsupported": "此提供者沒有結構化輸出欄位。結構描述會保留在此資料欄中，但不會傳送，模型將以純文字回答。",
       "outputPlaceholder": "輸出會顯示在此處 — 按一下執行。",
       "outputNotRun": "尚未執行",
       "retry": "重試",
