@@ -138,6 +138,7 @@ describe("PlaygroundPage", () => {
     runPlayground.mockResolvedValue({
       text: "an answer",
       toolCall: null,
+      reasoningContent: null,
       usage: { promptTokens: 5, completionTokens: 2, costUsd: 0.001, latencyMs: 100 },
     });
   });
@@ -210,6 +211,7 @@ describe("PlaygroundPage", () => {
         name: "lookup_order",
         arguments: '{"order_id":"123"}',
       },
+      reasoningContent: "I should look up this order before answering.",
       usage: { promptTokens: 5, completionTokens: 2, costUsd: 0.001, latencyMs: 100 },
     });
     const wrapper = await mountPage();
@@ -227,6 +229,7 @@ describe("PlaygroundPage", () => {
       toolName: "lookup_order",
       toolCallId: "call_1",
       toolArguments: '{"order_id":"123"}',
+      reasoningContent: "I should look up this order before answering.",
     });
 
     resultMessage.content = '{"status":"shipped"}';
@@ -237,6 +240,7 @@ describe("PlaygroundPage", () => {
       {
         role: "assistant",
         content: "",
+        reasoningContent: "I should look up this order before answering.",
         toolCalls: [
           {
             id: "call_1",

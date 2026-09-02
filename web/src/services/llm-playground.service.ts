@@ -30,6 +30,8 @@ export interface PlaygroundRequestToolCall {
 export interface PlaygroundRequestMessage {
   role: PlaygroundMessageRole;
   content: string;
+  /** DeepSeek thinking mode: must be replayed verbatim when tools are present. */
+  reasoningContent?: string;
   /** Assistant role only: calls the model issued before a tool result. */
   toolCalls?: PlaygroundRequestToolCall[];
   /** Tool role only: the assistant call this result answers. */
@@ -74,6 +76,8 @@ export interface PlaygroundRunToolCall {
 
 export interface PlaygroundRunResult {
   text: string;
+  /** Provider reasoning retained for a later tool-enabled turn, never rendered. */
+  reasoningContent: string | null;
   /** Non-null when the model issued a tool call. The call IS the output and the
    *  run ends there — the Playground does not execute tools. */
   toolCall: PlaygroundRunToolCall | null;
@@ -242,6 +246,9 @@ function wireBody(request: PlaygroundRunRequest): Record<string, unknown> {
     messages: request.messages.map((message) => ({
       role: message.role,
       content: message.content,
+      ...(message.reasoningContent !== undefined
+        ? { reasoningContent: message.reasoningContent }
+        : {}),
       ...(message.toolCalls?.length ? { toolCalls: message.toolCalls } : {}),
       ...(message.toolCallId ? { toolCallId: message.toolCallId } : {}),
     })),
@@ -308,6 +315,7 @@ async function runLive(
   let buffer = "";
   let text = "";
   let toolCall: PlaygroundRunToolCall | null = null;
+  let reasoningContent: string | null = null;
   let usage: PlaygroundRunUsage | null = null;
 
   // Drains until the reader reports done.
@@ -345,6 +353,8 @@ async function runLive(
           break;
         case "done":
           usage = normalizeUsage(data);
+          reasoningContent =
+            typeof data.reasoningContent === "string" ? data.reasoningContent : null;
           break;
         case "error":
           // Once the stream is open the server has no status code left, so an
@@ -359,7 +369,7 @@ async function runLive(
     }
   }
 
-  return { text, toolCall, usage: usage ?? emptyUsage() };
+  return { text, reasoningContent, toolCall, usage: usage ?? emptyUsage() };
 }
 
 /** The server's error message, falling back to the bare status. */

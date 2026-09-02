@@ -39,6 +39,8 @@ export interface PlaygroundMessage {
   toolCallId?: string;
   /** `tool` role only: JSON arguments passed into the function. */
   toolArguments?: string;
+  /** Assistant reasoning replayed verbatim for DeepSeek tool-enabled turns. */
+  reasoningContent?: string;
 }
 
 export interface PlaygroundTool {
@@ -115,6 +117,7 @@ export interface PlaygroundCellError {
 export interface PlaygroundCell {
   status: "idle" | "streaming" | "done" | "error";
   text: string;
+  reasoningContent: string | null;
   toolCall: PlaygroundToolCall | null;
   usage: PlaygroundUsage | null;
   error: PlaygroundCellError | null;
@@ -286,7 +289,14 @@ export function withFieldInserted(variant: PlaygroundVariant, field: string): Pl
 // ── run keys and cells ────────────────────────────────────────────
 
 export function idleCell(): PlaygroundCell {
-  return { status: "idle", text: "", toolCall: null, usage: null, error: null };
+  return {
+    status: "idle",
+    text: "",
+    reasoningContent: null,
+    toolCall: null,
+    usage: null,
+    error: null,
+  };
 }
 
 export function cellAt(
@@ -322,7 +332,15 @@ export function requestMessages(
   const messages: PlaygroundRequestMessage[] = [];
   for (const message of renderedMessages(variant, vars)) {
     if (message.role !== "tool") {
-      if (message.content.trim()) messages.push({ role: message.role, content: message.content });
+      if (message.content.trim()) {
+        messages.push({
+          role: message.role,
+          content: message.content,
+          ...(message.role === "assistant" && message.reasoningContent !== undefined
+            ? { reasoningContent: message.reasoningContent }
+            : {}),
+        });
+      }
       continue;
     }
 
@@ -332,6 +350,9 @@ export function requestMessages(
     messages.push({
       role: "assistant",
       content: "",
+      ...(message.reasoningContent !== undefined
+        ? { reasoningContent: message.reasoningContent }
+        : {}),
       toolCalls: [
         {
           id,
@@ -364,7 +385,9 @@ export function withRole(message: PlaygroundMessage, role: PlaygroundRole): Play
     toolArguments: _toolArguments,
     ...rest
   } = message;
-  return { ...rest, role };
+  if (role === "assistant") return { ...rest, role };
+  const { reasoningContent: _reasoningContent, ...withoutReasoning } = rest;
+  return { ...withoutReasoning, role };
 }
 
 /**

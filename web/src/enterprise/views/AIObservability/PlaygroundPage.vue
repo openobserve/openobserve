@@ -611,6 +611,7 @@ async function runCell(variant: PlaygroundVariant, rowKey: string) {
   setCell(variant.id, rowKey, {
     status: "streaming",
     text: "",
+    reasoningContent: null,
     toolCall: null,
     usage: null,
     error: null,
@@ -653,6 +654,7 @@ async function runCell(variant: PlaygroundVariant, rowKey: string) {
     setCell(variant.id, rowKey, {
       status: "done",
       text: result.text,
+      reasoningContent: result.reasoningContent,
       toolCall: result.toolCall,
       usage: result.usage,
     });
@@ -932,12 +934,18 @@ function addOutputToMessages(variantId: string) {
         toolName: cell.toolCall.name,
         toolCallId: cell.toolCall.id,
         toolArguments: cell.toolCall.arguments,
+        ...(cell.reasoningContent != null ? { reasoningContent: cell.reasoningContent } : {}),
       },
     ];
   } else {
     variant.messages = [
       ...variant.messages,
-      { id: playgroundId("msg"), role: "assistant", content: cell.text },
+      {
+        id: playgroundId("msg"),
+        role: "assistant",
+        content: cell.text,
+        ...(cell.reasoningContent != null ? { reasoningContent: cell.reasoningContent } : {}),
+      },
       { id: playgroundId("msg"), role: "user", content: "" },
     ];
   }

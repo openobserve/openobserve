@@ -76,7 +76,7 @@
               />
               <OButton
                 variant="ghost-muted"
-                size="icon-xs"
+                :size="cell.toolCall ? 'xs' : 'icon-xs'"
                 icon-left="chat"
                 :title="
                   cell.toolCall
@@ -85,7 +85,11 @@
                 "
                 :data-test="`ai-playground-output-add-to-messages-${label}`"
                 @click="emit('add-to-messages')"
-              />
+              >
+                <span v-if="cell.toolCall">
+                  {{ t("aiObservability.playground.toolCallAddToMessages") }}
+                </span>
+              </OButton>
               <OButton
                 variant="ghost-muted"
                 size="icon-xs"
@@ -112,6 +116,13 @@
     <!-- Outside the splitter: dragging the panes must never be able to push Run
          off the bottom of the column. -->
     <div class="border-border-default shrink-0 border-t px-2.5 py-2.5">
+      <p
+        v-if="runDisabledReason"
+        class="text-text-secondary mt-0 mb-1.5 text-center text-xs"
+        :data-test="`ai-playground-run-disabled-reason-${label}`"
+      >
+        {{ runDisabledReason }}
+      </p>
       <OButton
         v-if="running"
         variant="primary"
@@ -138,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import PlaygroundOutputCell from "./PlaygroundOutputCell.vue";
@@ -151,7 +162,7 @@ import type {
 } from "@/enterprise/views/AIObservability/playgroundDraft";
 import type { Provider } from "@/services/online-evals.service";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     variant: PlaygroundVariant;
     label: string;
@@ -178,6 +189,20 @@ withDefaults(
 );
 
 const { t } = useI18nTyped();
+
+const runDisabledReason = computed(() => {
+  if (!props.runDisabled) return "";
+  const incompleteTool = props.variant.messages.find(
+    (message) =>
+      message.role === "tool" &&
+      (!message.toolName?.trim() || !message.toolArguments?.trim() || !message.content.trim()),
+  );
+  if (!incompleteTool) return "";
+  if (!incompleteTool.toolName?.trim() || !incompleteTool.toolArguments?.trim()) {
+    return t("aiObservability.playground.toolSetupRequired");
+  }
+  return t("aiObservability.playground.toolResultRequired");
+});
 
 /** Percent of the column given to the config. Per column and not persisted —
  *  it is a reading preference for the moment, not part of the draft. */

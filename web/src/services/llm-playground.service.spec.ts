@@ -167,6 +167,31 @@ describe("runPlayground — live adapter", () => {
     expect(result.text).toBe("");
   });
 
+  it("preserves DeepSeek reasoning from the terminal stream frame", async () => {
+    stubFetch(
+      streamingResponse([
+        frame({
+          type: "toolCall",
+          id: "call_1",
+          name: "lookup_order",
+          arguments: '{"order_id":"123"}',
+        }),
+        frame({
+          type: "done",
+          reasoningContent: "I need the order lookup before answering.",
+          latencyMs: 9,
+          usage: {},
+        }),
+      ]),
+    );
+
+    const result = await runPlayground("org", request(), { onDelta: () => {} });
+
+    expect((result as unknown as { reasoningContent: string | null }).reasoningContent).toBe(
+      "I need the order lookup before answering.",
+    );
+  });
+
   it("throws a retryable error for an error frame inside an open stream", async () => {
     stubFetch(
       streamingResponse([
@@ -244,6 +269,7 @@ describe("runPlayground — live adapter", () => {
           {
             role: "assistant",
             content: "",
+            reasoningContent: "I should look up this order.",
             toolCalls: [
               {
                 id: "call_1",
@@ -266,6 +292,7 @@ describe("runPlayground — live adapter", () => {
       {
         role: "assistant",
         content: "",
+        reasoningContent: "I should look up this order.",
         toolCalls: [
           {
             id: "call_1",

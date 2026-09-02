@@ -74,6 +74,8 @@ pub struct PlaygroundMessageBody {
     #[serde(default)]
     pub content: Option<Value>,
     #[serde(default)]
+    pub reasoning_content: Option<String>,
+    #[serde(default)]
     pub tool_call_id: Option<String>,
     #[serde(default)]
     pub tool_calls: Vec<PlaygroundToolCallBody>,

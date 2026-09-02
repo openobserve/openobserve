@@ -335,6 +335,7 @@ fn render_messages(
             Ok(ProviderChatMessage {
                 role: message.role.clone(),
                 content,
+                reasoning_content: message.reasoning_content.clone(),
                 tool_call_id: message.tool_call_id.clone(),
                 tool_calls: message
                     .tool_calls
@@ -356,6 +357,11 @@ fn validate_tool_messages(messages: &[ProviderChatMessage]) -> Result<(), Respon
     let mut call_ids = HashSet::new();
     let mut result_ids = HashSet::new();
     for message in messages {
+        if message.reasoning_content.is_some() && message.role != "assistant" {
+            return Err(MetaHttpResponse::bad_request(
+                "Only assistant messages may contain reasoningContent",
+            ));
+        }
         if !message.tool_calls.is_empty() {
             if message.role != "assistant" {
                 return Err(MetaHttpResponse::bad_request(
@@ -537,6 +543,7 @@ pub async fn run_playground_cell(
                 json!({
                     "role": message.role,
                     "content": message.content,
+                    "reasoningContent": message.reasoning_content,
                     "toolCallId": message.tool_call_id,
                     "toolCalls": message.tool_calls,
                 })
@@ -563,6 +570,7 @@ pub async fn run_playground_cell(
                     "type": "done",
                     "model": result.model_used,
                     "latencyMs": result.latency_ms,
+                    "reasoningContent": result.reasoning_content,
                     "usage": {
                         "promptTokens": result.prompt_tokens,
                         "completionTokens": result.completion_tokens,
@@ -691,12 +699,14 @@ mod tests {
             PlaygroundMessageBody {
                 role: "user".to_string(),
                 content: Some(json!("Hello {{name}}")),
+                reasoning_content: None,
                 tool_call_id: None,
                 tool_calls: Vec::new(),
             },
             PlaygroundMessageBody {
                 role: "user".to_string(),
                 content: Some(structured.clone()),
+                reasoning_content: None,
                 tool_call_id: None,
                 tool_calls: Vec::new(),
             },
@@ -714,6 +724,7 @@ mod tests {
             PlaygroundMessageBody {
                 role: "assistant".to_string(),
                 content: Some(json!("")),
+                reasoning_content: Some("I should look up this order.".to_string()),
                 tool_call_id: None,
                 tool_calls: vec![PlaygroundToolCallBody {
                     id: "call_1".to_string(),
@@ -724,6 +735,7 @@ mod tests {
             PlaygroundMessageBody {
                 role: "tool".to_string(),
                 content: Some(json!({"status": "shipped"})),
+                reasoning_content: None,
                 tool_call_id: Some("call_1".to_string()),
                 tool_calls: Vec::new(),
             },
@@ -732,6 +744,10 @@ mod tests {
         let rendered = render_messages(&column, &Value::Null).unwrap();
         assert_eq!(rendered[0].tool_calls[0].id, "call_1");
         assert_eq!(rendered[0].tool_calls[0].name, "lookup_order");
+        assert_eq!(
+            rendered[0].reasoning_content.as_deref(),
+            Some("I should look up this order.")
+        );
         assert_eq!(rendered[1].tool_call_id.as_deref(), Some("call_1"));
     }
 }
