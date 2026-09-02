@@ -208,20 +208,25 @@ pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+// Losing these silently degrades sourcemap translation, breadcrumbs and session replay.
+const _DEFAULT_QUICK_MODE_FIELDS: [&str; 4] = ["service", "version", "session_id", "view_url"];
 pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = get_config()
-        .common
-        .feature_quick_mode_fields
-        .split(',')
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        })
-        .collect::<Vec<_>>();
+    let mut fields = chain(
+        _DEFAULT_QUICK_MODE_FIELDS.iter().map(|s| s.to_string()),
+        get_config()
+            .common
+            .feature_quick_mode_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -1737,7 +1742,11 @@ pub struct Common {
         help = "Comma-separated fields to build bloom filter on for all streams, replaces the deprecated ZO_BLOOM_FILTER_DEFAULT_FIELDS"
     )]
     pub feature_bloom_filter_extra_fields: String,
-    #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
+    #[env_config(
+        name = "ZO_FEATURE_QUICK_MODE_FIELDS",
+        default = "",
+        help = "Comma-separated extra fields quick mode always returns when the stream has them, on top of the built-in defaults"
+    )]
     pub feature_quick_mode_fields: String,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
     pub feature_query_queue_enabled: bool,

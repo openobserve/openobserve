@@ -21,6 +21,9 @@ export type ButtonVariant =
   | "ghost-warning"
   | "ghost-neutral"
   | "outline-destructive"
+  // Solid "stop this running operation" red — distinct from destructive
+  // (delete/danger): a query/task actively in flight that a click will abort
+  | "cancel-query"
   | "sidebar-toggle"
   // Dedicated variant for sidebar panel collapse/expand icon button
   | "panel-collapse"
