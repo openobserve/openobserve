@@ -25,12 +25,9 @@
 
     <!-- error -->
     <template v-else-if="cell.status === 'error'">
-      <OBanner
-        variant="error"
-        dense
-        :content="raw(cell.error?.message)"
-        data-test="ai-playground-output-error"
-      />
+      <OBanner variant="error" dense preserve-whitespace data-test="ai-playground-output-error">
+        {{ raw(cell.error?.message) }}
+      </OBanner>
       <div>
         <OButton
           variant="outline"

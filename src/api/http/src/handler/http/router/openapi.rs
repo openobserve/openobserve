@@ -535,6 +535,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::experiments::list_experiments,
     openobserve_api_management::request::experiments::compare_experiments,
     openobserve_api_management::request::experiments::get_experiment,
+    openobserve_api_management::request::experiments::list_experiment_result_rows,
     openobserve_api_management::request::experiments::get_experiment_row,
     openobserve_api_management::request::experiments::retry_experiment_slot,
     openobserve_api_management::request::experiments::cancel_experiment,

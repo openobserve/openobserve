@@ -11200,7 +11200,7 @@
             "item": "Élément",
             "versions": "Versions"
           },
-          "versionPill": "v{version} · {count} version | v{version} · {count} versions",
+          "versionPill": "{count} version | {count} versions",
           "sourceSection": "Source",
           "sourceTrace": "Trace",
           "sourceSpan": "Span",
@@ -11723,6 +11723,8 @@
       "schemaToggle": "Contraindre la sortie à un schéma JSON",
       "schemaHelp": "La sortie s'affiche avec un formatage JSON lorsqu'un schéma est défini.",
       "schemaInvalidJson": "Le schéma doit être un JSON valide.",
+      "schemaIgnored": "Schéma · Ignoré par ce fournisseur",
+      "schemaUnsupported": "Ce fournisseur ne dispose pas de champ de sortie structurée. Le schéma est conservé dans cette colonne, mais il n'est pas envoyé et le modèle répond en texte brut.",
       "outputPlaceholder": "La sortie apparaît ici — appuyez sur Exécuter.",
       "outputNotRun": "Non exécuté",
       "retry": "Réessayer",
