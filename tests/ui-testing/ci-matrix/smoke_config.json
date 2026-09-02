@@ -25,6 +25,8 @@
     "web/src/services/common.*",
     "web/src/services/config.*",
     "web/src/services/index.*",
+    "web/src/services/search.*",
+    "web/src/services/streaming_search.*",
     "web/src/App.vue",
     "web/src/main.ts",
     "web/package.json",
@@ -102,7 +104,6 @@
       "web/src/views/PinnedDashboardTab*",
       "web/src/services/dashboards.*",
       "web/src/services/dashboard_annotations.*",
-      "web/src/services/search.*",
       "tests/ui-testing/pages/dashboardPages/**"
     ],
     "Functions": [
@@ -136,9 +137,7 @@
     "Logs": [
       "web/src/plugins/logs/**",
       "web/src/components/logs/**",
-      "web/src/services/search.*",
       "web/src/services/httpsearch.*",
-      "web/src/services/streaming_search.*",
       "web/src/services/saved_views.*",
       "web/src/services/patterns.*",
       "tests/ui-testing/pages/logsPages/**",
@@ -150,8 +149,6 @@
       "web/src/components/promql/**",
       "web/src/views/PromQL/**",
       "web/src/services/metrics.*",
-      "web/src/services/search.*",
-      "web/src/services/streaming_search.*",
       "tests/ui-testing/pages/metricsPages/**"
     ],
     "Pipelines": [
@@ -186,8 +183,6 @@
     "Traces": [
       "web/src/plugins/traces/**",
       "web/src/services/service_graph.*",
-      "web/src/services/search.*",
-      "web/src/services/streaming_search.*",
       "tests/ui-testing/pages/tracesPages/**",
       "web/src/plugins/correlation/**"
     ],
