@@ -224,16 +224,23 @@ pub async fn get_sourcemap_file(
         .filter(Column::Org.eq(org))
         .filter(Column::SourceFileName.eq(source_file));
 
+    // None must match IS NULL (mirror delete_group); a dropped filter leaks another scope's map.
     if let Some(s) = service.as_ref() {
         stmt = stmt.filter(Column::Service.eq(s));
+    } else {
+        stmt = stmt.filter(Column::Service.is_null());
     }
 
     if let Some(e) = env.as_ref() {
         stmt = stmt.filter(Column::Env.eq(e));
+    } else {
+        stmt = stmt.filter(Column::Env.is_null());
     }
 
     if let Some(v) = version.as_ref() {
         stmt = stmt.filter(Column::Version.eq(v));
+    } else {
+        stmt = stmt.filter(Column::Version.is_null());
     }
 
     let res = stmt.one(client).await?.map(|model| model.into());
