@@ -266,6 +266,141 @@ const noHardcodedPx = {
   },
 };
 
+// ── no-hardcoded-color ─────────────────────────────────────────────────────
+// Colour is a design token: a component reaches it through a --color-* utility class,
+// never as a literal, or it cannot follow the theme. <style> blocks are gated by
+// stylelint (`color-no-hex`) and .ts by scripts/check-design-consistency.mjs, but the
+// `<script>` block of a .vue file was gated by NOTHING — this rule closes that hole.
+// Colour is read from AST nodes, never raw text, so a hex named in a comment or in
+// prose ("e.g. #FF0000") is excluded structurally rather than by comment-stripping.
+//
+// `#rgb` / `#rrggbb` / `#rrggbbaa` only — the trailing guard keeps a 7-digit id like
+// "#abcdef0" from being read as a 6-digit colour, and the leading guard keeps `##anchor`
+// and an HTML entity (`&#fff`) out. The `i` flag is required: CSS function names are
+// case-insensitive, so RGBA()/OKLCH() are just as real as the lowercase spellings.
+const COLOR_LITERAL =
+  /(?<![\w#&])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])|\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\s*\(/gi;
+
+// Pre-existing violations, measured when this rule was introduced: 260 colour literals
+// (201 hex, 59 functional) in the <script> blocks of these 51 .vue files. Every entry is a file that hardcodes
+// colour today and is PENDING MIGRATION to design tokens — it is a debt record, NOT a
+// sanctioned home. The list must only ever SHRINK: deleting a line when a file is
+// migrated is the only edit ever made to it. New entries are NOT accepted — a new colour
+// literal is either fixed at the site or, where a literal is genuinely required,
+// annotated there with `eslint-disable-next-line local/no-hardcoded-color -- <reason>`.
+const COLOR_ALLOWLIST = [
+  "web/src/components/CodeQueryEditor.vue",
+  "web/src/components/EnterpriseUpgradeDialog.vue",
+  "web/src/components/O2AIChat.vue",
+  "web/src/components/alerts/FilterGroup.vue",
+  "web/src/components/alerts/IncidentDetailDrawer.vue",
+  "web/src/components/alerts/IncidentServiceGraph.vue",
+  "web/src/components/alerts/PreviewAlert.vue",
+  "web/src/components/dashboards/ColorSwatchPicker.vue",
+  "web/src/components/dashboards/DashboardLogDrawer.vue",
+  "web/src/components/dashboards/PanelSchemaRenderer.vue",
+  "web/src/components/dashboards/addPanel/BackGroundColorConfig.vue",
+  "web/src/components/dashboards/addPanel/ColorBySeriesPopUp.vue",
+  "web/src/components/dashboards/addPanel/ColorPaletteDropDown.vue",
+  "web/src/components/dashboards/panels/TableRenderer.vue",
+  "web/src/components/ingestion/setupCard/SetupCardRenderer.vue",
+  "web/src/components/rum/errorTracking/list/ErrorsOverTimeChart.vue",
+  "web/src/components/rum/errorTracking/view/ErrorOccurrencesChart.vue",
+  "web/src/components/settings/General.vue",
+  "web/src/components/settings/License.vue",
+  "web/src/components/settings/ModelPricingEditor.vue",
+  "web/src/components/settings/ServiceIdentitySetup.vue",
+  "web/src/components/slos/SloBurndownChart.vue",
+  "web/src/components/slos/SloPreviewChart.vue",
+  "web/src/components/slos/SloTimeSlicePreview.vue",
+  "web/src/components/traces/FlameGraphView.vue",
+  "web/src/enterprise/components/billings/usage.vue",
+  "web/src/enterprise/components/onlineEvals/quality/QualityBooleanBarsChart.vue",
+  "web/src/enterprise/components/onlineEvals/quality/QualityBooleanTrendChart.vue",
+  "web/src/enterprise/components/onlineEvals/quality/QualityCategoryBarsChart.vue",
+  "web/src/enterprise/components/onlineEvals/quality/QualityDistributionChart.vue",
+  "web/src/lib/core/EmptyState/OEmptyState.vue",
+  "web/src/lib/forms/Color/OColor.vue",
+  "web/src/lib/overlay/Tooltip/OTooltip.vue",
+  "web/src/plugins/logs/BuildQueryPage.vue",
+  "web/src/plugins/logs/SearchResult.vue",
+  "web/src/plugins/pipelines/CustomNode.vue",
+  "web/src/plugins/traces/KpiSparkline.vue",
+  "web/src/plugins/traces/LLMContentRenderer.vue",
+  "web/src/plugins/traces/LLMInsightsDashboard.vue",
+  "web/src/plugins/traces/ServiceGraph.vue",
+  "web/src/plugins/traces/SessionRibbon.vue",
+  "web/src/plugins/traces/SpanBlock.vue",
+  "web/src/plugins/traces/TraceDAG.vue",
+  "web/src/plugins/traces/TraceDetails.vue",
+  "web/src/plugins/traces/TraceDetailsSidebar.vue",
+  "web/src/plugins/traces/TraceTree.vue",
+  "web/src/plugins/traces/components/TraceLatencyCell.vue",
+  "web/src/plugins/traces/components/TraceServiceCell.vue",
+  "web/src/plugins/workflows/WorkflowNode.vue",
+  "web/src/views/UsageTab.vue",
+  "web/src/views/synthetics/MonitorRuns.vue",
+];
+
+const noHardcodedColor = {
+  rules: {
+    "no-hardcoded-color": {
+      meta: {
+        type: "problem",
+        docs: { description: "Colour comes from a design token, not a literal" },
+      },
+      create(context) {
+        const filename = (context.filename ?? context.getFilename() ?? "").replace(/\\/g, "/");
+        // Spec files legitimately assert on literal colour strings.
+        if (/\.spec\.|\.test\.|\/tests?\//.test(filename)) return {};
+        // .vue <script> only — this is the gap nothing else covers. Hex in .ts/.js is
+        // already frozen by check-design-consistency.mjs `tsHex` + TS_HEX_ALLOWLIST;
+        // duplicating that debt here would give the same literal two owners.
+        if (!filename.endsWith(".vue")) return {};
+        const matches = (p) => (p.endsWith("/") ? filename.includes(p) : filename.endsWith(p));
+        if (COLOR_ALLOWLIST.some(matches)) return {};
+        const sourceCode = context.sourceCode ?? context.getSourceCode();
+
+        // Node ranges overlap (a TemplateElement sits inside its own literal), so dedupe.
+        const reported = new Set();
+        const reportAt = (start, raw) => {
+          if (reported.has(start)) return;
+          reported.add(start);
+          const shown = raw.endsWith("(") ? `${raw.replace(/\s*\($/, "")}()` : raw;
+          context.report({
+            loc: {
+              start: sourceCode.getLocFromIndex(start),
+              end: sourceCode.getLocFromIndex(start + raw.length),
+            },
+            message: `Hardcoded colour ${shown}. Colour comes from a design token: use the --color-* token through its utility class (bg-*/text-*/border-*), or read the token instead of restating its value. If a literal is genuinely required (ECharts/canvas option object, Monaco theme, SVG/email consumer, a token definition), add \`// eslint-disable-next-line local/no-hardcoded-color -- <why a literal is correct here>\` at the site.`,
+          });
+        };
+
+        const scanNode = (node) => {
+          const [start, end] = node.range;
+          const chunk = sourceCode.getText().slice(start, end);
+          let match;
+          COLOR_LITERAL.lastIndex = 0;
+          while ((match = COLOR_LITERAL.exec(chunk))) {
+            reportAt(start + match.index, match[0]);
+          }
+        };
+
+        const scriptVisitor = { Literal: scanNode, TemplateElement: scanNode };
+        const services = sourceCode.parserServices ?? context.parserServices;
+
+        // .vue: `<script>`/`<script setup>` only. The template's own colour literals
+        // (hexClass, inlineHexStyle, inlineHexBind) are already counted by
+        // scripts/check-design-consistency.mjs, so the template visitor is empty.
+        if (filename.endsWith(".vue") && services?.defineTemplateBodyVisitor) {
+          return services.defineTemplateBodyVisitor({}, scriptVisitor);
+        }
+        return scriptVisitor;
+      },
+    },
+  },
+};
+
 // Non-translatable tokens, fed to both i18n rules.
 //
 // An entry is a GLOBAL, PERMANENT exemption with no explanation at the call site,
@@ -532,7 +667,13 @@ export default [
       vue,
       "@typescript-eslint": typescript,
       prettier,
-      local: { rules: { ...noLegacyO2Tokens.rules, ...noHardcodedPx.rules } },
+      local: {
+        rules: {
+          ...noLegacyO2Tokens.rules,
+          ...noHardcodedPx.rules,
+          ...noHardcodedColor.rules,
+        },
+      },
       "@intlify/vue-i18n": vueI18n,
     },
     // en-US only. The other locales are generated from it and lag behind, so
@@ -546,6 +687,7 @@ export default [
     rules: {
       "local/no-legacy-o2-tokens": ["error"],
       "local/no-hardcoded-px": ["error"],
+      "local/no-hardcoded-color": ["error"],
 
       // A missing key is invisible at build time — vue-i18n renders the raw key to
       // the user. Dynamic keys are skipped by the rule; specs are exempted below.

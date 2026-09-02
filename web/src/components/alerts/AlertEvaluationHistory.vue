@@ -122,6 +122,15 @@
       </span>
     </template>
 
+    <template #cell-anomaly_count="{ row }">
+      <span
+        class="text-compact tabular-nums"
+        :class="row.anomaly_count > 0 ? 'text-status-error-text font-medium' : ''"
+      >
+        {{ row.anomaly_count ?? "—" }}
+      </span>
+    </template>
+
     <template #cell-query_time="{ row }">
       <span class="text-compact tabular-nums">
         {{ row.query_took != null ? row.query_took + "ms" : "—" }}
@@ -164,9 +173,10 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
 import { conditionSummary } from "@/utils/alerts/runOutcome";
 
-const props = withDefaults(defineProps<{ alertId: string; isComposite?: boolean }>(), {
-  isComposite: false,
-});
+const props = withDefaults(
+  defineProps<{ alertId: string; isComposite?: boolean; isAnomaly?: boolean }>(),
+  { isComposite: false, isAnomaly: false },
+);
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -218,7 +228,8 @@ const fetchHistory = async () => {
     const endTime = Date.now() * 1000;
     const startTime = endTime - (RANGE_MS[range.value] ?? RANGE_MS["1h"]) * 1000;
     const res = await alertsService.getHistory(orgId, {
-      alert_id: props.alertId,
+      // An anomaly id fails the endpoint's `alert_id` existence check outright.
+      ...(props.isAnomaly ? { anomaly_id: props.alertId } : { alert_id: props.alertId }),
       start_time: startTime,
       end_time: endTime,
       from: (currentPage.value - 1) * pageSize.value,
@@ -276,14 +287,29 @@ const columns = computed<OTableColumnDef[]>(() => [
     resizable: true,
     meta: { align: "left" },
   },
-  {
-    id: "condition",
-    accessorKey: "actual_value",
-    header: t("alerts.historyTable.condition"),
-    cell: " ",
-    resizable: true,
-    meta: { align: "left", flex: true },
-  },
+  // An anomaly run reports no threshold and no query timing, but does report a count.
+  ...(props.isAnomaly
+    ? [
+        {
+          id: "anomaly_count",
+          accessorKey: "anomaly_count",
+          header: t("alerts.historyTable.anomalies"),
+          cell: " ",
+          size: 140,
+          resizable: true,
+          meta: { align: "left" },
+        } as OTableColumnDef,
+      ]
+    : [
+        {
+          id: "condition",
+          accessorKey: "actual_value",
+          header: t("alerts.historyTable.condition"),
+          cell: " ",
+          resizable: true,
+          meta: { align: "left", flex: true },
+        } as OTableColumnDef,
+      ]),
   {
     id: "retries",
     accessorKey: "retries",
@@ -304,16 +330,20 @@ const columns = computed<OTableColumnDef[]>(() => [
     hideable: true,
     meta: { align: "left" },
   },
-  {
-    id: "query_time",
-    accessorKey: "query_took",
-    header: t("alerts.historyTable.queryTime"),
-    cell: " ",
-    size: 120,
-    resizable: true,
-    hideable: true,
-    meta: { align: "left" },
-  },
+  ...(props.isAnomaly
+    ? []
+    : [
+        {
+          id: "query_time",
+          accessorKey: "query_took",
+          header: t("alerts.historyTable.queryTime"),
+          cell: " ",
+          size: 120,
+          resizable: true,
+          hideable: true,
+          meta: { align: "left" },
+        } as OTableColumnDef,
+      ]),
   {
     id: "error",
     accessorKey: "error",

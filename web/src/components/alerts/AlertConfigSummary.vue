@@ -36,12 +36,13 @@
               {{ field.label }}
             </dt>
             <dd class="text-text-heading text-sm" :class="field.mono ? 'font-mono break-all' : ''">
+              <OTag v-if="field.badge" :type="field.badge" :value="field.value" size="sm" />
               <!-- Unstyled on purpose: base-elements.css already gives every
                    `a` the link colour AND the darker hover shade. Re-declaring
                    `text-text-link` here would pin hover to the resting colour,
                    making this the one link in the app that does not respond. -->
               <router-link
-                v-if="field.link"
+                v-else-if="field.link"
                 :to="field.link"
                 :data-test="`alerts-alertconfigsummary-${field.key}-link`"
                 >{{ field.value }}</router-link
@@ -57,13 +58,37 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OCard from "@/lib/core/Card/OCard.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import {
+  buildAnomalyFilterExpression,
+  operatorNeedsValue,
+} from "@/utils/alerts/anomalyFilterOperators";
 import { burnWindowLabel } from "@/utils/alerts/sloAlertPayload";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
+import { formatTimestampInTimezone } from "@/utils/date";
+
+/** A field row. Loose by construction: the optional render hints (`mono`,
+ *  `badge`, `link`) are set on some rows and not others, and inferring per-row
+ *  literal types splits the list into a union the template cannot read. */
+interface SummaryField {
+  key: string;
+  label: I18nText;
+  value: any;
+  mono?: boolean;
+  badge?: string;
+  link?: Record<string, any>;
+}
+
+interface SummarySection {
+  key: string;
+  title: I18nText;
+  fields: SummaryField[];
+}
 
 const props = defineProps<{
   alert: any;
@@ -172,7 +197,7 @@ const sloKindLabel = computed(() => {
 
 const sloFields = computed(() => {
   const cond = sloCondition.value;
-  const fields: Record<string, any>[] = [
+  const fields: SummaryField[] = [
     {
       key: "slo",
       label: t("alerts.sloColumn"),
@@ -217,7 +242,170 @@ const sloFields = computed(() => {
   return fields;
 });
 
-const sections = computed(() => [
+// The GET falls back to the flat config row, which has none of the generic fields.
+const isAnomalyConfig = computed(() => props.alert?.alert_type === "anomaly_detection");
+
+const anomalyFiltersText = computed(() => {
+  const filters = props.alert?.filters;
+  if (!Array.isArray(filters)) return EMPTY;
+  const parts = filters
+    // Matches the SQL preview's guard, so the two agree on what counts as configured.
+    .filter((f: any) => f?.field && (operatorNeedsValue(f.operator) ? f.value : true))
+    .map((f: any) => buildAnomalyFilterExpression(f.field, f.operator, f.value))
+    .filter(Boolean);
+  return parts.length ? parts.join(" AND ") : EMPTY;
+});
+
+const anomalyTimestamp = (us: unknown): string => {
+  const n = Number(us);
+  if (!Number.isFinite(n) || n <= 0) return EMPTY;
+  try {
+    // formatInTimeZone throws on a bad zone; inside a computed that blanks the tab.
+    return formatTimestampInTimezone(n, "YYYY-MM-DD HH:mm:ss", store.state.timezone || "UTC");
+  } catch {
+    return EMPTY;
+  }
+};
+
+const anomalySourceFields = computed(() => {
+  const a = props.alert;
+  const customSql = a?.query_mode === "custom_sql";
+  const fields: SummaryField[] = [
+    { key: "stream", label: t("alerts.streamName"), value: a?.stream_name || EMPTY },
+    { key: "stream-type", label: t("alerts.streamType"), value: a?.stream_type || EMPTY },
+    {
+      key: "query-mode",
+      label: t("alerts.anomaly.queryMode"),
+      value: customSql ? t("alerts.customSql") : t("alerts.anomaly.filters"),
+    },
+  ];
+  // The modes are exclusive: the unused one's dash reads as a missing setting.
+  if (customSql) {
+    fields.push({
+      key: "custom-sql",
+      label: t("alerts.customSql"),
+      value: a?.custom_sql || EMPTY,
+      mono: true,
+    });
+  } else {
+    fields.push(
+      {
+        key: "detection-function",
+        label: t("alerts.detectionFunction"),
+        value: a?.detection_function || EMPTY,
+        mono: true,
+      },
+      {
+        key: "filters",
+        label: t("alerts.anomaly.filters"),
+        value: anomalyFiltersText.value,
+        mono: true,
+      },
+    );
+  }
+  // Stored as the percentile scored against; the form shows its complement.
+  const percentile = isBlank(a?.threshold) ? NaN : Number(a.threshold);
+  fields.push({
+    key: "sensitivity",
+    label: t("alerts.sensitivity"),
+    value: Number.isFinite(percentile)
+      ? t("alerts.anomaly.summaryThresholdRate", { rate: 100 - percentile })
+      : EMPTY,
+  });
+  return fields;
+});
+
+const anomalyScheduleFields = computed(() => {
+  const a = props.alert;
+  // Number(null) is 0, and 0 is the stored value for "retrain never".
+  const retrainDays = isBlank(a?.retrain_interval_days) ? NaN : Number(a.retrain_interval_days);
+  const trainingDays = isBlank(a?.training_window_days) ? NaN : Number(a.training_window_days);
+  return [
+    {
+      key: "schedule-interval",
+      label: t("alerts.anomaly.checkEvery"),
+      value: a?.schedule_interval || EMPTY,
+    },
+    {
+      key: "histogram-interval",
+      label: t("alerts.anomaly.detectionResolution"),
+      value: a?.histogram_interval || EMPTY,
+    },
+    {
+      key: "detection-window",
+      label: t("alerts.anomaly.lookBackWindow"),
+      value: burnWindowLabel(a?.detection_window_seconds) || EMPTY,
+    },
+    {
+      key: "training-window",
+      label: t("alerts.trainingWindow"),
+      value: Number.isFinite(trainingDays)
+        ? t("alerts.anomaly.nDays", { days: trainingDays }, trainingDays)
+        : EMPTY,
+    },
+    {
+      key: "retrain-interval",
+      label: t("alerts.anomaly.retrainEvery"),
+      value: !Number.isFinite(retrainDays)
+        ? EMPTY
+        : retrainDays === 0
+          ? t("alerts.anomaly.retrainNever")
+          : t("alerts.anomaly.nDays", { days: retrainDays }, retrainDays),
+    },
+    {
+      key: "notifications",
+      label: t("alerts.anomaly.notifications"),
+      value: a?.alert_enabled ? t("alerts.anomaly.enabled") : t("alerts.anomaly.disabled"),
+    },
+    {
+      key: "destinations",
+      // Anomaly configs deliver through `alert_destinations`, not `destinations`.
+      label: t("alerts.destination"),
+      value:
+        Array.isArray(a?.alert_destinations) && a.alert_destinations.length
+          ? a.alert_destinations.join(", ")
+          : EMPTY,
+    },
+  ];
+});
+
+const anomalyModelFields = computed(() => {
+  const a = props.alert;
+  const fields: SummaryField[] = [
+    {
+      key: "status",
+      label: t("alerts.status"),
+      value: a?.status || EMPTY,
+      // The same badge the list renders, so one status does not read two ways.
+      badge: a?.status ? "alertStatus" : undefined,
+    },
+    {
+      key: "last-trained",
+      label: t("alerts.anomaly.lastTrained"),
+      value: anomalyTimestamp(a?.training_completed_at),
+    },
+    {
+      key: "model-version",
+      label: t("alerts.anomaly.modelVersion"),
+      // The column is NOT NULL and created as 0, so a never-trained config has
+      // a version number without having a model.
+      value: Number(a?.current_model_version) > 0 ? String(a.current_model_version) : EMPTY,
+    },
+  ];
+  // A permanent empty row implies an error slot worth watching on a healthy model.
+  if (a?.last_error) {
+    fields.push({ key: "last-error", label: t("alerts.anomaly.lastError"), value: a.last_error });
+  }
+  return fields;
+});
+
+const anomalySections = computed<SummarySection[]>(() => [
+  { key: "source", title: t("alerts.configuration"), fields: anomalySourceFields.value },
+  { key: "schedule", title: t("alerts.groups.schedule"), fields: anomalyScheduleFields.value },
+  { key: "model", title: t("alerts.anomaly.model"), fields: anomalyModelFields.value },
+]);
+
+const genericSections = computed<SummarySection[]>(() => [
   {
     key: "source",
     title: t("alerts.configuration"),
@@ -315,4 +503,8 @@ const sections = computed(() => [
     ],
   },
 ]);
+
+const sections = computed(() =>
+  isAnomalyConfig.value ? anomalySections.value : genericSections.value,
+);
 </script>

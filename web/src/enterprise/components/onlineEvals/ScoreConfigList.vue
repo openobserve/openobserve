@@ -62,6 +62,7 @@
               :loading="loading"
               selectable
               :selected-key="selectedStatKey"
+              default-key="all"
               @select="onStatSelect"
             />
           </div>
