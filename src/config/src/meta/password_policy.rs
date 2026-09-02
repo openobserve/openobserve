@@ -105,6 +105,13 @@ pub struct PasswordPolicy {
     pub history_max_retained: u32,
     pub lockout: LockoutPolicy,
     pub enforcement_mode: EnforcementMode,
+    /// How long a sign-in cookie stays valid, in seconds. `0` defers to `ZO_COOKIE_MAX_AGE`.
+    ///
+    /// This is the browser's copy of the credential, not a server-side session: shortening it
+    /// makes the browser stop sending the cookie sooner, and does nothing to a copy taken from
+    /// it. It applies from the next sign-in — cookies already issued keep the lifetime they
+    /// were given.
+    pub cookie_max_age_secs: u32,
     /// Whether root is held to rotation and lockout like every other native user.
     ///
     /// Default `false`, which is the documented exemption: root is the only account that can
@@ -288,6 +295,7 @@ impl Default for PasswordPolicy {
             lockout: LockoutPolicy::default(),
             enforcement_mode: EnforcementMode::HardBlock,
             apply_to_root: false,
+            cookie_max_age_secs: 0,
         }
     }
 }
@@ -383,6 +391,19 @@ impl PasswordPolicy {
     /// Failed attempts tolerated before the lockout at `level` (0 = no lockout yet) triggers.
     pub fn lockout_bucket(&self, level: u32) -> u32 {
         self.lockout.bucket(level)
+    }
+
+    /// Seconds a sign-in cookie should live, falling back to `fallback` when the policy defers.
+    ///
+    /// Deferring rather than storing the deployment's own default keeps `ZO_COOKIE_MAX_AGE`
+    /// authoritative for an instance nobody has configured, so this changes nothing until an
+    /// administrator sets it.
+    pub fn cookie_max_age_secs(&self, fallback: i64) -> i64 {
+        if self.cookie_max_age_secs == 0 {
+            fallback
+        } else {
+            i64::from(self.cookie_max_age_secs)
+        }
     }
 
     /// Reject combinations that contradict themselves. Errors name the offending field so the API
@@ -561,7 +582,20 @@ mod tests {
         next.lockout.threshold = 3;
         next.enforcement_mode = EnforcementMode::RestrictWrites;
         next.special_char_set = "!@#".to_string();
+        next.cookie_max_age_secs = 900;
         assert!(!next.is_stricter_than(&base()));
+    }
+
+    /// `0` is not "expire immediately" but "the deployment's own default stands", which is what
+    /// keeps an unconfigured instance on `ZO_COOKIE_MAX_AGE`.
+    #[test]
+    fn test_cookie_max_age_defers_to_the_fallback_until_it_is_set() {
+        let mut policy = base();
+        assert_eq!(policy.cookie_max_age_secs, 0, "unset by default");
+        assert_eq!(policy.cookie_max_age_secs(2_592_000), 2_592_000);
+
+        policy.cookie_max_age_secs = 900;
+        assert_eq!(policy.cookie_max_age_secs(2_592_000), 900);
     }
 
     #[test]
@@ -844,6 +878,10 @@ mod tests {
         assert!(
             !partial.apply_to_root,
             "a row predating the field must keep root exempt"
+        );
+        assert_eq!(
+            partial.cookie_max_age_secs, 0,
+            "and must keep deferring to the configured cookie lifetime"
         );
     }
 }

@@ -45,6 +45,17 @@ pub async fn get_effective_policy() -> PasswordPolicy {
     }
 }
 
+/// How long a sign-in cookie should live, in seconds.
+///
+/// The policy wins when an administrator has set it; otherwise `ZO_COOKIE_MAX_AGE` stands, so an
+/// instance nobody has configured keeps the lifetime its deployment chose. Every place that issues
+/// the auth cookie reads this rather than the config value directly.
+pub async fn cookie_max_age_secs() -> i64 {
+    get_effective_policy()
+        .await
+        .cookie_max_age_secs(config::get_config().auth.cookie_max_age)
+}
+
 /// Persist `policy`, flagging every eligible user for a forced password reset if the complexity
 /// requirements grew. Returns the number of users flagged, which is 0 when nothing tightened.
 ///

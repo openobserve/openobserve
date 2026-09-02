@@ -675,7 +675,8 @@ pub async fn authentication(
         let tokens = base64::encode(&tokens);
         let mut auth_cookie = Cookie::new("auth_tokens", tokens);
         auth_cookie.set_expires(
-            time::OffsetDateTime::now_utc() + time::Duration::seconds(cfg.auth.cookie_max_age),
+            time::OffsetDateTime::now_utc()
+                + time::Duration::seconds(db::password_policy::cookie_max_age_secs().await),
         );
         auth_cookie.set_http_only(true);
         auth_cookie.set_secure(cfg.auth.cookie_secure_only);
