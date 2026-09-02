@@ -32,8 +32,8 @@ use openobserve_api_management::request::cloud;
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, folders, kv, model_pricing,
-    organization, service_accounts, short_url, slos, sourcemaps, status, status_pages, stream,
-    synthetics, users,
+    organization, password_policy, service_accounts, short_url, slos, sourcemaps, status,
+    status_pages, stream, synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{promql, search, traces};
@@ -809,6 +809,8 @@ pub fn service_routes() -> Router {
 
         // Instance-wide native-user auth policy: authored on the meta org, enforced everywhere
         .route("/{org_id}/settings/password_policy", get(organization::password_policy::get_policy).put(organization::password_policy::set_policy))
+        // Administering the lockout that policy enforces: the only thing that ends one early
+        .route("/{org_id}/settings/password_policy/lockouts/{email_id}", get(password_policy::lockout::get_lockout).delete(password_policy::lockout::delete_lockout))
         // Complexity requirements only: readable by any authenticated user, including one the
         // policy middleware has blocked, who needs to know what password will satisfy it
         .route("/{org_id}/password_complexity", get(organization::password_policy::get_password_complexity))
@@ -2089,6 +2091,67 @@ mod tests {
 
         assert_eq!(refused.status(), StatusCode::FORBIDDEN);
     }
+
+    /// axum resolves the route table when the `Router` is built, panicking on two paths it cannot
+    /// tell apart. Nothing else here constructs the real table — the tests below use minimal
+    /// routers — so without this a conflicting path would first be discovered at startup.
+    #[test]
+    fn service_routes_table_has_no_conflicts() {
+        let _ = service_routes();
+    }
+
+    /// The lockout routes answer to the same rule as the policy: the state they expose is its
+    /// enforcement record, and the counters would tell the user they describe how to pace attempts
+    /// under the threshold. Both methods, because a read that leaks and a write that unlocks are
+    /// each worth refusing on their own.
+    #[tokio::test]
+    async fn lockout_routes_require_a_meta_admin() {
+        let app = Router::new().route(
+            "/{org_id}/settings/password_policy/lockouts/{email_id}",
+            get(password_policy::lockout::get_lockout)
+                .delete(password_policy::lockout::delete_lockout),
+        );
+
+        for (method, uri, case) in [
+            (
+                Method::GET,
+                "/acme/settings/password_policy/lockouts/target@example.com",
+                "read outside the meta org",
+            ),
+            (
+                Method::DELETE,
+                "/acme/settings/password_policy/lockouts/target@example.com",
+                "unlock outside the meta org",
+            ),
+            (
+                Method::GET,
+                "/_meta/settings/password_policy/lockouts/target@example.com",
+                "read by a non-admin on the meta org",
+            ),
+            (
+                Method::DELETE,
+                "/_meta/settings/password_policy/lockouts/target@example.com",
+                "unlock by a non-admin on the meta org",
+            ),
+        ] {
+            let refused = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri(uri)
+                        // Not present in ORG_USERS, so the role lookup finds nothing to admit.
+                        .header("user_id", "not-a-meta-admin@example.invalid")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+
+            // Returns before touching the database, which is what makes this assertable here.
+            assert_eq!(refused.status(), StatusCode::FORBIDDEN, "{case}");
+        }
+    } 
 
     #[tokio::test]
     async fn password_complexity_route_is_readable_by_any_org() {

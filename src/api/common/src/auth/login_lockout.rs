@@ -31,6 +31,8 @@
 
 use config::{meta::password_policy::LockoutPolicy, utils::time::now_micros};
 use infra::table::user_auth_state;
+use serde::Serialize;
+use utoipa::ToSchema;
 
 const MICROS_PER_SEC: i64 = 1_000_000;
 
@@ -45,6 +47,27 @@ pub enum LoginAttemptOutcome {
     Locked {
         retry_after_secs: i64,
     },
+}
+
+/// A user's lockout state as an administrator sees it.
+///
+/// The counters and the escalation level are included because the reader is an authenticated
+/// instance admin. They must not be handed to the user they describe: someone who can read the
+/// level and the remaining seconds can derive the thresholds behind them and pace attempts to stay
+/// underneath.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct LockoutState {
+    pub email: String,
+    pub locked: bool,
+    /// Seconds until the account may try again, present only while the lock holds.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry_after_secs: Option<i64>,
+    pub locked_until: Option<i64>,
+    pub failed_attempts: i32,
+    /// How many lockouts this account has served. Kept after a lock expires, because it is what
+    /// makes the next one longer.
+    pub lockout_level: i32,
+    pub last_failed_at: Option<i64>,
 }
 
 /// Whether `user_email` may attempt a password comparison at all.
@@ -109,9 +132,53 @@ pub async fn record_failed_attempt(
 /// Only worth calling when [`check_lockout`] reported [`LoginAttemptOutcome::AllowedWithFailures`];
 /// for everyone else there is no row and nothing to clear.
 pub async fn record_successful_login(user_email: &str) -> Result<(), anyhow::Error> {
+    clear_lockout(user_email).await
+}
+
+/// Drop every counter for `user_email`, releasing an active lockout.
+///
+/// The administrative unlock, and the only thing that ends a lockout early: a password change
+/// leaves it standing, because the lock records failed attempts rather than anything about the
+/// password. Clearing a user who was never locked is a no-op rather than an error.
+pub async fn clear_lockout(user_email: &str) -> Result<(), anyhow::Error> {
     user_auth_state::reset(user_email)
         .await
         .map_err(|e| anyhow::anyhow!("Error resetting the lockout state for {user_email}: {e}"))
+}
+
+/// Read `user_email`'s lockout state without touching it.
+///
+/// A user with no row has never failed a login, which reads as an unlocked account with zeroed
+/// counters rather than as an absence — the same reasoning that makes a missing policy row the
+/// default policy.
+pub async fn lockout_state(user_email: &str) -> Result<LockoutState, anyhow::Error> {
+    let state = user_auth_state::get(user_email)
+        .await
+        .map_err(|e| anyhow::anyhow!("Error reading the lockout state for {user_email}: {e}"))?;
+    let email = user_email.to_lowercase();
+
+    let Some(state) = state else {
+        return Ok(LockoutState {
+            email,
+            locked: false,
+            retry_after_secs: None,
+            locked_until: None,
+            failed_attempts: 0,
+            lockout_level: 0,
+            last_failed_at: None,
+        });
+    };
+
+    let retry_after_secs = remaining_lock_secs(state.locked_until, now_micros());
+    Ok(LockoutState {
+        email,
+        locked: retry_after_secs.is_some(),
+        retry_after_secs,
+        locked_until: state.locked_until,
+        failed_attempts: state.failed_attempts,
+        lockout_level: state.lockout_level,
+        last_failed_at: state.last_failed_at,
+    })
 }
 
 /// Increment the counter, inserting the row the first time. The insert ignores a conflict and the
@@ -356,6 +423,80 @@ mod tests {
             LoginAttemptOutcome::AllowedWithFailures,
             "the level survives the expiry so the next lockout is longer"
         );
+    }
+
+    #[tokio::test]
+    async fn state_reads_an_untouched_account_as_unlocked() {
+        let email = "lockout-state-clean@zo.dev";
+        set_up(email).await;
+
+        let state = lockout_state(email).await.unwrap();
+
+        assert_eq!(state.email, email);
+        assert!(!state.locked);
+        assert_eq!(state.retry_after_secs, None);
+        assert_eq!(state.locked_until, None);
+        assert_eq!(state.failed_attempts, 0);
+        assert_eq!(state.lockout_level, 0);
+        assert_eq!(state.last_failed_at, None);
+    }
+
+    #[tokio::test]
+    async fn state_reports_the_lock_then_its_expiry_then_the_clearing() {
+        let email = "lockout-state-locked@zo.dev";
+        set_up(email).await;
+        let p = policy(2, 0);
+
+        record_failed_attempt(email, &p).await;
+        record_failed_attempt(email, &p).await;
+
+        let locked = lockout_state(email).await.unwrap();
+        assert!(locked.locked);
+        assert!(matches!(locked.retry_after_secs, Some(secs) if (1..=60).contains(&secs)));
+        assert!(locked.locked_until.is_some());
+        assert_eq!(locked.lockout_level, 1);
+        assert!(locked.last_failed_at.is_some());
+
+        expire_lock(email).await;
+        let expired = lockout_state(email).await.unwrap();
+        assert!(!expired.locked, "an elapsed deadline is not a lockout");
+        assert_eq!(expired.retry_after_secs, None);
+        assert_eq!(
+            expired.lockout_level, 1,
+            "the level outlives the lock that set it"
+        );
+
+        clear_lockout(email).await.unwrap();
+        let cleared = lockout_state(email).await.unwrap();
+        assert!(!cleared.locked);
+        assert_eq!(cleared.failed_attempts, 0);
+        assert_eq!(
+            cleared.lockout_level, 0,
+            "an admin unlock forgives the escalation too"
+        );
+        assert_eq!(cleared.locked_until, None);
+    }
+
+    #[tokio::test]
+    async fn clearing_an_account_that_was_never_locked_is_a_no_op() {
+        let email = "lockout-state-noop@zo.dev";
+        set_up(email).await;
+
+        clear_lockout(email).await.unwrap();
+
+        assert!(!lockout_state(email).await.unwrap().locked);
+    }
+
+    #[tokio::test]
+    async fn state_is_keyed_case_insensitively() {
+        let email = "lockout-state-case@zo.dev";
+        set_up(email).await;
+        record_failed_attempt(email, &policy(2, 0)).await;
+
+        let state = lockout_state("Lockout-State-Case@ZO.dev").await.unwrap();
+
+        assert_eq!(state.failed_attempts, 1);
+        assert_eq!(state.email, email, "the address is echoed as it is stored");
     }
 
     /// The one that matters: simultaneous failures must all be counted, and must produce exactly

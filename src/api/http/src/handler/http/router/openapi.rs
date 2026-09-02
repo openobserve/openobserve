@@ -62,6 +62,8 @@ use crate::{
         openobserve_api_management::request::organization::password_policy::get_policy,
         openobserve_api_management::request::organization::password_policy::set_policy,
         openobserve_api_management::request::organization::password_policy::get_password_complexity,
+        openobserve_api_management::request::password_policy::lockout::get_lockout,
+        openobserve_api_management::request::password_policy::lockout::delete_lockout,
         openobserve_api_management::request::announcements::get_announcements,
         openobserve_api_management::request::announcements::get_announcements_config,
         openobserve_api_management::request::announcements::set_announcements_config,
