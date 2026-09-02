@@ -48,9 +48,12 @@ state (cycle 5 vs cycle 10 — a plateau proves no accumulation).
 | **Settings** | 0 | 0 → 0 | 519 → 519 | −25592 | −38 | flat plateau, no leak |
 | **IAM** | 0 | 1 → 1 | 787 → 787 | −26469 | −38 | flat plateau, no leak |
 
-Panel editor (`/dashboards/add_panel`) needs a live dashboard+folder+tab context,
-so a bare `router.push` redirects to `/dashboards`; it wasn't exercised here and
-needs interactive navigation (open dashboard → add panel) to benchmark.
+**Panel editor** (`/dashboards/add_panel`) — reached interactively (open dashboard →
+add panel). Confirmed live: Monaco=1 + 3 ECharts canvases on entry; after leaving,
+**Monaco→0 and canvas→0** (both fully torn down), `roDetached`=0 across repeated
+entries, and `roTotal`/DOM return to their pre-entry baseline (13 / ~1140). Its
+unsaved-changes route guard prompts on every leave, so a scripted N-cycle loop
+isn't clean; the forced round-trips served as a stress test it passed. No leak.
 
 `roDetached` is **0** on every page and every cycle (the reliable detached-observer
 signal). `roTotal` and DOM reach a per-page steady state and stay flat (c5 == c10);
@@ -251,8 +254,8 @@ Every Logs component + composable (~30 + ~35) checked for leak scenarios, not ju
 | `patterns/PatternVolumeCell.vue` | clean — IntersectionObserver disconnected on intersect AND `onBeforeUnmount` |
 | streaming layer (`useSearchStream*`, `useStreamingSearch`, `useSearchWebSocket`, `useSearchConnection`) | clean — `cleanUpListeners`/`closeSocket`/abort on all terminal paths |
 | `useSearchBar.ts` timers | clean — all 4 `setTimeout`s are commented-out dead code |
-| `patterns/useWildcardHover.ts` | minor/bounded — module-level `hoveredToken` can hold a detached anchor if the show-timer fires post-unmount; single-slot, overwritten on next hover, not accumulating (not fixed) |
-| `useLogs/usePatterns.ts` | minor/bounded — module-level `patternAbortController` (1 in-flight max, overwritten); not aborted on unmount but single-slot (not fixed) |
+| `patterns/useWildcardHover.ts` | **FIXED (#14)** — added `cleanup()` (clears show/hide timers + nulls `hoveredToken`), called on `PatternList` unmount |
+| `useLogs/usePatterns.ts` | **FIXED (#15)** — `cancelPatterns()` (already existed) now called in logs `Index.vue` `onBeforeUnmount` alongside `cancelQuery()` |
 | **`IndexList.vue`** | **LEAK → FIXED (fix #7)** |
 
 ### Fix #7 — `IndexList.vue` field-value streams not cancelled on unmount
@@ -352,11 +355,26 @@ Verified-clean consumers (cancel on unmount / deactivate): `usePanelDataLoader`,
 `useMetricsExplorerGrid`, `VariablesValueSelector`, `useStreamingSearch`,
 `useValuesWebSocket`, `useDurationPercentiles`, `useCorrelatedLogs`, traces `Index`
 /`ServicesCatalog`/`LLMInsightsDashboard`. `PreviewAlert.vue` doesn't stream
-(comment refs only). **Minor/bounded, not fixed:** `useCorrelatedTracesStream`
-(`resolveTracesStream`) — a cache-backed one-shot stream-name resolver that fires
-only on cache-miss.
+(comment refs only). **FIXED (#16):** `useCorrelatedTracesStream` — the cache-miss
+probe now tracks its `probeTraceId` in a set (added before fetch, deleted in
+`finally`) and exposes `cancel()`; wired into `PlayerTracesTab`,
+`EventDetailDrawerContent`, and (via `useTraceCorrelation.cancelTracesStream`)
+`TraceCorrelationCard` on unmount.
 
-**Total: 12 leaks fixed** (7 committed in `21b78c96f4` + fixes #8–#12 uncommitted).
+**Total: 17 leaks fixed** (7 committed in `21b78c96f4` + fixes #8–#17).
+
+## Metrics page deep-dive (`/metrics`)
+
+Route mapping (important): `/metrics` (name `metrics`) → `MetricsExplorer.vue`,
+`keepAlive: false`; `/metrics/editor` (name `metricsEditor`) → `Index.vue`,
+`keepAlive: true`.
+
+| Area | Verdict |
+|---|---|
+| `MetricsExplorer` streaming | clean — `onBeforeUnmount → grid.invalidateAll() → queue.cancelAll() → controller.abort() → onAbort → cancelStreamQueryBasedOnRequestId` cancels every in-flight PromQL stream by trace id |
+| `useMetricsExplorerGrid` | clean — `onScopeDispose` clears the sweep timer; stream cancellation bridged through the queue's AbortSignal |
+| `Index.vue` (editor) | clean — `keepAlive:true`, deactivated (not unmounted) on nav; one bounded cached instance |
+| **`AutoRefreshInterval.vue`** | **FIX #17** — cleared its `setInterval` only on `onDeactivated` (fires for keep-alive only) + value-change; a `keepAlive:false` parent (`/metrics`, plus View Dashboard/Panel, App Performance, Pinned tab) *unmounts*, so the auto-refresh timer was orphaned and kept firing `emit("trigger")` into a destroyed component. Added `onUnmounted(() => clearInterval(intervalInstance))`. **Live-verified:** leaving `/metrics` with refresh on drops the interval net (−4, timer among them); one-line fix, 8 consumers benefit. |
 
 ## App-wide sweep of the non-streaming classes — all clean
 
