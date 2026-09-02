@@ -1,0 +1,12 @@
+[
+  {
+    "title": "built-in fields survive a wide-stream quick-mode SELECT *",
+    "action": "new",
+    "verifies": "the four flattened RUM identity fields (service, version, session_id, view_url) survive the >500-field quick-mode trim on _rumdata"
+  },
+  {
+    "title": "config API exposes the built-in quick-mode fields",
+    "action": "new",
+    "verifies": "GET /api/{org}/config returns default_quick_mode_fields containing service, version, session_id and view_url"
+  }
+]

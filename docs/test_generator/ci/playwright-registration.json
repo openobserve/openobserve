@@ -1,0 +1,6 @@
+{
+  "group": "RUM",
+  "spec_filename": "quickModeBuiltinFields.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

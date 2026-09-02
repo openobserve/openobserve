@@ -1,0 +1,15 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/RUM/quickModeBuiltinFields.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/RUM/sourcemap-upload-pretty.spec.js",
+    "tests/ui-testing/playwright-tests/RUM/rum-page-dataflow.spec.js",
+    "tests/ui-testing/playwright-tests/RUM/rum-cdn-dataflow.spec.js",
+    "tests/ui-testing/playwright-tests/RUM/rum-npm-dataflow.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logsquickmode.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/ftsDefaultColumn.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_hint": "Add 'quickModeBuiltinFields.spec.js' to the 'RUM' folder run_files array in tests/ui-testing/ci-matrix/ci_matrix.json (mirror in ci_matrix_regression.json if this suite belongs to the regression set).",
+  "rationale": "No existing spec asserts the fix's direct observable behavior — that service/version/session_id/view_url survive a wide-stream quick-mode SELECT *. sourcemap-upload-pretty.spec.js is a serial sourcemap suite whose Pretty-tab tests already cover the DEPENDENT regression surface (translation needs service+version) but never assert the built-in-field re-add itself, and cramming a wide-event quick-mode test into it would needlessly couple the test to its beforeAll sourcemap uploads. logsquickmode.spec.js is a Logs-area UI spec on the e2e_automate stream and never touches _rumdata or the built-in field list. rum-*-dataflow.spec.js cover SDK ingestion flows, not quick-mode trimming. The feature is its own concern (backend field-survival during trim + config API exposure) with its own deterministic wide-event setup contract (docs/test_generator/ci/setup-contract.md), so a dedicated RUM-area spec is the least-duplicative home. Feature doc 'Route: enhance existing specs' referred to the specs already touched in the dev's diff (sourcemap-upload-pretty.spec.js, ftsDefaultColumn.spec.js) for flakiness fixes, not to a home for these new assertions."
+}

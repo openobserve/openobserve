@@ -1,0 +1,28 @@
+{
+  "feature_slug": "quick-mode-builtin-fields",
+  "feature_title": "Quick Mode Built-in Fields",
+  "area": "RUM",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "sourcemap-upload-pretty.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/RUM/sourcemap-upload-pretty.spec.js",
+  "playwright_group": "RUM",
+  "source_files": [
+    "src/config/src/config.rs",
+    "src/search/src/sql/schema.rs",
+    "tests/ui-testing/playwright-tests/RUM/sourcemap-upload-pretty.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/ftsDefaultColumn.spec.js"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path in changed_files.txt lives in OSS-owned locations: src/config/src/config.rs, src/search/src/sql/schema.rs, and tests/ui-testing/** (the OSS E2E tree). No enterprise-owned directories (enterprise/, o2_enterprise/, src/enterprise/) appear, and no enterprise keyword (cipher/SSO/SAML/RBAC/SDR/sensitive-data/logo-management) is present in paths or symbols. The field names service/version/session_id/view_url are RUM session attributes, not enterprise-gated modules.",
+    "skip": "Not skipped. There is no explicit opt-out (empty trigger_comment.txt, empty feature_hint.txt, no tests-added label). The diff is not docs/CI/comment-only: it carries a real backend behavior change (QUICK_MODEL_FIELDS now always chains in built-in defaults) that a user hits through RUM sourcemap translation, breadcrumbs, and session replay, and it modifies two Playwright E2E specs. Per the dev-authored-tests-are-NOT-an-automatic-skip rule, continue on the enhance route.",
+    "e2e": "E2E is warranted. The backend change alters user-visible RUM behavior — losing service/version/session_id/view_url silently degrades sourcemap translation, breadcrumbs, and session replay — and the dev modified the two Playwright specs covering those behaviors (RUM sourcemap-upload-pretty, Logs ftsDefaultColumn). Since the specs already exist in the diff, the route is enhance rather than author a fresh spec.",
+    "area": "RUM. The config.rs comment names three RUM features as the impacted surface (sourcemap translation, breadcrumbs, session replay), the added fields are RUM session attributes, and the most directly-affected existing spec (sourcemap-upload-pretty.spec.js) lives in tests/ui-testing/playwright-tests/RUM/. A second, Logs-area spec (ftsdDefaultColumn.spec.js) is also touched but the primary impact is RUM.",
+    "group": "RUM. The sourcemap spec lives under tests/ui-testing/playwright-tests/RUM/, which maps to the RUM matrix shard in the OSS ci-matrix (the RUM folder/group is not present in the enterprise overlay matrices checked into this repo). The spec carries the @rum tag.",
+    "existing_tests": "Two Playwright E2E specs are modified in the diff: tests/ui-testing/playwright-tests/RUM/sourcemap-upload-pretty.spec.js and tests/ui-testing/playwright-tests/Logs/ftsdDefaultColumn.spec.js — so existing_tests_in_diff is true. The src/search/src/sql/schema.rs change only adds a Rust unit test, which is not E2E coverage and is not counted. The E2E edits are mostly robustness/flakiness fixes (unique fixture filenames, retry/gating on FTS field resolution) rather than new feature assertions, so they partially cover the affected behavior and the Architect should verify and extend them."
+  }
+}

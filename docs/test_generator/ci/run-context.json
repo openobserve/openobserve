@@ -1,0 +1,20 @@
+{
+  "feature_slug": "quick-mode-builtin-fields",
+  "feature_title": "Quick Mode Built-in Fields",
+  "area": "RUM",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "sourcemap-upload-pretty.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/RUM/sourcemap-upload-pretty.spec.js",
+  "playwright_group": "RUM",
+  "source_files": [
+    "src/config/src/config.rs",
+    "src/search/src/sql/schema.rs",
+    "tests/ui-testing/playwright-tests/RUM/sourcemap-upload-pretty.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/ftsDefaultColumn.spec.js"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}
