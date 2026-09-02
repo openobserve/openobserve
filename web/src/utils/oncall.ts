@@ -111,6 +111,43 @@ export function upcomingShifts(rule: ShiftRule, fromMicros: number, count: numbe
   return shifts;
 }
 
+/** One time window, and everyone on call for it across a set of rules. */
+export interface CombinedShift {
+  startMicros: number;
+  endMicros: number;
+  /** One per rule that has a shift over this exact window, in rule order. */
+  entries: { ruleName: string; member: string }[];
+}
+
+/**
+ * The next shifts of several rules at once, merged into a single chronological
+ * timeline instead of one list per rule.
+ *
+ * Rules that share an anchor and cadence land on identical windows — the
+ * common case, e.g. a primary and secondary covering the same weeks — and
+ * those collapse into one row so the time only has to be read once. Rules
+ * that don't align just interleave by start time.
+ */
+export function combinedUpcomingShifts(
+  rules: ShiftRule[],
+  fromMicros: number,
+  countPerRule: number,
+): CombinedShift[] {
+  const byWindow = new Map<string, CombinedShift>();
+  for (const rule of rules) {
+    for (const shift of upcomingShifts(rule, fromMicros, countPerRule)) {
+      const key = `${shift.startMicros}-${shift.endMicros}`;
+      let combined = byWindow.get(key);
+      if (!combined) {
+        combined = { startMicros: shift.startMicros, endMicros: shift.endMicros, entries: [] };
+        byWindow.set(key, combined);
+      }
+      combined.entries.push({ ruleName: shift.rule ?? "", member: shift.member });
+    }
+  }
+  return [...byWindow.values()].sort((a, b) => a.startMicros - b.startMicros);
+}
+
 /** Every person named by any rule of a rotation, de-duplicated, in rule order. */
 export function rotationMembers(rotation: Rotation): string[] {
   const seen = new Set<string>();

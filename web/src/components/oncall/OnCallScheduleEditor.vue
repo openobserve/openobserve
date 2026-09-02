@@ -281,21 +281,14 @@
             </OTabPanels>
 
             <!-- Kept out from under the tabs and shown for every rule at
-                 once: it's the one place a follow-the-sun handover gets
-                 checked by eye, and that only works if every rule's shifts
-                 are visible without switching tabs. -->
+                 once, merged into one timeline: it's the one place a
+                 follow-the-sun handover gets checked by eye, and that only
+                 works if every rule's shifts are visible — and lined up
+                 against each other by time, not repeated once per rule —
+                 without switching tabs. -->
             <div class="border-border-default flex flex-col gap-4 border-t pt-4">
               <OText variant="section">{{ t("oncall.upcoming") }}</OText>
-              <div
-                v-for="(rule, ruleIndex) in active.shift_rules"
-                :key="ruleIndex"
-                class="flex flex-col gap-2"
-              >
-                <OText v-if="multiRule" variant="label">
-                  {{ raw(rule.name?.trim() ? rule.name : String(t("oncall.shiftRuleNthName", { n: ruleIndex + 1 }))) }}
-                </OText>
-                <OnCallUpcomingList :rule="rule" :now-micros="nowMicros" />
-              </div>
+              <OnCallUpcomingList :rules="namedShiftRules" :now-micros="nowMicros" />
             </div>
           </template>
         </section>
@@ -488,6 +481,16 @@ const dirty = computed(
 /// One rule IS the rotation, so it needs no name, no frame and no heading of
 /// its own; several are follow-the-sun and only then have to be told apart.
 const multiRule = computed(() => (active.value?.shift_rules.length ?? 0) > 1);
+
+/// Rules with a display name resolved, for the combined upcoming-shifts
+/// timeline — it needs a name per entry and has no access to a rule's index
+/// in `active.shift_rules` to fall back to "Rule N" itself.
+const namedShiftRules = computed(() =>
+  (active.value?.shift_rules ?? []).map((rule, ruleIndex) => ({
+    ...rule,
+    name: rule.name?.trim() ? rule.name : String(t("oncall.shiftRuleNthName", { n: ruleIndex + 1 })),
+  })),
+);
 
 /// Whether this rule already uses anything behind the fold — an unfolded
 /// section is how a restriction the API wrote stops being invisible.
