@@ -42,10 +42,17 @@ const yField = (alias: string, label = alias.toUpperCase(), functionName: any = 
 });
 
 /** Builds a table panel schema in pivot mode (x + breakdown + y all present). */
-const schema = (opts: { x?: any[]; y?: any[]; breakdown?: any[]; config?: any }) => ({
+const schema = (opts: {
+  x?: any[];
+  y?: any[];
+  breakdown?: any[];
+  config?: any;
+  customQuery?: boolean;
+}) => ({
   type: "table",
   queries: [
     {
+      customQuery: opts.customQuery ?? false,
       fields: {
         x: opts.x ?? [field("country", "Country")],
         y: opts.y ?? [yField("cnt", "Count")],
@@ -241,6 +248,123 @@ describe("convertPivotTableData", () => {
       );
       expect(result.rows[0].GET_cnt).toBeNull();
       expect(result.rows[0].POST_cnt).toBe(4);
+    });
+
+    // The reviewer's report: a max panel whose query grouped more finely than
+    // (x, breakdown) showed every cell as the SUM of its rows, and the row
+    // Total as the sum of all 20 returned values (11511) instead of 843.
+    const svc1 = [801, 633, 591, 549, 12, 843, 759, 717, 675, 507];
+    const svc4 = [18, 6, 780, 738, 696, 528, 822, 654, 612, 570];
+    const finerThanPivot = [
+      [
+        ...svc1.map((val, i) => ({ country: "IN", service: "svc1", endpoint: `e${i}`, val })),
+        ...svc4.map((val, i) => ({ country: "IN", service: "svc4", endpoint: `f${i}`, val })),
+      ],
+    ];
+    const maxSchema = (yExtra: any, customQuery = false) =>
+      schema({
+        y: [{ alias: "val", label: "Max Val", ...yExtra }],
+        breakdown: [field("service", "Service")],
+        config: { table_pivot_show_row_totals: true, table_pivot_show_col_totals: true },
+        customQuery,
+      });
+
+    it.each([
+      ["functionName (builder shape)", { functionName: "max" }],
+      ["aggregationFunction (legacy shape)", { aggregationFunction: "max" }],
+      ["upper-case function name", { functionName: "MAX" }],
+    ])("keeps the bound, never the sum, for max declared via %s", (_name, yExtra) => {
+      const result = convertPivotTableData(maxSchema(yExtra), finerThanPivot, store);
+      const row = result.rows[0];
+
+      expect(row.svc1_val).toBe(843);
+      expect(row.svc4_val).toBe(822);
+      // The reported symptom: 6087 / 5424 summed the endpoint rows.
+      expect(row.svc1_val).not.toBe(6087);
+    });
+
+    it("reports the row total of a max pivot as the bound, not a sum of bounds", () => {
+      const result = convertPivotTableData(
+        maxSchema({ functionName: "max" }),
+        finerThanPivot,
+        store,
+      );
+      // 11511 was the reported total (every returned value added together).
+      expect(result.rows[0][`${PIVOT_TABLE_TOTAL_LABEL}_val`]).toBe(843);
+    });
+
+    it("folds column and grand totals of a max pivot by the bound too", () => {
+      const result = convertPivotTableData(
+        maxSchema({ functionName: "max" }),
+        finerThanPivot,
+        store,
+      );
+      const totalRow = result.rows[result.rows.length - 1];
+
+      expect(totalRow.__isTotalRow).toBe(true);
+      expect(totalRow.svc1_val).toBe(843);
+      expect(totalRow[`${PIVOT_TABLE_TOTAL_LABEL}_val`]).toBe(843);
+    });
+
+    it("uses the bound for min totals as well", () => {
+      const result = convertPivotTableData(
+        maxSchema({ functionName: "min" }),
+        finerThanPivot,
+        store,
+      );
+      const row = result.rows[0];
+
+      expect(row.svc1_val).toBe(12);
+      expect(row.svc4_val).toBe(6);
+      expect(row[`${PIVOT_TABLE_TOTAL_LABEL}_val`]).toBe(6);
+    });
+
+    it("still sums additive aggregations and their totals", () => {
+      const result = convertPivotTableData(
+        maxSchema({ functionName: "sum" }),
+        finerThanPivot,
+        store,
+      );
+      const row = result.rows[0];
+
+      expect(row.svc1_val).toBe(6087);
+      expect(row.svc4_val).toBe(5424);
+      expect(row[`${PIVOT_TABLE_TOTAL_LABEL}_val`]).toBe(11511);
+    });
+
+    it("does not trust the functionName placeholder on custom-SQL panels", () => {
+      // usePanelFields stamps functionName: "count" on every custom-query y
+      // field; the real aggregation is in the SQL text, so adding the rows up
+      // would invent a number the query never returned.
+      const result = convertPivotTableData(
+        maxSchema({ functionName: "count" }, true),
+        finerThanPivot,
+        store,
+      );
+      const row = result.rows[0];
+
+      expect(row.svc1_val).toBe(801);
+      expect(row.svc4_val).toBe(18);
+      expect(row.svc1_val).not.toBe(6087);
+    });
+
+    it("leaves a min/max total null when the row has no values", () => {
+      const data = [
+        [
+          { country: "US", method: "GET", cnt: null },
+          { country: "IN", method: "GET", cnt: 4 },
+        ],
+      ];
+      const result = convertPivotTableData(
+        schema({
+          y: [yField("cnt", "Count", "max")],
+          config: { table_pivot_show_row_totals: true },
+        }),
+        data,
+        store,
+      );
+      expect(result.rows[0][`${PIVOT_TABLE_TOTAL_LABEL}_cnt`]).toBeNull();
+      expect(result.rows[1][`${PIVOT_TABLE_TOTAL_LABEL}_cnt`]).toBe(4);
     });
 
     it("applies the same merge to groups folded into the Others bucket", () => {

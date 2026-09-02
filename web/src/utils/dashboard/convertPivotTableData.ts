@@ -333,31 +333,68 @@ export const convertPivotTableData = (
   }
 
   // --- Step 2: Build pivoted rows ---
-  // When several source rows land in one cell — duplicate (x, breakdown)
-  // pairs from custom SQL with an extra GROUP BY column, or many breakdown
-  // groups folded into the overflow bucket — they merge per the y-field's
-  // aggregation. Additive aggregations combine exactly, min/max keep the
-  // exact bound of the union, and everything else (avg, percentiles,
-  // count-distinct, custom SQL with no functionName) cannot be reconstructed
-  // from the returned values, so the first value is kept rather than a
-  // fabricated combination being displayed.
-  const resolveMergeFn = (functionName: any): ((a: number, b: number) => number) => {
-    switch (functionName) {
+  // Several source rows land in one cell whenever the query groups more finely
+  // than (x, breakdown) — an extra GROUP BY column — or when breakdown groups
+  // fold into the overflow bucket. How they combine follows the y-field's
+  // aggregation: additive ones combine exactly, min/max keep the exact bound
+  // of the union, and anything else cannot be reconstructed from the values
+  // the query returned, so the first value is kept. Keeping a real returned
+  // value is the point: combining an avg or a max produces a number that
+  // appears nowhere in the data and silently disagrees with the same query
+  // shown anywhere else.
+  //
+  // The aggregation is only knowable for builder panels. Custom-SQL panels
+  // carry a hardcoded `functionName: "count"` placeholder (usePanelFields
+  // stamps it on every y field; the real aggregation lives in the SQL text),
+  // so trusting it there would add up rows the user asked to max. Both field
+  // shapes are live — builder writes `functionName`, older saved panels write
+  // `aggregationFunction` (see utils/autoName.ts) — so read whichever exists.
+  type MergeKind = "add" | "min" | "max" | "first";
+  const MERGE_FNS: Record<MergeKind, (a: number, b: number) => number> = {
+    add: (a, b) => a + b,
+    // Wrapped, not bare Math.min/max: those read every argument, so a bare
+    // reference passed to reduce() would also consume its index/array args.
+    min: (a, b) => Math.min(a, b),
+    max: (a, b) => Math.max(a, b),
+    first: (a) => a,
+  };
+
+  const resolveMergeKind = (yField: any): MergeKind => {
+    if (query.customQuery) return "first";
+    switch (String(yField?.functionName ?? yField?.aggregationFunction ?? "").toLowerCase()) {
       case "count":
       case "sum":
-        return (a, b) => a + b;
+        return "add";
       case "min":
-        return Math.min;
+        return "min";
       case "max":
-        return Math.max;
+        return "max";
       default:
-        return (a) => a;
+        return "first";
     }
   };
-  const mergeFnByAlias: Record<string, (a: number, b: number) => number> = {};
+
+  const mergeKindByAlias: Record<string, MergeKind> = {};
   for (const yField of yFields) {
-    mergeFnByAlias[yField.alias] = resolveMergeFn(yField.functionName);
+    mergeKindByAlias[yField.alias] = resolveMergeKind(yField);
   }
+
+  // Totals combine a row/column the same way its cells combine, so a min/max
+  // pivot reports the bound across the row instead of a sum of bounds. An
+  // unknown aggregation keeps the historical sum: "Total" has to mean
+  // something, and keeping one cell's value would not.
+  const foldTotal = (yAlias: string, values: any[]): number | null => {
+    const kind = mergeKindByAlias[yAlias];
+    const nums = values
+      .filter((v) => v !== null && v !== undefined)
+      .map(Number)
+      .filter((v) => !Number.isNaN(v));
+
+    if (kind === "min" || kind === "max") {
+      return nums.length ? nums.reduce((a, b) => MERGE_FNS[kind](a, b)) : null;
+    }
+    return nums.reduce((a, b) => a + b, 0);
+  };
 
   const rowMap: Map<string, any> = new Map();
 
@@ -403,7 +440,7 @@ export const convertPivotTableData = (
       targetRow[colKey] =
         existing === undefined || existing === null
           ? numericValue
-          : mergeFnByAlias[yAlias](existing, numericValue);
+          : MERGE_FNS[mergeKindByAlias[yAlias]](existing, numericValue);
     }
   }
 
@@ -413,16 +450,16 @@ export const convertPivotTableData = (
 
   for (const row of pivotedRows) {
     for (const yAlias of yAliases) {
-      let rowTotal = 0;
+      const cells: any[] = [];
       for (const pk of allPivotKeys) {
         const colKey = `${pk}_${yAlias}`;
         if (row[colKey] === undefined || row[colKey] === null) {
           row[colKey] = null; // Keep null for correct totals/sorting; format() handles display
         }
-        rowTotal += Number(row[colKey]) || 0;
+        cells.push(row[colKey]);
       }
       if (showRowTotals) {
-        row[`${PIVOT_TABLE_TOTAL_LABEL}_${yAlias}`] = rowTotal;
+        row[`${PIVOT_TABLE_TOTAL_LABEL}_${yAlias}`] = foldTotal(yAlias, cells);
       }
     }
   }
@@ -438,18 +475,17 @@ export const convertPivotTableData = (
     for (const yAlias of yAliases) {
       for (const pk of allPivotKeys) {
         const colKey = `${pk}_${yAlias}`;
-        let colTotal = 0;
-        for (const row of pivotedRows) {
-          colTotal += Number(row[colKey]) || 0;
-        }
-        totalRow[colKey] = colTotal;
+        totalRow[colKey] = foldTotal(
+          yAlias,
+          pivotedRows.map((row) => row[colKey]),
+        );
       }
       if (showRowTotals) {
-        let grandTotal = 0;
-        for (const row of pivotedRows) {
-          grandTotal += Number(row[`${PIVOT_TABLE_TOTAL_LABEL}_${yAlias}`]) || 0;
-        }
-        totalRow[`${PIVOT_TABLE_TOTAL_LABEL}_${yAlias}`] = grandTotal;
+        const totalKey = `${PIVOT_TABLE_TOTAL_LABEL}_${yAlias}`;
+        totalRow[totalKey] = foldTotal(
+          yAlias,
+          pivotedRows.map((row) => row[totalKey]),
+        );
       }
     }
 
