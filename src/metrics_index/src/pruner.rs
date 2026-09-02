@@ -49,15 +49,16 @@ use crate::{
 /// to each indexed [`FileKey`] (files without a matching series are
 /// dropped) and the generic DataFusion scan later converts that selection into
 /// a Parquet access plan. Files of any other layout are left untouched, in
-/// place, for a full scan. `Ok(None)` means no file or matcher was eligible and
-/// nothing was changed.
+/// place, for a full scan. `Ok(None)` means no file or matcher was eligible.
+/// `Ok(Some((took_ms, exact)))`: `exact` means every selection holds exactly
+/// the matching rows, so re-applying the matchers row by row is redundant.
 pub async fn search(
     trace_id: &str,
     files: &mut Vec<FileKey>,
     table_schema: &Schema,
     matchers: &Matchers,
     target_partitions: usize,
-) -> Result<Option<usize>> {
+) -> Result<Option<(usize, bool)>> {
     let Some(matcher_labels) = metrics_index_labels(table_schema, matchers) else {
         return Ok(None);
     };
@@ -77,26 +78,25 @@ pub async fn search(
         }
         let Some(sidecar_path) = MetricsFileLayout::metrics_index_path(&file.key) else {
             log::warn!(
-                "[trace_id {}] promql->metrics-index: indexed file {} has no metrics-index path, leaving the file unpruned",
-                trace_id,
+                "[trace_id {trace_id}] promql->metrics-index: indexed file {} has no metrics-index path, leaving the file unpruned",
                 file.key,
             );
             continue;
         };
         let Ok(expected_rows) = usize::try_from(file.meta.records) else {
             log::warn!(
-                "[trace_id {}] promql->metrics-index: invalid record count {} for {}, leaving the file unpruned",
-                trace_id,
+                "[trace_id {trace_id}] promql->metrics-index: invalid record count {} for {}, leaving the file unpruned",
                 file.meta.records,
                 file.key,
             );
             continue;
         };
-        // Include the parent row count so a corrected file-list entry cannot
-        // reuse ranges evaluated against stale metadata.
-        let cache_key = format!(
-            "{}\0{sidecar_path}\0{expected_rows}\0{filter_key}",
-            file.account
+        let cache_key = selection_cache_key(
+            &file.account,
+            &sidecar_path,
+            expected_rows,
+            &matcher_labels,
+            &filter_key,
         );
         index_files.entry(file.key.clone()).or_insert((
             file.account.clone(),
@@ -119,7 +119,8 @@ pub async fn search(
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         for (data_path, (account, sidecar_path, cache_key, expected_rows)) in index_files {
             if let Some(ranges) = cache.get(&cache_key) {
-                evaluated.push((data_path, ranges));
+                // only complete selections are cached, so a hit implies exactness
+                evaluated.push((data_path, ranges, true));
             } else {
                 misses.push((data_path, account, sidecar_path, cache_key, expected_rows));
             }
@@ -134,12 +135,15 @@ pub async fn search(
             let matchers = Arc::clone(&matchers);
             async move {
                 let result = async {
-                    let data = load_metrics_index_file(&account, &sidecar_path, labels).await?;
+                    let data =
+                        load_metrics_index_file(&account, &sidecar_path, Arc::clone(&labels))
+                            .await?;
                     tokio::task::spawn_blocking(move || {
+                        let complete = sidecar_covers_labels(data.schema.as_ref(), &labels);
                         let physical_filter =
                             create_physical_filter(data.schema.as_ref(), &matchers)?;
                         evaluate_metrics_index(&data, physical_filter.as_deref(), expected_rows)
-                            .map(|ranges| (cache_key, ranges))
+                            .map(|ranges| (cache_key, Arc::new(ranges), complete))
                     })
                     .await
                     .map_err(|error| DataFusionError::External(Box::new(error)))?
@@ -157,13 +161,14 @@ pub async fn search(
     let mut failed_files = 0usize;
     while let Some((data_path, result)) = evaluations.next().await {
         match result {
-            Ok((cache_key, ranges)) => {
-                let ranges = Arc::new(ranges);
-                METRICS_INDEX_SELECTION_CACHE
-                    .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner())
-                    .insert(cache_key, Arc::clone(&ranges));
-                evaluated.push((data_path, ranges));
+            Ok((cache_key, ranges, complete)) => {
+                if complete {
+                    METRICS_INDEX_SELECTION_CACHE
+                        .lock()
+                        .unwrap_or_else(|poisoned| poisoned.into_inner())
+                        .insert(cache_key, Arc::clone(&ranges));
+                }
+                evaluated.push((data_path, ranges, complete));
             }
             Err(error) => {
                 failed_files += 1;
@@ -177,14 +182,25 @@ pub async fn search(
 
     let selected_files = evaluated
         .iter()
-        .filter(|(_, ranges)| !ranges.is_empty())
+        .filter(|(_, ranges, _)| !ranges.is_empty())
         .count();
     let selected_ranges = evaluated
         .iter()
-        .map(|(_, ranges)| ranges.len())
+        .map(|(_, ranges, _)| ranges.len())
         .sum::<usize>();
     let indexed_file_count = evaluated.len() + failed_files;
-    let mut selections = evaluated.into_iter().collect::<HashMap<_, _>>();
+    // An empty selection drops its file, so an incomplete matcher set cannot
+    // have over-selected anything there.
+    let exact = other_files == 0
+        && failed_files == 0
+        && residual_matchers_covered(table_schema, &matchers, &matcher_labels)
+        && evaluated
+            .iter()
+            .all(|(_, ranges, complete)| *complete || ranges.is_empty());
+    let mut selections = evaluated
+        .into_iter()
+        .map(|(data_path, ranges, _)| (data_path, ranges))
+        .collect::<HashMap<_, _>>();
     files.retain_mut(|file| {
         let Some(ranges) = selections.remove(&file.key) else {
             // not indexed metrics: untouched, the caller decides how to scan it
@@ -200,13 +216,46 @@ pub async fn search(
         true
     });
 
-    let took = start.elapsed().as_millis() as usize;
+    let took_ms = start.elapsed().as_millis() as usize;
     log::info!(
-        "[trace_id {}] promql->metrics-index: selected {selected_ranges} ranges across {selected_files}/{} files, {failed_files} sidecars failed and were left for a full scan, {other_files} files without a usable sidecar left for a full scan, selection cache hits: {cache_hits}, took: {took} ms",
+        "[trace_id {}] promql->metrics-index: selected {selected_ranges} ranges across {selected_files}/{} files, {failed_files} sidecars failed and were left for a full scan, {other_files} files without a usable sidecar left for a full scan, selection cache hits: {cache_hits}, exact: {exact}, took: {took_ms} ms",
         trace_id,
         indexed_file_count,
     );
-    Ok(Some(took))
+    Ok(Some((took_ms, exact)))
+}
+
+/// A sidecar missing a matcher label skips that matcher and over-selects.
+pub(super) fn sidecar_covers_labels(sidecar_schema: &Schema, labels: &[String]) -> bool {
+    labels
+        .iter()
+        .all(|label| sidecar_schema.index_of(label).is_ok())
+}
+
+/// The label set is part of the key: schema evolution must not revive a
+/// selection evaluated against fewer labels.
+pub(super) fn selection_cache_key(
+    account: &str,
+    sidecar_path: &str,
+    expected_rows: usize,
+    matcher_labels: &[String],
+    filter_key: &str,
+) -> String {
+    format!("{account}\0{sidecar_path}\0{expected_rows}\0{matcher_labels:?}\0{filter_key}")
+}
+
+/// Whether every matcher the query would re-apply on the table is one the
+/// sidecars were asked to evaluate; matchers the sidecar cannot see (e.g. on
+/// hash-excluded labels) leave the selection a superset.
+pub(super) fn residual_matchers_covered(
+    table_schema: &Schema,
+    matchers: &Matchers,
+    matcher_labels: &[String],
+) -> bool {
+    matchers.matchers.iter().all(|matcher| {
+        !promql::utils::matcher_is_residual(table_schema, matcher)
+            || matcher_labels.contains(&matcher.name)
+    })
 }
 
 /// Labels referenced by the matchers that the sidecar can answer. `None`

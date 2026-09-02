@@ -268,25 +268,26 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   "sm-action": "h-[2.125rem] ps-3 pe-3 min-w-20 text-sm gap-2 rounded-default",
   md: "h-10 ps-4 pe-4 text-sm gap-2 rounded-default",
   lg: "h-12 ps-6 pe-6 text-base gap-3 rounded-default",
-  icon: "size-6 p-0 rounded-default gap-x-0",
-  "icon-xs": "h-7.5 px-2 text-lg rounded-default gap-x-0",
+  // shrink-0: without it min-width:auto lets a tight flex row squash these fixed squares to icon width.
+  icon: "size-6 shrink-0 p-0 rounded-default gap-x-0",
+  "icon-xs": "h-7.5 shrink-0 px-2 text-lg rounded-default gap-x-0",
   // 24px round circle — for small inline add/action icon buttons (e.g. + Joins, + Filters)
-  "icon-xs-circle": "size-6 p-0 rounded-full gap-x-0",
+  "icon-xs-circle": "size-6 shrink-0 p-0 rounded-full gap-x-0",
   // 28px square — matches xs chip height for paired close/remove buttons
-  "icon-xs-sq": "h-7 w-7 p-0 rounded-default gap-x-0",
+  "icon-xs-sq": "h-7 w-7 shrink-0 p-0 rounded-default gap-x-0",
   // 24px square — matches chip size for paired close/remove buttons
-  "icon-chip": "h-6 w-6 p-0 rounded-default gap-x-0",
-  "icon-sm": "h-8 w-8 p-0 rounded-default gap-x-0",
-  "icon-md": "h-10 w-10 p-0 rounded-default gap-x-0",
-  "icon-lg": "h-12 w-12 p-0 rounded-default gap-x-0",
-  "icon-circle": "size-8 p-0 rounded-full gap-x-0",
-  "icon-circle-sm": "size-7 p-0 rounded-full gap-x-0",
+  "icon-chip": "h-6 w-6 shrink-0 p-0 rounded-default gap-x-0",
+  "icon-sm": "h-8 w-8 shrink-0 p-0 rounded-default gap-x-0",
+  "icon-md": "h-10 w-10 shrink-0 p-0 rounded-default gap-x-0",
+  "icon-lg": "h-12 w-12 shrink-0 p-0 rounded-default gap-x-0",
+  "icon-circle": "size-8 shrink-0 p-0 rounded-full gap-x-0",
+  "icon-circle-sm": "size-7 shrink-0 p-0 rounded-full gap-x-0",
   // 30×30px square — for toolbar icon buttons (auto-refresh, share, hamburger)
-  "icon-toolbar": "size-[1.875rem] p-0 rounded-default gap-x-0",
+  "icon-toolbar": "size-[1.875rem] shrink-0 p-0 rounded-default gap-x-0",
   // 26px rounded-default — compact modern icon button for panel header collapse/expand
-  "icon-panel": "size-[1.625rem] p-0 rounded-default gap-x-0",
+  "icon-panel": "size-[1.625rem] shrink-0 p-0 rounded-default gap-x-0",
   // Tall narrow vertical rectangle — 32px × 20px for splitter collapse/expand buttons
-  "sidebar-button": "h-8 w-3 p-0 rounded-default overflow-hidden gap-x-0",
+  "sidebar-button": "h-8 w-3 shrink-0 p-0 rounded-default overflow-hidden gap-x-0",
 };
 
 const activeClasses = [
