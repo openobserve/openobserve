@@ -149,7 +149,7 @@
             :data-test="`ai-playground-message-input-${message.id}`"
             @update:model-value="(value: string) => onInput(message.id, value)"
             @focus="onFocus(message.id, $event)"
-            @blur="closeSuggest"
+            @blur="onBlur"
             @keydown="onKeydown(message.id, $event)"
           />
 
@@ -172,6 +172,23 @@
             >
               {{ tokenFor(name) }}
             </button>
+          </div>
+
+          <!-- Above the field, not below: the `{{` suggest list already owns
+               the space below, and the two can be open at once (typing a new
+               `{{` while the caret still reads as inside an older token until
+               the next click/keyup). -->
+          <div
+            v-if="caretToken?.messageId === message.id && caretTokenValue !== null"
+            class="bg-dropdown-bg border-dropdown-border rounded-default absolute bottom-full left-0 z-10 mb-1 max-w-72 border px-2 py-1.5 shadow-md"
+            :data-test="`ai-playground-var-value-${message.id}`"
+          >
+            <span class="text-accent font-mono text-2xs font-semibold">{{
+              tokenFor(caretToken.name)
+            }}</span>
+            <span class="text-text-secondary block text-xs wrap-break-word">{{
+              caretTokenValue
+            }}</span>
           </div>
         </div>
       </div>
@@ -245,11 +262,12 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import useDragHandle from "@/composables/useDragHandle";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
-import { computed, ref } from "vue";
+import { computed, onBeforeUnmount, ref } from "vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import {
   EXPECTED_OUTPUT_TOKEN,
   nextMessageRole,
+  tokenAtCaret,
   type PlaygroundMessage,
   type PlaygroundRole,
   type PlaygroundVariant,
@@ -259,6 +277,8 @@ const props = defineProps<{
   variant: PlaygroundVariant;
   /** Declared variables, offered as completions after `{{`. */
   varNames: string[];
+  /** Values, for the popover that shows one when the caret sits inside its token. */
+  vars: Record<string, string>;
 }>();
 
 const emit = defineEmits<{
@@ -405,10 +425,19 @@ function closeSuggest() {
   activeIndex.value = 0;
 }
 
+/** Both floating overlays are tied to where the caret was — neither one
+ *  outlives the field losing focus. */
+function onBlur() {
+  closeSuggest();
+  clearCaretTokenTimer();
+  caretToken.value = null;
+}
+
 function onInput(messageId: string, value: string) {
   emit("update", messageId, value);
   const element = elements.get(messageId);
   const caret = element?.selectionStart ?? value.length;
+  updateCaretToken(messageId);
   const found = OPEN_TOKEN.exec(value.slice(0, caret));
   if (!found) return closeSuggest();
   suggest.value = { messageId, query: found[1], start: caret - found[0].length };
@@ -452,8 +481,63 @@ function onKeydown(messageId: string, event: KeyboardEvent) {
 }
 
 // Registers the textarea so the `{{` completion list can insert at its caret.
+// OTextarea sets `inheritAttrs: false` and forwards only a curated attrs
+// subset to its root, so an external `@click`/`@keyup` on <OTextarea> never
+// reaches the real element — this listens on the native node directly
+// instead, the one part of OTextarea genuinely reachable without changing it.
 function onFocus(messageId: string, event: FocusEvent) {
   const element = event.target;
-  if (element instanceof HTMLTextAreaElement) elements.set(messageId, element);
+  if (!(element instanceof HTMLTextAreaElement)) return;
+  if (!elements.has(messageId)) {
+    const onCaretMove = () => updateCaretToken(messageId);
+    element.addEventListener("click", onCaretMove);
+    element.addEventListener("keyup", onCaretMove);
+  }
+  elements.set(messageId, element);
+  updateCaretToken(messageId);
 }
+
+// Long enough that passing through a token while moving the caret elsewhere
+// doesn't flash the popover; short enough to still read as "hover".
+const HOVER_DELAY_MS = 300;
+const caretToken = ref<{ messageId: string; name: string } | null>(null);
+let caretTokenTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearCaretTokenTimer() {
+  if (!caretTokenTimer) return;
+  clearTimeout(caretTokenTimer);
+  caretTokenTimer = null;
+}
+
+/**
+ * The value popover has no click/keydown wiring of its own — it exists purely
+ * to answer "what does this token resolve to", so it tracks wherever the
+ * caret already is rather than asking for a hover it cannot get from a plain
+ * textarea (no per-character DOM to attach one to). It hides instantly but
+ * shows only after HOVER_DELAY_MS, so passing through a token on the way
+ * elsewhere doesn't flash it.
+ */
+function updateCaretToken(messageId: string) {
+  const element = elements.get(messageId);
+  if (!element) return;
+  const name = tokenAtCaret(element.value, element.selectionStart ?? 0);
+  clearCaretTokenTimer();
+  if (caretToken.value?.messageId === messageId && caretToken.value?.name === name) return;
+  caretToken.value = null;
+  if (!name) return;
+  caretTokenTimer = setTimeout(() => {
+    caretToken.value = { messageId, name };
+    caretTokenTimer = null;
+  }, HOVER_DELAY_MS);
+}
+
+onBeforeUnmount(clearCaretTokenTimer);
+
+/** The value shown in the popover — `—` for a known variable with nothing in
+ *  it yet, matching how an empty value reads everywhere else in this app. */
+const caretTokenValue = computed(() => {
+  const token = caretToken.value;
+  if (!token || !(token.name in props.vars)) return null;
+  return raw(props.vars[token.name] || "—");
+});
 </script>
