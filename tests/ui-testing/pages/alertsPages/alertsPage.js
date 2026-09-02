@@ -477,8 +477,7 @@ export class AlertsPage {
         return this.page.locator(this.locators.queryTabsContainer).locator(this.locators.tabSql);
     }
 
-    /** The step-2 inline SQL editor. The wizard mounts several Monaco instances and
-     * the DOM-last one is an offscreen editor, so target this one by its editor id. */
+    /** Step-2 inline SQL editor; the wizard's DOM-last Monaco instance is offscreen. */
     getInlineSqlEditor() {
         return this.page.locator(this.locators.alertInlineSqlEditor);
     }

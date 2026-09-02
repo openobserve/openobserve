@@ -360,11 +360,9 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await page.waitForTimeout(1000);
     testLogger.info('Switched to SQL tab');
 
-    // Target the step-2 inline SQL editor by its editor id: the wizard mounts several
-    // Monaco instances and the DOM-last one is an offscreen editor that never shows.
+    // Editor id, not .last(): the wizard's DOM-last Monaco instance is offscreen.
     const sqlEditor = pm.alertsPage.getInlineSqlEditor();
-    // QueryEditor is a lazily loaded async component, so allow the chunk to arrive;
-    // 5s is not enough on a loaded runner. Matches the POM's SQL-dialog wait.
+    // QueryEditor is lazily loaded, so 5s is not enough on a loaded runner.
     await expect(sqlEditor, 'SQL editor should be visible').toBeVisible({ timeout: 30000 });
     await sqlEditor.click({ force: true });
     await page.waitForTimeout(500);
