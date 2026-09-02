@@ -19,7 +19,9 @@
 //!
 //! - **New (`gen_ai_*`)** — emitted since PR #11626 ("refactor llm attribute trace"). Tokens, cost,
 //!   model, user, session id all use the OTEL Gen-AI spec names: `gen_ai_usage_input_tokens`,
-//!   `gen_ai_response_model`, `user.id` (queried as `user.id`), `gen_ai_conversation_id`, etc.
+//!   `gen_ai_response_model`, `user.id`, `gen_ai_conversation_id`, etc. Ingestion flattens every
+//!   attribute key with `flatten::format_key` (dot → underscore), so the spec's `user.id` is
+//!   stored — and must be queried — as the `user_id` column.
 //! - **Legacy (`_o2_llm`)** — pre-PR #11626. Tokens live under
 //!   `llm_usage_tokens_{input,output,total}`, cost under `llm_usage_cost_total`, model under
 //!   `llm_model_name`, and user/session ids under `llm_user_id`/`llm_session_id`.
@@ -39,7 +41,6 @@ use config::meta::{
         REQUIRED_GEN_AI_FIELDS, REQUIRED_LLM_FIELDS,
     },
 };
-use openobserve_core::traces::otel::attributes::OtelAttributes;
 
 /// Column names that vary between the new and legacy LLM schemas.
 ///
@@ -55,10 +56,14 @@ pub(super) struct LlmColumns {
 
 impl LlmColumns {
     /// Column layout for the current (`gen_ai_*`) schema.
+    ///
+    /// These are stored column names, not raw OTEL attribute keys: ingestion
+    /// flattens `user.id` to `user_id` (see `GEN_AI_SCHEMA_FIELDS` in
+    /// `db/schema.rs`, which provisions exactly these columns).
     pub(super) const fn current() -> Self {
         Self {
             session_id: "gen_ai_conversation_id",
-            user_id: OtelAttributes::USER_ID,
+            user_id: "user_id",
         }
     }
 
@@ -241,6 +246,7 @@ pub(super) fn validate_llm_schema(
 #[cfg(test)]
 mod tests {
     use arrow_schema::{DataType, Field, Schema};
+    use openobserve_core::traces::otel::attributes::OtelAttributes;
 
     use super::*;
 
@@ -287,10 +293,10 @@ mod tests {
     fn current_layout_uses_gen_ai_columns() {
         let cols = LlmColumns::current();
         assert_eq!(cols.session_id, "gen_ai_conversation_id");
-        // user.id is the OTEL attribute name — the search layer resolves it
-        // to the flattened column.
-        assert_eq!(cols.user_id, OtelAttributes::USER_ID);
-        assert_eq!(cols.user_id, "user.id");
+        // The stored column is the Gen-AI spec's `user.id` attribute after the
+        // dot → underscore flattening ingestion applies to every key.
+        assert_eq!(cols.user_id, "user_id");
+        assert_eq!(cols.user_id, OtelAttributes::USER_ID.replace('.', "_"));
     }
 
     #[test]

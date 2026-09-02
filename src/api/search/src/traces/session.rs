@@ -934,13 +934,7 @@ fn build_session_trace_details_sql(
     service_key_expr: &str,
     trace_id_predicate: &str,
 ) -> String {
-    // Trace ingestion normalizes OTEL `user.id` to the stored `user_id`
-    // column. Keep the legacy schema's explicit `llm_user_id` name.
-    let user_id_col = if validated.has_gen_ai {
-        "user_id"
-    } else {
-        validated.columns.user_id
-    };
+    let user_id_col = validated.columns.user_id;
     let (root_service_name_expr, root_operation_name_expr) = if has_ref_parent_id {
         (
             "max(CASE WHEN reference_parent_span_id IS NULL OR reference_parent_span_id = '' THEN service_name END)",
@@ -1277,13 +1271,7 @@ fn build_latest_sessions_sql(
     validated: &super::schema_compat::ValidatedLlmSchema,
 ) -> String {
     let session_id_col = validated.columns.session_id;
-    // Trace ingestion normalizes OTEL `user.id` to the stored `user_id`
-    // column. Keep the legacy schema's explicit `llm_user_id` name.
-    let user_id_col = if validated.has_gen_ai {
-        "user_id"
-    } else {
-        validated.columns.user_id
-    };
+    let user_id_col = validated.columns.user_id;
     let session_ids_sql = session_ids
         .iter()
         .map(|session_id| format!("'{}'", session_id.replace('\'', "''")))
@@ -1643,6 +1631,29 @@ mod tests {
         );
         assert_eq!(hit.service_name[0].service_name, "o2-ai");
         assert_eq!(hit.models, vec!["claude-sonnet-4-6".to_string()]);
+    }
+
+    #[test]
+    fn gen_ai_session_sql_uses_flattened_user_id_column() {
+        // Ingestion flattens the Gen-AI `user.id` attribute to a `user_id`
+        // column, so the SQL must never emit the dotted attribute name —
+        // DataFusion would read `user.id` as `<table>.<column>`.
+        let validated = super::super::schema_compat::ValidatedLlmSchema::fallback(true);
+        let details_sql = build_session_trace_details_sql(
+            "default",
+            &validated,
+            false,
+            "service_name",
+            "\"trace_id\" IN ('trace-1')",
+        );
+        let sessions_sql =
+            build_latest_sessions_sql("default", &["session-1".to_string()], &validated);
+
+        for sql in [&details_sql, &sessions_sql] {
+            assert!(sql.contains("array_agg(DISTINCT user_id)"));
+            assert!(sql.contains("user_id IS NOT NULL AND user_id != ''"));
+            assert!(!sql.contains("user.id"));
+        }
     }
 
     #[test]
