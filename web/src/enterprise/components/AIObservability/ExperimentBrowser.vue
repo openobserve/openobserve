@@ -215,16 +215,16 @@
               :icon-left="isBaseline(row) ? 'keep' : 'keep-outline'"
               :title="
                 isBaseline(row)
-                  ? t('aiObservability.experiments.baseline')
+                  ? t('aiObservability.experiments.clearBaseline')
                   : t('aiObservability.experiments.setBaseline')
               "
               :aria-label="
                 isBaseline(row)
-                  ? t('aiObservability.experiments.baseline')
+                  ? t('aiObservability.experiments.clearBaseline')
                   : t('aiObservability.experiments.setBaseline')
               "
               :data-test="`ai-experiment-baseline-${row.id}`"
-              @click.stop="setBaseline(row)"
+              @click.stop="toggleBaseline(row)"
             />
             <OButton
               size="icon-sm"
@@ -562,9 +562,21 @@ async function cloneExperiment(experiment: LlmExperiment) {
   }
 }
 
-function setBaseline(experiment: LlmExperiment) {
-  baselineByDataset.value = { ...baselineByDataset.value, [experiment.datasetId]: experiment.id };
-  writeExperimentBaselines(props.orgId, baselineByDataset.value);
+function toggleBaseline(experiment: LlmExperiment) {
+  const next = { ...baselineByDataset.value };
+  if (next[experiment.datasetId] === experiment.id) {
+    // One baseline per dataset, so clearing is a delete rather than a write of
+    // some empty value — a "" left behind would still match a stale id lookup.
+    delete next[experiment.datasetId];
+    baselineByDataset.value = next;
+    writeExperimentBaselines(props.orgId, next);
+    return;
+  }
+  next[experiment.datasetId] = experiment.id;
+  baselineByDataset.value = next;
+  writeExperimentBaselines(props.orgId, next);
+  // Pinning starts a comparison from the new baseline. Clearing does not touch
+  // the selection: dropping the pin is not a statement about what to compare.
   selectedIds.value = [experiment.id];
 }
 

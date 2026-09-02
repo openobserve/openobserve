@@ -49,16 +49,6 @@
       </ODropdown>
 
       <OButton
-        v-if="running"
-        variant="outline"
-        size="sm-action"
-        icon-left="close"
-        data-test="ai-playground-stop-btn"
-        @click="stopAll"
-      >
-        {{ t("aiObservability.playground.stop") }}
-      </OButton>
-      <OButton
         variant="outline"
         size="sm-action"
         :disabled="running"
@@ -97,18 +87,26 @@
         {{ t("aiObservability.playground.share") }}
       </OButton>
       <OButton
+        v-if="runningAll"
         variant="primary"
         size="sm-action"
-        :loading="running"
+        class="bg-cancel-query-bg! text-button-primary-foreground!"
+        :title="t('common.cancel')"
+        data-test="ai-playground-run-all-cancel-btn"
+        @click="stopAll()"
+      >
+        {{ t("common.cancel") }}
+      </OButton>
+      <OButton
+        v-else
+        variant="primary"
+        size="sm-action"
         :disabled="runDisabled"
         :title="t('aiObservability.playground.runAllTooltip')"
         data-test="ai-playground-run-all-btn"
         @click="onRunAll()"
       >
-        <template v-if="running">
-          {{ t("aiObservability.playground.running", { done: completedCount, total: totalCells }) }}
-        </template>
-        <template v-else>{{ t("aiObservability.playground.runAll") }}</template>
+        {{ t("aiObservability.playground.runAll") }}
       </OButton>
     </template>
 
@@ -171,6 +169,7 @@
       </OBanner>
 
       <PlaygroundVariableBar
+        ref="variableBarRef"
         class="shrink-0"
         :var-names="varNames"
         :vars="draft.vars"
@@ -196,9 +195,9 @@
         <div v-if="canScrollLeft" class="absolute start-1.5 top-1/2 z-1 -translate-y-1/2">
           <OButton
             variant="outline"
-            size="icon-circle-sm"
+            size="icon-circle"
             icon-left="chevron-left"
-            class="bg-surface-base shadow-md"
+            class="bg-surface-panel! text-accent! border-border-strong! hover:bg-accent/12! hover:border-accent! shadow-lg"
             :aria-label="t('aiObservability.playground.scrollLeft')"
             data-test="ai-playground-scroll-left"
             @click="scrollByStep(-1)"
@@ -207,9 +206,9 @@
         <div v-if="canScrollRight" class="absolute end-1.5 top-1/2 z-1 -translate-y-1/2">
           <OButton
             variant="outline"
-            size="icon-circle-sm"
+            size="icon-circle"
             icon-left="chevron-right"
-            class="bg-surface-base shadow-md"
+            class="bg-surface-panel! text-accent! border-border-strong! hover:bg-accent/12! hover:border-accent! shadow-lg"
             :aria-label="t('aiObservability.playground.scrollRight')"
             data-test="ai-playground-scroll-right"
             @click="scrollByStep(1)"
@@ -228,14 +227,15 @@
             :providers="providers"
             :var-names="varNames"
             :vars="draft.vars"
-            :solo="draft.variants.length === 1"
             :running="isVariantRunning(variant.id)"
-            :run-disabled="runDisabled"
+            :run-disabled="variantRunDisabled(variant.id)"
             :can-remove="draft.variants.length > 1"
             :can-duplicate="draft.variants.length < MAX_VARIANTS"
             @change="updateVariant"
             @run="runVariant(variant.id)"
+            @cancel="cancelVariant(variant.id)"
             @duplicate="duplicate(variant.id)"
+            @reset="resetVariant(variant.id)"
             @remove="removeVariant(variant.id)"
             @copy="copyOutput(variant.id, SINGLE_ROW_KEY)"
             @add-to-messages="addOutputToMessages(variant.id)"
@@ -310,11 +310,12 @@ import {
   cellAt,
   cloneVariant,
   draftFromSnapshot,
+  emptyVariant,
   extractVars,
   hasReference as benchHasReference,
   idleCell,
   playgroundId,
-  renderedMessages,
+  requestMessages,
   renderTemplate,
   scorerEvidence,
   settledResults,
@@ -327,6 +328,7 @@ import {
   type PlaygroundTool,
   type PlaygroundVariant,
 } from "./playgroundDraft";
+import { takeHandoff } from "./playgroundHandoff";
 import { aiExperimentCreateRoute } from "./experimentRoutes";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useHorizontalOverflow } from "@/composables/useHorizontalOverflow";
@@ -381,8 +383,6 @@ const varNames = computed(() => {
 /** Referenced by a message somewhere; the rest are declared and never read. */
 const usedVarNames = computed(() => extractVars(draft.variants));
 
-const totalCells = computed(() => draft.variants.length);
-
 const streamingVariants = computed(() =>
   draft.variants
     .filter((variant) => cellAt(results, variant.id, SINGLE_ROW_KEY)?.status === "streaming")
@@ -390,20 +390,42 @@ const streamingVariants = computed(() =>
 );
 
 const running = computed(() => streamingVariants.value.length > 0);
-
-const completedCount = computed(() => {
-  let done = 0;
-  for (const variant of draft.variants) {
-    const status = cellAt(results, variant.id, SINGLE_ROW_KEY)?.status;
-    if (status === "done" || status === "error") done += 1;
-  }
-  return done;
-});
+/** True only while an actual Run All is in flight — a single bench's own Run
+ *  streaming must not make the Run All button look like it started the work. */
+const runningAll = ref(false);
 
 /** Nothing to run against, or nothing to run with. */
 const runDisabled = computed(
-  () => running.value || !providers.value.length || !draft.variants.length,
+  () =>
+    running.value ||
+    !providers.value.length ||
+    !draft.variants.length ||
+    draft.variants.some(hasIncompleteToolResult),
 );
+
+/**
+ * A single bench's own Run button. Unlike Run All, one variant streaming must
+ * not block the others — runCell() already keys state per variant id, so
+ * running two at once is safe; only this variant's own in-flight run (or no
+ * providers/variants at all) should disable it.
+ */
+function variantRunDisabled(variantId: string) {
+  const variant = draft.variants.find((candidate) => candidate.id === variantId);
+  return (
+    !providers.value.length ||
+    !draft.variants.length ||
+    isVariantRunning(variantId) ||
+    Boolean(variant && hasIncompleteToolResult(variant))
+  );
+}
+
+function hasIncompleteToolResult(variant: PlaygroundVariant): boolean {
+  return variant.messages.some(
+    (message) =>
+      message.role === "tool" &&
+      (!message.toolName?.trim() || !message.toolArguments?.trim() || !message.content.trim()),
+  );
+}
 
 /**
  * Back to an empty bench. Confirmed because the draft is the only copy of the
@@ -450,6 +472,7 @@ onMounted(async () => {
   // First, and synchronously: the bench is the work, and it must be on screen
   // before anything that can fail or take a round trip.
   restoreSession();
+  applyHandoff();
   await Promise.all([loadProviders(), loadDatasets(), loadScorers()]);
   applyEntryParams();
   loadRecentDrafts();
@@ -510,6 +533,31 @@ function seedDefaultProvider() {
   }
 }
 
+/**
+ * Loads the conversation Trace Details stashed for us. Everything arrives as
+ * ordinary editable content — the whole point of the entry is to change the
+ * call and re-run it, so nothing is pinned readonly.
+ */
+function applyHandoff() {
+  if (String(route.query.from ?? "") !== "span") return;
+  const handoff = takeHandoff();
+  if (!handoff) return;
+  const variant = emptyVariant();
+  variant.messages = handoff.messages;
+  // Provider and model are left to seedDefaultProvider: the trace's model may
+  // not exist on any provider configured here.
+  variant.temperature = handoff.temperature;
+  // A fresh draft, not a merge: the imported call is the subject of the bench,
+  // and leaving a restored session's variants beside it would silently compare
+  // the trace against whatever the user last had open.
+  Object.assign(draft, starterDraft());
+  draft.variants = [variant];
+  draft.provenance = {
+    type: "trace",
+    label: t("aiObservability.playground.fromTrace", { id: handoff.sourceId }),
+  };
+}
+
 /** Entry params are read once. The URL is an entry address, not a save file. */
 function applyEntryParams() {
   const experimentId = String(route.query.experiment ?? "");
@@ -527,16 +575,21 @@ function setCell(variantId: string, rowKey: string, changes: Partial<PlaygroundC
   byRow[rowKey] = { ...(byRow[rowKey] ?? idleCell()), ...changes };
 }
 
-function onRunAll() {
+async function onRunAll() {
   if (runDisabled.value) return;
-  for (const variant of draft.variants) runVariant(variant.id, true);
+  runningAll.value = true;
+  try {
+    await Promise.allSettled(draft.variants.map((variant) => runVariant(variant.id, true)));
+  } finally {
+    runningAll.value = false;
+  }
 }
 
 function runVariant(variantId: string, skipGate = false) {
-  if (!skipGate && runDisabled.value) return;
+  if (!skipGate && variantRunDisabled(variantId)) return Promise.resolve();
   const variant = draft.variants.find((candidate) => candidate.id === variantId);
-  if (!variant) return;
-  runCell(variant, SINGLE_ROW_KEY);
+  if (!variant) return Promise.resolve();
+  return runCell(variant, SINGLE_ROW_KEY);
 }
 
 async function runCell(variant: PlaygroundVariant, rowKey: string) {
@@ -548,6 +601,7 @@ async function runCell(variant: PlaygroundVariant, rowKey: string) {
   setCell(variant.id, rowKey, {
     status: "streaming",
     text: "",
+    reasoningContent: null,
     toolCall: null,
     usage: null,
     error: null,
@@ -557,9 +611,7 @@ async function runCell(variant: PlaygroundVariant, rowKey: string) {
   });
 
   const vars = { ...draft.vars };
-  const messages = renderedMessages(variant, vars)
-    .filter((message) => message.content.trim().length > 0)
-    .map((message) => ({ role: message.role, content: message.content }));
+  const messages = requestMessages(variant, vars);
   // The provider's type decides how tools and the response schema are shaped
   // for the wire — the server forwards both to the provider untouched.
   const provider = providers.value.find((candidate) => candidate.id === variant.providerId);
@@ -592,6 +644,7 @@ async function runCell(variant: PlaygroundVariant, rowKey: string) {
     setCell(variant.id, rowKey, {
       status: "done",
       text: result.text,
+      reasoningContent: result.reasoningContent,
       toolCall: result.toolCall,
       usage: result.usage,
     });
@@ -625,6 +678,17 @@ function stopAll() {
   }
 }
 
+/** One bench's own Cancel — mirrors stopAll() but only for that variant, so
+ *  cancelling one run does not touch the others. */
+function cancelVariant(variantId: string) {
+  const key = `${variantId}:${SINGLE_ROW_KEY}`;
+  controllers.get(key)?.abort();
+  controllers.delete(key);
+  if (cellAt(results, variantId, SINGLE_ROW_KEY)?.status === "streaming") {
+    setCell(variantId, SINGLE_ROW_KEY, { status: "idle" });
+  }
+}
+
 function safeParse(text: string): unknown {
   try {
     return JSON.parse(text);
@@ -644,7 +708,8 @@ function onKeydown(event: KeyboardEvent) {
 
 const hasReference = computed(() => benchHasReference(draft.expectedSingle));
 
-const expectedBarRef = ref<{ focus: () => void } | null>(null);
+const expectedBarRef = ref<{ focus: () => void; flash: () => void } | null>(null);
+const variableBarRef = ref<{ flash: () => void } | null>(null);
 
 /** A selected scorer reads `{{expected_output}}` and the bench has none, so the
  *  field has to be on screen for the Score panel's notice to point at. */
@@ -780,12 +845,55 @@ function removeVariant(variantId: string) {
   delete results[variantId];
 }
 
-function applySample(sample: PlaygroundSample, item: LlmDatasetItem) {
+/** One bench back to blank — the scoped alternative to Reset, which wipes
+ *  every bench and confirms first. Keeps the variant's id so it stays the
+ *  same column (same label, same position) rather than reflowing the bench. */
+async function resetVariant(variantId: string) {
+  const index = draft.variants.findIndex((variant) => variant.id === variantId);
+  if (index === -1) return;
+  const ok = await confirm({
+    title: t("aiObservability.playground.resetVariantTitle"),
+    message: t("aiObservability.playground.resetVariantMessage"),
+    confirmLabel: t("aiObservability.playground.reset"),
+    cancelLabel: t("common.cancel"),
+  });
+  if (!ok) return;
+  cancelVariant(variantId);
+  const fresh = emptyVariant();
+  fresh.id = variantId;
+  draft.variants[index] = fresh;
+  delete results[variantId];
+  seedDefaultProvider();
+}
+
+function applySample(sample: PlaygroundSample, item: LlmDatasetItem, notify = true) {
   draft.sample = sample;
   draft.vars = { ...draft.vars, input: item.inputPreview || item.input };
   draft.expectedSingle = item.expectedOutput;
   // New question ⇒ the answers on screen are answers to the old one.
   for (const key of Object.keys(results)) delete results[key];
+  // Sampling only ever fills a value — it never rewrites a message the user
+  // wrote — so without this, the value sits there with nothing telling the
+  // user it arrived or how to reach it. Only on the initial pick, though —
+  // stepSample() passes notify=false, since a toast on every Prev/Next click
+  // was noise once you're already stepping through rows you know are sampled.
+  if (notify) {
+    toast({
+      variant: "success",
+      message: t("aiObservability.playground.sampleApplied", {
+        index: sample.index + 1,
+        total: sample.total,
+        token: "{{input}}",
+      }),
+    });
+    // The toast fades; the flash on the two fields the values actually landed
+    // in — Variables and Expected Output — is what still says so a moment
+    // later, without the user having to already know to look there. flash(),
+    // not focus() — a sample can land while the cursor is anywhere else on
+    // the page, and it must stay there.
+    variableBarRef.value?.flash();
+    expectedBarRef.value?.flash();
+  }
 }
 
 /** Walk to a neighbouring dataset item without leaving the bench — this is what
@@ -803,7 +911,7 @@ async function stepSample(delta: number) {
     });
     const item = page.items[0];
     if (!item) return;
-    applySample({ ...sample, itemId: item.id, index, total: page.total }, item);
+    applySample({ ...sample, itemId: item.id, index, total: page.total }, item, false);
   } catch {
     toast({ variant: "error", message: t("aiObservability.playground.sampleLoadError") });
   } finally {
@@ -822,21 +930,52 @@ async function copyOutput(variantId: string, rowKey: string) {
   toast({ variant: "success", message: t("aiObservability.playground.copied") });
 }
 
-/** Continue the conversation: the answer becomes context, and an empty user
- *  turn is added so there is somewhere to type the follow-up. */
+/** Continue with text, or open the result field for a returned tool call. */
 function addOutputToMessages(variantId: string) {
   const cell = cellAt(results, variantId, SINGLE_ROW_KEY);
-  if (!cell || cell.status !== "done" || !cell.text) return;
+  if (!cell || cell.status !== "done" || (!cell.text && !cell.toolCall)) return;
   const variant = draft.variants.find((candidate) => candidate.id === variantId);
   if (!variant) return;
 
-  variant.messages = [
-    ...variant.messages,
-    { id: playgroundId("msg"), role: "assistant", content: cell.text },
-    { id: playgroundId("msg"), role: "user", content: "" },
-  ];
-  setCell(variantId, SINGLE_ROW_KEY, { status: "idle", text: "", usage: null });
-  toast({ variant: "info", message: t("aiObservability.playground.addedToMessages") });
+  if (cell.toolCall) {
+    variant.messages = [
+      ...variant.messages,
+      {
+        id: playgroundId("msg"),
+        role: "tool",
+        content: "",
+        toolName: cell.toolCall.name,
+        toolCallId: cell.toolCall.id,
+        toolArguments: cell.toolCall.arguments,
+        ...(cell.reasoningContent != null ? { reasoningContent: cell.reasoningContent } : {}),
+      },
+    ];
+  } else {
+    variant.messages = [
+      ...variant.messages,
+      {
+        id: playgroundId("msg"),
+        role: "assistant",
+        content: cell.text,
+        ...(cell.reasoningContent != null ? { reasoningContent: cell.reasoningContent } : {}),
+      },
+      { id: playgroundId("msg"), role: "user", content: "" },
+    ];
+  }
+  setCell(variantId, SINGLE_ROW_KEY, {
+    status: "idle",
+    text: "",
+    toolCall: null,
+    usage: null,
+  });
+  toast({
+    variant: "info",
+    message: t(
+      cell.toolCall
+        ? "aiObservability.playground.toolCallAddedToMessages"
+        : "aiObservability.playground.addedToMessages",
+    ),
+  });
 }
 
 // ── sharing ───────────────────────────────────────────────────────

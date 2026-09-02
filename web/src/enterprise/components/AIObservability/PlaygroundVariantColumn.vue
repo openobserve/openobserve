@@ -13,8 +13,7 @@
 -->
 <template>
   <section
-    class="border-border-default bg-surface-base rounded-surface flex min-h-0 min-w-85 flex-1 snap-start flex-col overflow-hidden border"
-    :class="solo ? '' : 'max-w-140'"
+    class="border-border-default bg-surface-base rounded-surface @container/variant flex min-h-0 min-w-93.5 flex-1 snap-start flex-col overflow-hidden border"
     :data-test="`ai-playground-variant-${label}`"
   >
     <div class="border-border-default shrink-0 border-b px-2.5 py-1.5">
@@ -26,6 +25,7 @@
         :can-duplicate="canDuplicate"
         @change="(next) => emit('change', next)"
         @duplicate="emit('duplicate')"
+        @reset="emit('reset')"
         @remove="emit('remove')"
         @create-experiment="emit('create-experiment')"
       />
@@ -74,14 +74,21 @@
                 @click="emit('copy')"
               />
               <OButton
-                v-if="!cell.toolCall"
                 variant="ghost-muted"
-                size="icon-xs"
+                :size="cell.toolCall ? 'xs' : 'icon-xs'"
                 icon-left="chat"
-                :title="t('aiObservability.playground.addToMessagesTooltip')"
+                :title="
+                  cell.toolCall
+                    ? t('aiObservability.playground.toolCallContinueTooltip')
+                    : t('aiObservability.playground.addToMessagesTooltip')
+                "
                 :data-test="`ai-playground-output-add-to-messages-${label}`"
                 @click="emit('add-to-messages')"
-              />
+              >
+                <span v-if="cell.toolCall">
+                  {{ t("aiObservability.playground.toolCallAddToMessages") }}
+                </span>
+              </OButton>
               <OButton
                 variant="ghost-muted"
                 size="icon-xs"
@@ -108,11 +115,28 @@
     <!-- Outside the splitter: dragging the panes must never be able to push Run
          off the bottom of the column. -->
     <div class="border-border-default shrink-0 border-t px-2.5 py-2.5">
+      <p
+        v-if="runDisabledReason"
+        class="text-text-secondary mt-0 mb-1.5 text-center text-xs"
+        :data-test="`ai-playground-run-disabled-reason-${label}`"
+      >
+        {{ runDisabledReason }}
+      </p>
       <OButton
+        v-if="running"
+        variant="primary"
+        size="sm-action"
+        class="bg-cancel-query-bg! text-button-primary-foreground! w-full"
+        :data-test="`ai-playground-variant-cancel-${label}`"
+        @click="emit('cancel')"
+      >
+        {{ t("common.cancel") }}
+      </OButton>
+      <OButton
+        v-else
         variant="primary"
         size="sm-action"
         class="w-full"
-        :loading="running"
         :disabled="runDisabled"
         :data-test="`ai-playground-variant-submit-${label}`"
         @click="emit('run')"
@@ -124,7 +148,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import PlaygroundOutputCell from "./PlaygroundOutputCell.vue";
@@ -137,7 +161,7 @@ import type {
 } from "@/enterprise/views/AIObservability/playgroundDraft";
 import type { Provider } from "@/services/online-evals.service";
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     variant: PlaygroundVariant;
     label: string;
@@ -149,9 +173,6 @@ withDefaults(
     runDisabled?: boolean;
     canRemove?: boolean;
     canDuplicate?: boolean;
-    /** The only visible column, so it takes the full width instead of leaving
-     *  dead space beside a comparison that has no second participant. */
-    solo?: boolean;
     /** Baseline output text, when this column should render as a change. */
   }>(),
   {
@@ -159,11 +180,24 @@ withDefaults(
     runDisabled: false,
     canRemove: true,
     canDuplicate: true,
-    solo: false,
   },
 );
 
 const { t } = useI18nTyped();
+
+const runDisabledReason = computed(() => {
+  if (!props.runDisabled) return "";
+  const incompleteTool = props.variant.messages.find(
+    (message) =>
+      message.role === "tool" &&
+      (!message.toolName?.trim() || !message.toolArguments?.trim() || !message.content.trim()),
+  );
+  if (!incompleteTool) return "";
+  if (!incompleteTool.toolName?.trim() || !incompleteTool.toolArguments?.trim()) {
+    return t("aiObservability.playground.toolSetupRequired");
+  }
+  return t("aiObservability.playground.toolResultRequired");
+});
 
 /** Percent of the column given to the config. Per column and not persisted —
  *  it is a reading preference for the moment, not part of the draft. */
@@ -172,7 +206,9 @@ const split = ref(60);
 const emit = defineEmits<{
   change: [variant: PlaygroundVariant];
   run: [];
+  cancel: [];
   duplicate: [];
+  reset: [];
   remove: [];
   copy: [];
   "add-to-messages": [];

@@ -25,12 +25,13 @@
 
     <!-- error -->
     <template v-else-if="cell.status === 'error'">
-      <OBanner
-        variant="error"
-        dense
-        :content="raw(cell.error?.message)"
+      <div
+        role="alert"
+        class="bg-banner-error-bg text-banner-error-text rounded-default p-2 text-sm wrap-break-word whitespace-pre-wrap"
         data-test="ai-playground-output-error"
-      />
+      >
+        {{ raw(cell.error?.message) }}
+      </div>
       <div>
         <OButton
           variant="outline"
@@ -136,7 +137,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type {

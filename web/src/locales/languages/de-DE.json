@@ -11637,6 +11637,8 @@
       "schemaToggle": "Ausgabe auf ein JSON-Schema beschränken",
       "schemaHelp": "Die Ausgabe wird im JSON-Format dargestellt, wenn ein Schema festgelegt ist.",
       "schemaInvalidJson": "Das Schema muss gültiges JSON sein.",
+      "schemaIgnored": "Schema · Von diesem Anbieter ignoriert",
+      "schemaUnsupported": "Dieser Anbieter hat kein Feld für strukturierte Ausgabe. Das Schema bleibt in dieser Spalte erhalten, wird aber nicht gesendet, und das Modell antwortet mit reinem Text.",
       "outputPlaceholder": "Die Ausgabe erscheint hier — drücken Sie „Ausführen“.",
       "outputNotRun": "Nicht ausgeführt",
       "retry": "Wiederholen",

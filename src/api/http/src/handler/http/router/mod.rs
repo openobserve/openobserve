@@ -1205,6 +1205,10 @@ pub fn service_routes() -> Router {
                         .delete(experiments::clear_experiment_baseline),
                 )
                 .route(
+                    "/{org_id}/experiments/{experiment_id}/rows",
+                    get(experiments::list_experiment_result_rows),
+                )
+                .route(
                     "/{org_id}/experiments/{experiment_id}/rows/{row_id}",
                     get(experiments::get_experiment_row),
                 )
