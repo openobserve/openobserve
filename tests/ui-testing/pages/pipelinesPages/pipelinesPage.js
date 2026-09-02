@@ -360,7 +360,11 @@ export class PipelinesPage {
 
     // Methods from original PipelinesPage
     async gotoPipelinesPage() {
-        await openNavFlyoutChild(this.page, 'pipeline');
+        // The flyout child is a hover-reveal that can self-close mid-click, so retry the reveal+click until the pipeline route actually loads.
+        await expect(async () => {
+            await openNavFlyoutChild(this.page, 'pipeline');
+            await this.page.waitForURL(/pipeline/, { timeout: 5000 });
+        }).toPass({ timeout: 30000, intervals: [500, 1000, 2000] });
     }
 
     async pipelinesPageDefaultOrg() {
