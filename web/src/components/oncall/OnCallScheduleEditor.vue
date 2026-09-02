@@ -155,8 +155,6 @@
              read rather than a plain form that turns into tabs the moment a
              second rule shows up. -->
         <section class="flex flex-col gap-4">
-          <OText v-if="multiRule" variant="section">{{ t("oncall.rotationSectionRules") }}</OText>
-
           <p
             v-if="!active.shift_rules.length"
             class="text-status-warning-text text-xs"
@@ -182,10 +180,41 @@
                 v-for="(rule, ruleIndex) in active.shift_rules"
                 :key="ruleIndex"
                 :name="String(ruleIndex)"
-                :icon="ruleTabIcon(rule)"
-                :label="raw(rule.name?.trim() ? rule.name : String(t('oncall.shiftRuleNthName', { n: ruleIndex + 1 })))"
                 :data-test="`oncall-schedule-rule-tab-${ruleIndex}`"
-              />
+              >
+                <!-- Custom slot content instead of the label/icon props: a
+                     multi-rule rotation needs a delete affordance ON the tab
+                     rather than a separate button buried in the panel below,
+                     where it read as deleting the FORM rather than the tab.
+                     Matches the dashboard panel's query-tab close icon
+                     (DashboardQueryEditor.vue) — inline, always-dimly-visible
+                     rather than hover-revealed, since a tab strip this short
+                     has no crowding to hide it from. -->
+                <OIcon
+                  v-if="ruleTabIcon(rule)"
+                  :name="ruleTabIcon(rule) as any"
+                  size="sm"
+                  class="shrink-0"
+                />
+                <span class="truncate">{{
+                  raw(
+                    rule.name?.trim()
+                      ? rule.name
+                      : String(t("oncall.shiftRuleNthName", { n: ruleIndex + 1 })),
+                  )
+                }}</span>
+                <OIcon
+                  v-if="multiRule"
+                  name="close"
+                  size="sm"
+                  :aria-label="t('oncall.removeShiftRule')"
+                  class="hover:bg-hover-gray text-text-secondary cursor-pointer opacity-60 transition-all duration-150 hover:rounded-full hover:opacity-100"
+                  :data-test="`oncall-schedule-rule-remove-${ruleIndex}`"
+                  @click.stop.prevent="removeRule(ruleIndex)"
+                  @mousedown.stop.prevent
+                  @pointerdown.stop.prevent
+                />
+              </OTab>
             </OTabs>
             <OButton
               variant="ghost"
@@ -219,18 +248,6 @@
                     <OTag v-if="isRetired(rule)" variant="default-soft" size="xs">
                       {{ t("oncall.rotationRetiredOnDate", { date: raw(shortDate(rule.ends_at ?? 0)) }) }}
                     </OTag>
-                    <!-- The only rule left has no delete affordance — a
-                         rotation with no rules stores nothing, so the last
-                         one can't be removed via this button. -->
-                    <OButton
-                      v-if="multiRule"
-                      variant="ghost"
-                      size="icon-sm"
-                      icon-left="delete-outline"
-                      :aria-label="t('oncall.removeShiftRule')"
-                      :data-test="`oncall-schedule-rule-remove-${ruleIndex}`"
-                      @click="removeRule(ruleIndex)"
-                    />
                   </div>
 
                   <OnCallShiftRuleFields
@@ -329,6 +346,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
