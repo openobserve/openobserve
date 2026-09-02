@@ -12599,7 +12599,7 @@
     "awayRemoveFailed": "Could not remove the absence",
     "awayUntil": "Away until {date}",
     "awayWindow": "Away {from} – {to}",
-    "presetsTitle": "Start from a preset",
+    "presetsTitle": "Quick start",
     "presetsHint": "Four shapes worth having, asked for by name. Applying one replaces the team's rotations; everything it builds stays editable afterwards.",
     "presetsBack": "Back to the shapes",
     "presetsAddGroup": "Add another",
