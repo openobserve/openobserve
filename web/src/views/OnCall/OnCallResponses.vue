@@ -395,8 +395,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ODimensionChip
                 dim-key="incident"
                 :key-label="String(t('oncall.incident'))"
-                :value="row.latest.incident_id"
-                tooltip
+                :value="incidentTitleById[row.latest.incident_id] ?? row.latest.incident_id"
+              />
+              <OTooltip
+                :content="raw(incidentTitleById[row.latest.incident_id] ?? row.latest.incident_id)"
               />
             </router-link>
           </span>
@@ -762,6 +764,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef, RowTone } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import incidentsService from "@/services/incidents";
 import oncallService, { RESPONSE_PAGE_LIMIT } from "@/services/oncall";
 import type {
   CauseGroup,
@@ -914,6 +917,12 @@ const viewerEmail = computed(() => String(store.state.userInfo?.email ?? "").toL
 const teamNameById = computed<Record<string, string>>(() =>
   Object.fromEntries(teams.value.map((team) => [team.id, team.name])),
 );
+
+// A ksuid asks the reader to look it up somewhere else, same as team_id
+// (`fetchTeamContext` below). There is no bulk "get these incidents" endpoint,
+// so this fills in one id at a time and the chip falls back to the raw id
+// until its title lands.
+const incidentTitleById = ref<Record<string, string>>({});
 
 const teamOptions = computed(() => [
   { label: t("oncall.allTeams"), value: "all" },
@@ -1564,6 +1573,9 @@ async function fetchResponses(opts: { background?: boolean } = {}) {
     // error render the first-run checklist, telling a configured org that
     // nothing is set up.
     loaded.value = true;
+    // Fire-and-forget: the list is already usable with ids as the fallback,
+    // so titles fill in behind it rather than holding up the table.
+    void fetchIncidentTitles();
   } catch (err) {
     // §G.8.1: the probe said "not here". Leaving `loaded` false keeps the
     // setup checklist away too — a build that cannot page must not be told
@@ -1576,6 +1588,32 @@ async function fetchResponses(opts: { background?: boolean } = {}) {
   } finally {
     busy.value = false;
   }
+}
+
+/// One request per incident id — there is no bulk "get these incidents"
+/// endpoint (see `fetchTeamContext` for the same constraint on team data).
+/// Already-resolved ids are skipped so a background refresh doesn't re-fetch
+/// titles the list already has.
+async function fetchIncidentTitles() {
+  const ids = [
+    ...new Set(
+      responses.value
+        .map((response) => response.incident_id)
+        .filter((id): id is string => !!id && !(id in incidentTitleById.value)),
+    ),
+  ];
+  if (!ids.length) return;
+  const results = await Promise.allSettled(
+    ids.map((id) => incidentsService.get(orgId.value, id)),
+  );
+  const next = { ...incidentTitleById.value };
+  ids.forEach((id, index) => {
+    const result = results[index];
+    if (result.status === "fulfilled" && result.value.data?.title) {
+      next[id] = result.value.data.title;
+    }
+  });
+  incidentTitleById.value = next;
 }
 
 /// Teams, coverage and ownership answer the checklist, not the list. A failure
