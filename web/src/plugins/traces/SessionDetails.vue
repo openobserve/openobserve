@@ -1609,8 +1609,16 @@ async function load() {
 }
 
 function goBack() {
-  // When opened from the AI/LLM Sessions page, return there (stays in the AI
-  // menu) instead of dropping into the Traces sessions tab.
+  // Real history back, when there is one, instead of a hand-built push: the
+  // list's own URL (filters, page, stream/agent mode) round-trips exactly as
+  // the user left it. A hand-built push can only guess at "org_identifier".
+  if (window.history.state?.back) {
+    router.back();
+    return;
+  }
+  // No history to pop (direct link / reload) — reconstruct a sane landing
+  // spot. When opened from the AI/LLM Sessions page, return there (stays in
+  // the AI menu) instead of dropping into the Traces sessions tab.
   if (route.name === "aiSessionDetails") {
     router.push({
       name: "aiSessions",
