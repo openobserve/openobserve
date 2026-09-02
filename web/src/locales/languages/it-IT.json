@@ -11115,7 +11115,7 @@
             "item": "Elemento",
             "versions": "Versioni"
           },
-          "versionPill": "v{version} · {count} Versione | v{version} · {count} Versioni",
+          "versionPill": "{count} Versione | {count} Versioni",
           "sourceSection": "Origine",
           "sourceTrace": "Traccia",
           "sourceSpan": "Span",
@@ -11637,6 +11637,8 @@
       "schemaToggle": "Vincola l'output a uno schema JSON",
       "schemaHelp": "L'output viene visualizzato con formattazione JSON quando è impostato uno schema.",
       "schemaInvalidJson": "Lo schema deve essere JSON valido.",
+      "schemaIgnored": "Schema · Ignorato da questo provider",
+      "schemaUnsupported": "Questo provider non ha un campo per l'output strutturato. Lo schema viene mantenuto in questa colonna, ma non viene inviato e il modello risponde con testo semplice.",
       "outputPlaceholder": "L'output appare qui — premi Esegui.",
       "outputNotRun": "Non eseguito",
       "retry": "Riprova",

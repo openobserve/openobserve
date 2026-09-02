@@ -11115,7 +11115,7 @@
             "item": "Elemento",
             "versions": "Versiones"
           },
-          "versionPill": "v{version} · {count} Versión | v{version} · {count} Versiones",
+          "versionPill": "{count} Versión | {count} Versiones",
           "sourceSection": "Origen",
           "sourceTrace": "Traza",
           "sourceSpan": "Span",
@@ -11637,6 +11637,8 @@
       "schemaToggle": "Restringir la salida a un esquema JSON",
       "schemaHelp": "La salida se muestra con formato JSON cuando se define un esquema.",
       "schemaInvalidJson": "El esquema debe ser JSON válido.",
+      "schemaIgnored": "Esquema · Ignorado por este proveedor",
+      "schemaUnsupported": "Este proveedor no tiene un campo de salida estructurada. El esquema se conserva en esta columna, pero no se envía y el modelo responde con texto plano.",
       "outputPlaceholder": "La salida aparece aquí — pulse Ejecutar.",
       "outputNotRun": "No ejecutado",
       "retry": "Reintentar",

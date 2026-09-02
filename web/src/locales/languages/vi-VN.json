@@ -11115,7 +11115,7 @@
             "item": "Mục",
             "versions": "Phiên bản"
           },
-          "versionPill": "v{version} · {count} phiên bản | v{version} · {count} phiên bản",
+          "versionPill": "{count} phiên bản | {count} phiên bản",
           "sourceSection": "Nguồn",
           "sourceTrace": "Trace",
           "sourceSpan": "Span",
@@ -11637,6 +11637,8 @@
       "schemaToggle": "Ràng buộc đầu ra theo một JSON schema",
       "schemaHelp": "Đầu ra hiển thị với định dạng JSON khi schema được thiết lập.",
       "schemaInvalidJson": "Schema phải là JSON hợp lệ.",
+      "schemaIgnored": "Lược đồ · Bị nhà cung cấp này bỏ qua",
+      "schemaUnsupported": "Nhà cung cấp này không có trường đầu ra có cấu trúc. Lược đồ vẫn được giữ trong cột này nhưng không được gửi, và mô hình trả lời bằng văn bản thuần.",
       "outputPlaceholder": "Đầu ra sẽ xuất hiện tại đây — nhấn Chạy.",
       "outputNotRun": "Chưa chạy",
       "retry": "Thử lại",
