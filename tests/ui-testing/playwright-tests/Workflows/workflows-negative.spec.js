@@ -144,7 +144,7 @@ test.describe(
         });
         await pm.workflowsPage.goToList();
         await pm.workflowsPage.openEdit(name);
-        await pm.workflowsPage.testRunFromEditor();
+        await pm.workflowsPage.testRunFromEditor({ liveSend: true });
         // The destination step fails to send; the trigger step still succeeds.
         await pm.workflowsPage.expectNodeTestError('destination');
         await pm.workflowsPage.expectNodeTestOk('workflow_trigger');

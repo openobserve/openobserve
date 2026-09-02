@@ -66,7 +66,7 @@ test.describe(
       });
       await pm.workflowsPage.goToList();
       await pm.workflowsPage.openEdit(name);
-      await pm.workflowsPage.testRunFromEditor();
+      await pm.workflowsPage.testRunFromEditor({ liveSend: true });
       await pm.workflowsPage.expectNodeTestOk('destination');
       await pm.workflowsPage.expectNodeTestOk('workflow_trigger');
       testLogger.info('destination reported a successful send', { name });
@@ -85,7 +85,7 @@ test.describe(
       });
       await pm.workflowsPage.goToList();
       await pm.workflowsPage.openEdit(name);
-      await pm.workflowsPage.testRunFromEditor();
+      await pm.workflowsPage.testRunFromEditor({ liveSend: true });
       await pm.workflowsPage.expectNodeTestOk('destination');
 
       // The receiving side confirms it stored the record. Verified live:

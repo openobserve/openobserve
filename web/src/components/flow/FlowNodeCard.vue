@@ -148,8 +148,8 @@ const spread = computed(() => sourceHandles.value.length > 1);
 // Which edge the offset runs along: a left/right handle column spreads vertically.
 const spreadClass = computed(() =>
   props.outputPosition === Position.Left || props.outputPosition === Position.Right
-    ? "top-[var(--fnc-handle-offset)]!"
-    : "left-[var(--fnc-handle-offset)]!",
+    ? "top-[var(--fnc-handle-offset,50%)]!"
+    : "left-[var(--fnc-handle-offset,50%)]!",
 );
 // (i+1)/(n+1) keeps every arm strictly inside the card, so more paths narrow the gap rather than overflow.
 const handleOffset = (index: number) =>

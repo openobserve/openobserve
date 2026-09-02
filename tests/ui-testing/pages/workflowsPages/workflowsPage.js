@@ -129,6 +129,7 @@ class WorkflowsPage {
     // config panel became an ODialog — so its buttons stay `o-drawer-*`.
     this.testDrawer = '[data-test="workflow-test-drawer"]';
     this.testDrawerPrimary = '[data-test="workflow-test-drawer"] [data-test="o-drawer-primary-btn"]';
+    this.testSuppressSwitch = '[data-test="workflow-test-suppress-destinations-btn"]';
     // Workflow function code editor (QuickJS/JavaScript), shared with the Functions page.
     this.functionEditor = '[data-test="logs-vrl-function-editor"]';
     // Warning toast — how a blocked Publish reports itself, since it never reaches the network.
@@ -529,9 +530,16 @@ class WorkflowsPage {
    * Open the Test drawer from the editor and run the saved graph against the (pre-filled) sample
    * payload. Per-node results paint as ✓/✗ badges on the canvas nodes afterwards.
    */
-  async testRunFromEditor() {
+  async testRunFromEditor({ liveSend = false } = {}) {
     await this.page.locator(this.testBtn).click({ timeout: DRAWER_TIMEOUT_MS });
     await this.page.locator(this.testDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    if (liveSend) {
+      // Destination sends are suppressed by default; send-error tests need the real dispatch.
+      const sw = this.page.locator(this.testSuppressSwitch);
+      if ((await sw.getAttribute('aria-checked')) === 'true') {
+        await sw.click({ timeout: DRAWER_TIMEOUT_MS });
+      }
+    }
     // The Test panel is still a real ODrawer (WorkflowTestDialog.vue) — only the NODE
     // config panel became an ODialog. Its buttons stay `o-drawer-*`.
     await this.page.locator(this.testDrawerPrimary).click({ timeout: DRAWER_TIMEOUT_MS });
