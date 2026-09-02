@@ -27,11 +27,15 @@ const OTag = {
   props: ["variant", "size", "label"],
   template: '<span class="o-tag" :data-label="label" />',
 };
+const OBanner = {
+  props: ["variant", "dense", "preserveWhitespace"],
+  template: '<div v-bind="$attrs"><slot /></div>',
+};
 
 function mountCell(cell: PlaygroundCell | undefined, props: Record<string, unknown> = {}) {
   return mount(PlaygroundOutputCell, {
     props: { cell, ...props },
-    global: { stubs: { OButton, OTag } },
+    global: { stubs: { OButton, OTag, OBanner } },
   });
 }
 

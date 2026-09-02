@@ -124,9 +124,9 @@
       </p>
       <OButton
         v-if="running"
-        variant="primary"
+        variant="cancel-query"
         size="sm-action"
-        class="bg-cancel-query-bg! text-button-primary-foreground! w-full"
+        class="w-full"
         :data-test="`ai-playground-variant-cancel-${label}`"
         @click="emit('cancel')"
       >
