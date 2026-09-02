@@ -30,11 +30,11 @@ use proto::cluster_rpc::{
     search_server::SearchServer, streams_server::StreamsServer,
 };
 use search_service::SEARCH_SERVER;
-use tokio::sync::oneshot;
+use tokio::{net::TcpListener, sync::oneshot};
 use tonic::{
     codec::CompressionEncoding,
     service::interceptor::InterceptedService,
-    transport::{Identity, ServerTlsConfig},
+    transport::{Identity, ServerTlsConfig, server::TcpIncoming},
 };
 
 use crate::{
@@ -163,7 +163,7 @@ async fn run_common(
         if cfg.grpc.tls_enabled { "with TLS" } else { "" },
         gaddr
     );
-    init_tx.send(()).ok();
+    let incoming = TcpIncoming::from(bind_listener(gaddr, init_tx).await?).with_nodelay(Some(true));
 
     let mut builder = server_builder()?;
     let ret = builder
@@ -179,7 +179,7 @@ async fn run_common(
         .add_service(flight_svc)
         .add_service(node_svc)
         .add_service(cluster_info_svc)
-        .serve_with_shutdown(gaddr, async {
+        .serve_with_incoming_shutdown(incoming, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
         })
@@ -227,14 +227,14 @@ async fn run_router(
         if cfg.grpc.tls_enabled { "with TLS" } else { "" },
         gaddr
     );
-    init_tx.send(()).ok();
+    let incoming = TcpIncoming::from(bind_listener(gaddr, init_tx).await?).with_nodelay(Some(true));
 
     let mut builder = server_builder()?;
     let ret = builder
         .add_service(logs_svc)
         .add_service(metrics_svc)
         .add_service(traces_svc)
-        .serve_with_shutdown(gaddr, async {
+        .serve_with_incoming_shutdown(incoming, async {
             shutdown_rx.await.ok();
             log::info!("gRPC server starts shutting down");
         })
@@ -257,6 +257,17 @@ fn otlp_authenticated<S>(service: S) -> InterceptedService<S, AuthInterceptor> {
     InterceptedService::new(service, check_otlp_auth)
 }
 
+async fn bind_listener(
+    gaddr: SocketAddr,
+    init_tx: oneshot::Sender<()>,
+) -> Result<TcpListener, anyhow::Error> {
+    let listener = TcpListener::bind(gaddr).await?;
+    init_tx
+        .send(())
+        .map_err(|_| anyhow::anyhow!("gRPC initialization receiver dropped"))?;
+    Ok(listener)
+}
+
 fn server_builder() -> Result<tonic::transport::Server, anyhow::Error> {
     let cfg = get_config();
     let builder = if cfg.grpc.tls_enabled {
@@ -272,4 +283,52 @@ fn server_builder() -> Result<tonic::transport::Server, anyhow::Error> {
         .initial_connection_window_size(config::GRPC_HTTP2_CONNECTION_WINDOW_SIZE)
         .http2_adaptive_window(Some(cfg.grpc.http2_adaptive_window))
         .tcp_nodelay(true))
+}
+
+#[cfg(test)]
+mod tests {
+    use futures::StreamExt;
+    use tokio::net::TcpStream;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn init_is_signaled_after_grpc_socket_listens() {
+        let gaddr = "127.0.0.1:0".parse().unwrap();
+        let (init_tx, init_rx) = oneshot::channel();
+
+        let listener = bind_listener(gaddr, init_tx).await.unwrap();
+        init_rx.await.unwrap();
+
+        assert!(
+            TcpStream::connect(listener.local_addr().unwrap())
+                .await
+                .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn failed_bind_does_not_signal_init() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let (init_tx, init_rx) = oneshot::channel();
+
+        assert!(
+            bind_listener(listener.local_addr().unwrap(), init_tx)
+                .await
+                .is_err()
+        );
+        assert!(init_rx.await.is_err());
+    }
+
+    #[tokio::test]
+    async fn incoming_stream_enables_tcp_nodelay() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let mut incoming = TcpIncoming::from(listener).with_nodelay(Some(true));
+
+        let _client = TcpStream::connect(addr).await.unwrap();
+        let accepted = incoming.next().await.unwrap().unwrap();
+
+        assert!(accepted.nodelay().unwrap());
+    }
 }

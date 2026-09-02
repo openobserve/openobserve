@@ -38,7 +38,7 @@ pub mod engine;
 pub mod exec;
 mod functions;
 mod fused;
-mod load_series;
+pub mod load_series;
 pub mod promql;
 pub mod utils;
 

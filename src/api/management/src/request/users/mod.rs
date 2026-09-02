@@ -134,6 +134,19 @@ pub async fn list(
     }
 }
 
+/// Rejects an `org_id` path segment that is empty or whitespace-only.
+///
+/// The `/{org_id}/users` route parameter can arrive as `""` (via a
+/// URL-encoded empty segment) or `" "` (via `%20`), which previously slipped
+/// through and let user records be created against a meaningless organization.
+fn validate_org_id(org_id: &str) -> Option<&'static str> {
+    if org_id.trim().is_empty() {
+        Some("Organization name is required")
+    } else {
+        None
+    }
+}
+
 /// CreateUser
 #[utoipa::path(
     post,
@@ -171,18 +184,20 @@ pub async fn save(
     user.email = user.email.trim().to_lowercase();
 
     let policy = db::password_policy::get_effective_policy().await;
-    let bad_req_msg =
-        if let Err(msg) = validate_password_strength_with_policy(&user.password, &policy) {
-            Some(msg)
-        } else if user.role.base_role == UserRole::Root {
-            Some("Not allowed".to_string())
-        } else if user.role.base_role == UserRole::SreAgent {
-            Some("SRE Agent role cannot be assigned via API".to_string())
-        } else if !is_valid_email(user.email.as_str()) {
-            Some("Invalid Email address".to_string())
-        } else {
-            None
-        };
+    let bad_req_msg = if let Some(msg) = validate_org_id(&org_id) {
+        Some(msg.to_string())
+    } else if let Err(msg) = validate_password_strength_with_policy(&user.password, &policy) {
+        Some(msg)
+    } else if user.role.base_role == UserRole::Root {
+        Some("Not allowed".to_string())
+    } else if user.role.base_role == UserRole::SreAgent {
+        Some("SRE Agent role cannot be assigned via API".to_string())
+    } else if !is_valid_email(user.email.as_str()) {
+        Some("Invalid Email address".to_string())
+    } else {
+        None
+    };
+
     if let Some(msg) = bad_req_msg {
         return Response::builder()
             .status(StatusCode::BAD_REQUEST)
@@ -1245,5 +1260,26 @@ mod tests {
         assert!(result.is_some());
         let role_response = result.unwrap();
         assert_eq!(role_response.value, "admin");
+    }
+
+    #[test]
+    fn test_validate_org_id_rejects_empty() {
+        assert_eq!(validate_org_id(""), Some("Organization name is required"));
+    }
+
+    #[test]
+    fn test_validate_org_id_rejects_whitespace() {
+        assert_eq!(validate_org_id(" "), Some("Organization name is required"));
+        assert_eq!(
+            validate_org_id("   \t\n"),
+            Some("Organization name is required"),
+        );
+    }
+
+    #[test]
+    fn test_validate_org_id_accepts_valid() {
+        assert!(validate_org_id("default").is_none());
+        assert!(validate_org_id("my-org").is_none());
+        assert!(validate_org_id(" default ").is_none());
     }
 }

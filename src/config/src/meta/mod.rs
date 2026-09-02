@@ -47,6 +47,7 @@ pub mod session;
 pub mod short_url;
 pub mod slo;
 pub mod sql;
+pub mod status_pages;
 pub mod stream;
 pub mod synthetics;
 pub mod system_settings;

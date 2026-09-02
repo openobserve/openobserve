@@ -197,10 +197,9 @@ describe("ExperimentBrowser", () => {
     }
   });
 
-  // The clone is a new run that this list does not show until it is opened, so
-  // the action confirms and navigates rather than leaving the page unchanged.
-  it("clones a row from the actions column and opens the copy", async () => {
-    cloneExperiment.mockResolvedValue({ id: "copy" });
+  // A clone costs a full run, and it is normally made in order to change
+  // something first — so the action opens the seeded form, it does not launch.
+  it("opens the create form seeded from the row instead of running a copy", async () => {
     const wrapper = mount(ExperimentBrowser, {
       props: {
         orgId: "acme",
@@ -213,13 +212,15 @@ describe("ExperimentBrowser", () => {
     await wrapper.get('[data-test="ai-experiment-clone-one"]').trigger("click");
     await flushPromises();
 
-    expect(cloneExperiment).toHaveBeenCalledWith("acme", "one");
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    expect(cloneExperiment).not.toHaveBeenCalled();
     expect(push).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "aiExperimentDetail", params: { id: "copy" } }),
+      expect.objectContaining({
+        name: "aiExperimentCreate",
+        query: expect.objectContaining({ clone_of: "one" }),
+      }),
     );
     // The click must not ALSO open the row it sits in, which would race the
-    // navigation to the clone.
+    // navigation to the form.
     expect(wrapper.emitted("select")).toBeUndefined();
   });
 

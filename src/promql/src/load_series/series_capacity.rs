@@ -20,7 +20,7 @@ const MAX_SERIES_FRAGMENT_HINT: usize = 24;
 const MAX_INITIAL_SERIES_CAPACITY: usize = 2048;
 
 /// Length of the contiguous run of equal hashes starting at `start`.
-pub(super) fn batch_run_len(hashes: &[u64], start: usize) -> usize {
+pub fn batch_run_len(hashes: &[u64], start: usize) -> usize {
     let hash = hashes[start];
     let mut end = start + 1;
     while end < hashes.len() && hashes[end] == hash {

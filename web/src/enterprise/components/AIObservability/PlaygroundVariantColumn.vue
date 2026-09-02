@@ -46,12 +46,8 @@
         <div class="h-full overflow-y-auto px-2.5 py-2.5">
           <PlaygroundVariantConfig
             :variant="variant"
-            :providers="providers"
             :var-names="varNames"
-            :vars="vars"
             @change="(next) => emit('change', next)"
-            @set-var="(name: string, value: string) => emit('set-var', name, value)"
-            @remove-var="(name: string) => emit('remove-var', name)"
           />
         </div>
       </template>
@@ -175,8 +171,6 @@ const split = ref(60);
 
 const emit = defineEmits<{
   change: [variant: PlaygroundVariant];
-  "set-var": [name: string, value: string];
-  "remove-var": [name: string];
   run: [];
   duplicate: [];
   remove: [];

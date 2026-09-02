@@ -360,6 +360,8 @@ pub enum DeliveryDecision {
     SuppressedByWarningPolicy,
     /// Nothing to deliver — the alert is not firing.
     NotFiring,
+    /// Currently in pending state
+    SuppressedByPending,
 }
 
 impl DeliveryDecision {

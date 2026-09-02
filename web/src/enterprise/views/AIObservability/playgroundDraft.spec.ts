@@ -10,7 +10,6 @@ import {
   extractVariantVars,
   extractVars,
   hasReference,
-  insertTokenAt,
   moveMessage,
   nextMessageRole,
   playgroundId,
@@ -145,20 +144,6 @@ describe("withFieldInserted", () => {
   it("does not leave a blank line when the target message is empty", () => {
     const variant = variantWith(["system", ""]);
     expect(withFieldInserted(variant, "input").messages[1].content).toBe("{{input}}");
-  });
-});
-
-describe("insertTokenAt", () => {
-  it("inserts at the caret and reports where the caret lands", () => {
-    expect(insertTokenAt("ab", "{{x}}", 1, 1)).toEqual({ content: "a{{x}}b", caret: 6 });
-  });
-
-  it("replaces the selection", () => {
-    expect(insertTokenAt("abcd", "{{x}}", 1, 3)).toEqual({ content: "a{{x}}d", caret: 6 });
-  });
-
-  it("clamps a caret past the end of the content", () => {
-    expect(insertTokenAt("ab", "{{x}}", 99, 99)).toEqual({ content: "ab{{x}}", caret: 7 });
   });
 });
 

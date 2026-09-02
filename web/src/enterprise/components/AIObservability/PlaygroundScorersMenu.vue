@@ -12,7 +12,7 @@
   server applies exactly the same rule.
 -->
 <template>
-  <ODropdown align="end" side="bottom">
+  <ODropdown v-model:open="menuOpen" align="end" side="bottom">
     <template #trigger>
       <OButton
         variant="outline"
@@ -71,6 +71,32 @@
         </span>
       </div>
 
+      <!-- The requirement and its field used to be at opposite ends of the page.
+           This states it where the scorer is picked, and its button focuses the
+           one field that fixes it. -->
+      <template v-if="selectedNeedingReference.length">
+        <OSeparator />
+
+        <div class="flex items-start gap-2">
+          <span class="text-status-warning-text text-2xs min-w-0 flex-1">
+            {{
+              t("aiObservability.playground.expectedMissing", {
+                scorers: selectedNeedingReference.join(", "),
+              })
+            }}
+          </span>
+          <OButton
+            variant="outline"
+            size="xs"
+            class="shrink-0"
+            data-test="ai-playground-focus-expected"
+            @click="goToExpected"
+          >
+            {{ t("aiObservability.playground.expectedMissingAction") }}
+          </OButton>
+        </div>
+      </template>
+
       <template v-if="scorers.length">
         <OSeparator />
 
@@ -120,7 +146,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -147,9 +173,19 @@ const emit = defineEmits<{
   "update:selected-ids": [ids: string[]];
   "update:auto-score": [value: boolean];
   score: [];
+  "focus-expected": [];
 }>();
 
 const { t } = useI18nTyped();
+
+const menuOpen = ref(false);
+
+/** Closes the panel first: the field it points at is at the other end of the
+ *  page, and a menu left open over the page keeps the eye where it was. */
+function goToExpected() {
+  menuOpen.value = false;
+  emit("focus-expected");
+}
 
 interface ScorerEntry {
   id: string;
@@ -178,6 +214,23 @@ const entries = computed<ScorerEntry[]>(() =>
           : "",
     };
   }),
+);
+
+/**
+ * Names only the SELECTED reference-based scorers. Warning about one nobody
+ * picked is noise, and each row already carries its own note. A trace-reading
+ * scorer is excluded: no expected output fixes it.
+ */
+const selectedNeedingReference = computed<string[]>(() =>
+  entries.value
+    .filter(
+      (entry) =>
+        props.selectedIds.includes(entry.id) &&
+        entry.referenceBased &&
+        !entry.blocked &&
+        !props.hasReference,
+    )
+    .map((entry) => entry.name),
 );
 
 function toggle(id: string, checked: boolean) {

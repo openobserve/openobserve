@@ -695,6 +695,26 @@ describe("Logs Index", async () => {
     );
   });
 
+  it("Should forward the active traces stream_type/stream to Search History", async () => {
+    // Search History must be scoped to whichever telemetry type the user was
+    // viewing, not always "logs" — see showSearchHistoryfn in Index.vue.
+    const pushSpy = vi.spyOn(wrapper.vm.router, "push");
+    wrapper.vm.searchObj.data.stream.streamType = "traces";
+    wrapper.vm.searchObj.data.stream.selectedStream = ["my_trace_stream"];
+
+    wrapper.vm.showSearchHistoryfn();
+
+    expect(pushSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "searchHistory",
+        query: expect.objectContaining({
+          stream_type: "traces",
+          stream: "my_trace_stream",
+        }),
+      }),
+    );
+  });
+
   it("Should set histogram date using searchBarRef", async () => {
     const setCustomDate = vi.fn();
     wrapper.vm.searchBarRef = { dateTimeRef: { setCustomDate } } as any;

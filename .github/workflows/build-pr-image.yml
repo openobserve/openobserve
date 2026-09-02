@@ -260,7 +260,8 @@ jobs:
   build:
     needs: [build_pr_image_amd64, build_pr_image_arm64, build_frontend]
     if: ${{ needs.build_pr_image_amd64.result == 'success' && needs.build_pr_image_arm64.result == 'success' }}
-    runs-on: ubicloud-standard-16-arm
+    # This job only publishes multi-arch manifests; it does not build either image.
+    runs-on: ubicloud-standard-4
     permissions:
       id-token: write
       contents: read

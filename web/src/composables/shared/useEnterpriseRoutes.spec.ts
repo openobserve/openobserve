@@ -257,10 +257,10 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(mcpRoute.path).toBe("mcpServer");
     });
 
-    // Test 20: iam + the 6 synthetics routes, which ship in OSS.
-    it("should have 7 routes in basic configuration", () => {
+    // Test 20: iam + synthetics + its 6 sub-routes, all of which ship in OSS.
+    it("should have 8 routes in basic configuration", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(7);
+      expect(routes.length).toBe(8);
     });
 
     // Synthetics moved out of `o2_enterprise` into `src/synthetics`; only the
@@ -360,10 +360,10 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(12);
     });
 
-    // Test 34: iam + synthetics + 5 synthetics sub-routes + 2 incidents + workflows = 10
-    it("should have 10 routes in cloud configuration", () => {
+    // Test 34: iam + synthetics + 6 synthetics sub-routes + 2 incidents + workflows = 11
+    it("should have 11 routes in cloud configuration", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(10);
+      expect(routes.length).toBe(11);
     });
   });
 
@@ -381,10 +381,10 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(11);
     });
 
-    // Test 37: iam + synthetics + 5 synthetics sub-routes + 2 incidents + workflows = 10
+    // Test 37: iam + synthetics + 6 synthetics sub-routes + 2 incidents + workflows = 11
     it("should have enterprise routes structure", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(10);
+      expect(routes.length).toBe(11);
     });
   });
 
@@ -395,10 +395,10 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "true";
     });
 
-    // Test 38: Should add all routes when both flags are true (iam + synthetics + 5 synthetics sub-routes + 2 incidents + workflows = 10)
+    // Test 38: Should add all routes when both flags are true (iam + synthetics + 6 synthetics sub-routes + 2 incidents + workflows = 11)
     it("should add all routes when both flags are true", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(10);
+      expect(routes.length).toBe(11);
     });
 
     // Test 39: Should have all IAM children when both flags are true
@@ -681,7 +681,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = undefined;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(7); // Basic routes only: iam + the 6 OSS synthetics routes
+      expect(routes.length).toBe(8); // Basic routes only: iam + synthetics + its 6 sub-routes
     });
 
     // Test 63: Should handle config with null values
@@ -691,7 +691,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = null;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(7); // Basic routes only: iam + the 6 OSS synthetics routes
+      expect(routes.length).toBe(8); // Basic routes only: iam + synthetics + its 6 sub-routes
     });
 
     // Test 64: Should handle config with non-string values
@@ -701,7 +701,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = false;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(7); // Only adds enterprise routes when string "true"
+      expect(routes.length).toBe(8); // Only adds enterprise routes when string "true"
     });
 
     // Test 65: Should handle config with empty string values
@@ -711,7 +711,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "";
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(7); // Basic routes only: iam + the 6 OSS synthetics routes
+      expect(routes.length).toBe(8); // Basic routes only: iam + synthetics + its 6 sub-routes
     });
 
     // Test 66: Should handle mixed string cases
@@ -721,7 +721,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "TRUE";
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(7); // Case sensitive: only "true" adds enterprise routes
+      expect(routes.length).toBe(8); // Case sensitive: only "true" adds enterprise routes
     });
 
     // Test 67: Should maintain iam route as first element
