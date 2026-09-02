@@ -103,7 +103,7 @@ fn prune_groups_by_hash_range(
 /// A metrics band scan keeps only the files whose `__hash__` statistics
 /// intersect the band and chains them into the fewest ordered chains; one
 /// task merges them all, so the scan is never repartitioned.
-pub(super) fn handler_metrics_band_scan(
+pub(super) fn handler_metrics_scan(
     trace_id: &str,
     plan: Arc<dyn ExecutionPlan>,
     sort_order: FileSortOrder,

@@ -37,7 +37,7 @@ use crate::{
         sort_order::FileSortOrder,
         table_provider::{
             helpers::{apply_combined_filter, file_scan_config, with_access_plans},
-            metrics::{handler_metrics_band_scan, hash_interval},
+            metrics::{handler_metrics_scan, hash_interval},
         },
     },
     index::IndexCondition,
@@ -143,7 +143,7 @@ impl TableProvider for ListingTableAdapter {
 
         let target_partitions = self.listing_table.options().target_partitions;
         let parquet_exec = match hash_interval(filters) {
-            Some(hash_range) if self.sort_order.is_sorted() => handler_metrics_band_scan(
+            Some(hash_range) if self.sort_order.is_sorted() => handler_metrics_scan(
                 &self.trace_id,
                 parquet_exec,
                 self.sort_order,
