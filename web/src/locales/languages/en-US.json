@@ -11173,7 +11173,7 @@
           "expectedOutput": "Expected Output",
           "source": "Source",
           "tags": "Tags",
-          "version": "Version",
+          "version": "Dataset Version",
           "actions": "Actions"
         },
         "deleteItemTitle": "Delete Item",
@@ -11187,7 +11187,7 @@
             "item": "Item",
             "versions": "Versions"
           },
-          "versionPill": "v{version} · {count} Version | v{version} · {count} Versions",
+          "versionPill": "{count} Version | {count} Versions",
           "sourceSection": "Source",
           "sourceTrace": "Trace",
           "sourceSpan": "Span",
