@@ -333,6 +333,7 @@ export class AlertsPage {
             errorOrNegativeElements: '[class*="error"], [class*="negative"]',
             errorToastOrAlert: '[data-test-variant="error"], [role="alert"]',
             monacoEditor: '.monaco-editor',
+            alertInlineSqlEditor: '#alert-inline-sql-editor-sql',
             alertDestinationsSelectPopover: '[data-test="alert-destinations-select-popover"]',
             alertDestinationsSelectOption: '[data-test="alert-destinations-select-option"]',
             groupBySelectFirstTrigger: '[data-test="alert-group-by-select-0-trigger"]',
@@ -476,9 +477,10 @@ export class AlertsPage {
         return this.page.locator(this.locators.queryTabsContainer).locator(this.locators.tabSql);
     }
 
-    /** Last Monaco editor on the page (alert creation wizard pattern). */
-    getMonacoEditorLast() {
-        return this.page.locator(this.locators.monacoEditor).last();
+    /** The step-2 inline SQL editor. The wizard mounts several Monaco instances and
+     * the DOM-last one is an offscreen editor, so target this one by its editor id. */
+    getInlineSqlEditor() {
+        return this.page.locator(this.locators.alertInlineSqlEditor);
     }
 
     /** Elements matching error/negative CSS classes (bug pre-check). */

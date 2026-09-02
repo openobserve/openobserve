@@ -360,10 +360,12 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await page.waitForTimeout(1000);
     testLogger.info('Switched to SQL tab');
 
-    // Click into the inline Monaco editor (use .last() per alert creation wizard pattern)
-    // then type via keyboard — same approach used by the POM wizard methods
-    const sqlEditor = pm.alertsPage.getMonacoEditorLast();
-    await expect(sqlEditor, 'SQL editor should be visible').toBeVisible({ timeout: 5000 });
+    // Target the step-2 inline SQL editor by its editor id: the wizard mounts several
+    // Monaco instances and the DOM-last one is an offscreen editor that never shows.
+    const sqlEditor = pm.alertsPage.getInlineSqlEditor();
+    // QueryEditor is a lazily loaded async component, so allow the chunk to arrive;
+    // 5s is not enough on a loaded runner. Matches the POM's SQL-dialog wait.
+    await expect(sqlEditor, 'SQL editor should be visible').toBeVisible({ timeout: 30000 });
     await sqlEditor.click({ force: true });
     await page.waitForTimeout(500);
 
@@ -375,13 +377,12 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     // may delay Monaco boot).
     await expect(async () => {
       const content = await page.evaluate(() => {
-        const editors = window.monaco?.editor?.getEditors?.();
-        if (editors && editors.length > 0) {
-          const editor = editors[editors.length - 1];
-          editor.setValue('SELECT * FROM default');
-          return editor.getValue();
-        }
-        return null;
+        const container = document.getElementById('alert-inline-sql-editor-sql');
+        const editors = window.monaco?.editor?.getEditors?.() || [];
+        const editor = editors.find((e) => container?.contains(e.getContainerDomNode()));
+        if (!editor) return null;
+        editor.setValue('SELECT * FROM default');
+        return editor.getValue();
       });
       expect(content).toContain('default');
     }).toPass({ timeout: 10000, intervals: [1000] });
