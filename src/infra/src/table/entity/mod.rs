@@ -2,7 +2,6 @@
 
 pub mod prelude;
 
-pub mod action_scripts;
 pub mod alert_composite_children;
 pub mod alert_composites;
 pub mod alert_dedup_state;
@@ -36,6 +35,7 @@ pub mod llm_dataset_items;
 pub mod llm_datasets;
 pub mod llm_experiments;
 pub mod llm_idempotency_records;
+pub mod llm_playground_snapshots;
 pub mod llm_remote_tasks;
 pub mod llm_secrets;
 pub mod model_pricing;
@@ -66,6 +66,16 @@ pub mod slo_budget_charges;
 pub mod slo_status;
 pub mod slos;
 pub mod source_maps;
+pub mod status_page_audit_log;
+pub mod status_page_check_snoozes;
+pub mod status_page_component_checks;
+pub mod status_page_components;
+pub mod status_page_custom_domains;
+pub mod status_page_notice_components;
+pub mod status_page_notice_updates;
+pub mod status_page_notices;
+pub mod status_page_snapshots;
+pub mod status_pages;
 pub mod synthetics_agents;
 pub mod synthetics_checks;
 pub mod synthetics_jobs;

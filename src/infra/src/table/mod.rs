@@ -18,7 +18,6 @@ use sea_orm_migration::MigratorTrait;
 
 use crate::{db::get_orm_client_ddl, dist_lock};
 
-pub mod action_scripts;
 pub mod alert_composites;
 pub mod alert_eval_intervals;
 pub mod alert_incidents;
@@ -70,6 +69,7 @@ pub mod slo_backfill_jobs;
 pub mod slo_budget;
 pub mod slos;
 pub mod source_maps;
+pub mod status_pages;
 pub mod synthetics_agents;
 pub mod synthetics_checks;
 pub mod synthetics_jobs;

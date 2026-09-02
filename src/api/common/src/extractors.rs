@@ -15,7 +15,7 @@
 
 use axum::{
     Json,
-    extract::FromRequestParts,
+    extract::{FromRequestParts, OptionalFromRequestParts},
     http::{StatusCode, header::HeaderMap, request::Parts},
     response::{IntoResponse, Response},
 };
@@ -56,6 +56,23 @@ where
             Ok(inner) => Ok(Headers(inner)),
             Err(e) => Err(HeadersRejection { message: e }),
         }
+    }
+}
+
+// lets a handler take Option<Headers<T>>: absent/invalid headers become None
+// instead of a 400 rejection
+impl<S, T> OptionalFromRequestParts<S> for Headers<T>
+where
+    S: Send + Sync,
+    T: DeserializeOwned + Send + Sync + 'static,
+{
+    type Rejection = std::convert::Infallible;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        _state: &S,
+    ) -> Result<Option<Self>, Self::Rejection> {
+        Ok(deserialize_headers::<T>(&parts.headers).ok().map(Headers))
     }
 }
 

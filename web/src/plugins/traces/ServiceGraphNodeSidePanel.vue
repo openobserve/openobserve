@@ -1062,13 +1062,31 @@ export default defineComponent({
     // is a plain `FROM "{stream}"` with no join.
     const serviceNameField = computed(() => identityField());
 
+    const hasCatalogServiceIdentity = computed(
+      () =>
+        Boolean(props.selectedNode?.service_type) &&
+        Object.prototype.hasOwnProperty.call(props.selectedNode ?? {}, "service_system"),
+    );
+
+    const serviceFilter = (alias = ""): string => {
+      const serviceName = buildServiceName();
+      let filter = `${identityField(alias)} = '${serviceName}'`;
+      if (!hasCatalogServiceIdentity.value) return filter;
+
+      filter += ` AND ${alias}infer_service_type = '${escapeSingleQuotes(props.selectedNode.service_type)}'`;
+      const serviceSystem = props.selectedNode.service_system;
+      if (serviceSystem) {
+        return `${filter} AND ${alias}infer_service_system = '${escapeSingleQuotes(serviceSystem)}'`;
+      }
+      return `${filter} AND (${alias}infer_service_system IS NULL OR ${alias}infer_service_system = '')`;
+    };
+
     const loadDashboard = () => {
       if (!props.selectedNode || props.streamFilter === "all") {
         dashboardData.value = {};
         return;
       }
 
-      const serviceName = buildServiceName();
       const streamName = props.streamFilter;
 
       selectedTimeObj.value = {
@@ -1084,15 +1102,15 @@ export default defineComponent({
       };
 
       const convertedDashboard = convertDashboardSchemaVersion(deepCopy(metrics));
-      const serviceFilter = `${serviceNameField.value} = '${serviceName}'`;
+      const catalogServiceFilter = serviceFilter();
 
       convertedDashboard.tabs[0].panels.forEach((panel: any, index: number) => {
         let whereClause: string;
 
         if (panel.title === "Errors") {
-          whereClause = `WHERE span_status = 'ERROR' AND ${serviceFilter}`;
+          whereClause = `WHERE span_status = 'ERROR' AND ${catalogServiceFilter}`;
         } else {
-          whereClause = `WHERE ${serviceFilter}`;
+          whereClause = `WHERE ${catalogServiceFilter}`;
         }
 
         panel.layout.h = 10;
@@ -1341,7 +1359,6 @@ export default defineComponent({
 
     // Fetch the most recent span for this service to extract rich semantic dimensions
     const fetchLatestSpan = async (): Promise<Record<string, any> | null> => {
-      const serviceName = buildServiceName();
       const streamName = props.streamFilter || "default";
       const org = store.state.selectedOrganization.identifier;
 
@@ -1350,7 +1367,7 @@ export default defineComponent({
           org_identifier: org,
           query: {
             query: {
-              sql: `SELECT * FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' ORDER BY _timestamp DESC`,
+              sql: `SELECT * FROM "${streamName}" WHERE ${serviceFilter()} ORDER BY _timestamp DESC`,
               start_time: props.timeRange.startTime,
               end_time: props.timeRange.endTime,
               from: 0,
@@ -1965,7 +1982,6 @@ export default defineComponent({
       recentOperations.value = [];
 
       try {
-        const serviceName = buildServiceName();
         const streamName = props.streamFilter || "default";
         const st = props.selectedNode?.service_type;
         // A tool/model node's caller is its OWNING AGENT, which usually sits on an
@@ -1981,16 +1997,13 @@ export default defineComponent({
         let sql: string;
         if (isGenAiChild) {
           const { callerExpr, joins } = genAiCallerClimb(streamName);
-          // The identity field, built already aliased to the child table `c`
-          // (no post-processing of the expression string).
-          const childField = identityField("c.");
-          sql = `SELECT ${callerExpr} as caller_service, c.operation_name, ${metrics} FROM "${streamName}" AS c ${joins} WHERE ${childField} = '${serviceName}' GROUP BY ${callerExpr}, c.operation_name`;
+          sql = `SELECT ${callerExpr} as caller_service, c.operation_name, ${metrics} FROM "${streamName}" AS c ${joins} WHERE ${serviceFilter("c.")} GROUP BY ${callerExpr}, c.operation_name`;
         } else {
           const selectCols = isInf
             ? "service_name as caller_service, operation_name"
             : "operation_name";
           const groupCols = isInf ? "service_name, operation_name" : "operation_name";
-          sql = `SELECT ${selectCols}, ${metrics} FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' GROUP BY ${groupCols}`;
+          sql = `SELECT ${selectCols}, ${metrics} FROM "${streamName}" WHERE ${serviceFilter()} GROUP BY ${groupCols}`;
         }
 
         const response = await searchService.search({
@@ -2035,7 +2048,6 @@ export default defineComponent({
       recentSpanData.value = { errorSpans: [], slowSpans: [] };
 
       try {
-        const serviceName = buildServiceName();
         const streamName = props.streamFilter || "default";
         const org = store.state.selectedOrganization.identifier;
         const timeParams = {
@@ -2049,7 +2061,7 @@ export default defineComponent({
             org_identifier: org,
             query: {
               query: {
-                sql: `SELECT operation_name, duration, start_time FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' AND span_status = 'ERROR' ORDER BY start_time DESC`,
+                sql: `SELECT operation_name, duration, start_time FROM "${streamName}" WHERE ${serviceFilter()} AND span_status = 'ERROR' ORDER BY start_time DESC`,
                 ...timeParams,
                 size: 5,
               },
@@ -2060,7 +2072,7 @@ export default defineComponent({
             org_identifier: org,
             query: {
               query: {
-                sql: `SELECT operation_name, duration FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' ORDER BY duration DESC`,
+                sql: `SELECT operation_name, duration FROM "${streamName}" WHERE ${serviceFilter()} ORDER BY duration DESC`,
                 ...timeParams,
                 size: 20,
               },
@@ -2129,7 +2141,6 @@ export default defineComponent({
       resourceTabData.value = { ...resourceTabData.value, [config.id]: [] };
 
       try {
-        const serviceName = buildServiceName();
         const streamName = props.streamFilter || "default";
         const groupField = config.groupField;
         const alias = config.colId + "_name";
@@ -2140,7 +2151,7 @@ export default defineComponent({
           ? `(${buildNullCheck(config.fields)})`
           : `${groupField} IS NOT NULL`;
 
-        const sql = `SELECT ${groupField} as ${alias}, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' AND ${nullClause} GROUP BY ${alias} ORDER BY request_count DESC`;
+        const sql = `SELECT ${groupField} as ${alias}, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE ${serviceFilter()} AND ${nullClause} GROUP BY ${alias} ORDER BY request_count DESC`;
 
         const response = await searchService.search({
           org_identifier: store.state.selectedOrganization.identifier,
@@ -2344,6 +2355,9 @@ export default defineComponent({
         serviceName:
           props.selectedNode?.name || props.selectedNode?.label || props.selectedNode?.id,
         serviceType: props.selectedNode?.service_type,
+        ...(hasCatalogServiceIdentity.value
+          ? { serviceSystem: props.selectedNode?.service_system }
+          : {}),
         operationName: params.operationName,
         callerService: params.callerService,
         nodeName: params.nodeName,

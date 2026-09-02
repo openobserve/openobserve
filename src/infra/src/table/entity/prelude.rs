@@ -2,7 +2,6 @@
 #[cfg(feature = "cloud")]
 pub use super::trial_quota_usage::Entity as TrialQuotaUsage;
 pub use super::{
-    action_scripts::Entity as ActionScripts,
     alert_composite_children::Entity as AlertCompositeChildren,
     alert_composites::Entity as AlertComposites,
     alert_incident_alerts::Entity as AlertIncidentAlerts,

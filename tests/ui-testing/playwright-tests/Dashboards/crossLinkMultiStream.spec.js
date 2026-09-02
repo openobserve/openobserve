@@ -1,10 +1,12 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { ingestTestData } = require('../utils/data-ingestion.js');
+const { ingestTestData, waitForStreamData } = require('../utils/data-ingestion.js');
 
-const STREAM_A = "e2e_automate";
-const STREAM_B = "e2e_stream1";
+// Cross-link settings are one whole-object PUT per stream, so each parallel worker owns its own streams and concurrent tests can never clobber one another.
+const WORKER_SLOT = process.env.TEST_PARALLEL_INDEX || '0';
+const STREAM_A = `e2e_crosslink_ms_w${WORKER_SLOT}_a`;
+const STREAM_B = `e2e_crosslink_ms_w${WORKER_SLOT}_b`;
 
 test.describe("Cross-Linking Multi-Stream testcases", () => {
     test.describe.configure({ mode: 'serial' });
@@ -20,7 +22,11 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         if (!dataIngested) {
             await ingestTestData(page, STREAM_A);
             await ingestTestData(page, STREAM_B);
-            await page.waitForTimeout(1000);
+            // These streams are created only here, so nothing else masks the lag before they are queryable and listed.
+            for (const streamName of [STREAM_A, STREAM_B]) {
+                expect(await waitForStreamData(page, streamName, 1, 30000),
+                    `stream ${streamName} never became queryable within 30s of ingestion`).toBe(true);
+            }
             dataIngested = true;
             testLogger.info('Test data ingested into both streams');
         }
@@ -160,7 +166,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
             await pm.logsPage.runQueryAndWaitForResults();
             await page.waitForTimeout(3000);
 
-            const captured = await crossLinkCapture.waitForAtLeast(2, { timeout: 8000 });
+            const captured = await crossLinkCapture.waitForAtLeast(1, { timeout: 8000 });
             await page.waitForTimeout(500);
 
             const nonEmpty = crossLinkCapture.getNonEmptyCount();
@@ -241,24 +247,21 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await pm.logsPage.ensureQuickModeState(false);
         // ensureQuickModeState already waits for the toggle data-state to flip
 
-        // Run query and wait for BOTH result_schema cross-linking responses
-        // (UNION ALL fires one per stream — we need both before checking cross-links)
-        let schemaCount = 0;
-        const bothSchemasPromise = new Promise((resolve) => {
+        // Run query and wait for the result_schema cross-linking response. One call
+        // covers every stream in the query: the backend resolves each table in the
+        // UNION and merges their cross-links into a single response.
+        const schemaPromise = new Promise((resolve) => {
             const handler = (resp) => {
                 if (resp.url().includes('result_schema') && resp.url().includes('cross_linking=true') && resp.status() === 200) {
-                    schemaCount++;
-                    if (schemaCount >= 2) {
-                        page.off('response', handler);
-                        resolve();
-                    }
+                    page.off('response', handler);
+                    resolve();
                 }
             };
             page.on('response', handler);
             setTimeout(() => { page.off('response', handler); resolve(); }, 20000);
         });
         await pm.logsPage.selectRunQuery();
-        await bothSchemasPromise;
+        await schemaPromise;
 
         // Step 4: Expand a log row
         // expandFirstLogRow waits up to 30 s for the first row to appear —
@@ -278,8 +281,8 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         testLogger.info('PASSED: Both streams cross-links visible in UNION ALL SQL query');
     });
 
-    // P1: Network verification — multiple result_schema calls for multi-stream
-    test("should fire separate result_schema calls for each stream in multi-stream mode", {
+    // P1: Network verification — one result_schema call covering every selected stream
+    test("should fire one result_schema call covering both streams in multi-stream mode", {
         tag: ['@crossLinking', '@multiStream', '@functional', '@P1', '@all']
     }, async ({ page }) => {
         testLogger.info('Testing network calls for multi-stream cross-links');
@@ -296,17 +299,24 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await pm.logsPage.runQueryAndWaitForResults();
         await page.waitForTimeout(3000);
 
-        // Step 4: Verify multiple result_schema calls were fired
+        // Step 4: Verify the cross-linking call fired for the union query
         testLogger.info('result_schema calls captured', {
             count: requestCapture.getCount(),
             urls: requestCapture.getUrls(),
         });
 
+        // Multi-stream search is one UNION ALL BY NAME query, so cross-linking needs a
+        // single result_schema call — the backend resolves every table in the query and
+        // merges their links (see resolve_stream_names in the cross_linking branch).
         expect(requestCapture.getCount(),
-            'Should fire at least 2 result_schema calls for 2 streams'
-        ).toBeGreaterThanOrEqual(2);
+            'Should fire exactly one result_schema call for the union query'
+        ).toBe(1);
 
-        testLogger.info('PASSED: Multiple result_schema calls verified for multi-stream');
+        const payload = requestCapture.getPayloads()[0] || '';
+        expect(payload, `result_schema payload should query ${STREAM_A}`).toContain(STREAM_A);
+        expect(payload, `result_schema payload should query ${STREAM_B}`).toContain(STREAM_B);
+
+        testLogger.info('PASSED: single result_schema call covers both streams');
     });
 
     // P1: Dashboard table panel — single stream cross-link in drilldown menu
@@ -409,11 +419,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         const crossLinkNameA = `CL-DashA-${Date.now()}`;
         const crossLinkNameB = `CL-DashB-${Date.now()}`;
 
-        // Step 1: Feature-gate check — navigate to STREAM_A only to verify cross-linking
-        // is enabled, without fully configuring it yet. The actual cross-link setup is
-        // deferred until right before the result_schema call (see Step 3) to minimise
-        // the window in which crossLinking.spec.js — which runs in parallel on CI and
-        // repeatedly calls deleteAllCrossLinks() on e2e_automate — can wipe the link.
+        // Probe the feature gate before building the dashboard so an unsupported build skips instead of failing deep in the panel setup.
         const featureCheckResult = await (async () => {
             await pm.crossLinkPage.navigateToStreams();
             await pm.crossLinkPage.searchStream(STREAM_A);
@@ -469,10 +475,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         // Capture the dashboard view URL so we can reload it after cross-link setup.
         const dashboardViewUrl = page.url();
 
-        // Step 3: Set up cross-links as late as possible — immediately before
-        // navigating back to the dashboard so result_schema fires with both links
-        // still present. Set up STREAM_B first (safe: no concurrent test touches it)
-        // then STREAM_A last (minimises the gap between A's save and result_schema call).
+        // Step 3: Set up both cross-links immediately before navigating back so result_schema fires with both present.
         const featureEnabledB = await setupStreamCrossLink(page, pm, STREAM_B, {
             name: crossLinkNameB,
             url: 'https://dash-union-b.example.com/${field.__value}',
@@ -482,10 +485,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
             test.skip(true, 'Cross-linking feature not enabled on second stream');
         }
 
-        // Step 3b: Retry loop — set up A's cross-link, immediately reload the
-        // dashboard, and verify the result_schema response body contains both links.
-        // If crossLinking.spec.js deletes A's link in the small window between setup
-        // and the API response, we re-setup and retry (up to 3 attempts total).
+        // result_schema can be served without a just-saved cross-link, so re-set A and reload rather than failing on the first miss.
         let crossLinkResponseData = null;
         for (let attempt = 1; attempt <= 3; attempt++) {
             // (Re-)set up A's cross-link immediately before navigating back.

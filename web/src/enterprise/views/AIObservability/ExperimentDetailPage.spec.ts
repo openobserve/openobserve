@@ -84,6 +84,57 @@ describe("ExperimentDetailPage", () => {
     expect(wrapper.get('[data-test="ai-experiment-detail-meta"]').text()).toContain("Dataset A");
   });
 
+  // A raw "10449" costs the reader the magnitude and overflows the tile, so the
+  // p50 card switches unit once the value passes a second.
+  it("renders a p50 latency over a second in seconds", async () => {
+    const detail = makeExperimentDetail(makeExperiment({ id: "exp-1" }), {
+      results: {
+        executions: [],
+        scores: [],
+        aggregateSummary: {
+          p50LatencyMs: 10_449,
+          totalCost: 0,
+          incomplete: false,
+          incompleteTaskSlots: 0,
+          incompleteScoreDimensions: 0,
+        },
+      },
+    });
+    get.mockResolvedValue(detail);
+
+    const wrapper = mount(ExperimentDetailPage);
+    await flushPromises();
+
+    const card = wrapper.get('[data-test="ai-experiment-detail-p50"]');
+    expect(card.text()).toContain("10.4");
+    expect(card.text()).toContain("s");
+    expect(card.text()).not.toContain("10449");
+  });
+
+  it("keeps a sub-second p50 latency in milliseconds", async () => {
+    const detail = makeExperimentDetail(makeExperiment({ id: "exp-1" }), {
+      results: {
+        executions: [],
+        scores: [],
+        aggregateSummary: {
+          p50LatencyMs: 840,
+          totalCost: 0,
+          incomplete: false,
+          incompleteTaskSlots: 0,
+          incompleteScoreDimensions: 0,
+        },
+      },
+    });
+    get.mockResolvedValue(detail);
+
+    const wrapper = mount(ExperimentDetailPage);
+    await flushPromises();
+
+    const card = wrapper.get('[data-test="ai-experiment-detail-p50"]');
+    expect(card.text()).toContain("840");
+    expect(card.text()).toContain("ms");
+  });
+
   it("labels a pending score column from its pinned score-config summary", async () => {
     const experiment = makeExperiment({ id: "exp-1", name: "run one", datasetId: "ds-1" });
     const detail = makeExperimentDetail(experiment, {
@@ -371,11 +422,10 @@ describe("ExperimentDetailPage", () => {
     expect(rows.map((r) => r.taskStatus)).toEqual(["error"]);
   });
 
-  // Clone produced no feedback at all: it toasted only on failure, and its
-  // success path refreshed the CURRENT experiment, so nothing on screen moved.
-  it("confirms a clone and opens the new experiment", async () => {
+  // A clone costs a full run, and it is normally made in order to change
+  // something first — so the action opens the seeded form, it does not launch.
+  it("opens the create form seeded from this run instead of cloning outright", async () => {
     get.mockResolvedValue(makeExperimentDetail(makeExperiment({ id: "exp-1" })));
-    clone.mockResolvedValue({ id: "exp-2" });
     const wrapper = mount(ExperimentDetailPage, {
       global: {
         stubs: {
@@ -392,9 +442,12 @@ describe("ExperimentDetailPage", () => {
     await wrapper.get('[data-test="ai-experiment-detail-clone"]').trigger("click");
     await flushPromises();
 
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    expect(clone).not.toHaveBeenCalled();
     expect(push).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "aiExperimentDetail", params: { id: "exp-2" } }),
+      expect.objectContaining({
+        name: "aiExperimentCreate",
+        query: expect.objectContaining({ clone_of: "exp-1" }),
+      }),
     );
   });
 

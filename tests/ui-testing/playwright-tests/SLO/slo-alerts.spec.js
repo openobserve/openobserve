@@ -316,9 +316,7 @@ test.describe('SLO burn-rate alerts', { tag: ['@slo', '@sloAlerts', '@all'] }, (
     await pm.sloAlertsPage.selectDestination(shared.destination);
     await pm.sloAlertsPage.cancel();
 
-    await expect(
-      page.locator(pm.sloAlertsPage.locators.list).getByText(name, { exact: false }),
-    ).toHaveCount(0);
+    await expect(pm.sloAlertsPage.getListItemByName(name)).toHaveCount(0);
   });
 
   /**
@@ -391,8 +389,7 @@ test.describe('SLO burn-rate alerts', { tag: ['@slo', '@sloAlerts', '@all'] }, (
     });
 
     // Both rows exist, which is exactly what makes them indistinguishable.
-    const rows = page.locator(`${pm.sloAlertsPage.locators.list} li`)
-      .filter({ hasText: name });
+    const rows = pm.sloAlertsPage.getListRowsByName(name);
     await expect(rows).toHaveCount(2, { timeout: 20000 });
   });
 

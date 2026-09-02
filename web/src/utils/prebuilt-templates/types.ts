@@ -58,6 +58,8 @@ export interface CredentialField {
   hintKey?: I18nKey;
   options?: Array<{ label: string; value: string; description?: string }>;
   validator?: (value: string) => CredentialValidatorResult;
+  /** Explicitly opts a non-secret value into `credential_*` metadata. */
+  persistInMetadata?: boolean;
 }
 
 /**

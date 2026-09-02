@@ -71,12 +71,18 @@ export function generateAnomalySummary(
         : t("alerts.anomaly.summaryRetrainEveryDays", { days: config.retrain_interval_days });
     parts.push(t("alerts.anomaly.summaryRetrain", { retrain: chip(retrain) }));
 
-    const anomalyRate = 100 - (config.threshold ?? 97);
-    parts.push(
-      t("alerts.anomaly.summaryThreshold", {
-        threshold: chip(t("alerts.anomaly.summaryThresholdRate", { rate: anomalyRate })),
-      }),
-    );
+    // A cleared field reaches here as "", and 100 - "" is 100 — "flag everything".
+    // Number("") and Number(null) are both 0, so blanks need excluding first.
+    const stored = config.threshold;
+    const percentile =
+      stored === null || stored === undefined || stored === "" ? NaN : Number(stored);
+    if (Number.isFinite(percentile)) {
+      parts.push(
+        t("alerts.anomaly.summaryThreshold", {
+          threshold: chip(t("alerts.anomaly.summaryThresholdRate", { rate: 100 - percentile })),
+        }),
+      );
+    }
   }
 
   // Step 3+: Alerting

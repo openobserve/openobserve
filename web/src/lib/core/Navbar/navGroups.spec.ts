@@ -589,7 +589,6 @@ describe("groupNavLinks", () => {
       link("rum"),
       link("aiObservability"),
       link("incidentList"),
-      link("actionScripts"),
       link("iam"),
       link("settings"),
     ];

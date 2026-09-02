@@ -120,6 +120,14 @@ describe("discord template", () => {
       expect(usernameField?.required).toBe(false);
     });
 
+    it("persists only the optional username in destination metadata", () => {
+      const persistentFields = discordConfig.credentialFields
+        .filter((field) => field.persistInMetadata)
+        .map((field) => field.key);
+
+      expect(persistentFields).toEqual(["username"]);
+    });
+
     it("webhook URL validator validates Discord URLs", () => {
       const webhookField = discordConfig.credentialFields.find((f) => f.key === "webhookUrl");
       const validator = webhookField?.validator;

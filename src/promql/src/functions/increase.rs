@@ -48,6 +48,10 @@ impl RangeFunc for IncreaseFunc {
             ExtrapolationKind::Increase,
         )
     }
+
+    fn counter_extrapolation(&self) -> Option<ExtrapolationKind> {
+        Some(ExtrapolationKind::Increase)
+    }
 }
 
 #[cfg(test)]

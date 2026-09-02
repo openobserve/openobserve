@@ -19,11 +19,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-#[cfg(feature = "enterprise")]
-use axum::http::HeaderMap;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
-#[cfg(feature = "enterprise")]
-use common::utils::http::get_or_create_trace_id;
 use config::{
     SMTP_CLIENT, TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -62,17 +58,17 @@ use lettre::{
     message::{Attachment, MultiPart, SinglePart},
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::actions::meta::{TriggerActionRequest, TriggerSource};
-#[cfg(feature = "enterprise")]
 use o2_openfga::{
     authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
     config::get_config as get_openfga_config,
 };
+use proto::cluster_rpc::SearchQuery;
 use sea_orm::{ConnectionTrait, TransactionTrait};
-use search::sql::RE_ONLY_SELECT;
+use search::{
+    datafusion::plan::projections::get_result_schema,
+    sql::{RE_ONLY_SELECT, Sql},
+};
 use svix_ksuid::Ksuid;
-#[cfg(feature = "enterprise")]
-use tracing::{Level, span};
 
 #[cfg(feature = "enterprise")]
 use crate::auth::check_permissions;
@@ -292,6 +288,12 @@ pub enum AlertError {
     /// and a shared reason would name the wrong fix for one of them.
     #[error("this edit breaks the SLOs measuring from this alert — {breakages}")]
     AlertSourceEditBreaksSlos { breakages: String },
+    #[error("Realtime alerts cannot have non-zero pending period")]
+    PendingPeriodOnRealtimeAlert,
+    #[error("Alert pending period must be >= 0")]
+    NegativePendingPeriod,
+    #[error("Error in multi alert grouping: {0}")]
+    MultiAlertGroupingError(String),
 }
 
 pub async fn save(
@@ -658,6 +660,14 @@ async fn prepare_alert(
         return Err(AlertError::RealtimeMissingCustomQuery);
     }
 
+    if alert.is_real_time && alert.pending_period_sec != 0 {
+        return Err(AlertError::PendingPeriodOnRealtimeAlert);
+    }
+
+    if alert.pending_period_sec < 0 {
+        return Err(AlertError::NegativePendingPeriod);
+    }
+
     // Multi-level thresholds (alerts_2.md Feature 1). Rejected at write time so
     // an unreachable warning level can never reach the evaluator.
     //
@@ -704,9 +714,68 @@ async fn prepare_alert(
     // `warning_value`. Validate whenever an aggregation is present, so a
     // non-numeric `having.value` is caught at write time rather than failing
     // every evaluation.
-    if let Some(agg) = alert.query_condition.aggregation.as_ref() {
+    if let Some(agg) = alert.query_condition.aggregation.as_mut() {
         config::meta::alerts::aggregation_level::validate_aggregation_thresholds(agg)
             .map_err(AlertError::InvalidAggregationThreshold)?;
+
+        if let Some(sql) = alert.query_condition.sql.as_ref()
+            && alert.query_condition.query_type == QueryType::SQL
+            && agg.multi_alert
+        {
+            // FE has a gate, this is mostly API check
+            if agg.having.column.is_empty() {
+                return Err(AlertError::MultiAlertGroupingError(
+                    "group by column must not be empty for sql multi alert having field"
+                        .to_string(),
+                ));
+            }
+            let query = SearchQuery {
+                sql: sql.to_owned(),
+                ..Default::default()
+            };
+            let sql = Sql::new(&query, &alert.org_id, alert.stream_type, None)
+                .await
+                .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
+            let schema = get_result_schema(sql, false, true)
+                .await
+                .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
+
+            // this is mostly API check, FE already has a restriction
+            if !schema.projections.contains(&agg.having.column) {
+                return Err(AlertError::MultiAlertGroupingError(format!(
+                    "SQL Multi alert query having column must be in the group by clause, '{}' column not in group by fields",
+                    agg.having.column
+                )));
+            }
+
+            if schema.group_by.is_empty() {
+                return Err(AlertError::MultiAlertGroupingError(
+                    "SQL Multi alert query Must have at least one group by field".to_string(),
+                ));
+            }
+
+            for group in &schema.group_by {
+                if !schema.projections.contains(group) {
+                    return Err(AlertError::MultiAlertGroupingError(format!(
+                        "SQL query projections must contain all group by fields, missing field '{group}'"
+                    )));
+                }
+                if let Some(v) = schema.field_alias_map.get(group)
+                    && v != group
+                {
+                    return Err(AlertError::MultiAlertGroupingError(format!(
+                        "SQL query projections must contain all group by fields without alias, field '{group}' is aliased"
+                    )));
+                }
+            }
+            let mut groups = Vec::with_capacity(schema.group_by.len());
+            for p in schema.projections {
+                if schema.group_by.contains(&p) {
+                    groups.push(p);
+                }
+            }
+            agg.group_by = Some(groups);
+        }
     }
 
     validate_multi_alert_config(alert)?;
@@ -2593,10 +2662,8 @@ async fn send_to_destination(
                 (RenderedMessage::Http { body }, DestinationType::Http(endpoint)) => {
                     // Discord with a rendered chart: upload the PNG in the
                     // same webhook POST (the embed references it as
-                    // `attachment://`). Actions destinations keep the plain
-                    // JSON path — their payload is rewritten server-side.
+                    // `attachment://`).
                     if matches!(format, ChannelFormat::Discord)
-                        && endpoint.action_id.is_none()
                         && let Some(png) = ctx.chart_png.clone()
                     {
                         send_discord_with_attachment(endpoint, body, png).await
@@ -2706,37 +2773,6 @@ pub(crate) async fn dispatch_test_message(
 }
 
 async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
-    #[cfg(feature = "enterprise")]
-    let msg = if endpoint.action_id.is_some() {
-        let incoming_msg = serde_json::from_str::<serde_json::Value>(&msg)
-            .map_err(|e| anyhow::anyhow!("Message should be valid JSON for actions: {e}"))?;
-        let inputs = if incoming_msg.is_object() {
-            vec![incoming_msg]
-        } else if incoming_msg.is_array() {
-            incoming_msg.as_array().unwrap().to_vec()
-        } else {
-            return Err(anyhow::anyhow!(
-                "Unsupported message format for actions: {}",
-                msg
-            ));
-        };
-
-        let trace_id = get_or_create_trace_id(
-            &HeaderMap::new(),
-            &span!(Level::TRACE, "action_destinations"),
-        );
-
-        let req = TriggerActionRequest {
-            inputs,
-            trigger_source: TriggerSource::Alerts,
-            trace_id,
-        };
-        serde_json::to_string(&req)
-            .map_err(|e| anyhow::anyhow!("Request should be valid JSON for actions: {e}"))?
-    } else {
-        msg
-    };
-
     // Block SSRF: validate the destination URL (including DNS resolution) before
     // making any outbound request. The client is built through `build_safe_client`
     // so that redirect targets and per-connect DNS resolution are re-validated.

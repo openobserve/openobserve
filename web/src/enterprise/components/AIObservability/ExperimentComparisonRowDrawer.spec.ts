@@ -74,6 +74,7 @@ function detail(experimentId: string, output: string, score: number): Experiment
 
 const row = {
   logicalId: "case-1",
+  input: { question: "When?" },
   baselineRowId: "old-row",
   candidateRowId: "new-row",
   bucket: "regressed" as const,
@@ -93,6 +94,34 @@ const row = {
       baselineSampleCount: 1,
       candidateSampleCount: 1,
       assignment: "regressed" as const,
+    },
+  ],
+};
+
+const categoricalRow = {
+  ...row,
+  dimensions: [
+    {
+      name: "health · v1",
+      kind: "score" as const,
+      dataType: "categorical" as const,
+      scoreConfigId: "health",
+      scoreConfigName: "health",
+      scoreConfigVersion: "1",
+      baseline: 1,
+      candidate: 2,
+      baselineLabel: "poor",
+      candidateLabel: "good",
+      delta: 1,
+      orientedDelta: 1,
+      gating: true,
+      normalized: false,
+      baselineSampleCount: 1,
+      candidateSampleCount: 1,
+      baselineDispersion: null,
+      candidateDispersion: null,
+      withinNoise: true,
+      assignment: "improved" as const,
     },
   ],
 };
@@ -210,5 +239,19 @@ describe("ExperimentComparisonRowDrawer", () => {
     expect(wrapper.get('[data-test="ai-experiment-comparison-candidate-output"]').text()).toContain(
       "Not present in this run",
     );
+  });
+});
+
+// `1 → 2` is a policy-derived rank nobody can read, and a delta inside the trial
+// noise is not a claim the page should make flatly.
+describe("typed score dimensions", () => {
+  it("renders category names, the score type, and a within-noise delta", () => {
+    const wrapper = mountDrawer({ row: categoricalRow });
+    const text = wrapper.get('[data-test="score-row"]').text();
+
+    expect(text).toContain("poor");
+    expect(text).toContain("good");
+    expect(text).toContain("Categorical");
+    expect(text).toContain("~+1");
   });
 });

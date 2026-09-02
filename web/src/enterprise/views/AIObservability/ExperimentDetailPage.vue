@@ -263,9 +263,16 @@ import llmExperimentsService, {
 import ExperimentRowDetailDrawer from "@/enterprise/components/AIObservability/ExperimentRowDetailDrawer.vue";
 import {
   aiExperimentCompareRoute,
+  aiExperimentCreateRoute,
   aiExperimentDetailRoute,
   aiExperimentsRoute,
 } from "./experimentRoutes";
+import { canCloneInForm } from "@/enterprise/components/AIObservability/ExperimentForm.schema";
+import {
+  durationLabel,
+  durationUnit,
+  formatDuration,
+} from "@/enterprise/components/AIObservability/experimentRowContent";
 import { experimentScoreValue, openExperimentTrace } from "./experimentResults";
 
 defineOptions({ name: "AIExperimentDetailPage" });
@@ -337,7 +344,7 @@ const slotRows = computed(() =>
       slotKey: `${slot.rowId}:${slot.trialIndex}`,
       input: slot.input ?? "—",
       output: slot.execution?.output ?? "—",
-      latency: slot.execution?.latencyMs == null ? "—" : `${slot.execution.latencyMs}ms`,
+      latency: durationLabel(slot.execution?.latencyMs),
     };
   }),
 );
@@ -430,11 +437,15 @@ const metricCards = computed<MetricCard[]>(() => {
   // without bound (the API puts no cap on pinned scorers). Per-scorer values
   // live in the table columns.
   const cards: MetricCard[] = [];
+  // Seconds once past a second: a raw "10449" costs the reader the magnitude and
+  // overflows the tile. Unit rides beside the number, so it is never guessed at.
+  const p50 = aggregate?.p50LatencyMs ?? null;
+  const p50Unit = p50 === null ? undefined : durationUnit(p50);
   cards.push({
     key: "p50",
     label: t("aiObservability.experiments.detail.p50Latency"),
-    value: aggregate?.p50LatencyMs == null ? "—" : String(aggregate.p50LatencyMs),
-    unit: aggregate?.p50LatencyMs == null ? undefined : "ms",
+    value: p50 === null || p50Unit === undefined ? "—" : formatDuration(p50, p50Unit),
+    unit: p50Unit,
     icon: "speed" as IconName,
     dataTest: "ai-experiment-detail-p50",
   });
@@ -617,7 +628,15 @@ function openComparison(baselineId: string) {
   void router.push(aiExperimentCompareRoute(orgId.value, baselineId, experimentId));
 }
 
+// Opens the create form seeded from this run rather than starting a copy
+// outright: a clone costs a full execution, and it is normally made in order to
+// change something first.
 async function cloneExperiment() {
+  const task = detail.value?.experiment.task;
+  if (task && canCloneInForm(task)) {
+    void router.push(aiExperimentCreateRoute(orgId.value, { cloneOf: experimentId.value }));
+    return;
+  }
   acting.value = true;
   try {
     const clone = await llmExperimentsService.clone(orgId.value, experimentId.value);

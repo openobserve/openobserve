@@ -569,15 +569,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center gap-1">
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
-          <TransformSelector
-            v-if="isActionsEnabled"
-            :function-options="functionOptions"
-            :hide-toggle="true"
-            @select:function="populateFunctionImplementation"
-            @save:function="fnSavedFunctionDialog"
-          />
           <FunctionSelector
-            v-else
             :function-options="functionOptions"
             :hide-toggle="true"
             @select:function="populateFunctionImplementation"
@@ -1443,17 +1435,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </template>
-              <template v-else-if="searchObj.data.transformType === 'action'">
-                <CodeQueryEditor
-                  v-if="router.currentRoute.value.name === 'logs'"
-                  data-test="logs-vrl-function-editor"
-                  ref="fnEditorRef"
-                  editor-id="fnEditor"
-                  :query="actionEditorQuery"
-                  read-only
-                  language="markdown"
-                />
-              </template>
             </div>
           </template>
         </OSplitter>
@@ -1935,8 +1916,6 @@ import searchService from "@/services/search";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-// Lazy load CodeQueryEditor to avoid loading Monaco Editor eagerly
-const CodeQueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 // Unified QueryEditor for main query editor (with built-in AI bar)
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
 
@@ -1967,7 +1946,6 @@ import { inject, toRef, computed } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
-import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
@@ -2092,9 +2070,7 @@ export default defineComponent({
     SyntaxGuide,
     AutoRefreshInterval,
     ConfirmDialog,
-    TransformSelector,
     FunctionSelector,
-    CodeQueryEditor,
     UnifiedQueryEditor,
     QueryPlanDialog,
     OIcon,
@@ -2264,7 +2240,6 @@ export default defineComponent({
       updatedLocalLogFilterField,
       updateUrlQueryParams,
       generateURLQuery,
-      isActionsEnabled,
       checkTimestampAlias,
     } = logsUtils();
     const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData, cancelQuery } =
@@ -2313,7 +2288,6 @@ export default defineComponent({
     const { closeSocketWithError } = useSearchWebSocket();
 
     const transformsExpandState = ref({
-      actions: false,
       functions: false,
     });
 
@@ -2469,19 +2443,7 @@ export default defineComponent({
       );
     });
 
-    const filteredActionOptions = computed(() => {
-      if (searchObj.data.transformType !== "action") return [];
-      if (!searchTerm.value) return searchObj.data.actions;
-      return searchObj.data.actions.filter((item) =>
-        item.name.toLowerCase().includes(searchTerm.value.toLowerCase()),
-      );
-    });
-
     const filteredTransformOptions = computed(() => {
-      if (!searchObj.data.transformType) return [];
-
-      if (searchObj.data.transformType === "action") return filteredActionOptions.value;
-
       if (searchObj.data.transformType === "function") return filteredFunctionOptions.value;
 
       return [];
@@ -2640,18 +2602,10 @@ export default defineComponent({
     const updateViewObj = ref({});
 
     const transformTypes = computed(() => {
-      return [
-        { label: t("logs.searchBar.transformTypeFunction"), value: "function" },
-        { label: t("logs.searchBar.transformTypeAction"), value: "action" },
-      ];
+      return [{ label: t("logs.searchBar.transformTypeFunction"), value: "function" }];
     });
 
-    const showFunctionEditor = computed(() => {
-      // When actions are disabled, fall back to the transform-editor toggle
-      if (!isActionsEnabled.value) return searchObj.meta.showTransformEditor;
-
-      return searchObj.data.transformType === "function";
-    });
+    const showFunctionEditor = computed(() => searchObj.meta.showTransformEditor);
 
     // Check if VRL editor should be disabled (in visualize mode with non-table chart)
     const isVrlEditorDisabled = computed(() => {
@@ -2764,25 +2718,7 @@ export default defineComponent({
         return searchObj.data.selectedTransform.name;
       }
 
-      return searchObj.data.transformType === "action"
-        ? "Action"
-        : searchObj.data.transformType === "function"
-          ? "Function"
-          : "Transform";
-    });
-
-    const actionEditorQuery = computed(() => {
-      if (
-        searchObj.data.transformType === "action" &&
-        searchObj.data.selectedTransform?.type === "action" &&
-        searchObj.data.selectedTransform?.name
-      ) {
-        return t("logs.searchBar.actionAppliedRunQuery", {
-          name: searchObj.data.selectedTransform?.name,
-        });
-      }
-
-      return t("logs.searchBar.selectActionToApply");
+      return searchObj.data.transformType === "function" ? "Function" : "Transform";
     });
 
     const updateAutoComplete = (value) => {
@@ -2800,8 +2736,6 @@ export default defineComponent({
     const transformIcon = computed(() => {
       if (searchObj.data.transformType === "function")
         return "img:" + getImageURL("images/common/function.svg");
-
-      if (searchObj.data.transformType === "action") return "code";
 
       if (!searchObj.data.transformType) return "img:" + getImageURL("images/common/transform.svg");
 
@@ -3428,10 +3362,6 @@ export default defineComponent({
         queryEditorRef?.value?.resetEditorLayout();
         fnEditorRef?.value?.resetEditorLayout();
       }, 100);
-    };
-
-    const applyAction = (actionId) => {
-      searchObj.data.actionId = actionId.id;
     };
 
     const populateFunctionImplementation = (fnValue, flag = false, openEditor = true) => {
@@ -4918,23 +4848,11 @@ export default defineComponent({
         populateFunctionImplementation(item, isSelected);
       }
 
-      // If action is selected notify the user
-      if (searchObj.data.transformType === "action") {
-        updateActionSelection(item);
-      }
-
       if (typeof item === "object")
         searchObj.data.selectedTransform = {
           ...item,
           type: searchObj.data.transformType,
         };
-    };
-
-    const updateActionSelection = (item: any) => {
-      toast({
-        message: t("logs.searchBar.actionAppliedSuccess", { name: item?.name }),
-        variant: "success",
-      });
     };
 
     const updateEditorWidth = () => {
@@ -5170,7 +5088,6 @@ export default defineComponent({
       openSearchInspectDialog,
       navigateToSearchInspect,
       searchTerm,
-      filteredActionOptions,
       filteredFunctionOptions,
       confirmUpdate,
       updateViewObj,
@@ -5184,8 +5101,6 @@ export default defineComponent({
       filteredTransformOptions,
       updateTransforms,
       selectTransform,
-      actionEditorQuery,
-      isActionsEnabled,
       showFunctionEditor,
       isVrlEditorDisabled,
       closeSocketWithError,
@@ -5210,10 +5125,8 @@ export default defineComponent({
       // Expose additional functions for testing
       updateAutoComplete,
       handleEscKey,
-      applyAction,
       getFieldList,
       buildStreamQuery,
-      updateActionSelection,
       updateEditorWidth,
       showExplainDialog,
       openExplainDialog,
@@ -5524,9 +5437,9 @@ export default defineComponent({
   border-radius: var(--radius-default);
 }
 
-/* keep(lib-override:o2): .saved-view-item is rendered by the Function/Transform
-   selector child components, so it needs :deep(). The !important outranks the
-   px-3/py-2 utilities TransformSelector puts on the same node. */
+/* keep(lib-override:o2): .saved-view-item is rendered by the FunctionSelector
+   child component, so it needs :deep(). The !important outranks the
+   px-3/py-2 utilities FunctionSelector puts on the same node. */
 .logs-search-bar-component :deep(.saved-view-item) {
   padding: 0.125rem 0.25rem !important;
 }

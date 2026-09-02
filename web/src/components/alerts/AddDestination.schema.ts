@@ -27,6 +27,7 @@
 import { z } from "zod";
 import { isValidResourceName } from "@/utils/zincutils";
 import { makePrebuiltDestinationSchema } from "./PrebuiltDestinationForm.schema";
+import { DEFAULT_SLACK_APP_NAME, SLACK_APP_NAME_MAX_LENGTH } from "@/utils/slackManifest";
 
 // One row in the dynamic api-headers array-field. Both fields are free-form
 // text (a blank starter row is valid — only non-empty rows persist on save).
@@ -54,8 +55,12 @@ export const makeAddDestinationSchema = (
       // Recipients are org users, chosen from a list — an array of their
       // email addresses rather than the comma-separated string this used to be.
       emails: z.array(z.string()).optional().default([]),
-      action_id: z.string().optional().default(""),
       skip_tls_verify: z.boolean().optional().default(false),
+      slack_setup_method: z.enum(["oauth", "manifest", "webhook"]).default("oauth"),
+      slack_app_name: z.string().default(DEFAULT_SLACK_APP_NAME),
+      slack_team_id: z.string().default(""),
+      slack_team_name: z.string().default(""),
+      slack_channel_id: z.string().default(""),
 
       // ── Form-owned dynamic api-headers rows ──────────────────────────────
       apiHeaders: z.array(headerRowSchema).default([]),
@@ -68,21 +73,19 @@ export const makeAddDestinationSchema = (
       const trimmed = (s: unknown) => String(s ?? "").trim();
       const isPrebuilt = isAlerts && !!val.destination_type && val.destination_type !== "custom";
 
-      // name: required + resource-name check. Scoped to NON-prebuilt paths.
-      if (!isPrebuilt) {
-        if (!trimmed(val.name)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["name"],
-            message: t("common.nameRequired"),
-          });
-        } else if (!isValidResourceName(String(val.name))) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["name"],
-            message: t("alerts.validation.nameInvalidChars"),
-          });
-        }
+      // Every destination has a name, including config-driven prebuilt types.
+      if (!trimmed(val.name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["name"],
+          message: t("common.nameRequired"),
+        });
+      } else if (!isValidResourceName(String(val.name))) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["name"],
+          message: t("alerts.validation.nameInvalidChars"),
+        });
       }
 
       // template: required only for custom alert destinations.
@@ -137,15 +140,6 @@ export const makeAddDestinationSchema = (
         }
       }
 
-      // action_id: required for action destinations.
-      if (!isPrebuilt && val.type === "action" && !val.action_id) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["action_id"],
-          message: t("alerts.validation.fieldRequired"),
-        });
-      }
-
       // Prebuilt credentials: validate the active type's credential fields from
       // the SAME config-driven schema, re-homed under `credentials.*` so each
       // issue lands on its OFormInput (name=`credentials.<key>`). This is what
@@ -164,6 +158,41 @@ export const makeAddDestinationSchema = (
           }
         }
       }
+
+      if (val.destination_type === "slack" && val.slack_setup_method === "oauth") {
+        const channel = trimmed(val.credentials.channel);
+        const hasConnectionMetadata =
+          channel.length > 0 &&
+          trimmed(val.slack_team_id).length > 0 &&
+          trimmed(val.slack_team_name).length > 0 &&
+          trimmed(val.slack_channel_id).length > 0;
+        if (!hasConnectionMetadata) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["credentials", "webhookUrl"],
+            message: t("alert_destinations.slackOAuth.connectionRequired"),
+          });
+        }
+      }
+
+      if (val.destination_type === "slack" && val.slack_setup_method === "manifest") {
+        const appName = trimmed(val.slack_app_name);
+        if (!appName) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["slack_app_name"],
+            message: t("alert_destinations.slackOAuth.manifestAppNameRequired"),
+          });
+        } else if (appName.length > SLACK_APP_NAME_MAX_LENGTH) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["slack_app_name"],
+            message: t("alert_destinations.slackOAuth.manifestAppNameTooLong", {
+              max: SLACK_APP_NAME_MAX_LENGTH,
+            }),
+          });
+        }
+      }
     });
 
 export type AddDestinationForm = z.infer<ReturnType<typeof makeAddDestinationSchema>>;
@@ -179,8 +208,12 @@ export const addDestinationDefaults = (): AddDestinationForm => ({
   method: "post",
   output_format: "json",
   emails: [] as string[],
-  action_id: "",
   skip_tls_verify: false,
+  slack_setup_method: "oauth",
+  slack_app_name: DEFAULT_SLACK_APP_NAME,
+  slack_team_id: "",
+  slack_team_name: "",
+  slack_channel_id: "",
   apiHeaders: [{ key: "", value: "" }],
   credentials: {},
 });

@@ -17,6 +17,8 @@ on:
 
 jobs:
   review:
+    # Explicit name: without it GitHub serializes the whole matrix object (api_key_env, marker) into the public check name.
+    name: review (${{ matrix.provider.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 25
     # Concurrency is per-job (not workflow-level) so it can see `matrix`: keyed per-PR AND
@@ -124,7 +126,7 @@ jobs:
         # Pinned to a full commit SHA (not a mutable tag) because this action receives the app's
         # signing private key — a repointed/compromised release could exfiltrate it. Same pin
         # discipline as OPENCODE_VERSION above. Bump deliberately after review.
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ vars.OO_REVIEWER_APP_ID }}
           private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}

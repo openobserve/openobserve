@@ -2576,21 +2576,6 @@ export default defineComponent({
       }
     };
 
-    const getSeverityColorHex = (severity: string) => {
-      switch (severity) {
-        case "P1":
-          return "#b91c1c"; // red-700
-        case "P2":
-          return "#c2410c"; // orange-700
-        case "P3":
-          return "#d97706"; // amber-600
-        case "P4":
-          return "#6b7280"; // gray-500
-        default:
-          return "#6b7280"; // gray-500
-      }
-    };
-
     const formatPeriod = (periodInSeconds: number | undefined) => {
       if (!periodInSeconds) return raw("N/A");
 
@@ -3419,7 +3404,6 @@ export default defineComponent({
       handleSeverityChange,
       handleTriggerRowClick,
       getStatusLabel,
-      getSeverityColorHex,
       formatPeriod,
       formatCustomConditions,
       formatTimestamp,

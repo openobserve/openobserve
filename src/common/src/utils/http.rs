@@ -141,6 +141,8 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
         && trace_id_str.chars().all(|c| c.is_ascii_hexdigit())
         && !trace_id_str.chars().all(|c| c == '0')
     {
+        // the W3C propagator rejects uppercase traceparent fields, so normalize
+        let trace_id_str = trace_id_str.to_ascii_lowercase();
         // Set as parent context if tracing is enabled
         if cfg.common.should_create_span() && !span.is_none() {
             // Check for x-openobserve-span-id header (parent span ID from RUM SDK)
@@ -152,7 +154,7 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
                 && !span_id_str.chars().all(|c| c == '0')
             {
                 // Use the provided span ID from RUM SDK
-                span_id_str.to_string()
+                span_id_str.to_ascii_lowercase()
             } else {
                 // Generate a new span ID if not provided or invalid
                 config::ider::generate_span_id()
@@ -165,7 +167,7 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
             let parent_ctx = global::get_text_map_propagator(|prop| prop.extract(&headers_map));
             let _ = span.set_parent(parent_ctx);
         }
-        return trace_id_str.to_string();
+        return trace_id_str;
     }
 
     // Check for traceparent header (W3C standard)
@@ -552,6 +554,18 @@ mod tests {
         // Should generate a new trace ID (32 characters hex)
         assert_eq!(trace_id.len(), 32);
         assert!(trace_id.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_lowercases_rum_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-openobserve-trace-id"),
+            HeaderValue::from_static("01A05C4446CC71AC872A7B594BCDC883"),
+        );
+        let span = tracing::Span::none();
+        let trace_id = get_or_create_trace_id(&headers, &span);
+        assert_eq!(trace_id, "01a05c4446cc71ac872a7b594bcdc883");
     }
 
     #[test]

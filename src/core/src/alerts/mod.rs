@@ -575,7 +575,6 @@ impl QueryConditionExt for QueryCondition {
                     quick_mode: false,
                     query_type: "".to_string(),
                     track_total_hits: false,
-                    action_id: None,
                     uses_zo_fn: false,
                     query_fn: encode_query_fn,
                     skip_wal: false,
@@ -693,9 +692,14 @@ impl QueryConditionExt for QueryCondition {
                     // GROUP-COUNT threshold. Both axes must hold — dropping the
                     // count silently rewrites "for at least 3 groups" as "for
                     // any group".
+                    let col = if self.query_type == QueryType::SQL {
+                        &agg.having.column
+                    } else {
+                        "alert_agg_value"
+                    };
                     let classified: Vec<_> = records
                         .iter()
-                        .filter_map(|r| r.get("alert_agg_value").and_then(|v| v.as_f64()))
+                        .filter_map(|r| r.get(col).and_then(|v| v.as_f64()))
                         .collect();
 
                     let level =
@@ -744,7 +748,7 @@ impl QueryConditionExt for QueryCondition {
                         }
                         records
                             .iter()
-                            .find(|r| r.get("alert_agg_value").and_then(|v| v.as_f64()) == Some(w))
+                            .find(|r| r.get(col).and_then(|v| v.as_f64()) == Some(w))
                             .map(|r| {
                                 group_by
                                     .iter()
@@ -781,7 +785,7 @@ impl QueryConditionExt for QueryCondition {
                         let observations: Vec<GroupObservation> = records
                             .iter()
                             .filter_map(|r| {
-                                let value = r.get("alert_agg_value")?.as_f64()?;
+                                let value = r.get(col)?.as_f64()?;
                                 let labels =
                                     config::meta::alerts::dispatch::row_group_labels(r, group_by);
                                 Some(GroupObservation::new(labels, value))
@@ -877,7 +881,6 @@ async fn run_alert_count_query(
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
-            action_id: None,
             uses_zo_fn: false,
             query_fn: None, // guard upstream: hybrid excludes VRL alerts
             skip_wal: false,
