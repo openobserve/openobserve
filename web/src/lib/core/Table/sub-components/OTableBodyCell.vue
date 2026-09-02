@@ -407,7 +407,7 @@ watch(isCellActionActive, async (active) => {
     Math.max(cellActionsPointerX.value, half),
     window.innerWidth - half,
   );
-  // Keep the arrow clear of the bar's rounded corners once the bar has been clamped.
+  // Keep the arrow clear of the bar's corner radius once the bar has been clamped.
   cellActionsArrowX.value = Math.min(
     Math.max(cellActionsPointerX.value - (cellActionsX.value - half), 10),
     Math.max(bar.width - 10, 10),
