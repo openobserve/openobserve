@@ -112,7 +112,17 @@
           :key="card.key"
           :label="card.label"
           :icon="card.icon"
+          :as="isMetricCardActionable(card) ? 'button' : 'div'"
+          :type="isMetricCardActionable(card) ? 'button' : undefined"
+          :aria-pressed="isMetricCardActionable(card) ? highDispersionOnly : undefined"
+          :class="{
+            'focus-visible:ring-button-outline-hover-border cursor-pointer text-left focus-visible:ring-3':
+              isMetricCardActionable(card),
+            'ring-button-outline-hover-border ring-2':
+              isMetricCardActionable(card) && highDispersionOnly,
+          }"
           :data-test="card.dataTest"
+          @click="handleMetricCardClick(card)"
         >
           <template #value>
             <span class="text-text-secondary text-2xl leading-none font-bold">
@@ -170,15 +180,19 @@
                 clearable
                 data-test="ai-experiment-detail-status-filter"
               />
-              <OSelect
+              <OButton
                 v-if="isMultiTrial"
-                v-model="dispersionView"
                 class="shrink-0"
-                width="md"
-                :options="dispersionOptions"
-                :searchable="false"
-                data-test="ai-experiment-detail-dispersion-filter"
-              />
+                size="sm-toolbar"
+                variant="outline"
+                icon-left="swap-vert"
+                :active="sortByDispersion"
+                :aria-pressed="sortByDispersion"
+                data-test="ai-experiment-detail-sort-dispersion"
+                @click="toggleDispersionSort"
+              >
+                {{ t("aiObservability.experiments.detail.sortByDispersion") }}
+              </OButton>
             </div>
           </template>
 
@@ -324,7 +338,8 @@ const RESULTS_PAGE_SIZE = 100;
 const resultRows = ref<ExperimentResultRow[]>([]);
 const rowSearch = ref("");
 const statusFilter = ref("");
-const dispersionView = ref<"dataset" | "dispersion_desc" | "high_only">("dataset");
+const sortByDispersion = ref(false);
+const highDispersionOnly = ref(false);
 const rowDrawerOpen = ref(false);
 const retryingRow = ref(false);
 const selectedRowDetail = ref<ExperimentRowDetail | null>(null);
@@ -401,21 +416,6 @@ const statusOptions = computed(() =>
     value: status,
   })),
 );
-
-const dispersionOptions = computed(() => [
-  {
-    label: t("aiObservability.experiments.detail.dispersionDatasetOrder"),
-    value: "dataset",
-  },
-  {
-    label: t("aiObservability.experiments.detail.dispersionHighestFirst"),
-    value: "dispersion_desc",
-  },
-  {
-    label: t("aiObservability.experiments.detail.dispersionHighOnly"),
-    value: "high_only",
-  },
-]);
 
 const visibleRows = computed(() => {
   const term = rowSearch.value.trim().toLowerCase();
@@ -544,6 +544,22 @@ const metricCards = computed<MetricCard[]>(() => {
   return cards;
 });
 
+function isMetricCardActionable(card: MetricCard) {
+  return card.key === "dispersion" && isMultiTrial.value;
+}
+
+function toggleDispersionSort() {
+  sortByDispersion.value = !sortByDispersion.value;
+}
+
+function toggleHighDispersionFilter() {
+  highDispersionOnly.value = !highDispersionOnly.value;
+}
+
+function handleMetricCardClick(card: MetricCard) {
+  if (isMetricCardActionable(card)) toggleHighDispersionFilter();
+}
+
 const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "slotStatus",
@@ -617,13 +633,12 @@ const columns = computed<OTableColumnDef[]>(() => [
 ]);
 
 function resultRowOptions(page: number) {
-  const sort: ExperimentResultRowSort =
-    dispersionView.value === "dataset" ? "dataset" : "dispersion_desc";
+  const sort: ExperimentResultRowSort = sortByDispersion.value ? "dispersion_desc" : "dataset";
   return {
     page,
     pageSize: RESULTS_PAGE_SIZE,
     sort,
-    highDispersionOnly: dispersionView.value === "high_only",
+    highDispersionOnly: highDispersionOnly.value,
   };
 }
 
@@ -805,5 +820,5 @@ async function runAction(
 }
 
 watch([orgId, experimentId], refresh, { immediate: true });
-watch(dispersionView, refreshRows);
+watch([sortByDispersion, highDispersionOnly], refreshRows);
 </script>

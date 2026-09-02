@@ -11005,9 +11005,7 @@
         "searchInputPlaceholder": "Search input",
         "statusFilter": "Status",
         "statusFilterAll": "All Statuses",
-        "dispersionDatasetOrder": "Dataset order",
-        "dispersionHighestFirst": "Highest dispersion",
-        "dispersionHighOnly": "High dispersion only",
+        "sortByDispersion": "Sort by dispersion",
         "highDispersionBadge": "High"
       },
       "rowDetail": {

@@ -391,7 +391,7 @@ describe("ExperimentDetailPage", () => {
             mounted() {
               seen.push({ pagination: this.pagination, rows: this.data.length });
             },
-            template: `<table />`,
+            template: `<table><slot name="toolbar" /></table>`,
           },
         },
       },
@@ -408,6 +408,7 @@ describe("ExperimentDetailPage", () => {
       "exp-1",
       expect.objectContaining({ page: 1, pageSize: 100, sort: "dataset" }),
     );
+    expect(wrapper.find('[data-test="ai-experiment-detail-sort-dispersion"]').exists()).toBe(false);
     expect(seen[0].pagination).toBe("client");
     wrapper.unmount();
   });
@@ -569,6 +570,7 @@ describe("ExperimentDetailPage", () => {
         results: {
           executions: [],
           scores: [],
+          dispersionSummary: { highDispersionRowCount: 1 },
           scoreSummaries: [
             {
               scorerId: "judge",
@@ -625,7 +627,7 @@ describe("ExperimentDetailPage", () => {
           OTable: {
             props: ["data", "columns"],
             emits: ["row-click"],
-            template: `<table><tbody><tr v-for="row in data" :key="row.rowKey"
+            template: `<table><slot name="toolbar" /><tbody><tr v-for="row in data" :key="row.rowKey"
               @click="$emit('row-click', row)"><td v-for="column in columns" :key="column.id">
                 <slot :name="'cell-' + column.id" :row="row">{{ row[column.accessorKey] }}</slot>
               </td></tr></tbody></table>`,
@@ -644,19 +646,34 @@ describe("ExperimentDetailPage", () => {
     expect(wrapper.text()).toContain("0.75");
     expect(wrapper.text()).toContain("High");
     expect(wrapper.text()).toContain("42%");
+    const sortButton = wrapper.get('[data-test="ai-experiment-detail-sort-dispersion"]');
+    const dispersionCard = wrapper.get('[data-test="ai-experiment-detail-dispersion"]');
+    expect(dispersionCard.element.tagName).toBe("BUTTON");
 
     await wrapper.get("tbody tr").trigger("click");
     await flushPromises();
     expect(getRow).toHaveBeenCalledWith("acme", "exp-1", "row-1");
 
     listRows.mockClear();
-    (wrapper.vm as any).dispersionView = "high_only";
+    await sortButton.trigger("click");
+    await flushPromises();
+    expect(listRows).toHaveBeenCalledWith(
+      "acme",
+      "exp-1",
+      expect.objectContaining({ sort: "dispersion_desc", highDispersionOnly: false }),
+    );
+    expect(sortButton.attributes("aria-pressed")).toBe("true");
+
+    listRows.mockClear();
+    await dispersionCard.trigger("click");
     await flushPromises();
     expect(listRows).toHaveBeenCalledWith(
       "acme",
       "exp-1",
       expect.objectContaining({ sort: "dispersion_desc", highDispersionOnly: true }),
     );
+    expect(sortButton.attributes("aria-pressed")).toBe("true");
+    expect(dispersionCard.attributes("aria-pressed")).toBe("true");
   });
 
   // A clone costs a full run, and it is normally made in order to change
