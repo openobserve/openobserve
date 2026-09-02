@@ -4516,6 +4516,10 @@ export class LogsPage {
         return await expect(this.page.locator(this.resultPagination)).toBeVisible();
     }
 
+    async expectSearchResultTextContains(expectedText, timeout = 15000) {
+        return await expect(this.page.locator(this.searchResultText)).toContainText(expectedText, { timeout });
+    }
+
     async clickPaginationPage(pageNumber) {
         return await this.page.locator(this.resultPaginationPageBtn(pageNumber)).first().click();
     }
