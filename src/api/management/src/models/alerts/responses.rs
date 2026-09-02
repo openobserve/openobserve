@@ -520,6 +520,13 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         ..Default::default()
     });
 
+    // Never inferred: an errored run and an empty one leave the config identical.
+    let last_outcome = v
+        .get("last_outcome")
+        .and_then(|o| o.as_str())
+        .map(String::from);
+    let last_outcome_at = v.get("last_outcome_at").and_then(|t| t.as_i64());
+
     let folder_name = v
         .get("folder_name")
         .and_then(|n| n.as_str())
@@ -546,11 +553,12 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         is_real_time: false,
         last_trained_at: v.get("training_completed_at").and_then(|t| t.as_i64()),
         status,
-        // Anomaly configs do not flow through the alert scheduler's state
-        // write path; leave run state unset rather than implying "never fired".
-        last_outcome: None,
-        last_outcome_at: None,
+        // No `alert_states` row exists, so `enrich_with_run_state` cannot fill these.
+        last_outcome,
+        last_outcome_at,
+        // How long the outcome has HELD is not recorded anywhere.
         last_outcome_since: None,
+        // The detector reports a count, never a warning/critical classification.
         level: None,
         level_since: None,
         last_error: v
@@ -967,5 +975,76 @@ mod anomaly_priority_tag_tests {
         let obj = json.as_object().unwrap();
         assert!(!obj.contains_key("priority"));
         assert!(!obj.contains_key("tags"));
+    }
+
+    /// `enrich_with_run_state` cannot reach an anomaly, so the scheduler records
+    /// the outcome on the trigger and `list_configs` merges it in.
+    #[test]
+    fn test_last_outcome_is_read_from_the_recorded_trigger_value() {
+        for outcome in ["firing", "normal", "error", "skipped"] {
+            let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+                "last_outcome": outcome,
+                "last_outcome_at": 1_700,
+            })))
+            .unwrap();
+            assert_eq!(item.last_outcome.as_deref(), Some(outcome));
+            // Never presented as live state — always qualified by when it ran.
+            assert_eq!(item.last_outcome_at, Some(1_700));
+        }
+    }
+
+    /// Why the outcome is recorded, not inferred: any derivation from the config
+    /// row reports a permanently broken detector as healthy.
+    #[test]
+    fn test_an_errored_run_is_not_reported_as_normal() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "is_trained": true,
+            "enabled": true,
+            "last_outcome": "error",
+            "last_outcome_at": 2_000,
+            // Identical to a clean run: nothing here distinguishes the two.
+            "last_detection_run": 2_000,
+        })))
+        .unwrap();
+        assert_eq!(item.last_outcome.as_deref(), Some("error"));
+    }
+
+    /// Nothing recorded yet — never run, or last run predates the upgrade.
+    #[test]
+    fn test_last_outcome_is_unset_when_nothing_was_recorded() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "is_trained": true,
+            // Present and zero: `push` binds start_time as a literal 0, so a
+            // freshly created trigger reports a run that never happened.
+            "last_detection_run": 0,
+        })))
+        .unwrap();
+        assert_eq!(item.last_outcome, None);
+        assert_eq!(item.last_outcome_at, None);
+        let json = serde_json::to_value(&item).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("last_outcome"));
+    }
+
+    /// Echoing `last_outcome_at` would claim the outcome changed on every run.
+    #[test]
+    fn test_last_outcome_since_is_not_faked_from_the_run_timestamp() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "last_outcome": "normal",
+            "last_outcome_at": 2_000,
+        })))
+        .unwrap();
+        assert_eq!(item.last_outcome_since, None);
+    }
+
+    /// The detector reports a count, never a warning/critical classification.
+    #[test]
+    fn test_anomaly_configs_have_no_level() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "last_outcome": "firing",
+            "last_outcome_at": 2_500,
+        })))
+        .unwrap();
+        assert_eq!(item.level, None);
+        assert_eq!(item.level_since, None);
     }
 }

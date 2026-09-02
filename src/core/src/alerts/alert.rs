@@ -62,8 +62,12 @@ use o2_openfga::{
     authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
     config::get_config as get_openfga_config,
 };
+use proto::cluster_rpc::SearchQuery;
 use sea_orm::{ConnectionTrait, TransactionTrait};
-use search::sql::RE_ONLY_SELECT;
+use search::{
+    datafusion::plan::projections::get_result_schema,
+    sql::{RE_ONLY_SELECT, Sql},
+};
 use svix_ksuid::Ksuid;
 
 #[cfg(feature = "enterprise")]
@@ -284,6 +288,12 @@ pub enum AlertError {
     /// and a shared reason would name the wrong fix for one of them.
     #[error("this edit breaks the SLOs measuring from this alert — {breakages}")]
     AlertSourceEditBreaksSlos { breakages: String },
+    #[error("Realtime alerts cannot have non-zero pending period")]
+    PendingPeriodOnRealtimeAlert,
+    #[error("Alert pending period must be >= 0")]
+    NegativePendingPeriod,
+    #[error("Error in multi alert grouping: {0}")]
+    MultiAlertGroupingError(String),
 }
 
 pub async fn save(
@@ -650,6 +660,14 @@ async fn prepare_alert(
         return Err(AlertError::RealtimeMissingCustomQuery);
     }
 
+    if alert.is_real_time && alert.pending_period_sec != 0 {
+        return Err(AlertError::PendingPeriodOnRealtimeAlert);
+    }
+
+    if alert.pending_period_sec < 0 {
+        return Err(AlertError::NegativePendingPeriod);
+    }
+
     // Multi-level thresholds (alerts_2.md Feature 1). Rejected at write time so
     // an unreachable warning level can never reach the evaluator.
     //
@@ -696,9 +714,68 @@ async fn prepare_alert(
     // `warning_value`. Validate whenever an aggregation is present, so a
     // non-numeric `having.value` is caught at write time rather than failing
     // every evaluation.
-    if let Some(agg) = alert.query_condition.aggregation.as_ref() {
+    if let Some(agg) = alert.query_condition.aggregation.as_mut() {
         config::meta::alerts::aggregation_level::validate_aggregation_thresholds(agg)
             .map_err(AlertError::InvalidAggregationThreshold)?;
+
+        if let Some(sql) = alert.query_condition.sql.as_ref()
+            && alert.query_condition.query_type == QueryType::SQL
+            && agg.multi_alert
+        {
+            // FE has a gate, this is mostly API check
+            if agg.having.column.is_empty() {
+                return Err(AlertError::MultiAlertGroupingError(
+                    "group by column must not be empty for sql multi alert having field"
+                        .to_string(),
+                ));
+            }
+            let query = SearchQuery {
+                sql: sql.to_owned(),
+                ..Default::default()
+            };
+            let sql = Sql::new(&query, &alert.org_id, alert.stream_type, None)
+                .await
+                .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
+            let schema = get_result_schema(sql, false, true)
+                .await
+                .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
+
+            // this is mostly API check, FE already has a restriction
+            if !schema.projections.contains(&agg.having.column) {
+                return Err(AlertError::MultiAlertGroupingError(format!(
+                    "SQL Multi alert query having column must be in the group by clause, '{}' column not in group by fields",
+                    agg.having.column
+                )));
+            }
+
+            if schema.group_by.is_empty() {
+                return Err(AlertError::MultiAlertGroupingError(
+                    "SQL Multi alert query Must have at least one group by field".to_string(),
+                ));
+            }
+
+            for group in &schema.group_by {
+                if !schema.projections.contains(group) {
+                    return Err(AlertError::MultiAlertGroupingError(format!(
+                        "SQL query projections must contain all group by fields, missing field '{group}'"
+                    )));
+                }
+                if let Some(v) = schema.field_alias_map.get(group)
+                    && v != group
+                {
+                    return Err(AlertError::MultiAlertGroupingError(format!(
+                        "SQL query projections must contain all group by fields without alias, field '{group}' is aliased"
+                    )));
+                }
+            }
+            let mut groups = Vec::with_capacity(schema.group_by.len());
+            for p in schema.projections {
+                if schema.group_by.contains(&p) {
+                    groups.push(p);
+                }
+            }
+            agg.group_by = Some(groups);
+        }
     }
 
     validate_multi_alert_config(alert)?;

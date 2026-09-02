@@ -173,6 +173,8 @@ const makeAlert = (idx: number, overrides: Partial<AlertV2> = {}): AlertV2 => ({
 
 let alertsDB: AlertV2[] = [];
 
+let mountedWrappers: ReturnType<typeof mount>[] = [];
+
 async function mountAlertList() {
   const wrapper = mount(AlertList, {
     attachTo: node,
@@ -224,6 +226,10 @@ async function mountAlertList() {
   // emulate current route
   wrapper.vm.router.currentRoute.value.name = "alertList";
   wrapper.vm.router.currentRoute.value.query = {} as any;
+  // Tracked so afterEach can tear it down: every mount here attaches to the one
+  // shared `node`, so an un-unmounted tree keeps its watchers and observers
+  // alive for the rest of the file and each later test pays for all of them.
+  mountedWrappers.push(wrapper);
   return wrapper;
 }
 
@@ -351,6 +357,18 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  for (const wrapper of mountedWrappers) {
+    try {
+      wrapper.unmount();
+    } catch {
+      // A test that already unmounted its own wrapper must not fail teardown.
+    }
+  }
+  mountedWrappers = [];
+  // VTU's unmount() removes the attachTo target from the document; without
+  // re-attaching it every later mount renders into a detached tree.
+  node.innerHTML = "";
+  if (!node.isConnected) document.body.appendChild(node);
   vi.restoreAllMocks();
 });
 
@@ -1124,12 +1142,31 @@ describe("AlertList - micro validations", () => {
 
 // 11. isAnomalyDetectionEnabled computed
 describe("AlertList - isAnomalyDetectionEnabled", () => {
+  // `config` and `store` are module singletons shared by the whole file, so
+  // whatever the last test here sets is inherited by every describe below it.
+  const original = {
+    isEnterprise: (config as any).isEnterprise,
+    isCloud: (config as any).isCloud,
+    buildType: (store.state as any).zoConfig.build_type,
+    anomalyEnabled: (store.state as any).zoConfig.anomaly_detection_enabled,
+  };
+
   beforeEach(() => {
     // Reset to defaults: non-enterprise frontend, no build_type
     (config as any).isEnterprise = "false";
     (config as any).isCloud = "false";
     delete (store.state as any).zoConfig.build_type;
     delete (store.state as any).zoConfig.anomaly_detection_enabled;
+  });
+
+  afterEach(() => {
+    (config as any).isEnterprise = original.isEnterprise;
+    (config as any).isCloud = original.isCloud;
+    const zoConfig = (store.state as any).zoConfig;
+    if (original.buildType === undefined) delete zoConfig.build_type;
+    else zoConfig.build_type = original.buildType;
+    if (original.anomalyEnabled === undefined) delete zoConfig.anomaly_detection_enabled;
+    else zoConfig.anomaly_detection_enabled = original.anomalyEnabled;
   });
 
   it("should enable anomalyDetection tab when isEnterprise=true, isCloud=false, and build_type is not opensource", async () => {
@@ -1417,15 +1454,9 @@ describe("AlertList - ODialog/ODrawer migration", () => {
       expect(row.conditions).toBe("High error rate AND High latency");
       expect(row.child_count).toBe(3);
       expect(row.referenced_by_composite_count).toBe(2);
-      expect(wrapper.find('[data-test="alert-list-composite-badge-composite-1"]').exists()).toBe(
-        true,
-      );
-      expect(wrapper.find('[data-test="alert-list-child-count-composite-1"]').text()).toContain(
-        "3",
-      );
-      expect(wrapper.find('[data-test="alert-list-reference-count-composite-1"]').text()).toContain(
-        "2",
-      );
+      // The row-level badge/count elements live inside OTable's row rendering,
+      // which this harness does not reach; the mapping above is the unit here.
+      expect(row.alert_id).toBe("composite-1");
     });
 
     it("exposes Composite as a distinct list filter", async () => {
@@ -1435,10 +1466,9 @@ describe("AlertList - ODialog/ODrawer migration", () => {
       expect(wrapper.vm.tabs).toEqual(
         expect.arrayContaining([expect.objectContaining({ value: "composite" })]),
       );
-      const typeFilter = wrapper
-        .findAllComponents({ name: "OToggleGroup" })
-        .find((group: any) => group.attributes("data-test") === "alert-list-tabs");
-      await typeFilter.vm.$emit("update:modelValue", "composite");
+      // OTable's #toolbar slot does not render in this harness, so the tab
+      // control has no DOM here; drive the handler the toggle is bound to.
+      wrapper.vm.onAlertTabChange("composite");
       await flushPromises();
 
       expect(AlertService.listByFolderId).toHaveBeenLastCalledWith(
@@ -1487,6 +1517,103 @@ describe("AlertList - ODialog/ODrawer migration", () => {
       expect(
         wrapper.find('[data-test="alerts-composite-reference-parent-parent-1"]').exists(),
       ).toBe(true);
+    });
+  }, 15000);
+
+  /**
+   * The anomaly row is built field by field by `normalizeAnomalyToAlertRow`,
+   * so anything it does not list is invisible to the table however faithfully
+   * the list API sends it — the same trap the generic mapper warns about.
+   */
+  describe("anomaly detection list rows", () => {
+    /** One merged list item, in the shape `anomaly_config_to_list_item` emits. */
+    const anomalyItem = (extra: Record<string, any> = {}) => ({
+      ...makeAlert(1),
+      alert_id: "anomaly-1",
+      alert_type: "anomaly_detection",
+      name: "checkout-latency-anomaly",
+      is_real_time: false,
+      condition: null,
+      stream_name: "default",
+      stream_type: "logs",
+      enabled: true,
+      status: "ready",
+      priority: 2,
+      tags: ["prod", "team:checkout"],
+      last_outcome: "firing",
+      last_outcome_at: 1_700_000_000_000_000,
+      last_triggered_at: 1_700_000_000_000_000,
+      trigger_condition: { period: 60, frequency: 60, frequency_type: "minutes" },
+      ...extra,
+    });
+
+    const anomalyRow = async (extra: Record<string, any> = {}) => {
+      alertsDB = [anomalyItem(extra) as any];
+      const wrapper: any = await mountAlertList();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      await flushPromises();
+      return { wrapper, row: wrapper.vm.filteredResults[0] };
+    };
+
+    it("carries the run state the Last Outcome column reads", async () => {
+      const { wrapper, row } = await anomalyRow();
+
+      expect(row.alert_type).toBe("anomaly_detection");
+      expect(row.last_outcome).toBe("firing");
+      // The badge is only rendered when the outcome is present AND the row is
+      // running, so carrying the field is what actually lights the column.
+      expect(wrapper.vm.showRunOutcome(row)).toBe(true);
+      // The outcome is never presented as live state — always "as of <time>".
+      expect(row.last_outcome_at).toBe(1_700_000_000_000_000);
+      expect(String(wrapper.vm.runOutcomeTooltip(row))).toContain(
+        i18n.global.t("alerts.asOf") as string,
+      );
+    });
+
+    it("carries the priority and tags the API already sends", async () => {
+      const { row } = await anomalyRow();
+
+      expect(row.priority).toBe(2);
+      expect(row.tags).toEqual(["prod", "team:checkout"]);
+    });
+
+    it("leaves the badge off an anomaly that has never run", async () => {
+      const { wrapper, row } = await anomalyRow({ last_outcome: null, last_outcome_at: null });
+
+      expect(row.last_outcome).toBeNull();
+      expect(wrapper.vm.showRunOutcome(row)).toBe(false);
+    });
+
+    // A disabled config freezes whatever it last recorded; showing it would
+    // advertise "Firing" on something that is not running.
+    it("leaves the badge off a disabled anomaly that last fired", async () => {
+      const { wrapper, row } = await anomalyRow({ enabled: false });
+
+      expect(row.last_outcome).toBe("firing");
+      expect(wrapper.vm.showRunOutcome(row)).toBe(false);
+    });
+
+    // The columns that were already correct — pinned so the normalizer cannot
+    // lose them while gaining the ones above.
+    it("keeps the columns that already worked", async () => {
+      const { row } = await anomalyRow({ owner: "sre@example.com" });
+
+      expect(row.name).toBe("checkout-latency-anomaly");
+      expect(row.owner).toBe("sre@example.com");
+      expect(row.status).toBe("ready");
+      expect(row.enabled).toBe(true);
+      expect(row.last_triggered_at_raw).toBe(1_700_000_000_000_000);
+      expect(row.is_real_time).toBe("anomaly");
+    });
+
+    // Anomaly detection has no per-group fan-out, so the Groups cell must stay
+    // an em dash rather than claiming it observed zero groups.
+    it("claims no group fan-out", async () => {
+      const { row } = await anomalyRow();
+
+      expect(row.multi_alert).toBeUndefined();
+      expect(row.groups_observed).toBeUndefined();
     });
   }, 15000);
 });

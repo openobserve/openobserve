@@ -1597,6 +1597,7 @@ export class AlertsPage {
     }
 
     async deleteFolder(folderName) {
+        await this.dismissNavFlyout();
         const folderRow = this.page.locator(`div.folder-item:has-text("${folderName}")`);
         await folderRow.hover();
         await this.page.waitForTimeout(500);
