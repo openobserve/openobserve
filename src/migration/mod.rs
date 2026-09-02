@@ -66,6 +66,7 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
         log::info!("DB_SCHEMA_VERSION match, skipping db upgrade");
         return Ok(());
     }
+    check_schema_not_newer(db_schema_version, DB_SCHEMA_VERSION)?;
     log::info!(
         "DB_SCHEMA_VERSION mismatch : expected {}, found {db_schema_version}; running db upgrade",
         DB_SCHEMA_VERSION
@@ -105,4 +106,45 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
     log::info!("DB upgrade completed to version {}", DB_SCHEMA_VERSION);
 
     Ok(())
+}
+
+/// The migrator only moves forward: a newer database carries migrations this build lacks.
+fn check_schema_not_newer(db_version: u64, build_version: u64) -> Result<(), anyhow::Error> {
+    if db_version <= build_version {
+        return Ok(());
+    }
+    Err(anyhow::anyhow!(
+        "db schema version {db_version} is newer than the {build_version} this build supports: \
+         the database has already been through a newer OpenObserve and its schema cannot be \
+         downgraded. Go back to the version you were running before, or restore a backup taken \
+         from before that upgrade. Do not edit the stored version by hand: the schema itself is \
+         still {db_version}, so lowering the number only hides the mismatch."
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn matching_and_older_schemas_are_upgradable() {
+        assert!(check_schema_not_newer(0, 78).is_ok(), "fresh install");
+        assert!(check_schema_not_newer(77, 78).is_ok(), "one behind");
+        assert!(check_schema_not_newer(78, 78).is_ok(), "same version");
+    }
+
+    #[test]
+    fn newer_schema_is_rejected_with_both_versions_named() {
+        let err = check_schema_not_newer(35, 32)
+            .expect_err("a database newer than the build must not be migrated")
+            .to_string();
+        assert!(err.contains("35") && err.contains("32"), "got: {err}");
+        assert!(err.contains("cannot be"), "got: {err}");
+    }
+
+    #[test]
+    fn rejection_starts_one_version_above_the_build() {
+        assert!(check_schema_not_newer(78, 78).is_ok());
+        assert!(check_schema_not_newer(79, 78).is_err());
+    }
 }
