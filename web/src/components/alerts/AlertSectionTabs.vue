@@ -70,6 +70,10 @@ interface Section {
 
 const sections = computed<Section[]>(() => {
   const query = { org_identifier: orgIdentifier.value };
+  // Raw split (no trim) to match how the rest of the app reads the flag.
+  const hideLibrary = (store.state.zoConfig?.custom_hide_menus ?? "")
+    .split(",")
+    .includes("alertLibrary");
   return [
     // "All Alerts", not "Alerts": the page title above this strip already says
     // "Alerts", so a tab repeating it names nothing. The rail's Alerts
@@ -82,7 +86,7 @@ const sections = computed<Section[]>(() => {
     },
     {
       key: "alertDestinations",
-      label: t("alert_destinations.sectionTab"),
+      label: t("alert_destinations.header"),
       icon: "location-on",
       to: { name: "alertDestinations", query },
     },
@@ -94,12 +98,16 @@ const sections = computed<Section[]>(() => {
     },
     // Last: the catalog is where you go once to fetch an alert, not where you
     // work. The rail's Reliability flyout lists these four in this same order.
-    {
-      key: "alertLibrary",
-      label: t("alert_library.sectionTab"),
-      icon: "menu-book",
-      to: { name: "alertLibrary", query },
-    },
+    ...(hideLibrary
+      ? []
+      : [
+          {
+            key: "alertLibrary",
+            label: t("alert_library.header"),
+            icon: "menu-book" as IconName,
+            to: { name: "alertLibrary", query },
+          },
+        ]),
   ];
 });
 

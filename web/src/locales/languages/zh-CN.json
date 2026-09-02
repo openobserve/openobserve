@@ -7593,7 +7593,6 @@
   "alert_library": {
     "header": "告警库",
     "subtitle": "精选的、可直接安装的告警，与您已摄取的数据相匹配",
-    "sectionTab": "库",
     "contribute": "在 GitHub 上贡献",
     "searchPlaceholder": "按名称、描述或流搜索",
     "searchLabel": "搜索告警库",
@@ -7927,7 +7926,6 @@
     "destinationsLoadError": "加载目标时出错"
   },
   "alert_destinations": {
-    "sectionTab": "目标",
     "chooseTypeTitle": "选择类型",
     "selectDestinationType": "选择目标类型",
     "connectionStepTitle": "连接",
