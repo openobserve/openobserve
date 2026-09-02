@@ -11200,7 +11200,7 @@
             "item": "Elemento",
             "versions": "Versioni"
           },
-          "versionPill": "v{version} · {count} Versione | v{version} · {count} Versioni",
+          "versionPill": "{count} Versione | {count} Versioni",
           "sourceSection": "Origine",
           "sourceTrace": "Traccia",
           "sourceSpan": "Span",

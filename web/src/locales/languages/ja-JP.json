@@ -11200,7 +11200,7 @@
             "item": "アイテム",
             "versions": "バージョン"
           },
-          "versionPill": "v{version} · {count} バージョン | v{version} · {count} バージョン",
+          "versionPill": "{count} バージョン | {count} バージョン",
           "sourceSection": "ソース",
           "sourceTrace": "トレース",
           "sourceSpan": "スパン",

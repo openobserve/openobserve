@@ -11200,7 +11200,7 @@
             "item": "Öğe",
             "versions": "Sürümler"
           },
-          "versionPill": "v{version} · {count} Sürüm | v{version} · {count} Sürüm",
+          "versionPill": "{count} Sürüm | {count} Sürüm",
           "sourceSection": "Kaynak",
           "sourceTrace": "İz",
           "sourceSpan": "Span",

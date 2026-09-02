@@ -11200,7 +11200,7 @@
             "item": "Mục",
             "versions": "Phiên bản"
           },
-          "versionPill": "v{version} · {count} phiên bản | v{version} · {count} phiên bản",
+          "versionPill": "{count} phiên bản | {count} phiên bản",
           "sourceSection": "Nguồn",
           "sourceTrace": "Trace",
           "sourceSpan": "Span",
