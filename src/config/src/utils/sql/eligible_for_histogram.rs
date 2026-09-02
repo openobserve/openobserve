@@ -51,6 +51,50 @@ mod tests {
     use super::*;
 
     #[test]
+    fn check_redundant_parentheses_do_not_change_eligibility() {
+        // A wrapped query is the same query, so it must not slip past a clause check.
+        let pairs = [
+            (
+                r#"SELECT * FROM "olympics""#,
+                r#"(SELECT * FROM "olympics")"#,
+                true,
+            ),
+            (
+                r#"SELECT * FROM "olympics" LIMIT 100"#,
+                r#"(SELECT * FROM "olympics" LIMIT 100)"#,
+                false,
+            ),
+            (
+                r#"SELECT * FROM "olympics" LIMIT 100"#,
+                r#"(SELECT * FROM "olympics") LIMIT 100"#,
+                false,
+            ),
+            (
+                r#"WITH cte AS (SELECT * FROM "olympics") SELECT * FROM cte"#,
+                r#"(WITH cte AS (SELECT * FROM "olympics") SELECT * FROM cte)"#,
+                false,
+            ),
+            (
+                r#"SELECT * FROM "a" JOIN "b" ON a.id = b.id"#,
+                r#"(SELECT * FROM "a" JOIN "b" ON a.id = b.id)"#,
+                false,
+            ),
+        ];
+        for (bare, wrapped, expected) in pairs {
+            assert_eq!(
+                is_eligible_for_histogram(bare, false).unwrap().0,
+                expected,
+                "unexpected eligibility for {bare}"
+            );
+            assert_eq!(
+                is_eligible_for_histogram(wrapped, false).unwrap().0,
+                expected,
+                "eligibility diverged for {wrapped}"
+            );
+        }
+    }
+
+    #[test]
     fn check_is_eligible_for_histogram_for_queries_should_be_true() {
         let queries = [
             r#"SELECT * FROM "olympics" WHERE _timestamp >= 1716854400000 AND _timestamp <= 1716940800000"#,

@@ -199,6 +199,13 @@ impl VisitorMut for TrackTotalHitsVisitor {
                     pipe_operators: vec![],
                 };
             }
+            // Rewrite the wrapped query here: `with` is visited before `body`, so continuing
+            // the walk would reach the CTE definitions and count one of those instead.
+            SetExpr::Query(inner) => {
+                let inner = inner.as_mut();
+                query.order_by = None;
+                return self.pre_visit_query(inner);
+            }
             _ => {}
         }
         ControlFlow::Break(())
@@ -346,5 +353,75 @@ mod tests {
         // For DISTINCT queries with multiple columns, we wrap in a subquery to count results
         let expected_sql = "SELECT count(*) AS zo_sql_num FROM (SELECT DISTINCT unique_id, continent, bronze_medals FROM oly WHERE continent = 'ASI')";
         assert_eq!(statement.to_string(), expected_sql);
+    }
+
+    fn rewritten(sql: &str) -> String {
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let mut track_total_hits_visitor = TrackTotalHitsVisitor::new();
+        let _ = statement.visit(&mut track_total_hits_visitor);
+        statement.to_string()
+    }
+
+    #[test]
+    fn test_track_total_hits_parenthesized_query() {
+        assert_eq!(
+            rewritten("(SELECT * FROM t WHERE name = 'a')"),
+            "(SELECT count(*) AS zo_sql_num FROM t WHERE name = 'a')"
+        );
+    }
+
+    #[test]
+    fn test_track_total_hits_nested_parentheses() {
+        assert_eq!(
+            rewritten("((SELECT * FROM t))"),
+            "((SELECT count(*) AS zo_sql_num FROM t))"
+        );
+    }
+
+    #[test]
+    fn test_track_total_hits_parenthesized_query_drops_outer_order_by() {
+        // The count projects no `name`, so an ORDER BY left outside would not resolve.
+        assert_eq!(
+            rewritten("(SELECT * FROM t) ORDER BY name"),
+            "(SELECT count(*) AS zo_sql_num FROM t)"
+        );
+    }
+
+    #[test]
+    fn test_track_total_hits_parenthesized_query_leaves_inner_subquery_alone() {
+        // Only the outermost SELECT becomes a count, exactly as without the parentheses.
+        assert_eq!(
+            rewritten("(SELECT * FROM (SELECT * FROM u))"),
+            "(SELECT count(*) AS zo_sql_num FROM (SELECT * FROM u))"
+        );
+    }
+
+    #[test]
+    fn test_track_total_hits_parenthesized_query_leaves_cte_definitions_alone() {
+        // `with` is visited before `body`, so the count must not land on a CTE.
+        assert_eq!(
+            rewritten("WITH cte AS (SELECT * FROM t) (SELECT * FROM cte WHERE x = 1)"),
+            "WITH cte AS (SELECT * FROM t) (SELECT count(*) AS zo_sql_num FROM cte WHERE x = 1)"
+        );
+        assert_eq!(
+            rewritten("(WITH cte AS (SELECT * FROM t) SELECT * FROM cte)"),
+            "(WITH cte AS (SELECT * FROM t) SELECT count(*) AS zo_sql_num FROM cte)"
+        );
+    }
+
+    #[test]
+    fn test_track_total_hits_parenthesized_query_matches_bare_form() {
+        for (bare, wrapped) in [
+            ("SELECT * FROM t", "(SELECT * FROM t)"),
+            (
+                "SELECT * FROM t WHERE a = 1 LIMIT 5",
+                "(SELECT * FROM t WHERE a = 1 LIMIT 5)",
+            ),
+        ] {
+            assert_eq!(format!("({})", rewritten(bare)), rewritten(wrapped));
+        }
     }
 }

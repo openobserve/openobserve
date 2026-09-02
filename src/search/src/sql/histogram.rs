@@ -18,7 +18,7 @@ use config::{
 };
 use infra::errors::{Error, ErrorCodes};
 use sqlparser::{
-    ast::{SetExpr, Statement},
+    ast::{Query, Select, SetExpr, Statement},
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
@@ -206,7 +206,7 @@ fn multi_stream_histogram_query(
 /// Extract WHERE clause from SQL statement
 fn extract_where_clause(statement: &Statement) -> Result<String, Error> {
     if let Statement::Query(query) = statement {
-        if let SetExpr::Select(select) = &*query.body {
+        if let Some(select) = innermost_select(query) {
             // Extract WHERE clause
             let where_clause = select
                 .selection
@@ -226,6 +226,18 @@ fn extract_where_clause(statement: &Statement) -> Result<String, Error> {
             "Statement is not a query".to_string(),
         ));
         Err(error)
+    }
+}
+
+/// The SELECT a query really runs, seen through however many parentheses wrap it.
+fn innermost_select(query: &Query) -> Option<&Select> {
+    let mut body = query.body.as_ref();
+    loop {
+        match body {
+            SetExpr::Select(select) => return Some(select),
+            SetExpr::Query(inner) => body = inner.body.as_ref(),
+            _ => return None,
+        }
     }
 }
 
@@ -558,5 +570,48 @@ mod tests {
         let result = single_stream_histogram_query(&statements, &stream_names, true, None).unwrap();
         // WHERE clause must be absent when is_sub_query is true
         assert!(!result.contains("WHERE"), "expected no WHERE: {result}");
+    }
+
+    #[test]
+    fn test_histogram_query_matches_across_redundant_parentheses() {
+        let streams = vec!["fortigate".to_string()];
+        for (bare, wrapped) in [
+            (
+                r#"SELECT * FROM "fortigate""#,
+                r#"(SELECT * FROM "fortigate")"#,
+            ),
+            (
+                r#"SELECT * FROM "fortigate" WHERE level = 'error'"#,
+                r#"((SELECT * FROM "fortigate" WHERE level = 'error'))"#,
+            ),
+        ] {
+            assert_eq!(
+                convert_to_histogram_query(bare, &streams, false, None).unwrap(),
+                convert_to_histogram_query(wrapped, &streams, false, None).unwrap(),
+            );
+        }
+    }
+
+    #[test]
+    fn test_histogram_query_keeps_where_clause_inside_parentheses() {
+        let result = convert_to_histogram_query(
+            r#"(SELECT * FROM "fortigate" WHERE level = 'error')"#,
+            &["fortigate".to_string()],
+            false,
+            None,
+        )
+        .unwrap();
+        assert!(result.contains("WHERE level = 'error'"), "got: {result}");
+    }
+
+    #[test]
+    fn test_histogram_query_still_rejects_a_set_operation() {
+        // Unwrapping parentheses must not make a UNION look like a plain SELECT.
+        let statements = Parser::parse_sql(
+            &PostgreSqlDialect {},
+            "(SELECT * FROM a) UNION (SELECT * FROM b)",
+        )
+        .unwrap();
+        assert!(extract_where_clause(statements.first().unwrap()).is_err());
     }
 }

@@ -63,7 +63,7 @@ pub(super) fn is_aggregate_expression(expr: &Expr) -> bool {
 }
 
 pub(super) fn has_group_by(query: &Query) -> bool {
-    if let SetExpr::Select(ref select) = *query.body {
+    if let SetExpr::Select(ref select) = *innermost_query(query).body {
         match &select.group_by {
             GroupByExpr::All(v) => !v.is_empty(),
             GroupByExpr::Expressions(v, _) => !v.is_empty(),
@@ -74,7 +74,7 @@ pub(super) fn has_group_by(query: &Query) -> bool {
 }
 
 pub(super) fn has_join(query: &Query) -> bool {
-    if let SetExpr::Select(ref select) = *query.body {
+    if let SetExpr::Select(ref select) = *innermost_query(query).body {
         select.from.len() > 1
             || select
                 .from
@@ -86,9 +86,32 @@ pub(super) fn has_join(query: &Query) -> bool {
 }
 
 pub(super) fn has_cte(query: &Query) -> bool {
-    query.with.is_some()
+    at_any_depth(query, |query| query.with.is_some())
 }
 
 pub(super) fn has_limit(query: &Query) -> bool {
-    query.limit_clause.is_some()
+    at_any_depth(query, |query| query.limit_clause.is_some())
+}
+
+/// The query that redundant parentheses wrap, since they carry no meaning of their own.
+fn innermost_query(query: &Query) -> &Query {
+    let mut current = query;
+    while let SetExpr::Query(inner) = current.body.as_ref() {
+        current = inner;
+    }
+    current
+}
+
+/// Either side of a redundant pair of parentheses can hold the clause, so test every level.
+fn at_any_depth(query: &Query, predicate: fn(&Query) -> bool) -> bool {
+    let mut current = query;
+    loop {
+        if predicate(current) {
+            return true;
+        }
+        match current.body.as_ref() {
+            SetExpr::Query(inner) => current = inner,
+            _ => return false,
+        }
+    }
 }

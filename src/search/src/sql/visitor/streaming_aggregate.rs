@@ -21,7 +21,7 @@ use std::{
 use config::TIMESTAMP_COL_NAME;
 use sqlparser::ast::{
     BinaryOperator, Expr, Function, FunctionArg, FunctionArgExpr, FunctionArguments, GroupByExpr,
-    Query, SelectItem, SetExpr, Statement, TableFactor, Visitor,
+    Query, Select, SelectItem, SetExpr, Statement, TableFactor, Visitor,
 };
 
 use super::utils::get_object_name_value;
@@ -813,7 +813,7 @@ impl Visitor for CacheAggregationVisitor {
         // Determine if this is the main query
         let is_main_query = query.with.is_some() || (query.with.is_none() && is_outermost);
 
-        if let SetExpr::Select(select) = query.body.as_ref() {
+        if let Some(select) = select_within_parentheses(query) {
             // Process FROM clause first to handle subqueries
             for table in &select.from {
                 self.pre_visit_table_factor(&table.relation)?;
@@ -871,6 +871,20 @@ pub fn matches_streaming_aggregate_pattern(sql: &str) -> Result<bool, String> {
     }
 }
 
+/// The SELECT this query runs, seen through parentheses that add nothing of their own.
+fn select_within_parentheses(query: &Query) -> Option<&Select> {
+    let mut body = query.body.as_ref();
+    loop {
+        match body {
+            SetExpr::Select(select) => return Some(select),
+            // A CTE declared inside the parentheses would go unanalyzed, and matching the
+            // pattern without it could enable the rewrite for a query it does not fit.
+            SetExpr::Query(inner) if inner.with.is_none() => body = inner.body.as_ref(),
+            _ => return None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -892,6 +906,35 @@ mod tests {
 
         let result = matches_streaming_aggregate_pattern(sql).unwrap();
         assert!(result);
+    }
+
+    #[test]
+    fn test_parenthesized_query_matches_the_same_pattern() {
+        let inner = r#"
+            SELECT k8s_namespace_name, SUM(request_count) as total_requests
+            FROM (
+                SELECT k8s_namespace_name, count(_timestamp) as request_count
+                FROM "default"
+                WHERE k8s_namespace_name IS NOT NULL
+                GROUP BY k8s_namespace_name
+            )
+            GROUP BY k8s_namespace_name
+            ORDER BY total_requests DESC
+            LIMIT 10
+        "#;
+
+        assert!(matches_streaming_aggregate_pattern(inner).unwrap());
+        assert!(matches_streaming_aggregate_pattern(&format!("({inner})")).unwrap());
+        assert!(matches_streaming_aggregate_pattern(&format!("(({inner}))")).unwrap());
+    }
+
+    #[test]
+    fn test_parenthesized_cte_is_left_unmatched() {
+        // The CTE inside the parentheses is never analyzed, so the pattern must not match.
+        let sql = r#"(WITH cte AS (SELECT k8s_namespace_name FROM "default")
+                      SELECT k8s_namespace_name FROM cte GROUP BY k8s_namespace_name)"#;
+
+        assert!(!matches_streaming_aggregate_pattern(sql).unwrap());
     }
 
     #[test]

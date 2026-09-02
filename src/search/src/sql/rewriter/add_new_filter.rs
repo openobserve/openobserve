@@ -112,6 +112,13 @@ impl VisitorMut for AddNewFiltersWithAndOperatorVisitor {
                     });
                 }
             },
+            // Filter the wrapped query here, then stop: continuing the walk would reach it a
+            // second time and conjoin the same filter twice.
+            SetExpr::Query(inner) => {
+                let inner = inner.as_mut();
+                let _ = self.pre_visit_query(inner);
+                return ControlFlow::Break(());
+            }
             _ => {
                 return ControlFlow::Break(());
             }
@@ -296,5 +303,30 @@ mod tests {
 
         // we support this type of query
         assert_eq!(result, sql.to_string());
+    }
+
+    #[test]
+    fn test_add_new_filters_reaches_a_parenthesized_query() {
+        // Parentheses used to end the walk here, dropping the filter without a word.
+        let filters = HashMap::from([("k8s_namespace".to_string(), "prod".to_string())]);
+        let result =
+            add_new_filters_with_and_operator("(SELECT * FROM t WHERE a = 1)", filters).unwrap();
+
+        assert_eq!(
+            result,
+            "(SELECT * FROM t WHERE a = 1 AND k8s_namespace = 'prod')"
+        );
+    }
+
+    #[test]
+    fn test_add_new_filters_applies_once_to_a_nested_parenthesized_query() {
+        let filters = HashMap::from([("k8s_namespace".to_string(), "prod".to_string())]);
+        let result =
+            add_new_filters_with_and_operator("((SELECT * FROM t WHERE a = 1))", filters).unwrap();
+
+        assert_eq!(
+            result,
+            "((SELECT * FROM t WHERE a = 1 AND k8s_namespace = 'prod'))"
+        );
     }
 }

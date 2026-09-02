@@ -18,7 +18,7 @@ use std::ops::ControlFlow;
 use config::{TIMESTAMP_COL_NAME, utils::sql::is_complex_query_stmt};
 use infra::errors::Error;
 use sqlparser::{
-    ast::{Expr, Ident, OrderByExpr, OrderByKind, Query, VisitMut, VisitorMut},
+    ast::{Expr, Ident, OrderByExpr, OrderByKind, Query, SetExpr, VisitMut, VisitorMut},
     dialect::PostgreSqlDialect,
     parser::Parser,
 };
@@ -52,7 +52,9 @@ impl VisitorMut for AddOrderingTermVisitor {
     type Break = ();
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if query.order_by.is_none() {
+        // An ORDER BY inside the parentheses still orders this query, and one added outside
+        // them would override it.
+        if !orders_itself(query) {
             query.order_by = Some(sqlparser::ast::OrderBy {
                 kind: OrderByKind::Expressions(vec![OrderByExpr {
                     expr: Expr::Identifier(Ident::new(self.field.clone())),
@@ -65,7 +67,22 @@ impl VisitorMut for AddOrderingTermVisitor {
                 interpolate: None,
             });
         }
-        ControlFlow::Continue(())
+        // Only the outermost query is ordered; continuing would order each nesting level too.
+        ControlFlow::Break(())
+    }
+}
+
+/// Whether the query already carries its own ORDER BY, at any parenthesis depth.
+fn orders_itself(query: &Query) -> bool {
+    let mut current = query;
+    loop {
+        if current.order_by.is_some() {
+            return true;
+        }
+        match current.body.as_ref() {
+            SetExpr::Query(inner) => current = inner,
+            _ => return false,
+        }
     }
 }
 
@@ -155,5 +172,28 @@ mod tests {
     fn test_check_or_add_order_by_timestamp_invalid_sql() {
         let result = check_or_add_order_by_timestamp("NOT VALID SQL !!!", true);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_parenthesized_query() {
+        assert_eq!(
+            check_or_add_order_by_timestamp("(SELECT * FROM users)", true).unwrap(),
+            "(SELECT * FROM users) ORDER BY _timestamp ASC"
+        );
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_keeps_ordering_inside_parentheses() {
+        // The inner ORDER BY is the user's; adding one outside would silently override it.
+        let sql = "(SELECT * FROM users ORDER BY age ASC)";
+        assert_eq!(check_or_add_order_by_timestamp(sql, true).unwrap(), sql);
+    }
+
+    #[test]
+    fn test_check_or_add_order_by_timestamp_orders_only_the_outermost_query() {
+        assert_eq!(
+            check_or_add_order_by_timestamp("((SELECT * FROM users))", false).unwrap(),
+            "((SELECT * FROM users)) ORDER BY _timestamp DESC"
+        );
     }
 }
