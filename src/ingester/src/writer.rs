@@ -448,9 +448,7 @@ impl Writer {
         // Bulk convert to Arrow RecordBatch
         let batch_entries = entries
             .iter()
-            .map(|entry| {
-                entry.into_batch(self.key.stream_type.clone(), entry.schema.clone().unwrap())
-            })
+            .map(|entry| entry.into_batch(self.key.stream_type.clone(), entry_schema(entry)?))
             .collect::<Result<Vec<_>>>()?;
 
         // Serialize entries to bytes for WAL writing, reusing the RecordBatch
@@ -531,6 +529,7 @@ impl Writer {
             if batch_entry.data.num_rows() == 0 {
                 continue;
             }
+            // preprocess_batch rejected any schema-less entry before the WAL write above
             mem.write(entry.schema.clone().unwrap(), entry, batch_entry)?;
             tokio::task::coop::consume_budget().await;
         }
@@ -748,6 +747,17 @@ impl MemorySize for WriterKey {
     }
 }
 
+/// Only `Writer::write` populates the schema, so a batch assembled elsewhere may lack it.
+fn entry_schema(entry: &Entry) -> Result<Arc<Schema>> {
+    entry
+        .schema
+        .clone()
+        .ok_or_else(|| Error::MissingSchemaError {
+            org_id: entry.org_id.to_string(),
+            stream: entry.stream.to_string(),
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -770,5 +780,24 @@ mod tests {
         let key = WriterKey::new_replay("abc", "xyz");
         let min_expected = std::mem::size_of::<WriterKey>() + "abc".len() + "xyz".len();
         assert_eq!(key.mem_size(), min_expected);
+    }
+
+    #[test]
+    fn entry_schema_returns_the_schema_when_present() {
+        let mut entry = Entry::new();
+        entry.schema = Some(Arc::new(Schema::empty()));
+        assert!(entry_schema(&entry).is_ok());
+    }
+
+    #[test]
+    fn entry_schema_names_the_stream_when_absent() {
+        let mut entry = Entry::new();
+        entry.org_id = "default".into();
+        entry.stream = "k8s_logs".into();
+        let err = entry_schema(&entry).unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Entry for stream default/k8s_logs reached the writer without a schema"
+        );
     }
 }

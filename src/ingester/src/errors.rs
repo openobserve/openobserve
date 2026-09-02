@@ -122,6 +122,15 @@ pub enum Error {
     MemoryCircuitBreakerError {},
     #[snafu(display("DiskCircuitBreakerError"))]
     DiskCircuitBreakerError {},
+    #[snafu(display(
+        "Entry for stream {}/{} reached the writer without a schema",
+        org_id,
+        stream
+    ))]
+    MissingSchemaError {
+        org_id: String,
+        stream: String,
+    },
     ExternalError {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
@@ -147,6 +156,18 @@ mod tests {
     fn test_disk_circuit_breaker_error_display() {
         let e = Error::DiskCircuitBreakerError {};
         assert_eq!(e.to_string(), "DiskCircuitBreakerError");
+    }
+
+    #[test]
+    fn test_missing_schema_error_display() {
+        let e = Error::MissingSchemaError {
+            org_id: "default".to_string(),
+            stream: "k8s_logs".to_string(),
+        };
+        assert_eq!(
+            e.to_string(),
+            "Entry for stream default/k8s_logs reached the writer without a schema"
+        );
     }
 
     #[test]
