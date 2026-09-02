@@ -12674,7 +12674,6 @@
     "rotationNameHint": "Escalation levels refer to this position by name. Renaming is safe.",
     "rotationNameClash": "{name} already uses this name.",
     "rotationSectionRules": "Shift rules",
-    "rotationRulesHint": "Several rules is follow-the-sun — one position, different people at different hours.",
     "rotationNeedsRules": "Add a shift rule — a rotation with none pages nobody.",
     "rotationRuleCount": "{count} rule | {count} rules",
     "rotationOnCallNow": "On call",
