@@ -232,6 +232,127 @@ pattern: `onUnmounted` cancels all field traceIds.
 So per "expand fields → navigate" the leak went from **~20 orphaned in-flight
 streams (each retaining the component) → 0**. Lint + `vue-tsc` clean.
 
+### Logs interaction-scenario battery (live, real `default` stream, 19.5B docs)
+
+Beyond components, the leak-prone *interaction sequences* were live-cycled with
+full instrumentation. All **clean** (`roObservingDetached:0`, `roStillObserving`
+flat, `ws`/`es`/`io`/`mo` flat — no accumulation):
+
+| Scenario | Result |
+|---|---|
+| **Rapid re-search** ×8 | observers/sockets/in-flight flat; only completed AbortControllers accrue (GC'd) |
+| **Tab switch** Search↔Visualize↔Patterns ×3 | `roStillObserving` flat per tab (113/35/38); `ro` net-count +1/round is unobserve-disposal (TanStack Virtual), confirmed by `ro` netCount 46 ≫ `roStillObserving` 38 |
+| **Detail-row open/close** ×5 | `io` flat, `roObservingDetached:0`; `win`/`doc` drift *negative* (over-removal, not a leak) |
+| **Field expand/collapse** ×5 (4 fields) | `roStillObserving:38` flat; `acLive` +4/cycle = completed field controllers (GC'd) |
+
+Only the **unmount** path (fix #7) leaked; all in-page interaction loops are clean.
+
+### Heap-growth investigation (dev 215→404 MB) — dev-build artifact, not a leak
+
+Random interaction on the dev build grew post-GC heap 215 → 325 → 404 MB. Snapshot
+diff showed the growth was the **Vue reactivity graph** (`object|Object` +160k,
+`closure|get` +145k, `Context/scope` +100k, `AccessorPair`, `Dep`) — *not* result
+strings (`ExternalStringData` went **down**, i.e. results are replaced/bounded) and
+*not* DevTools-console pinning (blocking-BFS: only **1.7%** held via DevTools).
+
+Decisive **production-build controlled soak** (10 identical searches, forced GC):
+
+| build | post-GC heap over 10 identical searches |
+|---|---|
+| production | **121 → 122 MB (+1 MB, flat)** |
+| dev | +80–110 MB per interaction batch |
+
+→ The dev growth is Vue dev-mode reactivity overhead (~2–3× per reactive object) +
+HMR-retained module state + unminified code — the same artifact class as the
+dashboard `+28 MB/open` (dev) vs `+0.45` (prod). **On production the Logs page does
+not accumulate; nothing to fix.**
+
+## Traces page deep-dive — 2 leaks found & fixed (fixes #8–#9)
+
+Same lens as logs (streaming without unmount cancel). Streaming consumers audited:
+`Index.vue` (cancels in `onDeactivated`+`onUnmounted` ✓), `ServicesCatalog.vue`
+(cancels in `onUnmounted` ✓), `useLLMInsights`→`LLMInsightsDashboard` (`cancelAll()`
+✓). Observers (`SearchResult`, `SpanBlock`, `TraceDetailsSidebar`, `LLMErrorTable`
+IO) disconnected on unmount; `ServiceGraph` listeners are element-lifetime;
+`TraceDetails` resize listener is commented-out dead code. Two real gaps:
+
+**Fix #8 — `useVersionCompare.ts`** (LLM version-compare): its `makeRunner`
+raw-sample fetch used a **local, untracked traceId with no cancel path**, and the
+consumer's `cancelAll()` only covered `useLLMInsights`'s traceIds — not this one or
+the two internal arms. Added traceId tracking + a `cancel()` (aborts the raw-sample
+stream + `armA/armB.cancelAll()`), and called it in `LLMInsightsDashboard.onUnmounted`.
+
+**Fix #9 — `LLMErrorTable.vue`**: consumed `useLLMStreamQuery` (which tracks
+traceIds + exposes `cancelAll`) but destructured only `executeQuery` and its
+`onUnmounted` only disconnected the IntersectionObserver — the in-flight
+error-spans query was never cancelled. Added `cancelAll` + called it on unmount.
+
+Both lint + `vue-tsc` clean.
+
+## App-wide streaming-cancel scan (fixes #10–#11)
+
+Rather than page-by-page, scanned **every** consumer of `fetchQueryDataWithHttpStream`
+for missing unmount cancellation. Two more real leaks (both stream with a local
+traceId and never cancel on unmount):
+
+**Fix #10 — `TelemetryCorrelationDashboard.vue`**: tracked `currentTracesStreamTraceId`
+and cancelled it on *re-entry*, but had **no lifecycle hooks at all** — an in-flight
+traces stream leaked on unmount. Added `onUnmounted` cancelling it.
+
+**Fix #11 — `PlayerTracesTab.vue`** (RUM session player): streamed trace metadata
+with a local, untracked traceId and only had `onMounted`. Added traceId tracking +
+`onUnmounted` cancel.
+
+Verified-clean consumers (cancel on unmount / deactivate): `usePanelDataLoader`,
+`useMetricsExplorerGrid`, `VariablesValueSelector`, `useStreamingSearch`,
+`useValuesWebSocket`, `useDurationPercentiles`, `useCorrelatedLogs`, traces `Index`
+/`ServicesCatalog`/`LLMInsightsDashboard`. `PreviewAlert.vue` doesn't stream
+(comment refs only). **Minor/bounded, not fixed:** `useCorrelatedTracesStream`
+(`resolveTracesStream`) — a cache-backed one-shot stream-name resolver that fires
+only on cache-miss.
+
+**Total: 11 leaks fixed** (7 committed in `21b78c96f4` + fixes #8–#11 uncommitted).
+
+## App-wide sweep of the non-streaming classes — all clean
+
+After the streaming class, every remaining leak class was swept across `web/src`:
+
+| Class | Result |
+|---|---|
+| Observers (Resize/Mutation/Intersection/Performance) | all disconnect on unmount (`ODialog` via `watchEffect` cleanup) |
+| `setInterval` | all paired with `clearInterval` on unmount |
+| window/document/visualViewport listeners | all removed on unmount (`ODropdown`/`OPopover` extra listener is a once-guarded module singleton) |
+| `onMounted`-returns-cleanup trap (Vue ignores the return) | **none** (the original `RichTextInput` case was fixed earlier) |
+| `requestAnimationFrame` | all one-shot; **no** self-rescheduling loops (incl. `OTable.measureFlexFill`) |
+
+**The streaming-cancel-on-unmount class was the last leak class with real defects
+(6 of the 11 fixes). All other classes are clean app-wide.**
+
+## Does route change clean the heap? (verified)
+
+Heap release on route change **depends on the route's `meta.keepAlive`** flag
+(`composables/shared/router.ts`), confirmed empirically with `WeakRef` liveness +
+detached-DOM counting on the production build:
+
+| Route type | `keepAlive` | Heap on route change |
+|---|---|---|
+| dashboards, alerts, streams, iam, settings, … | `false` | **cleaned** — component unmounts, DOM collected, heap released after GC (WeakRef: elements collected) |
+| **logs, home, traces, metricsEditor, dbmDatabases** | `true` | **not cleaned — by design** — kept alive as **one bounded cached instance** for fast re-entry |
+
+For **logs** (`keepAlive:true`, has `onActivated`): after navigating away + GC the
+logs DOM survives (`WeakRef` alive, detached), retained via **Monaco's
+context/worker** (`query-editor` → `_contextViewHandler` → `vscodeWindowId` →
+`DedicatedWorkerMessagingProxy`). Decisive **non-accumulation** check:
+
+| detached nodes | after 1 route-change | after 3 route-changes |
+|---|---:|---:|
+| `logs-search-index-list` | 1 | 1 |
+| `query-editor` | 6 | 6 |
+| total detached | 3,377 | 3,324 |
+
+Flat across cycles (a leak would be ~3×), and heap even dropped 172→122 MB. So the
+retention is the intended single kept-alive instance — **bounded, not a leak.**
+
 ## Benchmarks — before → after
 
 Two eras: the **branch's earlier fixes** (already committed, documented in
