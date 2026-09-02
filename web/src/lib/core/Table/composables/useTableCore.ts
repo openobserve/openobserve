@@ -57,6 +57,8 @@ export function useTableCore<TData>(
     initialColumnSizes?: Record<string, number> | null;
     /** When true, do not auto-reset page index when data changes */
     keepPageOnDataChange?: boolean;
+    /** Pivot row-field columns, left-pinned so merged row headers stay in view. */
+    pivotRowColumns?: OTableColumnDef<TData>[];
   },
   _emit?: unknown,
 ) {
@@ -186,7 +188,7 @@ export function useTableCore<TData>(
 
   // Column pinning — auto-pin isAction columns to right, pivotRowColumns to left, plus explicitly pinned columns
   const pivotRowColumnIds = computed(() => {
-    const raw = (props as any).pivotRowColumns as any[] | undefined;
+    const raw = props.pivotRowColumns;
     if (!raw || !raw.length) return undefined;
     // Fall back field-first, matching how consumers derive column ids
     // (id: field ?? name) — an id-less entry would otherwise pin `undefined`
