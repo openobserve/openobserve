@@ -18,7 +18,7 @@ use std::time::Duration;
 use axum::{
     Router,
     extract::{DefaultBodyLimit, FromRequestParts, Path, Request},
-    http::{Method, StatusCode, Uri, header},
+    http::{HeaderMap, Method, StatusCode, Uri, header},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, patch, post, put},
@@ -173,8 +173,16 @@ pub(crate) fn is_origin_allowed(request_origin: &[u8], web_url: &str) -> bool {
 
 /// If `resp` is a 401 for an MCP endpoint, attach the RFC 9728 `WWW-Authenticate`
 /// header so MCP clients start the OAuth flow. No-op for every other route/status.
-fn maybe_add_mcp_www_authenticate(uri: &Uri, resp: Response) -> Response {
+fn maybe_add_mcp_www_authenticate(uri: &Uri, headers: &HeaderMap, resp: Response) -> Response {
     if resp.status() != StatusCode::UNAUTHORIZED {
+        return resp;
+    }
+    // A rejected Basic credential is wrong, not missing; challenging it sends clients to SSO.
+    if headers
+        .get(header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.trim_start().starts_with("Basic "))
+    {
         return resp;
     }
     // MCP endpoint == `/{org}/mcp`. `auth_middleware` runs inside the
@@ -259,7 +267,9 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
     let uri = req_data.uri.clone();
     let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
         Ok(info) => info,
-        Err(e) => return maybe_add_mcp_www_authenticate(&uri, e.into_response()),
+        Err(e) => {
+            return maybe_add_mcp_www_authenticate(&uri, &req_data.headers, e.into_response());
+        }
     };
 
     // Validate authentication using extracted data
@@ -282,7 +292,7 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
 
             next.run(Request::from_parts(parts, body)).await
         }
-        Err(e) => maybe_add_mcp_www_authenticate(&uri, e.into_response()),
+        Err(e) => maybe_add_mcp_www_authenticate(&uri, &req_data.headers, e.into_response()),
     }
 }
 
@@ -2238,7 +2248,7 @@ mod tests {
     fn mcp_www_authenticate_skips_non_401() {
         let uri: Uri = "/default/mcp".parse().unwrap();
         let resp = (StatusCode::OK, "ok").into_response();
-        let out = maybe_add_mcp_www_authenticate(&uri, resp);
+        let out = maybe_add_mcp_www_authenticate(&uri, &HeaderMap::new(), resp);
         assert!(!out.headers().contains_key(header::WWW_AUTHENTICATE));
     }
 
@@ -2252,7 +2262,7 @@ mod tests {
         ] {
             let uri: Uri = p.parse().unwrap();
             let resp = (StatusCode::UNAUTHORIZED, "no").into_response();
-            let out = maybe_add_mcp_www_authenticate(&uri, resp);
+            let out = maybe_add_mcp_www_authenticate(&uri, &HeaderMap::new(), resp);
             assert!(
                 !out.headers().contains_key(header::WWW_AUTHENTICATE),
                 "non-mcp path {p} must not carry an MCP WWW-Authenticate challenge"
@@ -2279,7 +2289,7 @@ mod tests {
                 "//mcp".parse().unwrap()
             });
             let resp = (StatusCode::UNAUTHORIZED, "no").into_response();
-            let out = maybe_add_mcp_www_authenticate(&uri, resp);
+            let out = maybe_add_mcp_www_authenticate(&uri, &HeaderMap::new(), resp);
             if let Some(v) = out.headers().get(header::WWW_AUTHENTICATE) {
                 let v = v.to_str().unwrap();
                 assert!(
@@ -2291,10 +2301,44 @@ mod tests {
     }
 
     #[test]
+    fn mcp_www_authenticate_skips_rejected_basic_credentials() {
+        // A caller that sent Basic auth already chose its credential.
+        let uri: Uri = "/default/mcp".parse().unwrap();
+        for v in ["Basic Zm9vOmJhcg==", "  Basic Zm9vOmJhcg=="] {
+            let mut headers = HeaderMap::new();
+            headers.insert(header::AUTHORIZATION, v.parse().unwrap());
+            let resp = (StatusCode::UNAUTHORIZED, "no").into_response();
+            let out = maybe_add_mcp_www_authenticate(&uri, &headers, resp);
+            assert!(
+                !out.headers().contains_key(header::WWW_AUTHENTICATE),
+                "rejected Basic credential {v:?} must not be answered with an OAuth challenge"
+            );
+        }
+    }
+
+    #[test]
+    fn mcp_www_authenticate_still_challenges_bearer_and_missing_auth() {
+        // An absent or Bearer credential is the case RFC 9728 discovery exists for.
+        let uri: Uri = "/default/mcp".parse().unwrap();
+        for v in [None, Some("Bearer expired-token")] {
+            let mut headers = HeaderMap::new();
+            if let Some(v) = v {
+                headers.insert(header::AUTHORIZATION, v.parse().unwrap());
+            }
+            let resp = (StatusCode::UNAUTHORIZED, "no").into_response();
+            let out = maybe_add_mcp_www_authenticate(&uri, &headers, resp);
+            // OSS compiles the challenge out entirely, so assert only its shape.
+            if let Some(h) = out.headers().get(header::WWW_AUTHENTICATE) {
+                assert!(h.to_str().unwrap().contains("resource_metadata="));
+            }
+        }
+    }
+
+    #[test]
     fn mcp_www_authenticate_targets_mcp_endpoint() {
         let uri: Uri = "/default/mcp".parse().unwrap();
         let resp = (StatusCode::UNAUTHORIZED, "no").into_response();
-        let out = maybe_add_mcp_www_authenticate(&uri, resp);
+        let out = maybe_add_mcp_www_authenticate(&uri, &HeaderMap::new(), resp);
         // Enterprise adds the RFC 9728 challenge (when dex is enabled); OSS never does.
         // Assert only that the path classification did not panic and that any header
         // present is the expected RFC 9728 shape.

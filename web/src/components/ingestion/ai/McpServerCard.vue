@@ -23,12 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      just the URL, no header; the server's OAuth discovery drives the login.
      Enterprise/Cloud only: the discovery endpoints are compiled out of the OSS
      build (they 404), so the tab is hidden there and token mode is the default.
-   • Access token — Basic auth. Defaults to the user's own credentials
-     ([BASIC_PASSCODE], masked by CopyContent) as a quick start; a one-click
-     "Generate" creates a scoped, read-only service account and injects its
-     show-once token into every snippet. The generate button additionally needs
-     rbac + service accounts (see useMcpCredential), so on OSS the quick-start
-     passcode is the only path — which works, and the snippets are identical.
+   • Access token — Basic auth. A one-click "Generate" creates a read-only
+     service account and injects its show-once token into every snippet; until
+     then the snippets carry an inert placeholder. The credential MUST be a user
+     or service account — the org ingestion token (`o2oi_`) that fills
+     [BASIC_PASSCODE] elsewhere in Ingestion is scoped to ingestion routes and
+     is rejected on /mcp, so it is never used here.
 
   Each client's config is produced by a single build(endpoint, auth) function so
   the OAuth (auth=null → no header) and token variants can never drift.
@@ -69,16 +69,13 @@ const oauthAvailable = config.isEnterprise == "true" || config.isCloud == "true"
 // "oauth" (default, recommended where available) | "token".
 const authMode = ref<"oauth" | "token">(oauthAvailable ? "oauth" : "token");
 
-// The Authorization header VALUE injected into token-mode snippets:
-//  • generated credential → real base64(email:token), shown once;
-//  • otherwise → the [BASIC_PASSCODE] placeholder, which CopyContent masks on
-//    screen and substitutes with the user's own passcode on copy.
-// OAuth mode passes null so build() omits the header entirely.
+// Never [BASIC_PASSCODE] here: it expands to the org ingestion token, which /mcp rejects.
+const AUTH_PLACEHOLDER = "Basic <BASE64_OF_EMAIL:TOKEN>";
 const tokenAuthValue = computed(() => {
   if (credential.value) {
     return `Basic ${b64EncodeStandard(`${credential.value.email}:${credential.value.token}`)}`;
   }
-  return "Basic [BASIC_PASSCODE]";
+  return AUTH_PLACEHOLDER;
 });
 const authValue = computed(() => (authMode.value === "oauth" ? null : tokenAuthValue.value));
 
@@ -385,6 +382,13 @@ const openDocs = () => {
             {{ t("ingestion.mcp.credential.generate") }}
           </OButton>
         </div>
+        <p
+          v-if="!canGenerate()"
+          class="text-text-secondary"
+          data-test="ai-integrations-mcp-credential-unavailable"
+        >
+          {{ t("ingestion.mcp.credential.unavailable") }}
+        </p>
         <p v-if="genError" class="text-error" data-test="ai-integrations-mcp-credential-error">
           {{ genError }}
         </p>

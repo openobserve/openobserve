@@ -21,14 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   McpServerCard (copy/paste client configs) under the standard IAM page header.
 -->
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import McpServerCard from "@/components/ingestion/ai/McpServerCard.vue";
 import useIngestion from "@/composables/useIngestion";
-import organizationsService from "@/services/organizations";
-import { b64EncodeStandard } from "@/utils/zincutils";
 import type { CardSubstitutions } from "@/components/ingestion/ai/content/renderMarkdown";
 
 const { t } = useI18nTyped();
@@ -37,34 +35,12 @@ const { endpoint } = useIngestion();
 
 const docUrl = "https://openobserve.ai/docs/integration/ai/mcp/";
 
-const subs = computed<CardSubstitutions>(() => {
-  const email = store.state.userInfo?.email ?? "";
-  const passcode = store.state.organizationData?.organizationPasscode ?? "";
-  return {
-    url: store.state.zoConfig?.web_url || endpoint.value?.url || "",
-    org: store.state.selectedOrganization?.identifier ?? "",
-    token: b64EncodeStandard(`${email}:${passcode}`) ?? "",
-  };
-});
-
-onMounted(() => {
-  // The card's Basic-auth token is the org ingestion passcode (masked in the
-  // snippet, copied in full). IAM can be opened without visiting Ingestion
-  // first, so fetch it if the store doesn't already have it.
-  if (!store.state.organizationData?.organizationPasscode) {
-    organizationsService
-      .get_organization_passcode(store.state.selectedOrganization.identifier)
-      .then((res: any) => {
-        if (res.data?.data?.passcode) {
-          store.dispatch("setOrganizationPasscode", res.data.data.passcode);
-          store.dispatch("setOrganizationPasscodeUser", res.data.data.user);
-        }
-      })
-      .catch(() => {
-        // Non-critical: the card still shows the endpoint + a placeholder token.
-      });
-  }
-});
+// Unused by the card: the org ingestion passcode that used to fill it is rejected on /mcp.
+const subs = computed<CardSubstitutions>(() => ({
+  url: store.state.zoConfig?.web_url || endpoint.value?.url || "",
+  org: store.state.selectedOrganization?.identifier ?? "",
+  token: "",
+}));
 </script>
 
 <template>

@@ -48,9 +48,8 @@ export function useMcpCredential() {
   const error = ref("");
   const credential = ref<McpCredential | null>(null);
 
-  /** rbac + service accounts must both be enabled for a read-only SA to exist. */
-  const canGenerate = () =>
-    !!store.state.zoConfig?.rbac_enabled && (store.state.zoConfig?.service_account_enabled ?? true);
+  // Not gated on rbac: with no roles there is nothing to scope, and gating locked those orgs out.
+  const canGenerate = () => store.state.zoConfig?.service_account_enabled ?? true;
 
   const generate = async (): Promise<McpCredential | null> => {
     generating.value = true;

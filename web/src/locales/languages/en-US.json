@@ -3597,8 +3597,9 @@
         "oauthNote": "No credential to manage: your MCP client opens a browser to sign in, and access is scoped by your existing permissions. Use it whenever your client supports OAuth."
       },
       "credential": {
-        "quickStartTitle": "Quick start — your account",
-        "quickStartBody": "Snippets use your own credentials, which carry your full permissions. For production, generate a dedicated read-only credential instead.",
+        "quickStartTitle": "Generate a credential",
+        "quickStartBody": "The snippets below carry a placeholder until you generate one. MCP needs a user or service account credential — the org ingestion token used elsewhere in Ingestion is accepted on ingestion routes only and is rejected here.",
+        "unavailable": "Service accounts are disabled for this deployment, so no credential can be generated here. Enable them, or Base64-encode \"email:password\" for an existing account and use that as the Basic value.",
         "generate": "Generate read-only credential",
         "created": "Read-only credential created",
         "shownOnce": "For {email}. Copy it now — the token is shown only once and the snippets below now use it.",
@@ -3608,7 +3609,7 @@
         "error": "Couldn't create the credential. Try again, or create a service account manually in IAM."
       },
       "securityTitle": "Use a dedicated, least-privilege credential",
-      "securityBody": "The token defaults to your own account credentials. For production, generate a read-only credential above (or create a scoped service account) and never commit tokens to source control.",
+      "securityBody": "Generate a read-only credential above (or create a scoped service account in IAM) rather than reusing a personal login, and never commit tokens to source control.",
       "docsCta": "Read the full MCP documentation",
       "clients": {
         "claudeCode": "Claude Code",
