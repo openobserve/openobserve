@@ -9,8 +9,9 @@
  *   node build-ci-matrix.js <base.json>                 # OSS: base manifest verbatim
  *   node build-ci-matrix.js <base.json> <overlay.json>  # ENT: base + enterprise overlay
  *   ... --select-for-changes <changed-files.txt>        # PR smoke: emit only the shards
- *       whose "paths" globs (or run_files, for spec changes) match the changed files.
- *       Reads smoke_config.json next to the base manifest. A changed file matching a
+ *       owning the changed files — via run_files (specs), their test folder, the shared
+ *       folder_paths map in smoke_config.json (keyed by actual_folder), or optional
+ *       per-shard "paths" extras. A changed file matching a
  *       global_paths glob emits the FULL matrix; a file matching nothing pulls in the
  *       core_shards cross-section (never zero shards) — safe because merge_group always
  *       runs the full matrix before anything lands. Without the flag the full matrix is
@@ -43,7 +44,11 @@ function log(msg) {
   process.stderr.write(`build-ci-matrix: ${msg}\n`);
 }
 
+const globCache = new Map();
+
 function globToRegExp(glob) {
+  const cached = globCache.get(glob);
+  if (cached) return cached;
   // Only * and ** are supported; fail loud so ?/{}/[] syntax can't silently never match.
   const unsupported = glob.match(/[?{}[\]]/);
   if (unsupported) die(`unsupported glob syntax "${unsupported[0]}" in "${glob}" (only * and ** work)`);
@@ -58,17 +63,54 @@ function globToRegExp(glob) {
       } else {
         re += "[^/]*";
       }
-    } else if (".+^${}()|[]\\?".includes(c)) {
+    } else if (".+^$()|\\".includes(c)) {
       re += "\\" + c;
     } else {
       re += c;
     }
   }
-  return new RegExp("^" + re + "$");
+  const compiled = new RegExp("^" + re + "$");
+  globCache.set(glob, compiled);
+  return compiled;
 }
 
 function matchesAny(file, globs) {
   return (globs || []).some((g) => globToRegExp(g).test(file));
+}
+
+// Globs owning a shard: its folder's shared list plus optional per-shard extras.
+function shardGlobs(shard, config) {
+  return [...(config.folder_paths[shard.actual_folder] || []), ...(shard.paths || [])];
+}
+
+// Validated on EVERY selection run, so a PR that breaks the config fails its own CI
+// instead of merging green (via the full-matrix path) and detonating on the next PR.
+function validateSmokeConfig(shards, config) {
+  if (!Array.isArray(config.core_shards) || config.core_shards.length === 0) {
+    die("smoke_config.json must define a non-empty core_shards list");
+  }
+  for (const folder of [...config.core_shards, ...(config.always_run || [])]) {
+    if (!shards.some((s) => s.testfolder === folder)) {
+      die(`smoke_config core_shards/always_run names unknown shard "${folder}"`);
+    }
+  }
+  if (typeof config.folder_paths !== "object" || config.folder_paths === null) {
+    die("smoke_config.json must define a folder_paths map keyed by actual_folder");
+  }
+  for (const s of shards) {
+    if (shardGlobs(s, config).length === 0) {
+      die(`shard "${s.testfolder}" (folder "${s.actual_folder}") has no folder_paths entry and no paths — it would be unreachable by source changes`);
+    }
+  }
+  for (const globs of [
+    config.always_ignore_paths,
+    config.global_paths,
+    config.ignore_paths,
+    ...Object.values(config.folder_paths),
+    ...shards.map((s) => s.paths),
+  ]) {
+    (globs || []).forEach(globToRegExp);
+  }
 }
 
 // Decide which shards a PR needs. Returns null to mean "run the full matrix".
@@ -77,6 +119,11 @@ function matchesAny(file, globs) {
 // every shard before anything lands. Only global_paths (shared code and the smoke
 // machinery itself) still force full on the PR.
 function selectShards(shards, config, changedFiles) {
+  if (changedFiles.length === 0) {
+    // An empty list means the upstream diff broke, not that nothing changed — fail safe.
+    log("full matrix: changed-files list is empty (upstream diff produced nothing)");
+    return null;
+  }
   const wanted = new Set();
   let needCore = false;
   for (const file of changedFiles) {
@@ -91,44 +138,40 @@ function selectShards(shards, config, changedFiles) {
     }
     if (matchesAny(file, config.ignore_paths)) continue;
 
-    // A spec listed in run_files routes to exactly its owning shard; anything else in a
-    // test folder (new specs, shard-local helpers) falls through to the paths globs below.
+    // A spec listed in run_files routes to exactly its owning shard.
     const specMatch = file.match(/^tests\/ui-testing\/playwright-tests\/([^/]+)\/([^/]+)$/);
     if (specMatch) {
-      const owners = shards.filter(
+      const specOwners = shards.filter(
         (s) => s.actual_folder === specMatch[1] && s.run_files.includes(specMatch[2])
       );
-      if (owners.length > 0) {
-        owners.forEach((s) => wanted.add(s.testfolder));
+      if (specOwners.length > 0) {
+        specOwners.forEach((s) => wanted.add(s.testfolder));
         continue;
       }
     }
 
-    const owners = shards.filter((s) => matchesAny(file, s.paths));
-    if (owners.length === 0) {
-      log(`core fallback: "${file}" matches no shard's paths`);
+    // Union of folder ownership (a shard implicitly owns its test folder — new specs and
+    // shard-local helpers) and glob ownership, so cross-folder imports still route.
+    const owners = new Set();
+    const folderMatch = file.match(/^tests\/ui-testing\/playwright-tests\/([^/]+)\//);
+    if (folderMatch) {
+      shards.filter((s) => s.actual_folder === folderMatch[1]).forEach((s) => owners.add(s));
+    }
+    shards.filter((s) => matchesAny(file, shardGlobs(s, config))).forEach((s) => owners.add(s));
+    if (owners.size === 0) {
+      log(`core fallback: "${file}" matches no shard's globs`);
       needCore = true;
       continue;
     }
     owners.forEach((s) => wanted.add(s.testfolder));
   }
 
-  if (changedFiles.length === 0) {
-    // An empty list means the upstream diff broke, not that nothing changed — fail safe.
-    log("full matrix: changed-files list is empty (upstream diff produced nothing)");
-    return null;
-  }
   if (wanted.size === 0 && !needCore) {
     log("core fallback: no selectable changes (only ignored files)");
     needCore = true;
   }
-  const extra = needCore ? [...(config.core_shards || []), ...(config.always_run || [])] : (config.always_run || []);
-  for (const folder of extra) {
-    if (!shards.some((s) => s.testfolder === folder)) {
-      die(`smoke_config core_shards/always_run names unknown shard "${folder}"`);
-    }
-    wanted.add(folder);
-  }
+  if (needCore) config.core_shards.forEach((f) => wanted.add(f));
+  (config.always_run || []).forEach((f) => wanted.add(f));
   return shards.filter((s) => wanted.has(s.testfolder));
 }
 
@@ -216,12 +259,20 @@ for (const s of include) {
 
 let emitted = include;
 if (changedFilesPath) {
-  const config = readJson(path.join(path.dirname(basePath), "smoke_config.json"));
-  if (!Array.isArray(config.core_shards) || config.core_shards.length === 0) {
-    die("smoke_config.json must define a non-empty core_shards list");
+  // Selection only exists for pull_request; merge_group/push must always get the full matrix.
+  const event = process.env.GITHUB_EVENT_NAME;
+  if (event && event !== "pull_request") {
+    die(`--select-for-changes is pull_request-only (GITHUB_EVENT_NAME=${event})`);
   }
-  const changedFiles = fs
-    .readFileSync(changedFilesPath, "utf8")
+  const config = readJson(path.join(path.dirname(basePath), "smoke_config.json"));
+  validateSmokeConfig(include, config);
+  let raw;
+  try {
+    raw = fs.readFileSync(changedFilesPath, "utf8");
+  } catch (e) {
+    die(`cannot read changed-files list ${changedFilesPath}: ${e.message}`);
+  }
+  const changedFiles = raw
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);
