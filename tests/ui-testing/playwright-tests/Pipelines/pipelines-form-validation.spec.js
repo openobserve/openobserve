@@ -273,7 +273,7 @@ test.describe(
             await navigateToBase(page);
             pm = new PageManager(page);
             await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-            // Build a fresh Associate Function node so the drawer opens with no function selected — the old shared-node path prefilled one under parallel load.
+            // Build a fresh Associate Function node so the drawer opens with no function selected.
             await pm.pipelinesPage.openPipelineMenu();
             await pm.pipelinesPage.addPipeline();
             await pm.pipelinesPage.selectAndDragFunction();
