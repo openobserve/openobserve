@@ -306,26 +306,42 @@ const hasCellActions = computed(() => !!slots["cell-hover-actions"]);
 const cellActionsCtx = inject(OTableCellActionsKey, null);
 const isCellActionActive = computed(() => cellActionsCtx?.activeCellKey.value === props.cell.id);
 
-// The actions float just above the pointer instead of pinning to the cell's right
-// edge, so they never sit on top of the value they act on. Escaping a cell that is
-// one row tall and clips overflow means teleporting to <body> and positioning from
-// the pointer, which is why the coordinates are an inline style rather than a class.
+// Anchored to the cell's top edge (not the pointer) with an arrow pointing back at
+// the row, so the toolbar can't be read as belonging to the row it is drawn over.
+// The cell is one row tall and clips overflow, hence <body> teleport + inline coords.
+const cellEl = ref<HTMLElement | null>(null);
 const cellActionsEl = ref<HTMLElement | null>(null);
 const cellActionsX = ref(0);
 const cellActionsY = ref(0);
 const cellActionsBelow = ref(false);
+const cellActionsPointerX = ref(0);
+const cellActionsArrowX = ref(0);
 
 const cellActionsStyle = computed(() => ({
-  // px because these are viewport coordinates read from MouseEvent.clientX/Y.
+  // px because these are viewport coordinates read off getBoundingClientRect.
   left: `${cellActionsX.value}px`,
   top: `${cellActionsY.value}px`,
   transform: cellActionsBelow.value ? "translate(-50%, 0)" : "translate(-50%, -100%)",
 }));
 
+// Clip the rotated square to the half outside the bar plus a ~1.5px sliver that hides
+// the bar's border; the full square would notch any filled control (the AI chip) 3px in.
+const cellActionsArrowClass = computed(() =>
+  cellActionsBelow.value
+    ? "-top-1 border-t border-l [clip-path:polygon(0_0,100%_0,100%_26%,26%_100%,0_100%)]"
+    : "-bottom-1 border-r border-b [clip-path:polygon(0_100%,100%_100%,100%_0,74%_0,0_74%)]",
+);
+
+// Arrow centre within the bar (`-ml-1` offsets its box), so it stays under the pointer
+// after the bar is clamped to the window.
+const cellActionsArrowStyle = computed(() => ({ left: `${cellActionsArrowX.value}px` }));
+
 function onCellActionsEnter(event: MouseEvent) {
   if (!hasCellActions.value) return;
-  cellActionsX.value = event.clientX ?? 0;
-  cellActionsY.value = event.clientY ?? 0;
+  cellActionsPointerX.value = event.clientX ?? 0;
+  cellActionsX.value = cellActionsPointerX.value;
+  // Pre-placed so the toolbar doesn't flash at the window origin before measurement.
+  cellActionsY.value = cellEl.value?.getBoundingClientRect().top ?? event.clientY ?? 0;
   cellActionsBelow.value = false;
   cellActionsCtx?.setActiveCell(props.cell.id);
 }
@@ -378,12 +394,24 @@ watch(isCellActionActive, async (active) => {
   }
   window.addEventListener("scroll", onScrollDismiss, { capture: true, passive: true });
   await nextTick();
-  const rect = cellActionsEl.value?.getBoundingClientRect();
-  if (!rect) return;
-  // Flip below the pointer when the row is too close to the top of the window.
-  if (rect.top < 0) cellActionsBelow.value = true;
-  const half = rect.width / 2;
-  cellActionsX.value = Math.min(Math.max(cellActionsX.value, half), window.innerWidth - half);
+  const bar = cellActionsEl.value?.getBoundingClientRect();
+  const cellRect = cellEl.value?.getBoundingClientRect();
+  if (!bar || !cellRect) return;
+  // The sticky header, not the window edge, is the ceiling: flip below rather than cover it.
+  const headerBottom =
+    cellEl.value?.closest("table")?.querySelector("thead")?.getBoundingClientRect().bottom ?? 0;
+  cellActionsBelow.value = cellRect.top - bar.height < Math.max(headerBottom, 0);
+  cellActionsY.value = cellActionsBelow.value ? cellRect.bottom : cellRect.top;
+  const half = bar.width / 2;
+  cellActionsX.value = Math.min(
+    Math.max(cellActionsPointerX.value, half),
+    window.innerWidth - half,
+  );
+  // Keep the arrow clear of the bar's rounded corners once the bar has been clamped.
+  cellActionsArrowX.value = Math.min(
+    Math.max(cellActionsPointerX.value - (cellActionsX.value - half), 10),
+    Math.max(bar.width - 10, 10),
+  );
 });
 
 onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true));
@@ -391,6 +419,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
 
 <template>
   <td
+    ref="cellEl"
     :data-test="`o2-table-cell-${cell.column.id}`"
     :class="[
       // Base text color for the whole cell so custom `#cell-*` slots (which skip
@@ -548,11 +577,11 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
       </span>
     </template>
 
-    <!-- Hover-action toolbar, floated just above the pointer and teleported out of
+    <!-- Hover-action toolbar, floated clear of the hovered row and teleported out of
          the cell, which is one row tall and clips overflow. The wrapper's padding is
-         the gap the user sees AND the hover bridge from the pointer up to the
-         buttons — without it the pointer would cross bare table on the way and
-         activate the row above. -->
+         the gap the user sees AND the hover bridge from the row up to the buttons —
+         without it the pointer would cross bare table on the way and activate the
+         row above. -->
     <Teleport v-if="hasCellActions && isCellActionActive && hasCellActionsContent" to="body">
       <div
         ref="cellActionsEl"
@@ -563,17 +592,28 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
         @mouseenter="onCellActionsHoverEnter"
         @mouseleave="onCellActionsLeave"
       >
-        <!-- empty:hidden covers what the vnode walk can't see: slot content that IS a
-             component but renders nothing, e.g. the AI button on a non-AI build. -->
-        <div
-          class="bg-surface-overlay border-border-default rounded-default flex items-center gap-1 border border-solid px-1 py-0.5 shadow-lg empty:hidden"
-        >
-          <slot
-            name="cell-hover-actions"
-            :row="row.original"
-            :column="cell.column.columnDef"
-            :value="rawValue"
-            :active="isCellActionActive"
+        <div class="relative">
+          <!-- empty:hidden covers what the vnode walk can't see: slot content that IS a
+               component but renders nothing, e.g. the AI button on a non-AI build. -->
+          <div
+            class="peer bg-surface-overlay border-border-default rounded-default flex items-center gap-1 border border-solid px-1 py-0.5 shadow-lg empty:hidden"
+          >
+            <slot
+              name="cell-hover-actions"
+              :row="row.original"
+              :column="cell.column.columnDef"
+              :value="rawValue"
+              :active="isCellActionActive"
+            />
+          </div>
+          <!-- The bar sits clear of the hovered row, so this arrow is the only thing
+               tying it to the row it acts on. -->
+          <span
+            class="bg-surface-overlay border-border-default absolute -ml-1 size-2 rotate-45 border-solid peer-empty:hidden"
+            :class="cellActionsArrowClass"
+            :style="cellActionsArrowStyle"
+            :data-test="`o2-table-cell-hover-arrow-${cell.column.id}`"
+            aria-hidden="true"
           />
         </div>
       </div>
