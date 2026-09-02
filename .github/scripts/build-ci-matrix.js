@@ -8,6 +8,13 @@
  * Usage:
  *   node build-ci-matrix.js <base.json>                 # OSS: base manifest verbatim
  *   node build-ci-matrix.js <base.json> <overlay.json>  # ENT: base + enterprise overlay
+ *   ... --select-for-changes <changed-files.txt>        # PR smoke: emit only the shards
+ *       whose "paths" globs (or run_files, for spec changes) match the changed files.
+ *       Reads smoke_config.json next to the base manifest. A changed file matching a
+ *       global_paths glob emits the FULL matrix; a file matching nothing pulls in the
+ *       core_shards cross-section (never zero shards) — safe because merge_group always
+ *       runs the full matrix before anything lands. Without the flag behavior is
+ *       byte-identical to before (ENT is unaffected until it opts in).
  *
  * The base (OSS tests/ui-testing/ci-matrix/ci_matrix.json) is the ONLY place shared shards are
  * listed. ENT never re-lists shared specs — its overlay (ci_matrix.ent.json) carries
@@ -24,10 +31,98 @@
  * This lives in OSS so ENT can reuse it from its tree-merged OSS checkout.
  */
 const fs = require("fs");
+const path = require("path");
 
 function die(msg) {
   process.stderr.write(`build-ci-matrix: ${msg}\n`);
   process.exit(1);
+}
+
+function log(msg) {
+  // stderr, because stdout must stay pure matrix JSON for $GITHUB_OUTPUT.
+  process.stderr.write(`build-ci-matrix: ${msg}\n`);
+}
+
+function globToRegExp(glob) {
+  let re = "";
+  for (let i = 0; i < glob.length; i++) {
+    const c = glob[i];
+    if (c === "*") {
+      if (glob[i + 1] === "*") {
+        re += ".*";
+        i++;
+        if (glob[i + 1] === "/") i++;
+      } else {
+        re += "[^/]*";
+      }
+    } else if (".+^${}()|[]\\?".includes(c)) {
+      re += "\\" + c;
+    } else {
+      re += c;
+    }
+  }
+  return new RegExp("^" + re + "$");
+}
+
+function matchesAny(file, globs) {
+  return (globs || []).some((g) => globToRegExp(g).test(file));
+}
+
+// Decide which shards a PR needs. Returns null to mean "run the full matrix".
+// Mapped files select their shards; anything unmapped pulls in core_shards — a fixed
+// cross-section — instead of the full matrix, because the merge queue always runs
+// every shard before anything lands. Only global_paths (shared code and the smoke
+// machinery itself) still force full on the PR.
+function selectShards(shards, config, changedFiles) {
+  const wanted = new Set();
+  let needCore = false;
+  for (const file of changedFiles) {
+    // always_ignore_paths beats global_paths: unit specs/snapshots under web/src are
+    // never bundled into the app, so they can't affect e2e no matter where they live.
+    if (matchesAny(file, config.always_ignore_paths)) continue;
+    // global_paths outranks ignore_paths so files like playwright.yml can't be
+    // ignored away by a broad ignore glob.
+    if (matchesAny(file, config.global_paths)) {
+      log(`full matrix: "${file}" matches global_paths`);
+      return null;
+    }
+    if (matchesAny(file, config.ignore_paths)) continue;
+
+    const specMatch = file.match(/^tests\/ui-testing\/playwright-tests\/([^/]+)\/([^/]+)$/);
+    if (specMatch) {
+      const owners = shards.filter(
+        (s) => s.actual_folder === specMatch[1] && s.run_files.includes(specMatch[2])
+      );
+      if (owners.length === 0) {
+        log(`core fallback: "${file}" is in no shard's run_files (new/disabled/support file)`);
+        needCore = true;
+        continue;
+      }
+      owners.forEach((s) => wanted.add(s.testfolder));
+      continue;
+    }
+
+    const owners = shards.filter((s) => matchesAny(file, s.paths));
+    if (owners.length === 0) {
+      log(`core fallback: "${file}" matches no shard's paths`);
+      needCore = true;
+      continue;
+    }
+    owners.forEach((s) => wanted.add(s.testfolder));
+  }
+
+  if (wanted.size === 0 && !needCore) {
+    log("core fallback: no selectable changes (only ignored files)");
+    needCore = true;
+  }
+  const extra = needCore ? [...(config.core_shards || []), ...(config.always_run || [])] : (config.always_run || []);
+  for (const folder of extra) {
+    if (!shards.some((s) => s.testfolder === folder)) {
+      die(`smoke_config core_shards/always_run names unknown shard "${folder}"`);
+    }
+    wanted.add(folder);
+  }
+  return shards.filter((s) => wanted.has(s.testfolder));
 }
 
 function readJson(path) {
@@ -38,8 +133,18 @@ function readJson(path) {
   }
 }
 
-const [basePath, overlayPath] = process.argv.slice(2);
-if (!basePath) die("usage: build-ci-matrix.js <base.json> [overlay.json]");
+const args = process.argv.slice(2);
+const selectIdx = args.indexOf("--select-for-changes");
+let changedFilesPath = null;
+if (selectIdx !== -1) {
+  changedFilesPath = args[selectIdx + 1];
+  if (!changedFilesPath) die("--select-for-changes requires a path to a changed-files list");
+  args.splice(selectIdx, 2);
+}
+const [basePath, overlayPath] = args;
+if (!basePath) {
+  die("usage: build-ci-matrix.js <base.json> [overlay.json] [--select-for-changes <changed.txt>]");
+}
 
 const base = readJson(basePath);
 if (!Array.isArray(base)) die(`base ${basePath} must be a JSON array of shards`);
@@ -102,6 +207,30 @@ for (const s of include) {
   }
 }
 
+let emitted = include;
+if (changedFilesPath) {
+  const config = readJson(path.join(path.dirname(basePath), "smoke_config.json"));
+  if (!Array.isArray(config.core_shards) || config.core_shards.length === 0) {
+    die("smoke_config.json must define a non-empty core_shards list");
+  }
+  const changedFiles = fs
+    .readFileSync(changedFilesPath, "utf8")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const selected = selectShards(include, config, changedFiles);
+  if (selected) {
+    emitted = selected;
+    log(
+      `smoke: ${emitted.length}/${include.length} shards — ${emitted
+        .map((s) => s.testfolder)
+        .join(", ")}`
+    );
+  } else {
+    log(`smoke: falling back to full matrix (${include.length} shards)`);
+  }
+}
+
 // Emit ONLY the fields the CI matrix consumes — disabled/_comment/notes are stripped,
 // so turned-off specs never reach `npx playwright test`.
 //
@@ -122,7 +251,7 @@ for (const s of include) {
 // backfill in 7 sequential chunks under ZO_SCHEDULER_SLO_BACKFILL_CONCURRENCY=1;
 // SLO-Measurement widens it to the full window so its 3 backfilled SLOs don't
 // pay 21 chunks serially.
-const matrix = include.map((s) => ({
+const matrix = emitted.map((s) => ({
   testfolder: s.testfolder,
   actual_folder: s.actual_folder,
   browser: s.browser || "chrome",
