@@ -249,9 +249,10 @@ jobs:
               echo "::warning::changed-file diff failed — running the full matrix"
             fi
           fi
-          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json $SELECT_ARGS 2> /tmp/pw-select-log.txt)
+          # || true: under bash -e a die() would abort before the log below ever prints.
+          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json $SELECT_ARGS 2> /tmp/pw-select-log.txt) || true
           cat /tmp/pw-select-log.txt >&2
-          if [ -z "$MATRIX" ]; then echo "::error::matrix generation failed (build-ci-matrix produced no output)"; exit 1; fi
+          if [ -z "$MATRIX" ]; then echo "::error::matrix generation failed (see build-ci-matrix log above)"; exit 1; fi
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           COUNT=$(echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log('generated',m.include.length,'shards:', m.include.map(s=>s.testfolder).join(', ')); require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'shards_selected='+m.include.length+'\n')")
           echo "smoke_active=$([ -n "$SELECT_ARGS" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
