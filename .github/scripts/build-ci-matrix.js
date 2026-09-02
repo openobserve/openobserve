@@ -15,7 +15,9 @@
  *       global_paths glob emits the FULL matrix; a file matching nothing pulls in the
  *       core_shards cross-section (never zero shards) — safe because merge_group always
  *       runs the full matrix before anything lands. Without the flag the full matrix is
- *       emitted; ENT does not pass the flag, so the flag is OSS-only for now.
+ *       emitted. With an overlay manifest, a sibling smoke_config.ent.json (same dir as
+ *       the overlay) refines selection for ENT shards — folder_paths and path lists
+ *       concatenate onto the base smoke config, core_shards/always_run replace it.
  *
  * The base (OSS tests/ui-testing/ci-matrix/ci_matrix.json) is the ONLY place shared shards are
  * listed. ENT never re-lists shared specs — its overlay (ci_matrix.ent.json) carries
@@ -265,6 +267,23 @@ if (changedFilesPath) {
     die(`--select-for-changes is pull_request-only (GITHUB_EVENT_NAME=${event})`);
   }
   const config = readJson(path.join(path.dirname(basePath), "smoke_config.json"));
+  // With a manifest overlay (ENT), a sibling smoke_config.ent.json refines selection for
+  // enterprise shards: folder_paths/path lists concatenate, core_shards/always_run replace.
+  if (overlayPath) {
+    const entConfigPath = path.join(path.dirname(overlayPath), "smoke_config.ent.json");
+    if (fs.existsSync(entConfigPath)) {
+      const ent = readJson(entConfigPath);
+      for (const key of ["always_ignore_paths", "global_paths", "ignore_paths"]) {
+        if (ent[key]) config[key] = [...(config[key] || []), ...ent[key]];
+      }
+      for (const [folder, globs] of Object.entries(ent.folder_paths || {})) {
+        config.folder_paths[folder] = [...(config.folder_paths[folder] || []), ...globs];
+      }
+      if (ent.core_shards) config.core_shards = ent.core_shards;
+      if (ent.always_run) config.always_run = ent.always_run;
+      log(`merged smoke config overlay ${entConfigPath}`);
+    }
+  }
   validateSmokeConfig(include, config);
   let raw;
   try {
