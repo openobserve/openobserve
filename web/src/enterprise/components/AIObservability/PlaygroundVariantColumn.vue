@@ -13,8 +13,8 @@
 -->
 <template>
   <section
-    class="border-border-default bg-surface-base rounded-surface flex min-h-0 min-w-85 flex-1 snap-start flex-col overflow-hidden border"
-    :class="solo ? '' : 'max-w-140'"
+    class="border-border-default bg-surface-base rounded-surface flex min-h-0 snap-start flex-col overflow-hidden border"
+    :class="solo ? 'min-w-85 flex-1' : 'w-[clamp(21.25rem,30%,35rem)] shrink-0'"
     :data-test="`ai-playground-variant-${label}`"
   >
     <div class="border-border-default shrink-0 border-b px-2.5 py-1.5">

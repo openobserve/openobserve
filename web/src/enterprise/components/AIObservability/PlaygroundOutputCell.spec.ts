@@ -18,10 +18,6 @@ vi.mock("@/types/i18n", async () => {
   };
 });
 
-const OBanner = {
-  props: ["variant", "dense", "content", "icon", "inlineActions"],
-  template: '<div class="o-banner" :data-variant="variant" :data-content="content"><slot /></div>',
-};
 const OButton = {
   props: ["variant", "size", "iconLeft", "title"],
   emits: ["click"],
@@ -35,7 +31,7 @@ const OTag = {
 function mountCell(cell: PlaygroundCell | undefined, props: Record<string, unknown> = {}) {
   return mount(PlaygroundOutputCell, {
     props: { cell, ...props },
-    global: { stubs: { OBanner, OButton, OTag } },
+    global: { stubs: { OButton, OTag } },
   });
 }
 
