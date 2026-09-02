@@ -718,6 +718,45 @@ describe("Search Service", () => {
         start_time: 1609459200,
       });
     });
+
+    it("should get search history scoped to a traces stream", async () => {
+      await search.get_history("test-org", 1609459200, 1609545600, "traces", "my-trace-stream");
+
+      expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/_search_history", {
+        stream_type: "traces",
+        org_identifier: "test-org",
+        user_email: null,
+        start_time: 1609459200,
+        end_time: 1609545600,
+        stream_name: "my-trace-stream",
+      });
+    });
+
+    it("should get search history scoped to a metrics stream", async () => {
+      await search.get_history("test-org", 1609459200, 1609545600, "metrics", "my-metric-stream");
+
+      expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/_search_history", {
+        stream_type: "metrics",
+        org_identifier: "test-org",
+        user_email: null,
+        start_time: 1609459200,
+        end_time: 1609545600,
+        stream_name: "my-metric-stream",
+      });
+    });
+
+    it("should default to logs and omit stream_name when only stream_type is missing", async () => {
+      await search.get_history("test-org", 1609459200, 1609545600, null, "unscoped-stream");
+
+      expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/_search_history", {
+        stream_type: "logs",
+        org_identifier: "test-org",
+        user_email: null,
+        start_time: 1609459200,
+        end_time: 1609545600,
+        stream_name: "unscoped-stream",
+      });
+    });
   });
 
   describe("schedule_search", () => {

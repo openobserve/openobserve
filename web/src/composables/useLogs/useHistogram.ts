@@ -407,27 +407,6 @@ export const useHistogram = () => {
     }
   };
 
-  const setMultiStreamHistogramQuery = (_queryReq?: unknown) => {
-    let histogramQuery = `select histogram(${store.state.zoConfig.timestamp_column}, '${searchObj.meta.resultGrid.chartInterval}') AS zo_sql_key, count(*) AS zo_sql_num from "[INDEX_NAME]" [WHERE_CLAUSE] GROUP BY zo_sql_key`;
-    let multiSql = [];
-
-    for (const stream of searchObj.data.stream.selectedStream) {
-      // one or more filter fields are missing in this stream so no need to include in histogram query
-      // this is to avoid the issue of missing fields in multi stream histogram query
-      if (searchObj.data.stream.missingStreamMultiStreamFilter.includes(stream)) {
-        continue;
-      }
-      // Replace the index name and where clause in the histogram query for each stream
-      multiSql.push(
-        histogramQuery
-          .replace("[INDEX_NAME]", stream)
-          .replace("[WHERE_CLAUSE]", searchObj.data.query ? "WHERE " + searchObj.data.query : ""),
-      );
-    }
-
-    return multiSql.join(" UNION ALL ");
-  };
-
   // Bhargav Todo: duplicate function in index.vue
   const isHistogramEnabled = (searchObj: any) => {
     return (
@@ -718,7 +697,6 @@ export const useHistogram = () => {
     generateHistogramData,
     resetHistogramWithError,
     generateHistogramSkeleton,
-    setMultiStreamHistogramQuery,
     isHistogramEnabled,
   };
 };

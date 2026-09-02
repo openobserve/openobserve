@@ -52,6 +52,8 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubicloud-standard-8
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
     permissions:
       contents: read
 
@@ -85,8 +87,10 @@ jobs:
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          cache-on-failure: true
-          shared-key: backend-debug-mimalloc
+          # This successful main-branch build is the single writer for the
+          # canonical dev(debug=0)+mimalloc cache consumed by API and DB PRs.
+          shared-key: backend-debug0-mimalloc-deps-v1
+          add-job-id-key: false
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc

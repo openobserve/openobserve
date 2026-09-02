@@ -45,9 +45,31 @@ mod tests {
 
     use super::{
         METRICS_INDEX_ROW_COUNT,
-        pruner::{create_physical_filter, metrics_index_labels},
+        pruner::{
+            create_physical_filter, metrics_index_labels, residual_matchers_covered,
+            selection_cache_key, sidecar_covers_labels,
+        },
         reader::{MetricsIndexData, decode_metrics_index, evaluate_metrics_index},
     };
+
+    #[test]
+    fn cache_key_changes_with_the_schema_derived_label_set() {
+        // same matcher text, wider label set after schema evolution -> new key
+        let labels_v1 = vec!["a".to_string()];
+        let labels_v2 = vec!["a".to_string(), "b".to_string()];
+        let filter_key = r#"{a="x", b="y"}"#;
+        let key_v1 = selection_cache_key("acct", "path.midx", 100, &labels_v1, filter_key);
+        let key_v2 = selection_cache_key("acct", "path.midx", 100, &labels_v2, filter_key);
+        assert_ne!(key_v1, key_v2);
+        assert_eq!(
+            key_v1,
+            selection_cache_key("acct", "path.midx", 100, &labels_v1, filter_key)
+        );
+        assert_ne!(
+            key_v1,
+            selection_cache_key("acct", "path.midx", 101, &labels_v1, filter_key)
+        );
+    }
 
     #[test]
     fn labels_keep_only_matchable_table_labels() {
@@ -194,6 +216,52 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    #[test]
+    fn exactness_requires_sidecar_coverage_of_every_residual_matcher() {
+        let table_schema = Schema::new(vec![
+            Field::new("__hash__", DataType::UInt64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("path", DataType::Utf8View, true),
+            Field::new("instance", DataType::Utf8View, true),
+            Field::new("trace_id", DataType::Utf8View, true),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+        ]);
+        let matcher_labels = vec!["path".to_string(), "instance".to_string()];
+
+        // matchers the query never re-applies do not break exactness
+        let covered = Matchers::new(vec![
+            Matcher::new(MatchOp::Equal, "path", "a"),
+            Matcher::new(MatchOp::Re("i.*".parse().unwrap()), "instance", "i.*"),
+            Matcher::new(MatchOp::Equal, "__name__", "m"),
+            Matcher::new(MatchOp::Equal, "missing_label", "x"),
+        ]);
+        assert!(residual_matchers_covered(
+            &table_schema,
+            &covered,
+            &matcher_labels
+        ));
+
+        // `trace_id` is hash-excluded: the sidecar cannot answer it, but the
+        // query filters on it, so the selection stays a superset
+        let uncovered = Matchers::new(vec![
+            Matcher::new(MatchOp::Equal, "path", "a"),
+            Matcher::new(MatchOp::Equal, "trace_id", "t1"),
+        ]);
+        assert!(!residual_matchers_covered(
+            &table_schema,
+            &uncovered,
+            &matcher_labels
+        ));
+
+        let full = sidecar_bytes(&[("path", vec!["a"]), ("instance", vec!["i1"])], vec![3]);
+        let data = decode_metrics_index("full", full, &matcher_labels).unwrap();
+        assert!(sidecar_covers_labels(&data.schema, &matcher_labels));
+
+        let partial = sidecar_bytes(&[("path", vec!["a"])], vec![3]);
+        let data = decode_metrics_index("partial", partial, &matcher_labels).unwrap();
+        assert!(!sidecar_covers_labels(&data.schema, &matcher_labels));
     }
 
     #[test]
