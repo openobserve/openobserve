@@ -13,8 +13,8 @@
  *       Reads smoke_config.json next to the base manifest. A changed file matching a
  *       global_paths glob emits the FULL matrix; a file matching nothing pulls in the
  *       core_shards cross-section (never zero shards) — safe because merge_group always
- *       runs the full matrix before anything lands. Without the flag behavior is
- *       byte-identical to before (ENT is unaffected until it opts in).
+ *       runs the full matrix before anything lands. Without the flag the full matrix is
+ *       emitted; ENT does not pass the flag, so the flag is OSS-only for now.
  *
  * The base (OSS tests/ui-testing/ci-matrix/ci_matrix.json) is the ONLY place shared shards are
  * listed. ENT never re-lists shared specs — its overlay (ci_matrix.ent.json) carries
@@ -44,6 +44,9 @@ function log(msg) {
 }
 
 function globToRegExp(glob) {
+  // Only * and ** are supported; fail loud so ?/{}/[] syntax can't silently never match.
+  const unsupported = glob.match(/[?{}[\]]/);
+  if (unsupported) die(`unsupported glob syntax "${unsupported[0]}" in "${glob}" (only * and ** work)`);
   let re = "";
   for (let i = 0; i < glob.length; i++) {
     const c = glob[i];
@@ -88,18 +91,17 @@ function selectShards(shards, config, changedFiles) {
     }
     if (matchesAny(file, config.ignore_paths)) continue;
 
+    // A spec listed in run_files routes to exactly its owning shard; anything else in a
+    // test folder (new specs, shard-local helpers) falls through to the paths globs below.
     const specMatch = file.match(/^tests\/ui-testing\/playwright-tests\/([^/]+)\/([^/]+)$/);
     if (specMatch) {
       const owners = shards.filter(
         (s) => s.actual_folder === specMatch[1] && s.run_files.includes(specMatch[2])
       );
-      if (owners.length === 0) {
-        log(`core fallback: "${file}" is in no shard's run_files (new/disabled/support file)`);
-        needCore = true;
+      if (owners.length > 0) {
+        owners.forEach((s) => wanted.add(s.testfolder));
         continue;
       }
-      owners.forEach((s) => wanted.add(s.testfolder));
-      continue;
     }
 
     const owners = shards.filter((s) => matchesAny(file, s.paths));
@@ -111,6 +113,11 @@ function selectShards(shards, config, changedFiles) {
     owners.forEach((s) => wanted.add(s.testfolder));
   }
 
+  if (changedFiles.length === 0) {
+    // An empty list means the upstream diff broke, not that nothing changed — fail safe.
+    log("full matrix: changed-files list is empty (upstream diff produced nothing)");
+    return null;
+  }
   if (wanted.size === 0 && !needCore) {
     log("core fallback: no selectable changes (only ignored files)");
     needCore = true;

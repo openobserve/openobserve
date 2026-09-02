@@ -44,7 +44,8 @@
       "web/src/services/alertInsights.*",
       "web/src/services/anomaly_detection.*",
       "tests/ui-testing/pages/alertsPages/**",
-      "tests/ui-testing/pages/anomalyPages/**"
+      "tests/ui-testing/pages/anomalyPages/**",
+      "tests/ui-testing/playwright-tests/Alerts/**"
     ]
   },
   {
@@ -75,7 +76,8 @@
       "web/src/services/dashboards.*",
       "web/src/services/dashboard_annotations.*",
       "web/src/services/search.*",
-      "tests/ui-testing/pages/dashboardPages/**"
+      "tests/ui-testing/pages/dashboardPages/**",
+      "tests/ui-testing/playwright-tests/Dashboards/**"
     ]
   },
   {
@@ -103,7 +105,8 @@
       "web/src/services/dashboards.*",
       "web/src/services/dashboard_annotations.*",
       "web/src/services/search.*",
-      "tests/ui-testing/pages/dashboardPages/**"
+      "tests/ui-testing/pages/dashboardPages/**",
+      "tests/ui-testing/playwright-tests/Dashboards/**"
     ]
   },
   {
@@ -135,7 +138,8 @@
       "web/src/services/dashboards.*",
       "web/src/services/dashboard_annotations.*",
       "web/src/services/search.*",
-      "tests/ui-testing/pages/dashboardPages/**"
+      "tests/ui-testing/pages/dashboardPages/**",
+      "tests/ui-testing/playwright-tests/Dashboards/**"
     ]
   },
   {
@@ -154,7 +158,8 @@
       "web/src/services/dashboards.*",
       "web/src/services/dashboard_annotations.*",
       "web/src/services/search.*",
-      "tests/ui-testing/pages/dashboardPages/**"
+      "tests/ui-testing/pages/dashboardPages/**",
+      "tests/ui-testing/playwright-tests/Dashboards/**"
     ]
   },
   {
@@ -177,7 +182,8 @@
       "web/src/services/dashboards.*",
       "web/src/services/dashboard_annotations.*",
       "web/src/services/search.*",
-      "tests/ui-testing/pages/dashboardPages/**"
+      "tests/ui-testing/pages/dashboardPages/**",
+      "tests/ui-testing/playwright-tests/Dashboards/**"
     ]
   },
   {
@@ -203,7 +209,8 @@
       "web/src/services/dashboards.*",
       "web/src/services/dashboard_annotations.*",
       "web/src/services/search.*",
-      "tests/ui-testing/pages/dashboardPages/**"
+      "tests/ui-testing/pages/dashboardPages/**",
+      "tests/ui-testing/playwright-tests/Dashboards/**"
     ]
   },
   {
@@ -222,7 +229,8 @@
       "web/src/services/dashboards.*",
       "web/src/services/dashboard_annotations.*",
       "web/src/services/search.*",
-      "tests/ui-testing/pages/dashboardPages/**"
+      "tests/ui-testing/pages/dashboardPages/**",
+      "tests/ui-testing/playwright-tests/Dashboards/**"
     ]
   },
   {
@@ -249,7 +257,8 @@
       "web/src/services/dashboards.*",
       "web/src/services/dashboard_annotations.*",
       "web/src/services/search.*",
-      "tests/ui-testing/pages/dashboardPages/**"
+      "tests/ui-testing/pages/dashboardPages/**",
+      "tests/ui-testing/playwright-tests/Dashboards/**"
     ]
   },
   {
@@ -279,7 +288,8 @@
       "web/src/services/dashboards.*",
       "web/src/services/dashboard_annotations.*",
       "web/src/services/search.*",
-      "tests/ui-testing/pages/dashboardPages/**"
+      "tests/ui-testing/pages/dashboardPages/**",
+      "tests/ui-testing/playwright-tests/Dashboards/**"
     ]
   },
   {
@@ -299,7 +309,8 @@
       "web/src/services/dashboards.*",
       "web/src/services/dashboard_annotations.*",
       "web/src/services/search.*",
-      "tests/ui-testing/pages/dashboardPages/**"
+      "tests/ui-testing/pages/dashboardPages/**",
+      "tests/ui-testing/playwright-tests/Dashboards/**"
     ]
   },
   {
@@ -318,7 +329,8 @@
       "web/src/views/Functions*",
       "web/src/services/jstransform.*",
       "web/src/services/query_functions.*",
-      "tests/ui-testing/pages/functionsPages/**"
+      "tests/ui-testing/pages/functionsPages/**",
+      "tests/ui-testing/playwright-tests/Functions/**"
     ]
   },
   {
@@ -372,7 +384,8 @@
       "web/src/services/iam.*",
       "web/src/services/service_accounts.*",
       "tests/ui-testing/pages/generalPages/**",
-      "tests/ui-testing/pages/iamPages/**"
+      "tests/ui-testing/pages/iamPages/**",
+      "tests/ui-testing/playwright-tests/GeneralTests/**"
     ]
   },
   {
@@ -396,7 +409,8 @@
       "web/src/services/saved_views.*",
       "web/src/services/patterns.*",
       "tests/ui-testing/pages/logsPages/**",
-      "tests/ui-testing/pages/generalPages/**"
+      "tests/ui-testing/pages/generalPages/**",
+      "tests/ui-testing/playwright-tests/Logs/**"
     ]
   },
   {
@@ -419,7 +433,8 @@
       "web/src/services/saved_views.*",
       "web/src/services/patterns.*",
       "tests/ui-testing/pages/logsPages/**",
-      "tests/ui-testing/pages/generalPages/**"
+      "tests/ui-testing/pages/generalPages/**",
+      "tests/ui-testing/playwright-tests/Logs/**"
     ]
   },
   {
@@ -448,7 +463,8 @@
       "web/src/services/saved_views.*",
       "web/src/services/patterns.*",
       "tests/ui-testing/pages/logsPages/**",
-      "tests/ui-testing/pages/generalPages/**"
+      "tests/ui-testing/pages/generalPages/**",
+      "tests/ui-testing/playwright-tests/Logs/**"
     ]
   },
   {
@@ -481,7 +497,8 @@
       "web/src/services/saved_views.*",
       "web/src/services/patterns.*",
       "tests/ui-testing/pages/logsPages/**",
-      "tests/ui-testing/pages/generalPages/**"
+      "tests/ui-testing/pages/generalPages/**",
+      "tests/ui-testing/playwright-tests/Logs/**"
     ]
   },
   {
@@ -504,7 +521,8 @@
       "web/src/services/saved_views.*",
       "web/src/services/patterns.*",
       "tests/ui-testing/pages/logsPages/**",
-      "tests/ui-testing/pages/generalPages/**"
+      "tests/ui-testing/pages/generalPages/**",
+      "tests/ui-testing/playwright-tests/Logs/**"
     ]
   },
   {
@@ -534,7 +552,8 @@
       "web/src/services/metrics.*",
       "web/src/services/search.*",
       "web/src/services/streaming_search.*",
-      "tests/ui-testing/pages/metricsPages/**"
+      "tests/ui-testing/pages/metricsPages/**",
+      "tests/ui-testing/playwright-tests/Metrics/**"
     ]
   },
   {
@@ -566,7 +585,8 @@
       "web/src/plugins/pipelines/**",
       "web/src/services/pipelines.*",
       "tests/ui-testing/pages/pipelinesPages/**",
-      "tests/ui-testing/pages/generalPages/**"
+      "tests/ui-testing/pages/generalPages/**",
+      "tests/ui-testing/playwright-tests/Pipelines/**"
     ]
   },
   {
@@ -587,7 +607,8 @@
       "web/src/components/reports/**",
       "web/src/services/reports.*",
       "tests/ui-testing/pages/reportsPages/**",
-      "tests/ui-testing/pages/dashboardPages/**"
+      "tests/ui-testing/pages/dashboardPages/**",
+      "tests/ui-testing/playwright-tests/Reports/**"
     ]
   },
   {
@@ -609,7 +630,8 @@
       "web/src/views/RUM/**",
       "web/src/services/sessions.*",
       "web/src/services/sourcemaps.*",
-      "tests/ui-testing/pages/rumPages/**"
+      "tests/ui-testing/pages/rumPages/**",
+      "tests/ui-testing/playwright-tests/RUM/**"
     ]
   },
   {
@@ -626,7 +648,8 @@
       "web/src/views/RUM/**",
       "web/src/services/sessions.*",
       "web/src/services/sourcemaps.*",
-      "tests/ui-testing/pages/rumPages/**"
+      "tests/ui-testing/pages/rumPages/**",
+      "tests/ui-testing/playwright-tests/RUM/**"
     ]
   },
   {
@@ -647,7 +670,8 @@
       "web/src/views/StreamExplorer*",
       "web/src/services/stream.*",
       "web/src/services/service_streams.*",
-      "tests/ui-testing/pages/streamsPages/**"
+      "tests/ui-testing/pages/streamsPages/**",
+      "tests/ui-testing/playwright-tests/Streams/**"
     ]
   },
   {
@@ -670,7 +694,8 @@
       "web/src/services/service_graph.*",
       "web/src/services/search.*",
       "web/src/services/streaming_search.*",
-      "tests/ui-testing/pages/tracesPages/**"
+      "tests/ui-testing/pages/tracesPages/**",
+      "tests/ui-testing/playwright-tests/Traces/**"
     ]
   },
   {
@@ -690,7 +715,8 @@
       "web/src/components/slos/**",
       "web/src/views/slos/**",
       "web/src/services/slos.*",
-      "tests/ui-testing/pages/sloPages/**"
+      "tests/ui-testing/pages/sloPages/**",
+      "tests/ui-testing/playwright-tests/SLO/**"
     ]
   },
   {
@@ -710,7 +736,8 @@
       "web/src/components/slos/**",
       "web/src/views/slos/**",
       "web/src/services/slos.*",
-      "tests/ui-testing/pages/sloPages/**"
+      "tests/ui-testing/pages/sloPages/**",
+      "tests/ui-testing/playwright-tests/SLO/**"
     ]
   }
 ]
