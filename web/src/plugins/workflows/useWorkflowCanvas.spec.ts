@@ -1498,7 +1498,17 @@ const branchGraph = () => {
         position: { x: 0, y: 0 },
         data: { node_type: "workflow_trigger" },
       },
-      { id: "b1", type: "default", position: { x: 0, y: 160 }, data: { node_type: "branch" } },
+      {
+        id: "b1",
+        type: "default",
+        position: { x: 0, y: 160 },
+        // Mirrors initialNodeData: a Branch is born with case-0 + else declared.
+        data: {
+          node_type: "branch",
+          cases: [{ handle: "case-0", conditions: null }],
+          else_handle: "else",
+        },
+      },
     ],
     edges: [{ id: "et1-b1", source: "t1", target: "b1" }],
   } as any;
@@ -1602,16 +1612,16 @@ describe("onConnect — a manual drag keeps the arm it was dragged from", () => 
   });
 });
 
-describe("Branch node — addNodeAfter must not overlap the true/false children", () => {
-  it("puts the first `true` child and the first `false` child at DIFFERENT positions", () => {
+describe("Branch node — addNodeAfter must not overlap the two seeded arm children", () => {
+  it("puts the first case-0 child and the first else child at DIFFERENT positions", () => {
     const { addNodeAfter } = useWorkflowCanvas(t);
     branchGraph();
 
-    addNodeAfter("b1", "true", "function");
+    addNodeAfter("b1", "case-0", "function");
     const wf = workflowObj.currentSelectedWorkflow;
     const trueChild = wf.nodes.find((n: any) => n.data.node_type === "function");
 
-    addNodeAfter("b1", "false", "destination");
+    addNodeAfter("b1", "else", "destination");
     const falseChild = wf.nodes.find((n: any) => n.data.node_type === "destination");
 
     expect(trueChild).toBeTruthy();
@@ -1624,11 +1634,11 @@ describe("Branch node — addNodeAfter must not overlap the true/false children"
     });
   });
 
-  it("places the `true` child LEFT of the `false` child (declared handle order)", () => {
+  it("places the case-0 child LEFT of the else child (declared handle order)", () => {
     const { addNodeAfter } = useWorkflowCanvas(t);
     branchGraph();
-    addNodeAfter("b1", "true", "function");
-    addNodeAfter("b1", "false", "destination");
+    addNodeAfter("b1", "case-0", "function");
+    addNodeAfter("b1", "else", "destination");
     const wf = workflowObj.currentSelectedWorkflow;
     const trueChild = wf.nodes.find((n: any) => n.data.node_type === "function");
     const falseChild = wf.nodes.find((n: any) => n.data.node_type === "destination");
@@ -1658,25 +1668,25 @@ describe("Branch node — addNodeAfter must not overlap the true/false children"
 // the per-arm wiring the Branch depends on, so a later refactor of the add path
 // cannot silently drop the handle and collapse both arms onto one edge.
 describe("Branch node — edges carry their sourceHandle (regression guard)", () => {
-  it("wires the true child on the `true` handle and the false child on `false`", () => {
+  it("wires each child on the arm it was added from", () => {
     const { addNodeAfter } = useWorkflowCanvas(t);
     branchGraph();
-    addNodeAfter("b1", "true", "function");
-    addNodeAfter("b1", "false", "destination");
+    addNodeAfter("b1", "case-0", "function");
+    addNodeAfter("b1", "else", "destination");
     const wf = workflowObj.currentSelectedWorkflow;
     const trueChild = wf.nodes.find((n: any) => n.data.node_type === "function");
     const falseChild = wf.nodes.find((n: any) => n.data.node_type === "destination");
     const handleFor = (target: string) =>
       wf.edges.find((e: any) => e.source === "b1" && e.target === target)?.sourceHandle;
-    expect(handleFor(trueChild.id)).toBe("true");
-    expect(handleFor(falseChild.id)).toBe("false");
+    expect(handleFor(trueChild.id)).toBe("case-0");
+    expect(handleFor(falseChild.id)).toBe("else");
   });
 
   it("gives the two arm edges distinct, handle-suffixed ids", () => {
     const { addNodeAfter } = useWorkflowCanvas(t);
     branchGraph();
-    addNodeAfter("b1", "true", "function");
-    addNodeAfter("b1", "false", "destination");
+    addNodeAfter("b1", "case-0", "function");
+    addNodeAfter("b1", "else", "destination");
     const armEdges = workflowObj.currentSelectedWorkflow.edges.filter(
       (e: any) => e.source === "b1",
     );
@@ -1754,13 +1764,13 @@ describe("Branch node — unwired handles are flagged, but do not block publish"
     branchGraph();
     const wf = workflowObj.currentSelectedWorkflow;
     wf.nodes.push({ id: "f1", position: { x: 0, y: 320 }, data: { node_type: "function" } });
-    wf.edges.push({ id: "eb1-f1-true", source: "b1", target: "f1", sourceHandle: "true" });
+    wf.edges.push({ id: "eb1-f1-c0", source: "b1", target: "f1", sourceHandle: "case-0" });
     expect(
       branchUnwiredHandles(
         wf.nodes.find((n: any) => n.id === "b1"),
         wf.edges,
       ),
-    ).toEqual(["false"]);
+    ).toEqual(["else"]);
   });
 
   it("reports no unwired handles once both arms are wired", () => {
@@ -1768,8 +1778,8 @@ describe("Branch node — unwired handles are flagged, but do not block publish"
     const wf = workflowObj.currentSelectedWorkflow;
     wf.nodes.push({ id: "f1", position: { x: 0, y: 320 }, data: { node_type: "function" } });
     wf.nodes.push({ id: "d1", position: { x: 0, y: 320 }, data: { node_type: "destination" } });
-    wf.edges.push({ id: "eb1-f1-true", source: "b1", target: "f1", sourceHandle: "true" });
-    wf.edges.push({ id: "eb1-d1-false", source: "b1", target: "d1", sourceHandle: "false" });
+    wf.edges.push({ id: "eb1-f1-c0", source: "b1", target: "f1", sourceHandle: "case-0" });
+    wf.edges.push({ id: "eb1-d1-else", source: "b1", target: "d1", sourceHandle: "else" });
     expect(
       branchUnwiredHandles(
         wf.nodes.find((n: any) => n.id === "b1"),
@@ -1795,8 +1805,8 @@ describe("Branch node — unwired handles are flagged, but do not block publish"
     // Both handles unwired, yet the node is fully configured: `meta.incomplete` is
     // what Publish validation reads, and it must stay clear.
     expect(branchUnwiredHandles(branch, workflowObj.currentSelectedWorkflow.edges)).toEqual([
-      "true",
-      "false",
+      "case-0",
+      "else",
     ]);
     expect(isNodeIncomplete(branch)).toBe(false);
   });
@@ -2293,6 +2303,208 @@ describe("branchHandles — handles come from the stored case, not its position"
       data: { node_type: "branch", cases: [{}, {}], else_handle: "else" },
     };
     expect(branchHandles(branch)).toEqual(["case-0", "case-1", "else"]);
+  });
+});
+
+describe("branchHandles — an unconfigured Branch offers no legacy arms", () => {
+  // The old ["true","false"] fallback minted handles the drawer could never
+  // declare (it only mints case-N + else), condemning every early-wired edge.
+  it("returns no handles for a branch with no cases field", () => {
+    expect(branchHandles({ id: "b", data: { node_type: "branch" } })).toEqual([]);
+  });
+
+  it("returns no handles for a branch with an empty cases array", () => {
+    expect(branchHandles({ id: "b", data: { node_type: "branch", cases: [] } })).toEqual([]);
+  });
+});
+
+describe("a new Branch node is born with a declared path", () => {
+  it("addNodeAfter seeds a first case and the else arm on a fresh branch", () => {
+    const { addNodeAfter } = useWorkflowCanvas(t);
+    branchGraph();
+    addNodeAfter("t1", "out", "branch");
+    const created = workflowObj.currentSelectedWorkflow.nodes.find(
+      (n: any) => n.data.node_type === "branch" && n.id !== "b1",
+    );
+    expect(created.data.cases).toEqual([{ handle: "case-0", conditions: null }]);
+    expect(created.data.else_handle).toBe("else");
+    expect(branchHandles(created)).toEqual(["case-0", "else"]);
+  });
+
+  it("wiring both seeded arms before configuring is never structurally broken", () => {
+    const { addNodeAfter, onConnect } = useWorkflowCanvas(t);
+    branchGraph();
+    addNodeAfter("t1", "out", "branch");
+    const wf = workflowObj.currentSelectedWorkflow;
+    const created = wf.nodes.find((n: any) => n.data.node_type === "branch" && n.id !== "b1");
+    wf.nodes.push(
+      { id: "dA", position: { x: 0, y: 480 }, data: { node_type: "destination" } },
+      { id: "dB", position: { x: 300, y: 480 }, data: { node_type: "destination" } },
+    );
+    onConnect({ source: created.id, target: "dA", sourceHandle: "case-0" });
+    onConnect({ source: created.id, target: "dB", sourceHandle: "else" });
+    expect(structurallyBrokenNodes()).toEqual([]);
+  });
+
+  it("does not seed cases on non-branch node types", () => {
+    const { addNodeAfter } = useWorkflowCanvas(t);
+    branchGraph();
+    addNodeAfter("t1", "out", "condition");
+    const created = workflowObj.currentSelectedWorkflow.nodes.find(
+      (n: any) => n.data.node_type === "condition",
+    );
+    expect(created.data.cases).toBeUndefined();
+    expect(created.data.else_handle).toBeUndefined();
+  });
+});
+
+describe("hydrateWorkflow — heals branch edges wired before the paths existed", () => {
+  // The reference wedge: a draft whose branch was wired on the legacy true/false
+  // arms BEFORE cases existed, then partially configured (case-0 + its edge).
+  const wedge = () => ({
+    id: "w1",
+    name: "wf",
+    is_draft: true,
+    nodes: [
+      { id: "t", data: { node_type: "workflow_trigger" } },
+      { id: "b", data: { node_type: "branch", cases: [{ handle: "case-0" }] } },
+      { id: "d1", data: { node_type: "destination" } },
+      { id: "d2", data: { node_type: "destination" } },
+      { id: "d3", data: { node_type: "destination" } },
+    ],
+    edges: [
+      { id: "e0", source: "t", target: "b" },
+      { id: "e1", source: "b", target: "d1", source_handle: "true" },
+      { id: "e2", source: "b", target: "d2", source_handle: "false" },
+      { id: "e3", source: "b", target: "d3", source_handle: "case-0" },
+    ],
+  });
+  const handleFor = (target: string) =>
+    workflowObj.currentSelectedWorkflow.edges.find((e: any) => e.target === target)?.sourceHandle;
+  const branch = () => workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === "b");
+
+  it("keeps the already-valid case-0 edge untouched", () => {
+    hydrateWorkflow(wedge());
+    expect(handleFor("d3")).toBe("case-0");
+  });
+
+  it("maps the legacy false edge onto the else arm", () => {
+    hydrateWorkflow(wedge());
+    expect(handleFor("d2")).toBe("else");
+  });
+
+  it("mints a fresh case for the true edge when every case arm is taken", () => {
+    hydrateWorkflow(wedge());
+    expect(handleFor("d1")).toBe("case-1");
+    expect(branch().data.cases.map((c: any) => c.handle)).toEqual(["case-0", "case-1"]);
+  });
+
+  it("declares the else arm the UI always offers", () => {
+    hydrateWorkflow(wedge());
+    expect(branch().data.else_handle).toBe("else");
+  });
+
+  it("a healed wedge is no longer structurally broken", () => {
+    hydrateWorkflow(wedge());
+    expect(structurallyBrokenNodes()).toEqual([]);
+  });
+
+  it("healed handles reach the save payload (no stale source_handle wins)", () => {
+    hydrateWorkflow(wedge());
+    const edges = serializeWorkflow().edges as any[];
+    expect(edges.find((e) => e.target === "d2")?.source_handle).toBe("else");
+    expect(edges.find((e) => e.target === "d1")?.source_handle).toBe("case-1");
+  });
+
+  it("a healed load leaves storedSnapshot empty so saving the fix is not a no-op", () => {
+    hydrateWorkflow(wedge());
+    expect(workflowObj.storedSnapshot).toBe("");
+  });
+
+  it("maps true onto the first case when that arm is free", () => {
+    const wf = wedge();
+    wf.edges = [
+      { id: "e0", source: "t", target: "b" },
+      { id: "e1", source: "b", target: "d1", source_handle: "true" },
+      { id: "e2", source: "b", target: "d2", source_handle: "false" },
+    ];
+    hydrateWorkflow(wf);
+    expect(handleFor("d1")).toBe("case-0");
+    expect(handleFor("d2")).toBe("else");
+    expect(branch().data.cases.map((c: any) => c.handle)).toEqual(["case-0"]);
+  });
+
+  it("seeds a first case on a never-configured branch and routes its edges", () => {
+    const wf = wedge();
+    (wf.nodes[1] as any).data = { node_type: "branch" };
+    wf.edges = [
+      { id: "e0", source: "t", target: "b" },
+      { id: "e1", source: "b", target: "d1", source_handle: "true" },
+      { id: "e2", source: "b", target: "d2", source_handle: "false" },
+    ];
+    hydrateWorkflow(wf);
+    expect(branch().data.cases).toEqual([{ handle: "case-0", conditions: null }]);
+    expect(branch().data.else_handle).toBe("else");
+    expect(handleFor("d1")).toBe("case-0");
+    expect(handleFor("d2")).toBe("else");
+    expect(structurallyBrokenNodes()).toEqual([]);
+  });
+
+  it("heals a handle-less branch edge onto the first free arm", () => {
+    const wf = wedge();
+    wf.edges = [
+      { id: "e0", source: "t", target: "b" },
+      { id: "e1", source: "b", target: "d1" },
+    ];
+    hydrateWorkflow(wf);
+    expect(handleFor("d1")).toBe("case-0");
+  });
+
+  it("leaves a fully declared workflow untouched and captures the stored snapshot", () => {
+    hydrateWorkflow({
+      id: "w1",
+      name: "wf",
+      is_draft: true,
+      nodes: [
+        { id: "t", data: { node_type: "workflow_trigger" } },
+        {
+          id: "b",
+          data: { node_type: "branch", cases: [{ handle: "case-0" }], else_handle: "else" },
+        },
+        { id: "d1", data: { node_type: "destination" } },
+        { id: "d2", data: { node_type: "destination" } },
+      ],
+      edges: [
+        { id: "e0", source: "t", target: "b" },
+        { id: "e1", source: "b", target: "d1", source_handle: "case-0" },
+        { id: "e2", source: "b", target: "d2", source_handle: "else" },
+      ],
+    });
+    expect(handleFor("d1")).toBe("case-0");
+    expect(handleFor("d2")).toBe("else");
+    expect(workflowObj.storedSnapshot).not.toBe("");
+  });
+
+  it("respects a branch whose declared case handles are literally true/false", () => {
+    hydrateWorkflow({
+      id: "w1",
+      name: "wf",
+      is_draft: true,
+      nodes: [
+        { id: "t", data: { node_type: "workflow_trigger" } },
+        {
+          id: "b",
+          data: { node_type: "branch", cases: [{ handle: "true" }], else_handle: "else" },
+        },
+        { id: "d1", data: { node_type: "destination" } },
+      ],
+      edges: [
+        { id: "e0", source: "t", target: "b" },
+        { id: "e1", source: "b", target: "d1", source_handle: "true" },
+      ],
+    });
+    expect(handleFor("d1")).toBe("true");
+    expect(branch().data.cases.map((c: any) => c.handle)).toEqual(["true"]);
   });
 });
 

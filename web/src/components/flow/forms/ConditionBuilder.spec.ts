@@ -339,3 +339,90 @@ describe("ConditionBuilder", () => {
     expect(payload.conditions.conditions[0].ignore_case).toBe(true);
   });
 });
+
+// Authoring-time unknown-column warning: only workflow callers pass
+// normalize-column-names (the payload envelope is known there), so the warning
+// must be inert for pipeline usage where stream columns are open-ended.
+describe("ConditionBuilder unknown-column warning", () => {
+  const FIELDS = [
+    { label: "meta.alert_name", value: "meta_alert_name", type: "Utf8" },
+    { label: "meta.severity", value: "meta_severity", type: "Utf8" },
+  ];
+  const treeWith = (column: string) => ({
+    filterType: "group",
+    logicalOperator: "AND",
+    conditions: [{ filterType: "condition", column, operator: "=", value: "critical" }],
+  });
+  const warnings = (wrapper: any) =>
+    wrapper.findAll('[data-test="condition-builder-unknown-column-warning"]');
+
+  it("warns for a typed column the trigger payload cannot resolve, with a suggestion", () => {
+    const wrapper = createWrapper({
+      fields: FIELDS,
+      initialConditions: treeWith("severity"),
+      normalizeColumnNames: true,
+    });
+    const warns = warnings(wrapper);
+    expect(warns).toHaveLength(1);
+    expect(warns[0].text()).toContain("severity");
+    expect(warns[0].text()).toContain("meta.severity");
+  });
+
+  it("shows the warning without a suggestion when nothing near-matches", () => {
+    const wrapper = createWrapper({
+      fields: FIELDS,
+      initialConditions: treeWith("hostname"),
+      normalizeColumnNames: true,
+    });
+    const warns = warnings(wrapper);
+    expect(warns).toHaveLength(1);
+    expect(warns[0].text()).not.toContain("?");
+  });
+
+  it("does not warn for a dropdown-picked (known) column", () => {
+    const wrapper = createWrapper({
+      fields: FIELDS,
+      initialConditions: treeWith("meta_severity"),
+      normalizeColumnNames: true,
+    });
+    expect(warnings(wrapper)).toHaveLength(0);
+  });
+
+  it("does not warn for a custom path under a known payload root", () => {
+    const wrapper = createWrapper({
+      fields: FIELDS,
+      initialConditions: treeWith("meta_custom_runtime_field"),
+      normalizeColumnNames: true,
+    });
+    expect(warnings(wrapper)).toHaveLength(0);
+  });
+
+  it("stays inert without normalizeColumnNames (pipeline builders)", () => {
+    const wrapper = createWrapper({
+      fields: FIELDS,
+      initialConditions: treeWith("severity"),
+    });
+    expect(warnings(wrapper)).toHaveLength(0);
+  });
+
+  it("stays inert when the payload shape is unknown (no fields)", () => {
+    const wrapper = createWrapper({
+      fields: [],
+      initialConditions: treeWith("severity"),
+      normalizeColumnNames: true,
+    });
+    expect(warnings(wrapper)).toHaveLength(0);
+  });
+
+  it("never blocks submit — the payload is returned despite the warning", async () => {
+    const wrapper = createWrapper({
+      fields: FIELDS,
+      initialConditions: treeWith("severity"),
+      normalizeColumnNames: true,
+      optional: true,
+    });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload).not.toBeNull();
+    expect(payload.conditions.conditions[0].column).toBe("severity");
+  });
+});

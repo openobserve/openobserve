@@ -231,7 +231,15 @@ describe("WorkflowNode", () => {
   // mechanism as the "Set Up Later" placeholder marker — and NOT the
   // `meta.incomplete` flag, which is what blocks Publish.
   describe("branch: unwired-handle badge", () => {
-    const BRANCH = { id: "b1", data: { node_type: "branch" } };
+    // Mirrors initialNodeData: a Branch is born with case-0 + else declared.
+    const BRANCH = {
+      id: "b1",
+      data: {
+        node_type: "branch",
+        cases: [{ handle: "case-0", conditions: null }],
+        else_handle: "else",
+      },
+    };
 
     it("shows the unwired-handle badge when an arm has no outgoing edge", () => {
       setGraph([TRIGGER, BRANCH], [{ source: "t1", target: "b1" }]);
@@ -244,8 +252,8 @@ describe("WorkflowNode", () => {
         [TRIGGER, BRANCH, FUNCTION, DESTINATION],
         [
           { source: "t1", target: "b1" },
-          { source: "b1", target: "f1", sourceHandle: "true" },
-          { source: "b1", target: "d1", sourceHandle: "false" },
+          { source: "b1", target: "f1", sourceHandle: "case-0" },
+          { source: "b1", target: "d1", sourceHandle: "else" },
         ],
       );
       wrapper = mountNode("b1", BRANCH.data);
@@ -257,7 +265,7 @@ describe("WorkflowNode", () => {
         [TRIGGER, BRANCH, FUNCTION],
         [
           { source: "t1", target: "b1" },
-          { source: "b1", target: "f1", sourceHandle: "true" },
+          { source: "b1", target: "f1", sourceHandle: "case-0" },
         ],
       );
       wrapper = mountNode("b1", BRANCH.data);
@@ -290,7 +298,7 @@ describe("WorkflowNode", () => {
     it("gives the card both branch handles so the arms are clickable", () => {
       setGraph([TRIGGER, BRANCH], [{ source: "t1", target: "b1" }]);
       wrapper = mountNode("b1", BRANCH.data);
-      expect(card(wrapper).props("outputHandles")).toEqual([{ id: "true" }, { id: "false" }]);
+      expect(card(wrapper).props("outputHandles")).toEqual([{ id: "case-0" }, { id: "else" }]);
     });
   });
 

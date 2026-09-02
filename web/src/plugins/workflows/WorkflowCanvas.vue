@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="workflow-flow o2vf_node"
     :class="{ 'workflow-flow--readonly': readOnly }"
     :connect-on-click="false"
+    :delete-key-code="null"
     :default-viewport="{ zoom: 0.8 }"
     :min-zoom="0.2"
     :max-zoom="4"
@@ -91,6 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="edgeProps.data"
         :marker-end="edgeProps.markerEnd"
         :style="edgeProps.style"
+        :selected="edgeProps.selected"
         :insertable="!readOnly && isEdgeRevealed(edgeProps.id)"
         :label="edgeBranchLabel(edgeProps.id, t)"
         @insert="onEdgeInsert(edgeProps.id, $event)"
@@ -348,6 +350,7 @@ const {
   openActionPicker,
   openStepPicker,
   openInsertPicker,
+  requestDeleteNode,
 } = useWorkflowCanvas(t);
 
 const {
@@ -357,6 +360,7 @@ const {
   dimensions,
   findNode,
   getSelectedEdges,
+  getSelectedNodes,
   removeEdges,
   fitView,
   setCenter,
@@ -440,8 +444,8 @@ const isTextInputTarget = (target: EventTarget | null): boolean => {
 };
 
 // Keyboard handling on the canvas:
-//   • Backspace/Delete removes the selected edge (the action the hint advertises;
-//     scoped to EDGES only so node deletion keeps flowing through the confirm dialog).
+//   • Backspace/Delete removes the selected edge (the action the hint advertises);
+//     a selected NODE instead opens the same confirm dialog as the trash button.
 //   • Ctrl/Cmd+Z undoes the last structural change; Ctrl/Cmd+Shift+Z redoes it
 //     (redo is keyboard-only — no on-screen button, by product decision).
 // All of these are inert on the read-only Runs canvas and while a text input /
@@ -460,11 +464,18 @@ const onKeydown = (event: KeyboardEvent) => {
 
   if (event.key !== "Delete" && event.key !== "Backspace") return;
   const selected = getSelectedEdges.value;
-  if (!selected.length) return;
+  if (selected.length) {
+    event.preventDefault();
+    // Snapshot BEFORE removal so the edge-delete is a single undo step.
+    pushWorkflowHistory();
+    removeEdges(selected.map((e) => e.id));
+    return;
+  }
+  // VueFlow's own delete keys are off (delete-key-code null) so nodes reach this confirm.
+  const node = getSelectedNodes.value[0];
+  if (!node) return;
   event.preventDefault();
-  // Snapshot BEFORE removal so the edge-delete is a single undo step.
-  pushWorkflowHistory();
-  removeEdges(selected.map((e) => e.id));
+  requestDeleteNode(node.id);
 };
 
 onMounted(() => {
@@ -662,6 +673,9 @@ const appendPointFor = (node: any) => {
 const ARM_GAP = 88;
 const appendPointsFor = (node: any) => {
   const handles = branchHandles(node);
+  // A case-less Branch declares nothing, so its + must MINT a path — an "out" + here would wire a handle-less edge the backend rejects.
+  if (node?.data?.node_type === "branch" && !handles.length)
+    return [{ id: node.id, handle: NEW_BRANCH_PATH_HANDLE, ...appendPointFor(node) }];
   if (handles.length < 2) return [{ id: node.id, handle: "out", ...appendPointFor(node) }];
   const base = screenBelow(node);
   // An arm already wired leads somewhere: re-offering its `+` made a fully wired

@@ -136,7 +136,8 @@ export const nodeMeta = (nodeType: string): WorkflowNodeMeta | undefined =>
 export const branchHandles = (node: any): string[] => {
   if (node?.data?.node_type !== "branch") return [];
   const cases = node?.data?.cases;
-  if (!Array.isArray(cases) || !cases.length) return ["true", "false"];
+  // No legacy true/false fallback: those arms can never be declared, so every edge wired on them died at publish.
+  if (!Array.isArray(cases) || !cases.length) return [];
   return [...cases.map((c: any, i: number) => c?.handle || `case-${i}`), "else"];
 };
 
@@ -155,6 +156,19 @@ export const appendBranchCase = (node: any): string => {
   node.data = { ...node.data, cases: [...cases, { handle, conditions: null }] };
   return handle;
 };
+
+// A Branch is born with a declared first path + else: handles minted before
+// configuration (the old true/false) could never be declared, condemning every
+// edge wired ahead of setup.
+const initialNodeData = (nodeType: string, id: string) =>
+  nodeType === "branch"
+    ? {
+        label: id,
+        node_type: nodeType,
+        cases: [{ handle: "case-0", conditions: null }],
+        else_handle: "else",
+      }
+    : { label: id, node_type: nodeType };
 
 // A single-output card's handle id is the literal "output" — not a routable Branch arm, so persisting it would invent a path the backend does not have.
 export const routableHandle = (handle?: string): string | undefined =>
@@ -273,8 +287,7 @@ export const structurallyBrokenNodes = (): string[] => {
     if (!out.length) continue; // routing nothing yet — legal
     const declared = new Set(branchHandles(node));
     const configured = Array.isArray(node?.data?.cases) && node.data.cases.length > 0;
-    // Unconfigured: branchHandles falls back to legacy true/false, which no edge
-    // drawn today can carry — so any outgoing edge is unroutable.
+    // Unconfigured: no declared handles at all, so any outgoing edge is unroutable.
     if (!configured) {
       broken.push(node.id);
       continue;
@@ -1667,6 +1680,59 @@ export const loadWorkflowRun = async (opts: {
   }
 };
 
+// Remap one orphan branch edge to a declared arm: legacy `false` means "everything
+// else", `true` means "the matching case"; anything else takes the first free arm.
+// A fresh case is minted only when no free arm remains, so a healed arm is never
+// double-routed and declared handles stay unique.
+const healOrphanEdge = (node: any, edge: any, wired: Set<string>): void => {
+  const caseHandles = (node.data.cases as any[]).map(
+    (c: any, i: number) => c?.handle || `case-${i}`,
+  );
+  const firstFree = (handles: string[]) => handles.find((h) => !wired.has(h));
+  let target: string | undefined;
+  if (edge.sourceHandle === "false") target = wired.has("else") ? firstFree(caseHandles) : "else";
+  else if (edge.sourceHandle === "true") target = firstFree(caseHandles);
+  else target = firstFree([...caseHandles, "else"]);
+  if (!target) target = appendBranchCase(node);
+  wired.add(target);
+  edge.sourceHandle = target;
+  // serializeEdge prefers snake_case, so a stale copy would resurrect the dead handle on save.
+  delete edge.source_handle;
+};
+
+// Drafts skip save-time validation, so a branch edge wired before its paths
+// existed (legacy true/false arms, a deleted case, a missing handle) loads
+// pointing at a handle the node does not declare — unpublishable, with no way to
+// finish short of rebuilding the subtree. Heal on load instead. Returns whether
+// anything changed, so the caller can keep the fix saveable (not a stored no-op).
+const healBranchEdges = (nodes: any[], edges: any[]): boolean => {
+  let changed = false;
+  for (const node of nodes) {
+    if (node?.data?.node_type !== "branch") continue;
+    if (!Array.isArray(node.data.cases) || !node.data.cases.length) {
+      node.data = { ...node.data, cases: [{ handle: "case-0", conditions: null }] };
+      changed = true;
+    }
+    // The UI offers the else arm on every configured Branch; undeclared it fails publish.
+    if (!node.data.else_handle) {
+      node.data = { ...node.data, else_handle: "else" };
+      changed = true;
+    }
+    const out = edges.filter((e: any) => (e.source ?? e.sourceNode?.id) === node.id);
+    if (!out.length) continue;
+    const declared = new Set(branchHandles(node));
+    const wired = new Set<string>(
+      out.map((e: any) => e.sourceHandle).filter((h: string) => declared.has(h)),
+    );
+    for (const edge of out) {
+      if (edge.sourceHandle && declared.has(edge.sourceHandle)) continue;
+      healOrphanEdge(node, edge, wired);
+      changed = true;
+    }
+  }
+  return changed;
+};
+
 // Load a workflow (a list row or API result) into the shared editor state,
 // normalizing nodes/edges for VueFlow (type from node_type; edge styling). Mirrors
 // the pipeline pattern where editPipeline() sets pipelineObj from the row
@@ -1702,6 +1768,7 @@ export const hydrateWorkflow = (wf: any) => {
     const styled = makeEdge(src, tgt, e.source_handle ?? e.sourceHandle);
     return { ...e, ...styled, id: e.id || styled.id };
   });
+  const healed = healBranchEdges(nodes, edges);
   // List rows carry `is_draft`; normalize it onto the store's `isDraft` so the
   // editor knows to save via the draft endpoints and to offer Publish.
   workflowObj.currentSelectedWorkflow = { ...wf, nodes, edges, isDraft: !!wf.is_draft };
@@ -1710,7 +1777,9 @@ export const hydrateWorkflow = (wf: any) => {
   workflowObj.workflowWithoutChange = JSON.parse(
     JSON.stringify(workflowObj.currentSelectedWorkflow),
   );
-  captureStoredSnapshot();
+  // A healed graph differs from the server copy; a snapshot of it would make the very save that persists the fix read as a no-op.
+  if (healed) workflowObj.storedSnapshot = "";
+  else captureStoredSnapshot();
   workflowObj.isEditWorkflow = true;
   // A freshly-loaded workflow is clean and carries no prior local edit history.
   workflowObj.dirtyFlag = false;
@@ -2010,7 +2079,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       id,
       type: meta.ioType,
       position,
-      data: { label: id, node_type: nodeType },
+      data: initialNodeData(nodeType, id),
       meta: { incomplete: "true" },
     };
     // No auto-wire on drag-drop — the node is placed where dropped and stays
@@ -2097,7 +2166,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       id,
       type: meta.ioType,
       position: position ?? { x: 320, y: 240 },
-      data: { label: id, node_type: nodeType },
+      data: initialNodeData(nodeType, id),
       meta: { incomplete: "true" },
     };
     // Unconnected — no trigger to wire from yet; the trigger add links it later.
@@ -2141,7 +2210,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       // VueFlow render template (UI only) — derived from node_type, not stored.
       type: meta.ioType,
       position,
-      data: { label: id, node_type: nodeType },
+      data: initialNodeData(nodeType, id),
       // A freshly-added config node is an unconfigured placeholder until the panel
       // is closed with its payload; flag it so it shows the "Set up later" badge and
       // Publish stays blocked.
@@ -2186,7 +2255,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       id,
       type: meta.ioType,
       position,
-      data: { label: id, node_type: nodeType },
+      data: initialNodeData(nodeType, id),
       meta: { incomplete: "true" },
     };
     workflowObj.pendingEdge = null;

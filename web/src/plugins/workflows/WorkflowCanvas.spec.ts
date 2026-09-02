@@ -37,6 +37,7 @@ vi.mock("@vue-flow/core", async () => {
     setCenter: vi.fn(),
     removeEdges: vi.fn(),
     getSelectedEdges: ref([]),
+    getSelectedNodes: ref([]),
     viewport: ref({ x: 0, y: 0, zoom: 1 }),
     dimensions: ref({ width: 1000, height: 600 }),
   };
@@ -44,7 +45,7 @@ vi.mock("@vue-flow/core", async () => {
     __state: state,
     VueFlow: {
       name: "VueFlow",
-      props: ["nodes", "edges", "defaultViewport", "minZoom", "maxZoom"],
+      props: ["nodes", "edges", "defaultViewport", "minZoom", "maxZoom", "deleteKeyCode"],
       emits: [
         "update:nodes",
         "update:edges",
@@ -73,6 +74,7 @@ vi.mock("@vue-flow/core", async () => {
             data: { foo: "bar" },
             markerEnd: "url(#arrow)",
             style: { stroke: "grey" },
+            selected: true,
           },
         };
       },
@@ -103,6 +105,7 @@ vi.mock("@vue-flow/core", async () => {
       fitView: state.fitView,
       setCenter: state.setCenter,
       getSelectedEdges: state.getSelectedEdges,
+      getSelectedNodes: state.getSelectedNodes,
       removeEdges: state.removeEdges,
       viewport: state.viewport,
       dimensions: state.dimensions,
@@ -148,6 +151,7 @@ vi.mock("@/components/flow/FlowEdge.vue", () => ({
       "data",
       "markerEnd",
       "style",
+      "selected",
       "insertable",
       "label",
     ],
@@ -180,6 +184,7 @@ vi.mock("@/plugins/workflows/useWorkflowCanvas", async () => {
     openActionPicker: vi.fn(),
     openStepPicker: vi.fn(),
     openInsertPicker: vi.fn(),
+    requestDeleteNode: vi.fn(),
   };
   return {
     default: () => api,
@@ -197,7 +202,7 @@ vi.mock("@/plugins/workflows/useWorkflowCanvas", async () => {
     branchHandles: (node: any) => {
       if (node?.data?.node_type !== "branch") return [];
       const cases = node?.data?.cases;
-      if (!Array.isArray(cases) || !cases.length) return ["true", "false"];
+      if (!Array.isArray(cases) || !cases.length) return [];
       return [...cases.map((c: any, i: number) => c?.handle || `case-${i}`), "else"];
     },
     // The canvas asks for a node's io_type to decide which leaves can offer an
@@ -371,6 +376,13 @@ describe("WorkflowCanvas", () => {
     it("passes the resolved Branch-arm label onto FlowEdge", () => {
       wrapper = mountCanvas();
       expect(wrapper.findComponent({ name: "FlowEdge" }).props("label")).toBe("Severe (>=1000)");
+    });
+
+    // Without this the click-selected edge looks identical to every other edge,
+    // so users conclude edges cannot be selected or deleted at all.
+    it("passes VueFlow's selected flag onto FlowEdge so selection is visible", () => {
+      wrapper = mountCanvas();
+      expect(wrapper.findComponent({ name: "FlowEdge" }).props("selected")).toBe(true);
     });
   });
 
@@ -763,6 +775,27 @@ describe("WorkflowCanvas", () => {
       expect(pts[0].attributes("style")).not.toContain("--wf-ox: 200px");
     });
 
+    // A case-less Branch declares no handles at all now, so its + must MINT a
+    // path — an "out" + here would wire a handle-less edge the backend rejects.
+    it("a case-less branch offers one + that mints a path instead of legacy arms", async () => {
+      wfObj.currentSelectedWorkflow = {
+        nodes: [
+          { id: "t1", position: { x: 100, y: 40 }, data: { node_type: "workflow_trigger" } },
+          { id: "b1", position: { x: 100, y: 240 }, data: { node_type: "branch" } },
+        ],
+        edges: [{ id: "e1", source: "t1", target: "b1" }],
+      };
+      wrapper = mountCanvas();
+      await nextTick();
+      flow(wrapper).vm.$emit("node-mouse-enter", { node: { id: "b1" } });
+      await nextTick();
+      const pts = points(wrapper);
+      expect(pts).toHaveLength(1);
+      const buttons = wrapper.findAllComponents({ name: "FlowAddButton" });
+      await buttons[0].vm.$emit("click", { clientX: 1, clientY: 2 });
+      expect(api.openStepPicker.mock.calls[0][1]).toBe("__new_path__");
+    });
+
     it('a NON-branch node still gets exactly one + carrying "out"', async () => {
       wfObj.currentSelectedWorkflow = {
         nodes: [
@@ -934,6 +967,50 @@ describe("WorkflowCanvas", () => {
       vi.advanceTimersByTime(15000);
       await nextTick();
       expect(insertable(wrapper)).toBe(false); // released → hides
+    });
+  });
+
+  // Keyboard delete must funnel through the SAME confirm flow as the trash button:
+  // VueFlow's default delete-key handling removes selected elements directly, which
+  // silently destroyed a just-configured node (still selected after its drawer closed).
+  describe("keyboard node delete goes through the confirm flow", () => {
+    const keydown = (key: string) =>
+      window.dispatchEvent(new KeyboardEvent("keydown", { key, cancelable: true }));
+
+    beforeEach(() => {
+      vf.getSelectedEdges.value = [];
+      vf.getSelectedNodes.value = [];
+      wfObj.readOnly = false;
+    });
+
+    it("🔑 disables VueFlow's built-in delete keys (delete-key-code null)", () => {
+      wrapper = mountCanvas();
+      expect(flow(wrapper).props("deleteKeyCode")).toBeNull();
+    });
+
+    it("🔑 Backspace on a selected node asks for confirmation instead of deleting", () => {
+      wrapper = mountCanvas();
+      vf.getSelectedNodes.value = [{ id: "n1" }];
+      keydown("Backspace");
+      expect(api.requestDeleteNode).toHaveBeenCalledWith("n1");
+      expect(vf.removeEdges).not.toHaveBeenCalled();
+    });
+
+    it("Delete triggers the same confirm; a selected edge still wins (direct removal)", () => {
+      wrapper = mountCanvas();
+      vf.getSelectedEdges.value = [{ id: "e1" }];
+      vf.getSelectedNodes.value = [{ id: "n1" }];
+      keydown("Delete");
+      expect(vf.removeEdges).toHaveBeenCalledWith(["e1"]);
+      expect(api.requestDeleteNode).not.toHaveBeenCalled();
+    });
+
+    it("is inert on the read-only Runs canvas", () => {
+      wrapper = mountCanvas();
+      wfObj.readOnly = true;
+      vf.getSelectedNodes.value = [{ id: "n1" }];
+      keydown("Backspace");
+      expect(api.requestDeleteNode).not.toHaveBeenCalled();
     });
   });
 });

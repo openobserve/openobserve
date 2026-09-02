@@ -656,6 +656,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
+          <!-- A filtering step's real verdict — forwarded counts must never read as success when 0-of-N. -->
+          <div
+            v-if="showOutcomeSummary"
+            data-test="workflow-ndv-output-outcome"
+            class="flex shrink-0 flex-col gap-1 p-2.5"
+            :class="{ 'border-border-default border-b': outputRecords }"
+          >
+            <div
+              v-if="outputNoMatch"
+              data-test="workflow-ndv-output-nomatch"
+              class="text-status-warning-text text-xs font-semibold"
+            >
+              {{ t("workflow.ndv.noMatchForwarded", { total: runInputTotal }, runInputTotal) }}
+            </div>
+            <div
+              v-else
+              data-test="workflow-ndv-output-forwarded-count"
+              class="text-text-secondary text-xs font-semibold"
+            >
+              {{
+                t(
+                  "workflow.ndv.forwardedCount",
+                  { out: forwardedTotal, total: runInputTotal },
+                  runInputTotal,
+                )
+              }}
+            </div>
+            <template v-if="isBranchNode">
+              <div
+                v-for="p in branchPaths"
+                :key="p.handle"
+                data-test="workflow-ndv-branch-path"
+                class="text-text-secondary flex items-center justify-between gap-2 text-xs"
+              >
+                <span class="truncate">{{ p.label }}</span>
+                <span class="font-semibold" :class="{ 'text-text-body': p.count > 0 }">{{
+                  p.count
+                }}</span>
+              </div>
+              <div
+                v-if="branchDroppedCount > 0"
+                data-test="workflow-ndv-branch-dropped"
+                class="text-status-warning-text text-xs"
+              >
+                {{
+                  t("workflow.ndv.branchDropped", { count: branchDroppedCount }, branchDroppedCount)
+                }}
+              </div>
+            </template>
+          </div>
+
           <template v-if="outputRecords">
             <div
               v-if="outputHasError"
@@ -675,7 +726,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <div
-            v-else-if="!outputHasError"
+            v-else-if="!outputHasError && !outputNoMatch"
             class="text-text-secondary flex h-full items-center justify-center p-4 text-center text-sm italic"
           >
             {{ hasResult ? t("workflow.ndv.noOutput") : t("workflow.ndv.noRunYet") }}
@@ -735,6 +786,7 @@ import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import WorkflowRunSwitcher from "./WorkflowRunSwitcher.vue";
+import { branchPathCounts, forwardedRunCount, isNoMatchRun } from "./nodeRunOutcome";
 import WorkflowTrigger from "@/plugins/workflows/nodes/WorkflowTrigger.vue";
 import WorkflowCondition from "@/plugins/workflows/nodes/WorkflowCondition.vue";
 import WorkflowBranch from "@/plugins/workflows/nodes/WorkflowBranch.vue";
@@ -1179,20 +1231,57 @@ const outputErrorMessages = computed<string[]>(() => {
   return entries.map((e: any) => (Array.isArray(e) ? String(e[0]) : String(e)));
 });
 const outputHasError = computed(() => outputErrorMessages.value.length > 0);
-const outputStatus = computed<"ok" | "error" | "skipped">(() => {
+
+// "Executed clean" and "matched something" are different claims — a green Passed on 0-of-N hides a dead workflow.
+const runEdges = () => workflowObj.currentSelectedWorkflow?.edges || [];
+const isBranchNode = computed(
+  () => workflowObj.currentSelectedNodeData?.data?.node_type === "branch",
+);
+const isFilteringNode = computed(
+  () => isBranchNode.value || workflowObj.currentSelectedNodeData?.data?.node_type === "condition",
+);
+const runInputTotal = computed(() => nodeTestInput(nodeId.value)?.length ?? 0);
+const forwardedTotal = computed(() =>
+  forwardedRunCount(workflowObj.currentSelectedNodeData, workflowObj.testRun.result, runEdges()),
+);
+const outputNoMatch = computed(() =>
+  isNoMatchRun(workflowObj.currentSelectedNodeData, workflowObj.testRun.result, runEdges()),
+);
+const branchPaths = computed(() =>
+  isBranchNode.value
+    ? branchPathCounts(
+        workflowObj.currentSelectedNodeData,
+        runEdges(),
+        workflowObj.testRun.result?.inputs,
+        t,
+      )
+    : [],
+);
+const branchDroppedCount = computed(() => Math.max(0, runInputTotal.value - forwardedTotal.value));
+const showOutcomeSummary = computed(
+  () =>
+    hasResult.value && isFilteringNode.value && runInputTotal.value > 0 && !outputHasError.value,
+);
+
+const outputStatus = computed<"ok" | "error" | "skipped" | "noMatch">(() => {
   const r = workflowObj.testRun.result;
   if (!r) return "ok";
   if (r.errors?.[nodeId.value]) return "error";
+  if (outputNoMatch.value) return "noMatch";
   if (r.inputs) return r.inputs[nodeId.value]?.length ? "ok" : "skipped";
   if (r.blockedNodeIds?.includes(nodeId.value)) return "skipped";
   return "ok";
 });
-const outputStatusVariant = computed<"error-soft" | "success-soft" | "default-soft">(() =>
+const outputStatusVariant = computed<
+  "error-soft" | "success-soft" | "warning-soft" | "default-soft"
+>(() =>
   outputStatus.value === "error"
     ? "error-soft"
-    : outputStatus.value === "ok"
-      ? "success-soft"
-      : "default-soft",
+    : outputStatus.value === "noMatch"
+      ? "warning-soft"
+      : outputStatus.value === "ok"
+        ? "success-soft"
+        : "default-soft",
 );
 
 // The node types that open the NDV, each showing the full Input · Config · Output
@@ -1245,10 +1334,12 @@ const nodeDisplay = (node: any): { label: string; icon: string; detail: string }
 // tree, not just the executed steps). Clicking one walks the panel to that node
 // (navigateTo → editNode); the dot/ring mirrors the canvas ✓/✗ for the last run
 // (null = didn't run / no run).
-const stepStatusFor = (id: string): "ok" | "error" | "skipped" | null => {
+const stepStatusFor = (id: string): "ok" | "error" | "skipped" | "noMatch" | null => {
   const r = workflowObj.testRun.result;
   if (!r || !r.ranNodeIds?.includes(id)) return null;
   if (r.errors?.[id]) return "error";
+  const node = (workflowObj.currentSelectedWorkflow?.nodes || []).find((n: any) => n.id === id);
+  if (isNoMatchRun(node, r, runEdges())) return "noMatch";
   if (r.inputs) return r.inputs[id]?.length ? "ok" : "skipped";
   if (r.blockedNodeIds?.includes(id)) return "skipped";
   return "ok";
@@ -1258,16 +1349,20 @@ const stepDotClass = (status: string | null): string =>
     ? "bg-status-negative"
     : status === "ok"
       ? "bg-status-positive"
-      : status === "skipped"
-        ? "bg-badge-default-solid-bg"
-        : "bg-border-strong";
+      : status === "noMatch"
+        ? "bg-status-warning-text"
+        : status === "skipped"
+          ? "bg-badge-default-solid-bg"
+          : "bg-border-strong";
 // Circle badge (child count) ring + text colour, keyed to the step's run status.
 const stepRingClass = (status: string | null): string =>
   status === "error"
     ? "border-status-negative text-status-negative"
     : status === "ok"
       ? "border-status-positive text-status-positive"
-      : "border-border-strong text-text-secondary";
+      : status === "noMatch"
+        ? "border-status-warning-text text-status-warning-text"
+        : "border-border-strong text-text-secondary";
 const stepTree = computed(() => {
   const wf = workflowObj.currentSelectedWorkflow;
   const nodes = wf.nodes || [];

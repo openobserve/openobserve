@@ -112,6 +112,23 @@ describe("FlowEdge.vue", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
+    // Selection is invisible without this: the resting stroke is an INLINE style,
+    // which beats the library's `.selected` stylesheet rule — so the selected
+    // state must be painted from the style object itself.
+    it("selected: overrides the resting stroke with the selection colour", () => {
+      wrapper = createWrapper({ style: { stroke: "grey", strokeWidth: 2 }, selected: true });
+      const style = wrapper.findComponent({ name: "BaseEdge" }).props("style");
+      expect(style.stroke).toBe("var(--color-indigo-500)");
+      expect(style.strokeWidth).toBe(3);
+    });
+
+    it("selected defaults to false and keeps the resting stroke (pipelines unchanged)", () => {
+      wrapper = createWrapper({ style: { stroke: "grey", strokeWidth: 2 } });
+      const style = wrapper.findComponent({ name: "BaseEdge" }).props("style");
+      expect(style.stroke).toBe("grey");
+      expect(style.strokeWidth).toBe(2);
+    });
+
     it("defaults isInView to false", () => {
       wrapper = createWrapper();
       expect((wrapper.vm as any).isInView ?? false).toBe(false);

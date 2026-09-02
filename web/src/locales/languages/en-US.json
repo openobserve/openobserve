@@ -848,7 +848,9 @@
     },
     "condition": {
       "loading": "Loading conditions...",
-      "loadError": "The saved condition could not be read and has been reset. Saving now will overwrite it."
+      "loadError": "The saved condition could not be read and has been reset. Saving now will overwrite it.",
+      "unknownColumn": "\"{column}\" isn't in this trigger's payload, so this condition may never match.",
+      "unknownColumnSuggestion": "Did you mean \"{suggestion}\"?"
     },
     "destination": {
       "createNew": "Create New Destination",
@@ -2719,7 +2721,8 @@
         "status": {
           "ok": "Passed",
           "error": "Errored",
-          "skipped": "No Records"
+          "skipped": "No Records",
+          "noMatch": "No Match"
         },
         "suppressed": "Suppressed — not sent to the real destination"
       }
@@ -2854,6 +2857,9 @@
       "openStep": "Open {name}",
       "runToView": "Run A Test To View This Data.",
       "noBranchItems": "No Items On This Branch.",
+      "forwardedCount": "{out} of {total} record forwarded | {out} of {total} records forwarded",
+      "noMatchForwarded": "No match \u2014 0 of {total} record forwarded | No match \u2014 0 of {total} records forwarded",
+      "branchDropped": "{count} record matched no path \u2014 dropped | {count} records matched no path \u2014 dropped",
       "noUpstream": "No Upstream Steps.",
       "noRunYet": "No Run Yet.",
       "runLabel": "Run",

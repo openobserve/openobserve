@@ -1705,6 +1705,169 @@ describe("WorkflowNodeDrawer", () => {
       );
     });
   });
+
+  // ── Output outcome: a step that ran but filtered everything must not read as
+  // success (UX audit #9). Condition: counts; Branch: per-path counts + dropped.
+  describe("output outcome for filtering nodes", () => {
+    const STATUS = '[data-test="workflow-ndv-output-status"]';
+    const NO_MATCH = '[data-test="workflow-ndv-output-nomatch"]';
+    const FWD = '[data-test="workflow-ndv-output-forwarded-count"]';
+    const PATH_ROW = '[data-test="workflow-ndv-branch-path"]';
+    const DROPPED = '[data-test="workflow-ndv-branch-dropped"]';
+
+    const recs = (n: number) => Array.from({ length: n }, (_, i) => ({ i }));
+
+    const seedConditionRun = (opts: { input: number; output?: number; childInput?: number }) => {
+      seedGraph();
+      const result: any = {
+        errors: {},
+        inputs: { trig: recs(1), cond: recs(opts.input) },
+        outputs: {},
+        ranNodeIds: ["trig", "cond", "dest"],
+        blockedNodeIds: [],
+      };
+      if (opts.output !== undefined) result.outputs.cond = recs(opts.output);
+      if (opts.childInput !== undefined) result.inputs.dest = recs(opts.childInput);
+      workflowObj.testRun.result = result;
+      openNode("cond", false);
+    };
+
+    const seedBranchGraph = () => {
+      workflowObj.currentSelectedWorkflow.nodes = [
+        {
+          id: "trig",
+          type: "input",
+          position: { x: 0, y: 0 },
+          data: { node_type: "workflow_trigger", trigger_kind: "alert_fired" },
+        },
+        {
+          id: "br",
+          type: "default",
+          position: { x: 0, y: 0 },
+          data: {
+            node_type: "branch",
+            cases: [
+              { handle: "case-0", label: "Payments", conditions: { and: [{ column: "x" }] } },
+            ],
+          },
+        },
+        {
+          id: "destA",
+          type: "output",
+          position: { x: 0, y: 0 },
+          data: { node_type: "destination" },
+        },
+        {
+          id: "destB",
+          type: "output",
+          position: { x: 0, y: 0 },
+          data: { node_type: "destination" },
+        },
+      ] as any;
+      workflowObj.currentSelectedWorkflow.edges = [
+        { id: "e1", source: "trig", target: "br" },
+        { id: "e2", source: "br", sourceHandle: "case-0", target: "destA" },
+        { id: "e3", source: "br", sourceHandle: "else", target: "destB" },
+      ] as any;
+    };
+
+    const seedBranchRun = (opts: { input: number; routedA?: number; routedElse?: number }) => {
+      seedBranchGraph();
+      const routed = (opts.routedA ?? 0) + (opts.routedElse ?? 0);
+      const result: any = {
+        errors: {},
+        inputs: { trig: recs(1), br: recs(opts.input) },
+        outputs: {},
+        ranNodeIds: ["trig", "br", "destA", "destB"],
+        blockedNodeIds: [],
+      };
+      if (routed) result.outputs.br = recs(routed);
+      if (opts.routedA !== undefined) result.inputs.destA = recs(opts.routedA);
+      if (opts.routedElse !== undefined) result.inputs.destB = recs(opts.routedElse);
+      workflowObj.testRun.result = result;
+      openNode("br", false);
+    };
+
+    afterEach(() => {
+      workflowObj.testRun.result = null;
+    });
+
+    it("a condition that matched nothing is amber No Match, never green Passed", async () => {
+      seedConditionRun({ input: 3 });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(wrapper.find(STATUS).text()).toBe("No Match");
+      expect(wrapper.find(STATUS).text()).not.toContain("Passed");
+      const noMatch = wrapper.find(NO_MATCH);
+      expect(noMatch.exists()).toBe(true);
+      expect(noMatch.text()).toMatch(/0 of 3/);
+      expect(wrapper.find('[data-test="workflow-ndv-output"]').text()).not.toContain(
+        "No records forwarded.",
+      );
+    });
+
+    it("a condition that forwarded some records stays Passed and shows the counts", async () => {
+      seedConditionRun({ input: 3, output: 2, childInput: 2 });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(wrapper.find(STATUS).text()).toBe("Passed");
+      expect(wrapper.find(FWD).text()).toMatch(/2 of 3/);
+      expect(wrapper.find(NO_MATCH).exists()).toBe(false);
+    });
+
+    it("a legacy run with no outputs map derives the forwarded count from the child's input", async () => {
+      seedConditionRun({ input: 3, childInput: 3 });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(wrapper.find(STATUS).text()).toBe("Passed");
+      expect(wrapper.find(FWD).text()).toMatch(/3 of 3/);
+    });
+
+    it("a branch names each path with its per-path count and flags dropped records", async () => {
+      seedBranchRun({ input: 3, routedA: 2, routedElse: 0 });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      const rows = wrapper.findAll(PATH_ROW);
+      expect(rows.length).toBe(2);
+      expect(rows[0].text()).toContain("Payments");
+      expect(rows[0].text()).toContain("2");
+      expect(rows[1].text()).toContain("Everything Else");
+      expect(rows[1].text()).toContain("0");
+      expect(wrapper.find(DROPPED).text()).toMatch(/1/);
+    });
+
+    it("a branch that routed every record shows no dropped row", async () => {
+      seedBranchRun({ input: 2, routedA: 2, routedElse: 0 });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(wrapper.find(DROPPED).exists()).toBe(false);
+      expect(wrapper.find(STATUS).text()).toBe("Passed");
+    });
+
+    it("a branch where no record matched any path is No Match with the dropped count", async () => {
+      seedBranchRun({ input: 3 });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      expect(wrapper.find(STATUS).text()).toBe("No Match");
+      expect(wrapper.find(DROPPED).text()).toMatch(/3/);
+    });
+
+    it("the steps rail marks a no-match step amber, not green", async () => {
+      seedConditionRun({ input: 3 });
+      wrapper = mountDrawer();
+      await nextTick();
+
+      const row = wrapper.find('[data-test="workflow-ndv-step-cond"]');
+      expect(row.html()).toContain("status-warning");
+      expect(row.html()).not.toContain("status-positive");
+    });
+  });
 });
 
 // ── Retry from this step (from_node) ─────────────────────────────────────────

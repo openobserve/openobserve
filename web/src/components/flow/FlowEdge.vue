@@ -20,13 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   (Backspace/Delete) using VueFlow events, so the edge itself is purely visual.
 -->
 <template>
-  <BaseEdge
-    :id="id"
-    :style="{ ...style, cursor: 'pointer', strokeDasharray: 'none' }"
-    :path="path[0]"
-    :marker-end="markerEnd"
-    type="smoothstep"
-  />
+  <BaseEdge :id="id" :style="edgeStyle" :path="path[0]" :marker-end="markerEnd" type="smoothstep" />
 
   <!-- Mid-edge "insert step here" `+` — opt-in (Workflows pass `insertable`), so
        the shared pipeline canvas is unchanged. Rendered into the EdgeLabelRenderer
@@ -82,6 +76,8 @@ const props = defineProps({
   insertable: { type: Boolean, required: false, default: false },
   // Same opt-in shape: only Workflows label an edge (the Branch arm it routes).
   label: { type: String as PropType<I18nText | "">, required: false, default: "" },
+  // Opt-in visible selection (Workflows pass VueFlow's selected flag through).
+  selected: { type: Boolean, required: false, default: false },
 });
 
 // Clicking the mid-edge `+` asks the canvas to splice a step onto THIS edge. The
@@ -94,6 +90,15 @@ const emit = defineEmits<{
 }>();
 
 const path = computed(() => getBezierPath(props));
+
+// The resting stroke arrives as an INLINE style, so the library's `.selected`
+// stylesheet rule can never win over it — selection must be painted here too.
+const edgeStyle = computed(() => ({
+  ...props.style,
+  ...(props.selected ? { stroke: "var(--color-indigo-500)", strokeWidth: 3 } : {}),
+  cursor: "pointer",
+  strokeDasharray: "none",
+}));
 </script>
 
 <script lang="ts">
