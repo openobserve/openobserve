@@ -17,8 +17,9 @@ import { createApp } from "vue";
 import store from "./stores";
 import App from "./App.vue";
 import createRouter from "./router";
-import i18n, { getLocale, loadLocaleMessages } from "./locales";
+import i18n, { applyDocumentLocale, getLocale, loadLocaleMessages } from "./locales";
 import "./styles/tailwind.css";
+import "./styles/rtl.css";
 // Global generated-content stylesheet: syntax classes (.log-key, .log-string, …)
 // applied to v-html-highlighted log output across logs/traces/RUM. Loaded once
 // here instead of re-@imported inside each consumer's <style> block.
@@ -38,6 +39,9 @@ import { raw } from "@/types/i18n";
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).
 bootstrapTheme();
+
+const activeLocale = getLocale();
+applyDocumentLocale(activeLocale);
 
 const app = createApp(App);
 const router = createRouter(store);
@@ -282,7 +286,7 @@ router.onError(async (error) => {
 
 // Ensure the active locale's messages are loaded (en-us is bundled; any other
 // language is fetched as a code-split chunk) before the first render.
-loadLocaleMessages(getLocale())
+loadLocaleMessages(activeLocale)
   // On a locale-chunk load failure, fall back to the bundled en-us messages
   // (no console noise). The app must mount regardless.
   .catch(() => {})

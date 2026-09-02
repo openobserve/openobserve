@@ -109,6 +109,7 @@ describe("alert_library locale parity", () => {
   // "yükle" interchangeably — and must exclude "kuruluş", which means
   // organization, not installation.
   const INSTALL_STEMS: Record<string, RegExp[]> = {
+    "ar-SA": [/تثبيت/, /مثبت/, /تركيب/],
     "de-DE": [/instal/i],
     "es-ES": [/instal/i, /instál/i],
     "fr-FR": [/instal/i],
