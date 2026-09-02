@@ -156,6 +156,7 @@
             :loading="loading"
             selectable
             :selected-key="healthFilter"
+            default-key="total"
             @select="onStatSelect"
           />
         </div>

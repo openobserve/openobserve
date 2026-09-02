@@ -177,7 +177,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # Which platform's files changed in this PR? (only evaluated for pull_request events)
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         if: github.event_name == 'pull_request'
         with:

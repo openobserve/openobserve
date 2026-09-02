@@ -165,7 +165,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         requires: "alertList",
         categoryKey: "menu.alerts",
       },
-      // The curated catalog you install alerts FROM — gated the same way, so
+      // The curated catalog you add alerts FROM — gated the same way, so
       // hiding Alerts hides the place to get more. Last, like its tab: you go
       // looking for it once, then work in the other three.
       {

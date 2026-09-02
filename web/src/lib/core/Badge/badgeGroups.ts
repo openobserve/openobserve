@@ -150,6 +150,8 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       active: { variant: "success-soft", labelKey: "components.badge.alertStatus.active" },
+      // Every anomaly config starts here and stays until its first model trains.
+      waiting: { variant: "default-soft", labelKey: "components.badge.alertStatus.waiting" },
       ready: { variant: "success-soft", labelKey: "components.badge.alertStatus.ready" },
       running: { variant: "blue-soft", labelKey: "components.badge.alertStatus.running" },
       training: { variant: "warning-soft", labelKey: "components.badge.alertStatus.training" },

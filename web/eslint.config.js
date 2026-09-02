@@ -281,8 +281,8 @@ const noHardcodedPx = {
 const COLOR_LITERAL =
   /(?<![\w#&])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])|\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\s*\(/gi;
 
-// Pre-existing violations, measured when this rule was introduced: 261 colour literals
-// (202 hex, 59 functional) in the <script> blocks of these 52 .vue files. Every entry is a file that hardcodes
+// Pre-existing violations, measured when this rule was introduced: 260 colour literals
+// (201 hex, 59 functional) in the <script> blocks of these 51 .vue files. Every entry is a file that hardcodes
 // colour today and is PENDING MIGRATION to design tokens — it is a debt record, NOT a
 // sanctioned home. The list must only ever SHRINK: deleting a line when a file is
 // migrated is the only edit ever made to it. New entries are NOT accepted — a new colour
@@ -296,7 +296,6 @@ const COLOR_ALLOWLIST = [
   "web/src/components/alerts/IncidentDetailDrawer.vue",
   "web/src/components/alerts/IncidentServiceGraph.vue",
   "web/src/components/alerts/PreviewAlert.vue",
-  "web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue",
   "web/src/components/dashboards/ColorSwatchPicker.vue",
   "web/src/components/dashboards/DashboardLogDrawer.vue",
   "web/src/components/dashboards/PanelSchemaRenderer.vue",
