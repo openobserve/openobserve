@@ -283,10 +283,12 @@
                  never touches, so they are folded away — and unfolded already
                  when this rule is one of the ones using them. -->
             <OCollapsible
+              icon="tune"
               :label="t('oncall.rotationSectionApplies')"
               :caption="t('oncall.rotationSectionAppliesCaption')"
               :default-open="usesAdvanced(rule)"
               :data-test="`oncall-schedule-advanced-${ruleIndex}`"
+              class="border-border-default rounded-default border"
             >
               <div class="flex flex-col gap-4 px-2 pt-2 pb-1">
                 <!-- Hours: the windows and the button that adds one are one
@@ -429,10 +431,11 @@
                   v-for="shift in preview(rule)"
                   :key="shift.startMicros"
                   class="flex flex-wrap items-center gap-2 px-3 py-1.5"
+                  :class="isCurrent(shift) ? 'bg-status-success-bg' : ''"
                   data-test="oncall-schedule-preview-shift"
                 >
                   <OUserCell :value="shift.member" />
-                  <span class="text-text-muted ms-auto text-xs">{{ raw(shiftRange(shift)) }}</span>
+                  <OText variant="meta" class="ms-auto">{{ raw(shiftRange(shift)) }}</OText>
                   <OTag v-if="isCurrent(shift)" variant="success-soft" size="xs">
                     {{ t("oncall.onCallNowTag") }}
                   </OTag>
