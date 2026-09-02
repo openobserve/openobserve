@@ -141,6 +141,7 @@ const trendClass = computed(() =>
   <component
     :is="clickable ? 'button' : 'div'"
     :type="clickable ? 'button' : undefined"
+    :aria-pressed="clickable ? String(selected) : undefined"
     class="rounded-default bg-surface-base flex min-w-0 flex-col justify-center gap-1 overflow-hidden border px-2.5 py-1 text-left transition-colors"
     :class="[
       selected ? 'border-accent' : 'border-border-default',

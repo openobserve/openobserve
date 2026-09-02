@@ -19,7 +19,7 @@
 
 import type { LibrarySeverity } from "@/constants/alertLibrary";
 
-/** One installable alert, as indexed by the manifest. */
+/** One addable alert, as indexed by the manifest. */
 export interface AlertLibraryEntry {
   /** `<pack>/<name>` — stable key, stamped on install for provenance. */
   id: string;

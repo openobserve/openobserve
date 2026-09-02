@@ -128,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :loading="loading"
                     selectable
                     :selected-key="stateFilter"
+                    default-key="total"
                     @select="onStatSelect"
                   />
                 </div>
@@ -1687,6 +1688,11 @@ export default defineComponent({
       firing_count: anomaly.firing_count ?? "--",
       status: anomaly.status || "--",
       last_error: anomaly.last_error || null,
+      // Built field by field: anything unlisted is invisible to the table.
+      last_outcome: anomaly.last_outcome ?? null,
+      last_outcome_at: anomaly.last_outcome_at ?? null,
+      priority: anomaly.priority ?? null,
+      tags: anomaly.tags ?? [],
       selected: false,
       type: "anomaly",
       folder_name: {

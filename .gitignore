@@ -74,3 +74,6 @@ tests/ui-testing/playwright-tests/utils/auth/user.json
 /.claude/settings.local.json
 /.claude/worktrees/
 .screenshots/
+
+__pytest__/
+__pycache__/

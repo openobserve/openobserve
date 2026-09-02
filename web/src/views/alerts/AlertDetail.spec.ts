@@ -131,6 +131,18 @@ function makeCompositeAlert(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** An anomaly config, as the GET falls back to and stamps a discriminator on. */
+function makeAnomalyAlert() {
+  return {
+    id: "alert-1",
+    alert_type: "anomaly_detection",
+    name: "login-error-spike",
+    stream_name: "default",
+    stream_type: "logs",
+    histogram_interval: "5m",
+  };
+}
+
 function makeRollupTransition(overrides: Partial<AlertGroupTransition> = {}): AlertGroupTransition {
   return {
     group_key: "",
@@ -212,6 +224,7 @@ async function mountView({
         AlertGroupChart: true,
         AlertGroupsTable: true,
         AlertConfigSummary: true,
+        AnomalyDetectionChart: true,
       },
     },
   });
@@ -521,5 +534,40 @@ describe("AlertDetail — History tab", () => {
         false,
       );
     });
+  });
+});
+
+describe("AlertDetail — anomaly alerts", () => {
+  let wrapper: VueWrapper;
+
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("opens on the charts tab — the detection record is what this page is read for", async () => {
+    wrapper = await mountView({ alert: makeAnomalyAlert() });
+    expect(wrapper.find('[data-test="alerts-alertdetail-tab-charts"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "AnomalyDetectionChart" }).exists()).toBe(true);
+  });
+
+  it("does not draw the generic evaluation chart, which has no SQL to build", async () => {
+    wrapper = await mountView({ alert: makeAnomalyAlert() });
+    expect(wrapper.findComponent({ name: "AlertGroupChart" }).exists()).toBe(false);
+  });
+
+  it("never asks for transitions — an anomaly config writes none", async () => {
+    wrapper = await mountView({ alert: makeAnomalyAlert() });
+    expect(alertsService.list_group_transitions).not.toHaveBeenCalled();
+  });
+
+  it("switches tab before the next await, so History never fires a fetch first", async () => {
+    wrapper = await mountView({ alert: makeAnomalyAlert() });
+    expect(alertsService.getHistory).not.toHaveBeenCalled();
+  });
+
+  it("leaves every other alert family without a charts tab", async () => {
+    wrapper = await mountView({ alert: makeSimpleAlert() });
+    expect(wrapper.find('[data-test="alerts-alertdetail-tab-charts"]').exists()).toBe(false);
   });
 });

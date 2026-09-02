@@ -73,8 +73,12 @@ const makeAnomalyDetectionConfigBase = (t: Translator) =>
     training_window_days: z.coerce.number().min(1, t("alerts.validation.minimumOneDay")),
     // Type-only (fixed OSelect options).
     retrain_interval_days: z.coerce.number(),
-    // ORange dual-handle value; written back to config.threshold_min/threshold.
-    threshold_range: z.object({ min: z.coerce.number(), max: z.coerce.number() }),
+    // The server clamps to 50–99.9 then truncates with `as i32`, so 99 is the real ceiling.
+    threshold: z.coerce
+      .number()
+      .int(t("alerts.anomaly.sensitivityRange"))
+      .min(50, t("alerts.anomaly.sensitivityRange"))
+      .max(99, t("alerts.anomaly.sensitivityRange")),
   });
 
 export type AnomalyDetectionConfigForm = z.infer<ReturnType<typeof makeAnomalyDetectionConfigBase>>;
@@ -163,8 +167,5 @@ export const anomalyDetectionConfigDefaults = (
   detection_window_unit: cfg?.detection_window_unit ?? "h",
   training_window_days: cfg?.training_window_days ?? 14,
   retrain_interval_days: cfg?.retrain_interval_days ?? 7,
-  threshold_range: {
-    min: cfg?.threshold_min ?? 0,
-    max: cfg?.threshold ?? 100,
-  },
+  threshold: cfg?.threshold == null || cfg.threshold === "" ? 97 : Number(cfg.threshold),
 });
