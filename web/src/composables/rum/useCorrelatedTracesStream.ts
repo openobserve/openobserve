@@ -52,7 +52,9 @@ const inFlight = new Map<string, Promise<string>>();
 export default function useCorrelatedTracesStream(t: TranslateFn) {
   const store = useStore();
   const { getStreams } = useStreams(t);
-  const { fetchQueryDataWithHttpStream } = useHttpStreaming();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
+
+  const activeProbeTraceIds = new Set<string>();
 
   const cache = () => store.state.organizationData.correlatedTracesStreams;
 
@@ -99,6 +101,8 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     // hits[streamIndex] = set of ids found in that stream
     const hitsByStreamIndex: Array<Set<string>> = streams.map(() => new Set());
 
+    const probeTraceId = generateTraceContext()?.traceId ?? "";
+    if (probeTraceId) activeProbeTraceIds.add(probeTraceId);
     try {
       await new Promise<void>((resolve) => {
         fetchQueryDataWithHttpStream(
@@ -113,7 +117,7 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
               },
             },
             type: "search",
-            traceId: generateTraceContext()?.traceId ?? "",
+            traceId: probeTraceId,
             org_id: store.state.selectedOrganization.identifier,
             pageType: "traces",
             searchType: "UI",
@@ -155,6 +159,8 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
       });
     } catch {
       return {};
+    } finally {
+      if (probeTraceId) activeProbeTraceIds.delete(probeTraceId);
     }
 
     // First stream in probe order wins ties (edge case 16).
@@ -257,5 +263,15 @@ export default function useCorrelatedTracesStream(t: TranslateFn) {
     return promise;
   };
 
-  return { resolveTracesStream, resolveTracesStreamsBulk };
+  const cancel = () => {
+    activeProbeTraceIds.forEach((traceId) =>
+      cancelStreamQueryBasedOnRequestId({
+        trace_id: traceId,
+        org_id: store.state.selectedOrganization?.identifier,
+      }),
+    );
+    activeProbeTraceIds.clear();
+  };
+
+  return { resolveTracesStream, resolveTracesStreamsBulk, cancel };
 }

@@ -233,7 +233,8 @@ import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 const { t } = useI18nTyped();
 const store = useStore();
 const { getStream } = useStreams(t);
-const { resolveTracesStreamsBulk } = useCorrelatedTracesStream(t);
+const { resolveTracesStreamsBulk, cancel: cancelCorrelatedTracesStream } =
+  useCorrelatedTracesStream(t);
 
 const props = defineProps({
   sessionId: {
@@ -439,6 +440,7 @@ onUnmounted(() => {
     cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: orgId }),
   );
   activeTraceIds = [];
+  cancelCorrelatedTracesStream();
 });
 
 async function fetchTraces() {

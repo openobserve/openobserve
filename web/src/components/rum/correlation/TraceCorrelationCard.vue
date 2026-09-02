@@ -185,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from "vue";
+import { computed, onMounted, onUnmounted, watch } from "vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -234,12 +234,16 @@ const correlationRange = computed(() =>
     : null,
 );
 
-const { isLoading, hasBackendTrace, fetchCorrelation, backendSpanCount, performanceData } =
-  useTraceCorrelation(
-    computed(() => props.traceId),
-    t,
-    correlationRange,
-  );
+const {
+  isLoading,
+  hasBackendTrace,
+  fetchCorrelation,
+  backendSpanCount,
+  performanceData,
+  cancelTracesStream,
+} = useTraceCorrelation(computed(() => props.traceId), t, correlationRange);
+
+onUnmounted(() => cancelTracesStream());
 
 onMounted(() => {
   if (props.traceId) {

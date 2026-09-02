@@ -49,7 +49,7 @@ export default function useTraceCorrelation(
 ) {
   const store = useStore();
   const { getStream } = useStreams(t);
-  const { resolveTracesStream } = useCorrelatedTracesStream(t);
+  const { resolveTracesStream, cancel: cancelTracesStream } = useCorrelatedTracesStream(t);
   const correlationData = ref<TraceCorrelationData | null>(null);
   const isLoading = ref(false);
   const error = ref<Error | null>(null);
@@ -228,5 +228,6 @@ export default function useTraceCorrelation(
     performanceData,
     fetchCorrelation,
     reset,
+    cancelTracesStream,
   };
 }

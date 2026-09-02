@@ -31,6 +31,31 @@ A leak drives observer/DOM counts monotonically **up** and listener/interval net
 monotonically **positive**; here counts are flat and nets go negative — the
 opposite. Empirically confirms disciplined route teardown on the live build.
 
+### Per-page cycle benchmark — 10× each (page↔dashboards)
+
+Each keep-alive-heavy page cycled 10× against dashboards; reported at the steady
+state (cycle 5 vs cycle 10 — a plateau proves no accumulation).
+
+| Page | roDetached | roTotal (c5→c10) | DOM (c5→c10) | listeners net | intervals net | Verdict |
+|---|---|---|---|---|---|---|
+| **Logs** | 0 | 21 → 21 | 4269 → 4274 | −16672 | −30 | flat plateau, no leak |
+| **Metrics** | 0 | 7 → 7 | 526 → 526 | −18444 | −36 | flat plateau, no leak |
+| **Traces** | 0 | 5 → 5 | 615 → 615 | −18958 | −35 | flat plateau, no leak |
+| **Alerts** | 0 | 5 → 5 | 2837 → 2837 | −21482 | −36 | flat plateau, no leak |
+| **Pipelines** (vue-flow) | 0 | 2 → 2 | 861 → 861 | −22417 | −36 | flat plateau, no leak |
+| **RUM sessions** | 0 | 33 → 33 | 1203 → 1203 | −23070 | −37 | flat plateau, no leak |
+| **Streams** | 0 | 2 → 2 | 848 → 848 | −25213 | −38 | flat plateau, no leak |
+| **Settings** | 0 | 0 → 0 | 519 → 519 | −25592 | −38 | flat plateau, no leak |
+| **IAM** | 0 | 1 → 1 | 787 → 787 | −26469 | −38 | flat plateau, no leak |
+
+Panel editor (`/dashboards/add_panel`) needs a live dashboard+folder+tab context,
+so a bare `router.push` redirects to `/dashboards`; it wasn't exercised here and
+needs interactive navigation (open dashboard → add panel) to benchmark.
+
+`roDetached` is **0** on every page and every cycle (the reliable detached-observer
+signal). `roTotal` and DOM reach a per-page steady state and stay flat (c5 == c10);
+listener/interval nets stay negative (teardown outpaces allocation). No page leaks.
+
 ## Route inventory & coverage (all 236 routes)
 
 The app declares **236 named routes**, from SEVEN route sources:
