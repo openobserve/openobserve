@@ -1325,20 +1325,28 @@ async function fetchHandover() {
 /// `ladder_exhausted` arrives as a 200, deliberately — "there is nobody above
 /// you" is an answer, not a failure — so it is said plainly rather than as an
 /// error, which would read as though the press failed and invite a second one.
-function escalateOutcome(result: EscalateResult | undefined): I18nText {
+/// It is not a success either: nothing advanced, so the toast reports it as
+/// `info` rather than reusing the green checkmark a real escalation gets.
+function escalateOutcome(result: EscalateResult | undefined): {
+  variant: "success" | "info";
+  message: I18nText;
+} {
   if (result?.escalated_to === "ladder_exhausted") {
-    return t("oncall.escalateExhausted", { team: teamName.value });
+    return { variant: "info", message: t("oncall.escalateExhausted", { team: teamName.value }) };
   }
   const reached = result?.escalated_to === "rung" ? [...result.recipients, ...result.chased] : [];
   if (!reached.length) {
     // A rung that resolved to nobody is a real outcome and the one worth
     // saying loudest: the ladder moved and no phone rang.
-    return t("oncall.escalatedNobody", { team: teamName.value });
+    return { variant: "success", message: t("oncall.escalatedNobody", { team: teamName.value }) };
   }
-  return t("oncall.escalatedTo", {
-    team: teamName.value,
-    who: raw(reached.join(", ")),
-  });
+  return {
+    variant: "success",
+    message: t("oncall.escalatedTo", {
+      team: teamName.value,
+      who: raw(reached.join(", ")),
+    }),
+  };
 }
 
 /// Wakes the next rung now instead of when the timer says so. Ownership does
@@ -1351,7 +1359,7 @@ async function escalateNow() {
       org_identifier: orgId.value,
       response_id: responseId.value,
     });
-    toast({ variant: "success", message: escalateOutcome(res.data) });
+    toast(escalateOutcome(res.data));
     await fetchResponse();
   } catch (err: any) {
     toast({

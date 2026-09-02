@@ -1181,8 +1181,10 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
 
     /// `ladder_exhausted` is a 200 on purpose — "there is nobody above you" is
     /// an answer, not a failure. Reporting it as an error reads as though the
-    /// press failed and invites a second one.
-    it("reports an exhausted ladder as an answer, not a failure", async () => {
+    /// press failed and invites a second one — but it isn't a success either,
+    /// since nothing advanced, so it gets its own `info` treatment rather than
+    /// the green checkmark a real escalation earns.
+    it("reports an exhausted ladder as an answer, not a success or a failure", async () => {
       const wrapper = await renderWith();
       service.escalateNow.mockResolvedValue({
         data: { escalated_to: "ladder_exhausted", response: {} },
@@ -1192,7 +1194,7 @@ describe("OnCallResponseDetail — what the payload already knew", () => {
       await flushPromises();
 
       const call = toastSpy.mock.calls.at(-1)![0];
-      expect(call.variant).toBe("success");
+      expect(call.variant).toBe("info");
       expect(String(call.message)).toContain("last step");
     });
   });
