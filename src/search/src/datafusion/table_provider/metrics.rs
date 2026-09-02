@@ -73,21 +73,21 @@ pub(super) fn hash_interval(filters: &[Expr]) -> Option<(u64, u64)> {
 /// Keeps files whose `__hash__` statistics may intersect `[lo, hi]`; a file
 /// without usable statistics always survives.
 fn prune_groups_by_hash_range(
-    file_groups: Vec<FileGroup>,
+    file_groups: &[FileGroup],
     schema: &arrow_schema::Schema,
     (lo, hi): (u64, u64),
 ) -> Vec<FileGroup> {
     let Ok(hash_index) = schema.index_of(HASH_LABEL) else {
-        return file_groups;
+        return file_groups.to_vec();
     };
     let mut pruned: Vec<FileGroup> = file_groups
-        .into_iter()
+        .iter()
         .map(|group| {
             FileGroup::new(
                 group
-                    .into_inner()
-                    .into_iter()
+                    .iter()
                     .filter(|file| file_may_intersect(file, hash_index, lo, hi))
+                    .cloned()
                     .collect(),
             )
         })
@@ -114,8 +114,7 @@ pub(super) fn handler_metrics_scan(
         return plan;
     };
     let schema = config.file_source().table_schema().table_schema();
-    let mut file_groups =
-        prune_groups_by_hash_range(config.file_groups.clone(), schema, hash_range);
+    let mut file_groups = prune_groups_by_hash_range(&config.file_groups, schema, hash_range);
 
     // an all-pruned band keeps its single empty group: a scan needs a partition
     if file_groups.iter().any(|group| !group.is_empty()) {

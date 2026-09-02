@@ -106,7 +106,9 @@ fn create_session_config(
             .options_mut()
             .execution
             .split_file_groups_by_statistics = true;
-        // a round-robin exchange would trade the chains' ordering for a re-sort
+    }
+    // a round-robin exchange would trade the hash chains' ordering for a re-sort
+    if sort_order == FileSortOrder::HashTimestampAsc {
         config
             .options_mut()
             .optimizer
@@ -513,6 +515,9 @@ pub fn catalog_functions(org_id: &str) -> Vec<CatalogFunction> {
     by_name.into_values().collect()
 }
 
+/// Registers the metrics files as `table_name`; an all-hash-sorted file set
+/// additionally registers `{table_name}__hash_sorted` with the file order
+/// declared, for the streaming aggregation path.
 pub async fn register_metrics_table(
     session: &SearchSession,
     schema: Arc<Schema>,
