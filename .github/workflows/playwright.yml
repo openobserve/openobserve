@@ -83,12 +83,16 @@ jobs:
           fetch-depth: 0
 
       - id: check
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           # Skip when a PR touches only docs, images, or unrelated workflow files (e.g. a
           # dependabot bump to another workflow) — none can affect the app. Source, web/, and
           # this workflow (playwright.yml) still run the suite.
+          # Two-dot on purpose: base-branch drift over-reports has_changes, which keeps the
+          # merge_group full run firing whenever the merged tree differs from what PRs tested.
           IGNORE_RE='(\.md$|^docs/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
+          CHANGED=$(git diff --name-only "origin/${BASE_REF:-main}" ${{ github.sha }})
           # Files not matching IGNORE_RE. Captured (not `grep -qv`) so the check doesn't depend
           # on grep -qv exit semantics, which differ across grep builds; the `|| true` keeps
           # `set -e` from aborting when grep matches nothing (exit 1). The `grep -qE` below is a
@@ -108,7 +112,8 @@ jobs:
     # (push to main / merge_group always run) or the PR carries the 'e2e' label.
     if: >-
       (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'e2e')) ||
+       (contains(github.event.pull_request.labels.*.name, 'e2e') ||
+        contains(github.event.pull_request.labels.*.name, 'e2e-full'))) ||
       (github.event_name != 'pull_request' &&
        needs.check_changes.outputs.has_changes == 'true')
     runs-on:
@@ -202,7 +207,8 @@ jobs:
     needs: [check_changes]
     if: >-
       (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'e2e')) ||
+       (contains(github.event.pull_request.labels.*.name, 'e2e') ||
+        contains(github.event.pull_request.labels.*.name, 'e2e-full'))) ||
       (github.event_name != 'pull_request' &&
        needs.check_changes.outputs.has_changes == 'true')
     runs-on: ubuntu-latest
@@ -210,14 +216,55 @@ jobs:
       contents: read
     outputs:
       matrix: ${{ steps.gen.outputs.matrix }}
+      smoke_active: ${{ steps.gen.outputs.smoke_active }}
+      shards_selected: ${{ steps.gen.outputs.shards_selected }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Full history only where the selection diff needs it; merge_group never diffs.
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
+      - name: Selection contract tests
+        run: node --test .github/scripts/build-ci-matrix.test.js
       - id: gen
+        env:
+          # Smoke selection runs only on PRs; merge_group ALWAYS gets the full matrix, so
+          # everything that merges is still covered by all shards. Escape hatches: the
+          # 'e2e-full' PR label forces the full matrix for one PR; the PW_SMOKE_DISABLED
+          # repo variable ('true') turns smoke off everywhere without a code change.
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+          HAS_FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'e2e-full') }}
+          SMOKE_DISABLED: ${{ vars.PW_SMOKE_DISABLED }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json)
-          if [ -z "$MATRIX" ]; then echo "::error::matrix generation failed (build-ci-matrix produced no output)"; exit 1; fi
+          SMOKE_DISABLED=$(echo "$SMOKE_DISABLED" | tr '[:upper:]' '[:lower:]')
+          SELECT_ARGS=""
+          if [ "$IS_PR" == "true" ] && [ "$HAS_FULL_LABEL" != "true" ] && [ "$SMOKE_DISABLED" != "true" ]; then
+            # Three-dot: diff from the merge base, so commits that landed on the base branch
+            # after this PR's merge commit was cut never leak into the selection.
+            # --no-renames lists a moved file under BOTH paths, so the shard owning the old
+            # location still runs; quotepath off keeps non-ASCII names matchable.
+            if git -c core.quotepath=false diff --no-renames --name-only "origin/${BASE_REF:-main}...${{ github.sha }}" > /tmp/pw-changed-files.txt; then
+              SELECT_ARGS="--select-for-changes /tmp/pw-changed-files.txt"
+            else
+              echo "::warning::changed-file diff failed — running the full matrix"
+            fi
+          fi
+          # || true: under bash -e a die() would abort before the log below ever prints.
+          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json $SELECT_ARGS 2> /tmp/pw-select-log.txt) || true
+          cat /tmp/pw-select-log.txt >&2
+          if [ -z "$MATRIX" ]; then echo "::error::matrix generation failed (see build-ci-matrix log above)"; exit 1; fi
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
-          echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log('generated',m.include.length,'shards:', m.include.map(s=>s.testfolder).join(', '))"
+          COUNT=$(echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log('generated',m.include.length,'shards:', m.include.map(s=>s.testfolder).join(', ')); require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'shards_selected='+m.include.length+'\n')")
+          echo "smoke_active=$([ -n "$SELECT_ARGS" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          # Durable record of what ran and why, visible from the PR checks page.
+          {
+            echo "### Playwright shard selection"
+            echo "Mode: $([ -n "$SELECT_ARGS" ] && echo "smoke (changed-path selection)" || echo "full matrix")"
+            echo '```'
+            echo "$COUNT"
+            cat /tmp/pw-select-log.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   ui_integration_tests:
     timeout-minutes: 45
@@ -721,7 +768,7 @@ jobs:
   report_openobserve:
     timeout-minutes: 10
     name: Report to OpenObserve
-    needs: [ui_integration_tests, merge_reports]
+    needs: [generate_matrix, ui_integration_tests, merge_reports]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
       labels: eks-openobserve-standard-4
@@ -747,6 +794,8 @@ jobs:
           # merge_group (gh-readonly-queue/main/pr-<n>-<sha>). PR empty on merge_group/push.
           REPORT_BRANCH: ${{ github.head_ref || github.ref_name }}
           REPORT_PR: ${{ github.event.pull_request.number }}
+          SMOKE_ACTIVE: ${{ needs.generate_matrix.outputs.smoke_active }}
+          SHARDS_SELECTED: ${{ needs.generate_matrix.outputs.shards_selected }}
         run: |
           # This job runs only when tests actually ran (merge `if:` gates on !cancelled &&
           # ui != skipped), so TESTS is success|failure here.
@@ -754,8 +803,17 @@ jobs:
           # Per-test counts from the merged report.json (tests_total includes skipped).
           if [ -n "${MERGE_STATS:-}" ] && [ "$MERGE_STATS" != "null" ] && [ "$MERGE_STATS" != "{}" ]; then
             EXTRA_JSON=$(printf '%s' "$MERGE_STATS" | jq -c '{tests_total:((.expected//0)+(.unexpected//0)+(.flaky//0)+(.skipped//0)), tests_passed:(.expected//0), tests_failed:(.unexpected//0), tests_flaky:(.flaky//0), tests_skipped:(.skipped//0)}' 2>/dev/null || echo "")
-            [ -n "$EXTRA_JSON" ] && export EXTRA_JSON
           fi
+          # smoke_active/shards_selected let dashboards separate smoke rows from full runs,
+          # since shards_total now varies by selection instead of always being the full set.
+          SMOKE_JSON=$(jq -nc --arg a "${SMOKE_ACTIVE:-false}" --arg n "${SHARDS_SELECTED:-}" \
+            '{smoke_active:($a=="true"), shards_selected:(($n|tonumber?)//null)}')
+          if [ -n "${EXTRA_JSON:-}" ]; then
+            EXTRA_JSON=$(jq -nc --argjson a "$EXTRA_JSON" --argjson b "$SMOKE_JSON" '$a * $b')
+          else
+            EXTRA_JSON="$SMOKE_JSON"
+          fi
+          export EXTRA_JSON
           export CONCLUSION STREAM=ci_test_runs SUITE=ui
           bash .github/scripts/o2-run-report.sh
           # One row per flaky-or-failed test -> ci_test_results (status flaky|failed; suite/
@@ -799,7 +857,7 @@ jobs:
           #    when the change is Playwright-relevant so the author opts in, else bypass (pass).
           #    Adding the 'e2e' label always runs the suite (see build_binary's if).
           if [ "${{ github.event_name }}" == "pull_request" ] && \
-             [ "${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}" != "true" ]; then
+             [ "${{ contains(github.event.pull_request.labels.*.name, 'e2e') || contains(github.event.pull_request.labels.*.name, 'e2e-full') }}" != "true" ]; then
             if [ "${{ needs.check_changes.outputs.has_changes }}" == "true" ]; then
               echo "::error::This PR changes Playwright-relevant files but has no 'e2e' label, so the suite did not run."
               echo "::error::Add the 'e2e' label to the PR to run the full Playwright suite before merging."
