@@ -17,6 +17,7 @@ pub mod add_new_filter;
 pub mod add_o2_id;
 pub mod add_ordering_term;
 pub mod add_timestamp;
+pub mod harden_string_literal;
 pub mod match_all_raw;
 pub mod remove_dashboard_placeholder;
 pub mod track_total_hits;

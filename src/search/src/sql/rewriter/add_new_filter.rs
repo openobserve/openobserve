@@ -27,7 +27,7 @@ use sqlparser::{
     tokenizer::Span,
 };
 
-use crate::utils::conjunction;
+use crate::{sql::rewriter::harden_string_literal::HardenStringLiteralVisitor, utils::conjunction};
 
 pub fn add_new_filters_with_and_operator(
     sql: &str,
@@ -46,6 +46,9 @@ pub fn add_new_filters_with_and_operator(
     }
     let mut visitor = AddNewFiltersWithAndOperatorVisitor::new(filters);
     let _ = statement.visit(&mut visitor);
+    // filter values come from row data, so harden them before re-emitting (GHSA-fgm2-fp3h-h54f)
+    let mut harden_visitor = HardenStringLiteralVisitor::new();
+    let _ = statement.visit(&mut harden_visitor);
     Ok(statement.to_string())
 }
 

@@ -41,7 +41,8 @@ use sqlparser::{ast::VisitMut, dialect::PostgreSqlDialect, parser::Parser};
 use crate::sql::{
     rewriter::{
         add_o2_id::AddO2IdVisitor, add_timestamp::AddTimestampVisitor,
-        match_all_raw::MatchAllRawVisitor, remove_dashboard_placeholder::RemoveDashboardAllVisitor,
+        harden_string_literal::HardenStringLiteralVisitor, match_all_raw::MatchAllRawVisitor,
+        remove_dashboard_placeholder::RemoveDashboardAllVisitor,
         track_total_hits::TrackTotalHitsVisitor,
     },
     schema::{generate_schema_fields, generate_select_star_schema, has_original_column},
@@ -268,6 +269,9 @@ impl Sql {
                 let _ = statement.visit(&mut add_o2_id_visitor);
             }
         }
+        // 12. harden string literals so the re-emitted SQL round-trips without injection
+        let mut harden_visitor = HardenStringLiteralVisitor::new();
+        let _ = statement.visit(&mut harden_visitor);
         //********************Change the sql end************************************//
 
         // 13. replace the Utf8 to Utf8View type
