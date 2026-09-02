@@ -14,29 +14,31 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ─── Model provider selection ──────────────────────────────────────────────
 // The review runs against a single provider per invocation, chosen via env so the same script
-// can be launched once per provider (see .github/workflows/ai-code-review.yml). There are no
-// defaults on purpose: this repo and its Actions logs are public, so the provider and model are
-// supplied from secrets at run time and named nowhere in the tree.
+// can be launched once per provider (see .github/workflows/ai-code-review.yml, whose matrix
+// currently has a single deepseek leg). Everything defaults to that DeepSeek-V4-Pro setup, so an
+// invocation with no REVIEW_* env set still works. The model is named freely here and in CI logs;
+// what must never name it is the posted PR comment — see redactProviderIdentity.
 //
-// - REVIEW_PROVIDER_ID / REVIEW_MODEL_ID: opencode provider+model IDs (must match the provider
-//   block supplied at run time through OPENCODE_CONFIG).
+// - REVIEW_PROVIDER_ID / REVIEW_MODEL_ID: opencode provider+model IDs (must match a
+//   provider/model registered in opencode.jsonc).
 // - REVIEW_MODEL_VARIANT: opencode `variant` on session.prompt (empty ⇒ omit).
 // - REVIEW_API_KEY_ENV: name of the env var holding the provider API key (checked for presence).
 // - REVIEW_MARKER: HTML comment marker that identifies this provider's comment on the PR, so
 //   providers post/update independent comments and never clobber each other.
-const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "";
-const MODEL_ID = process.env.REVIEW_MODEL_ID || "";
+const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "deepseek-review";
+const MODEL_ID = process.env.REVIEW_MODEL_ID || "deepseek-v4-pro";
 const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "";
-// REVIEW_API_KEY_ENV holds the NAME of the env var carrying the key (e.g. "REVIEW_API_KEY"),
+// REVIEW_API_KEY_ENV holds the NAME of the env var carrying the key (e.g. "DEEPSEEK_API_KEY"),
 // never the key itself — the value is read only via apiKey() below and is never logged or
-// posted. Constrain it to an env-var-shaped token anyway: the name is echoed into CI logs and
-// into a public PR comment on misconfiguration, so a malformed value must not become the
-// vehicle for leaking anything. This also keeps CodeQL's js/clear-text-logging taint analysis
-// from treating the *name* as the secret (it flags any `...API_KEY...` env read reaching a log).
-const RAW_API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "REVIEW_API_KEY";
+// posted. Constrain it to an env-var-shaped token anyway: the name is echoed into CI logs, so a
+// malformed value must not become the vehicle for leaking anything. This also keeps CodeQL's
+// js/clear-text-logging taint analysis from treating the *name* as the secret (it flags any
+// `...API_KEY...` env read reaching a log).
+const RAW_API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "DEEPSEEK_API_KEY";
 const API_KEY_VAR_NAME = /^[A-Z][A-Z0-9_]{0,63}$/.test(RAW_API_KEY_VAR_NAME)
   ? RAW_API_KEY_VAR_NAME
-  : "REVIEW_API_KEY";
+  : "DEEPSEEK_API_KEY";
+const MODEL_SLUG = `${PROVIDER_ID}/${MODEL_ID}`;
 
 function apiKey() {
   return process.env[API_KEY_VAR_NAME];
@@ -44,13 +46,13 @@ function apiKey() {
 
 const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review -->";
 
-// The marker any provider leg may post. The coordinator prompt is told not to emit markers at
-// all, but models don't reliably obey formatting instructions, so sanitizeReviewBody strips every
-// match and re-prepends only REVIEW_MARKER: exactly one marker per comment, enforced in code
-// rather than by the prompt. findExistingReviewComment matches the same pattern, so whichever leg
-// posted a comment, the next run claims and rewrites it in place.
-// Matched as a pattern rather than a list so a retired leg's suffixed marker is still claimed
-// and rewritten in place — without this file having to spell that leg's name out.
+// The shape of any marker a provider leg may post — matched as a pattern rather than a list so a
+// retired leg's suffixed marker (e.g. the old per-provider ones) is still claimed and rewritten
+// in place. The coordinator prompt is told not to emit markers at all, but models don't reliably
+// obey formatting instructions, so sanitizeReviewBody strips every match and re-prepends only
+// REVIEW_MARKER: exactly one marker per comment, enforced in code rather than by the prompt.
+// findExistingReviewComment matches the same pattern. Keep in sync with the `marker` values in
+// .github/workflows/ai-code-review.yml.
 const ANY_REVIEW_MARKER = "<!--\\s*ai-code-review[a-z0-9-]*\\s*-->";
 
 // ─── Branding (presentation only) ───────────────────────────────────────────
@@ -596,8 +598,8 @@ function selectAgents(tierConfig, filteredDiff) {
 // Each reviewer/coordinator is a named agent in opencode.jsonc (ai-review-*), running
 // read-only against the checked-out repo via OpencodeServer + callOpencode below. Unlike
 // a bare chat-completion call, opencode agents can Read/Grep the actual codebase around
-// the diff, not just the diff text — that repo context is the main quality lever over a
-// bare diff-only review.
+// the diff, not just the diff text — that repo context is the main quality lever over the
+// old DeepSeek-only approach.
 
 class OpencodeServer {
   constructor() {
@@ -866,7 +868,7 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
 
   const fullSystem = `${systemPrompt}\n\n${agentPrompt}`;
 
-  console.log(`[${isoNow()}] Starting ${agentDef.name} (${agentDef.opencodeAgent})`);
+  console.log(`[${isoNow()}] Starting ${agentDef.name} (${MODEL_SLUG}, ${agentDef.opencodeAgent})`);
   const start = Date.now();
 
   try {
@@ -911,12 +913,16 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
 
 // ─── Sanitization ──────────────────────────────────────────────────────────
 
-// Anything reaching the PR goes through here: the reviewers run on a model whose identity is
-// deliberately absent from this public repo, and a model naming itself (or an upstream error
-// echoing the slug) would undo that.
+// Anything reaching the PR goes through here: the posted review must never name the model or
+// provider behind it, and a model naming itself (or an upstream error echoing the slug) would
+// undo that. The vendor prefix of the ids is redacted too, so "deepseek-v4-pro" and a bare
+// "DeepSeek" both go. Longest term first: alternation is first-match, so an unsorted list would
+// leave the rest of a longer id behind after redacting its prefix.
 function redactProviderIdentity(text) {
-  const terms = [PROVIDER_ID, MODEL_ID]
+  const vendor = MODEL_ID.split(/[-/_]/)[0];
+  const terms = [PROVIDER_ID, MODEL_ID, vendor.length >= 4 ? vendor : null]
     .filter(Boolean)
+    .sort((a, b) => b.length - a.length)
     .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   if (terms.length === 0) return text;
   return text.replace(new RegExp(terms.join("|"), "gi"), "[redacted]");
@@ -1031,7 +1037,7 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
     "review.failed_agents": agentResults.filter(r => r.error).length,
   }, parentSpan);
 
-  console.log(`[${isoNow()}] Running coordinator (${coordinatorAgent})`);
+  console.log(`[${isoNow()}] Running coordinator (${MODEL_SLUG}, ${coordinatorAgent})`);
 
   try {
     const completion = await callOpencode(coordinatorAgent, `${sharedRules}\n\n${coordinatorPrompt}`, userPrompt, AGENT_TIMEOUT_MS, {
@@ -1231,35 +1237,29 @@ async function main() {
     console.log(`[${isoNow()}] AI Code Review started for PR #${prNumber}`);
     console.log(`[${isoNow()}] Repository: ${process.env.GITHUB_REPOSITORY}`);
 
-    // Provider and model carry no defaults (they arrive from secrets), so a missing one is the
-    // same class of failure as a missing key and must surface the same way.
-    const missingConfig = [
-      apiKey() ? null : API_KEY_VAR_NAME,
-      PROVIDER_ID ? null : "REVIEW_PROVIDER_ID",
-      MODEL_ID ? null : "REVIEW_MODEL_ID",
-    ].filter(Boolean);
-
-    if (missingConfig.length > 0) {
+    if (!apiKey()) {
       outcome = "misconfigured";
       TRACE.setSpanAttributes(rootSpan, {
         "review.skipped": true,
-        "review.skip_reason": "missing_provider_config",
+        "review.skip_reason": "missing_api_key",
       });
       // A missing key is a CI/secrets misconfiguration, not a "nothing to review" case —
       // fail loudly (non-zero exit) instead of warn+return, so review coverage silently
       // dropping to zero can't slip by as a green check. Also post to the PR so it's
       // visible without digging into Actions logs.
-      const message = `${missingConfig.join(", ")} not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip.`;
+      const message = `${API_KEY_VAR_NAME} is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip.`;
       console.error(`[${isoNow()}] ${message}`);
       try {
-        postReviewComment(prNumber, `${REVIEW_MARKER}\n${REVIEW_HEADING}\n\n> [!CAUTION]\n> ### ⛔ Not reviewed\n> ${message} Please confirm the review secrets are provisioned.`);
+        // The key's env var name is named in the log but not in the comment: it carries the
+        // provider name, and the posted comment must not.
+        postReviewComment(prNumber, `${REVIEW_MARKER}\n${REVIEW_HEADING}\n\n> [!CAUTION]\n> ### ⛔ Not reviewed\n> The review API key is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip. Please confirm the review secrets are provisioned.`);
       } catch (postErr) {
         console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
       }
       throw new Error(message);
     }
 
-    console.log(`[${isoNow()}] Review provider (via opencode serve): configured`);
+    console.log(`[${isoNow()}] ${MODEL_SLUG} (via opencode serve): configured`);
 
     // 1. Get PR diff
     console.log(`[${isoNow()}] Fetching PR diff...`);
@@ -1396,9 +1396,9 @@ async function main() {
     if (allAgentsFailed) {
       outcome = "all_agents_failed";
       exitCode = 1;
-      const detail = redactProviderIdentity(
-        failedAgents.map(r => `- ${r.agentName}: ${r.error}`).join("\n"),
-      );
+      const detail = failedAgents
+        .map(r => `- ${r.agentName}: ${r.error}`)
+        .join("\n");
       console.error(`[${isoNow()}] All ${results.length} reviewers failed — skipping coordinator and reporting failure.`);
       TRACE.setSpanAttributes(rootSpan, {
         "review.all_agents_failed": true,
@@ -1463,7 +1463,7 @@ async function main() {
     // so a total reviewer outage can't pass as a green tick. Thrown after the comment lands
     // (not at detection time) to guarantee both happen.
     if (allAgentsFailed) {
-      const err = new Error(`All ${results.length} reviewers failed; no review was produced.`);
+      const err = new Error(`All ${results.length} reviewers failed against ${MODEL_SLUG}; no review was produced.`);
       err.suppressFatalLog = true;
       throw err;
     }

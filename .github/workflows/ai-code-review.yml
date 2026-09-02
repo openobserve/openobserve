@@ -17,9 +17,8 @@ on:
 
 jobs:
   review:
-    # Explicit name: without it GitHub serializes the whole matrix object into the public check
-    # name, and the check name is public on every PR.
-    name: review
+    # Explicit name: without it GitHub serializes the whole matrix object (api_key_env, marker) into the public check name.
+    name: review (${{ matrix.provider.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 25
     # Concurrency is per-job (not workflow-level) so it can see `matrix`: keyed per-PR AND
@@ -36,15 +35,16 @@ jobs:
       # One provider's failure shouldn't sink the others.
       fail-fast: false
       matrix:
-        # The provider and model are NOT declared here: this repo is public, and so are its
-        # Actions logs. Everything that would name the model comes from secrets (masked in logs)
-        # via the "Configure review provider" step below. Only leg-local, non-identifying values
-        # live in the matrix. Adding a leg? Give it a distinct `<!-- ai-code-review-<suffix> -->`
-        # marker — run-review.mjs matches that shape, so two legs sharing one marker would claim
-        # and overwrite each other's comment.
+        # DeepSeek-V4-Pro is the sole reviewer (the GLM-5.2 head-to-head has ended).
+        # Markers must not name the model: they ship inside the posted PR comment. Adding a
+        # provider? Give it a distinct `<!-- ai-code-review-<suffix> -->` marker — run-review.mjs
+        # matches that shape, so two legs sharing one marker overwrite each other's comment.
         provider:
-          - name: primary
+          - name: deepseek
+            provider_id: deepseek-review
+            model_id: deepseek-v4-pro
             model_variant: ""
+            api_key_env: DEEPSEEK_API_KEY
             marker: "<!-- ai-code-review -->"
     steps:
       - name: Checkout repository
@@ -131,21 +131,6 @@ jobs:
           app-id: ${{ vars.OO_REVIEWER_APP_ID }}
           private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}
 
-      # The opencode provider block (endpoint + model id) lives in a secret and is merged over
-      # the repo's opencode.jsonc at runtime, so no committed file and no public log names the
-      # model. Empty secret ⇒ no overlay: run-review.mjs then reports a misconfiguration.
-      - name: Configure review provider
-        if: steps.skip.outputs.skip_review == 'false'
-        env:
-          REVIEW_OPENCODE_CONFIG: ${{ secrets.REVIEW_OPENCODE_CONFIG }}
-        run: |
-          if [ -z "$REVIEW_OPENCODE_CONFIG" ]; then
-            echo "REVIEW_OPENCODE_CONFIG is not set; the review will report a misconfiguration."
-            exit 0
-          fi
-          printf '%s' "$REVIEW_OPENCODE_CONFIG" > "$RUNNER_TEMP/opencode-review.json"
-          echo "OPENCODE_CONFIG=$RUNNER_TEMP/opencode-review.json" >> "$GITHUB_ENV"
-
       - name: Run AI Code Review
         if: steps.skip.outputs.skip_review == 'false'
         env:
@@ -154,12 +139,14 @@ jobs:
           GH_TOKEN: ${{ steps.app_token.outputs.token || github.token }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           FORCE_FULL: ${{ steps.skip.outputs.force_full }}
-          # Provider and model come from secrets so GitHub masks them in this public log.
-          REVIEW_PROVIDER_ID: ${{ secrets.REVIEW_PROVIDER_ID }}
-          REVIEW_MODEL_ID: ${{ secrets.REVIEW_MODEL_ID }}
+          # Provider selection for this matrix leg (see run-review.mjs for how these are used).
+          REVIEW_PROVIDER_ID: ${{ matrix.provider.provider_id }}
+          REVIEW_MODEL_ID: ${{ matrix.provider.model_id }}
           REVIEW_MODEL_VARIANT: ${{ matrix.provider.model_variant }}
+          REVIEW_API_KEY_ENV: ${{ matrix.provider.api_key_env }}
           REVIEW_MARKER: ${{ matrix.provider.marker }}
-          REVIEW_API_KEY: ${{ secrets.REVIEW_API_KEY }}
+          # run-review.mjs reads only the key named by REVIEW_API_KEY_ENV.
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           O2_TRACE_INGEST_URL: ${{ secrets.O2_TRACE_INGEST_URL }}
           O2_TRACE_ORG: ${{ secrets.O2_TRACE_ORG }}
           O2_TRACE_USERNAME: ${{ secrets.O2_TRACE_USERNAME }}
