@@ -226,6 +226,7 @@ import useTheme from "@/composables/useTheme";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import BillingService from "@/services/billings";
 import organizations from "@/services/organizations";
+import { organizationKeys } from "@/services/organizations.querykeys";
 import { useRouter } from "vue-router";
 import { getImageURL } from "@/utils/zincutils";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
@@ -311,6 +312,8 @@ export default defineComponent({
       };
       try {
         await organizations.post_organization_settings(orgId, updatedSettings);
+        // MainLayout re-reads this scope on every org switch and would serve the pre-save payload back.
+        await queryClient.invalidateQueries({ queryKey: organizationKeys.settings(orgId) });
         store.dispatch("setOrganizationSettings", updatedSettings);
         toast({
           variant: "success",

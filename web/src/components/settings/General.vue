@@ -589,6 +589,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { configFullQuery } from "@/services/config.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { orgSummaryQuery } from "@/services/organizations.queries";
+import { organizationKeys } from "@/services/organizations.querykeys";
 import {
   computed,
   defineComponent,
@@ -968,6 +969,11 @@ export default defineComponent({
           store.state?.selectedOrganization?.identifier,
           store.state?.organizationData?.organizationSettings,
         );
+
+        // MainLayout re-reads this scope on every org switch and would serve the pre-save payload back.
+        await queryClient.invalidateQueries({
+          queryKey: organizationKeys.settings(store.state?.selectedOrganization?.identifier),
+        });
 
         // Apply the current mode's theme
         const currentMode = isDark.value ? "dark" : "light";
