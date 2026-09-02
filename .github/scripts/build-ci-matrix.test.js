@@ -172,6 +172,49 @@ test("config errors die eagerly, even when the changed file is global", () => {
   assert.throws(() => run(["web/global/app.ts"], { base }), /unreachable by source changes/);
 });
 
+test("ENT smoke overlay: adds folders, replaces core, dies without it", () => {
+  const dir = path.join(TMP, "ent-overlay");
+  fs.mkdirSync(dir, { recursive: true });
+  const base = path.join(dir, "ci_matrix.json");
+  fs.writeFileSync(
+    base,
+    JSON.stringify([{ testfolder: "X", actual_folder: "X", run_files: ["a.spec.js"] }])
+  );
+  fs.writeFileSync(
+    path.join(dir, "smoke_config.json"),
+    JSON.stringify({ core_shards: ["X"], folder_paths: { X: ["web/x/**"] } })
+  );
+  const entDir = path.join(dir, "ent");
+  fs.mkdirSync(entDir, { recursive: true });
+  const overlay = path.join(entDir, "ci_matrix.ent.json");
+  fs.writeFileSync(
+    overlay,
+    JSON.stringify({ shards: [{ testfolder: "W", actual_folder: "W", run_files: ["w.spec.js"] }] })
+  );
+  const changed = path.join(dir, "changed.txt");
+  const env = { ...process.env, GITHUB_EVENT_NAME: "pull_request" };
+  const runEnt = () =>
+    JSON.parse(
+      execFileSync("node", [SCRIPT, base, overlay, "--select-for-changes", changed], {
+        encoding: "utf8",
+        env,
+      })
+    ).include.map((s) => s.testfolder);
+
+  // Without the ENT smoke config the ENT shard is unreachable — validation refuses.
+  fs.writeFileSync(changed, "web/x/app.ts\n");
+  assert.throws(runEnt, /unreachable by source changes/);
+
+  fs.writeFileSync(
+    path.join(entDir, "smoke_config.ent.json"),
+    JSON.stringify({ folder_paths: { W: ["o2_enterprise/src/w/**"] }, core_shards: ["X", "W"] })
+  );
+  fs.writeFileSync(changed, "o2_enterprise/src/w/mod.rs\n");
+  assert.deepStrictEqual(runEnt().sort(), ["W"]);
+  fs.writeFileSync(changed, "unmapped/file.rs\n");
+  assert.deepStrictEqual(runEnt().sort(), ["W", "X"]);
+});
+
 test("every selection glob matches at least one tracked file", () => {
   const tracked = execFileSync("git", ["-C", REPO, "ls-files"], { encoding: "utf8" })
     .split("\n")
