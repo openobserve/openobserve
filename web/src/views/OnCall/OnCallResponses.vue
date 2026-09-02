@@ -826,13 +826,12 @@ const ESCALATION_DETAIL_LIMIT = 25;
  * The states a reader triages by, in the order they matter.
  *
  * The first three are not the wire's `ResponseState`: "ringing" is an
- * escalating record that nobody has claimed, nothing is snoozing, and the
- * ladder has not already exhausted — four fields rather than one, and it is
- * the only distinction that changes what somebody does next. The last of
- * those matters because a ladder with nobody behind it (a priority with no
- * channels) exhausts the instant it opens, yet the wire state stays
- * `triggered` forever — there is no backend state for "gave up" — so `state`
- * alone cannot answer "is this still paging". "resolved" IS the wire state:
+ * escalating record that nobody has claimed and nothing is snoozing, which is
+ * three fields rather than one, and it is the only distinction that changes
+ * what somebody does next. A record stays ringing here even once its ladder
+ * has exhausted with nobody reached — that is the one case a human most needs
+ * to see, not one to bury under "handled" alongside pages an owner actually
+ * has. "resolved" IS the wire state:
  * once a page is resolved there is nothing left to triage, only the record of
  * what happened — the reader has to ask for it (`includeResolved`) by picking
  * the "all" or "resolved" tab, rather than it always riding along with the
@@ -1281,26 +1280,10 @@ const myShift = computed(() => {
   };
 });
 
-/// Whether an escalating record can still reach anybody. Two independent ways
-/// this is knowable: the ladder ran and used up every rung (`exhausted`), or
-/// the priority's policy defines zero rungs for it, so no ladder was ever
-/// going to run — a P4 with nobody configured behind it, say. The zero-rung
-/// case is checked first because it is synchronous (already loaded in
-/// `policyByTeam`) and correct from the first paint, unlike `exhausted`,
-/// which needs a per-record fetch that a policy fact should not have to wait
-/// on. Unknown while the ladder detail has not loaded yet — first paint, or
-/// past ESCALATION_DETAIL_LIMIT — defaults to still-ringing, so a genuinely
-/// live page is never hidden for lack of a fetch.
-function isStillRinging(record: OnCallResponse): boolean {
-  if (totalRungsFor(record) === 0) return false;
-  return !(progressById.value[record.id]?.exhausted ?? false);
-}
-
-// Only an escalating page that could still reach somebody can be claimed. One
-// whose ladder already exhausted with nobody left offers no button rather than
-// one that promises to notify somebody it never will.
+// Only an escalating page can be claimed. A row with nothing left to claim
+// offers no button rather than one that errors.
 function canAcknowledge(row: PageRow): boolean {
-  return row.escalating.some((r) => isStillRinging(r));
+  return row.escalating.length > 0;
 }
 
 /// Anything under the row still open. A group stands for every firing beneath
@@ -1464,9 +1447,7 @@ async function bulkResolve() {
 /// with anything still ringing is ringing, whatever its latest firing says.
 function rowSection(row: PageRow): SectionKey {
   if (row.latest.state === "resolved") return "resolved";
-  if (row.escalating.some((r) => !r.acked_by && !isSnoozed(r) && isStillRinging(r))) {
-    return "ringing";
-  }
+  if (row.escalating.some((r) => !r.acked_by && !isSnoozed(r))) return "ringing";
   if (row.firings.some((r) => isSnoozed(r))) return "snoozed";
   return "handled";
 }

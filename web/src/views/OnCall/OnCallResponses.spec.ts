@@ -362,6 +362,39 @@ describe("OnCallResponses", () => {
 
       expect(sections(wrapper)).toEqual({ handled: 1 });
     });
+
+    /// A ladder that ran out of rungs with nobody reaching anybody is the one
+    /// case a responder most needs to see, not one to bury under "handled"
+    /// next to pages that already have an owner — "Nobody yet" under a
+    /// heading that says a human owns each of these was the bug.
+    it("keeps an exhausted-ladder page in the ringing run until somebody claims it", async () => {
+      service.escalationProgress.mockResolvedValue({
+        data: {
+          fired: [{ after_micros: 0, at: 1, targets: [] }],
+          next_targets: [],
+          next_at: null,
+          exhausted: true,
+          stopped_because: "the ladder is exhausted — nobody acknowledged",
+        },
+      } as any);
+      const wrapper = await withPages([page({ id: "resp_1" })]);
+
+      expect(sections(wrapper)).toEqual({ ringing: 1 });
+      expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(true);
+    });
+
+    /// A priority with no rungs configured (P4, by design) never starts a
+    /// ladder at all, so `exhausted` never even gets a chance to be true.
+    /// Same fix has to cover this path too, or the bug just moves.
+    it("keeps a zero-rung priority in the ringing run until somebody claims it", async () => {
+      service.getPolicy.mockResolvedValue({
+        data: { rungs: [{ priority: 1, steps: [], channels: [] }] },
+      } as any);
+      const wrapper = await withPages([page({ id: "resp_1" })]);
+
+      expect(sections(wrapper)).toEqual({ ringing: 1 });
+      expect(wrapper.find('[data-test^="oncall-row-ack-"]').exists()).toBe(true);
+    });
   });
 
   describe("the escalation ladder", () => {
