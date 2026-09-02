@@ -72,9 +72,30 @@ test("only-ignored changes fall back to the core cross-section", () => {
   assert.deepStrictEqual(folders.sort(), [...CORE, "Logs-SelectStar"].sort());
 });
 
-test("spec not in any shard's run_files falls back to core", () => {
+test("spec not in run_files routes to its folder's shards, not core", () => {
   const folders = run(["tests/ui-testing/playwright-tests/Alerts/brand-new.spec.js"]);
-  assert.deepStrictEqual(folders.sort(), [...CORE, "Logs-SelectStar"].sort());
+  assert.deepStrictEqual(folders.sort(), ["Alerts", "Logs-SelectStar"]);
+});
+
+test("shard-local helper routes to its folder's shards", () => {
+  const folders = run(["tests/ui-testing/playwright-tests/Alerts/utils/alerts-api-helpers.js"]);
+  assert.deepStrictEqual(folders.sort(), ["Alerts", "Logs-SelectStar"]);
+});
+
+test("shared test infrastructure forces the full matrix", () => {
+  for (const file of [
+    "tests/ui-testing/pages/page-manager.js",
+    "tests/ui-testing/playwright-tests/utils/data-ingestion.js",
+    "tests/ui-testing/playwright-tests/baseFixtures.js",
+    "tests/ui-testing/playwright.config.js",
+    "tests/ui-testing/package.json",
+  ]) {
+    assert.strictEqual(run([file]).length, FULL_COUNT, file);
+  }
+});
+
+test("empty changed-files list forces the full matrix", () => {
+  assert.strictEqual(run([]).length, FULL_COUNT);
 });
 
 test("frontend unit spec changes are ignored even inside global dirs", () => {
@@ -88,6 +109,22 @@ test("frontend unit spec changes are ignored even inside global dirs", () => {
 test("page-object change selects its feature's shards", () => {
   const folders = run(["tests/ui-testing/pages/alertsPages/alertsPage.js"]);
   assert.deepStrictEqual(folders.sort(), ["Alerts", "Logs-SelectStar"]);
+});
+
+test("unsupported glob syntax dies loudly instead of silently never matching", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ci-matrix-badglob-"));
+  const manifest = path.join(dir, "ci_matrix.json");
+  fs.writeFileSync(
+    manifest,
+    JSON.stringify([{ testfolder: "X", actual_folder: "X", run_files: ["a.spec.js"], paths: ["web/{a,b}/**"] }])
+  );
+  fs.writeFileSync(path.join(dir, "smoke_config.json"), JSON.stringify({ core_shards: ["X"] }));
+  const changed = path.join(dir, "changed.txt");
+  fs.writeFileSync(changed, "web/a/file.ts\n");
+  assert.throws(
+    () => execFileSync("node", [SCRIPT, manifest, "--select-for-changes", changed], { encoding: "utf8" }),
+    /unsupported glob syntax/
+  );
 });
 
 test("ignored file alongside a mapped file does not widen the selection", () => {

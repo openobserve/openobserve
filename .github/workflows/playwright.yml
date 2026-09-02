@@ -88,7 +88,7 @@ jobs:
           # dependabot bump to another workflow) — none can affect the app. Source, web/, and
           # this workflow (playwright.yml) still run the suite.
           IGNORE_RE='(\.md$|^docs/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }}...${{ github.sha }})
           # Files not matching IGNORE_RE. Captured (not `grep -qv`) so the check doesn't depend
           # on grep -qv exit semantics, which differ across grep builds; the `|| true` keeps
           # `set -e` from aborting when grep matches nothing (exit 1). The `grep -qE` below is a
@@ -100,57 +100,17 @@ jobs:
             echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
 
-  # PR pushes often arrive in quick bursts; concurrency's cancel-in-progress only fires once
-  # the NEXT run starts, by which time this run's build + eks shards are minutes in (30% of
-  # runs die cancelled, ~100 eks-min each). A short quiet-period check here means a superseded
-  # run stops before the expensive jobs ever start. Non-PR events pass through instantly.
-  debounce:
-    timeout-minutes: 5
-    name: debounce
+  build_binary:
+    timeout-minutes: 45
+    name: build_binary
     needs: [check_changes]
+    # Run when there are e2e-relevant changes AND either this is not a pull_request
+    # (push to main / merge_group always run) or the PR carries the 'e2e' label.
     if: >-
       (github.event_name == 'pull_request' &&
        contains(github.event.pull_request.labels.*.name, 'e2e')) ||
       (github.event_name != 'pull_request' &&
        needs.check_changes.outputs.has_changes == 'true')
-    runs-on: ubuntu-latest
-    permissions: {}
-    outputs:
-      superseded: ${{ steps.check.outputs.superseded }}
-    steps:
-      - id: check
-        env:
-          IS_PR: ${{ github.event_name == 'pull_request' }}
-          HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          HEAD_REPO_URL: ${{ github.event.pull_request.head.repo.clone_url }}
-        run: |
-          if [ "$IS_PR" != "true" ]; then
-            echo "superseded=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          sleep 150
-          LATEST=$(git ls-remote "$HEAD_REPO_URL" "refs/heads/$HEAD_REF" | cut -f1)
-          if [ -n "$LATEST" ] && [ "$LATEST" != "$HEAD_SHA" ]; then
-            echo "superseded=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::PR branch moved to $LATEST during the quiet period — skipping this run; the newer run reports."
-          else
-            echo "superseded=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  build_binary:
-    timeout-minutes: 45
-    name: build_binary
-    needs: [check_changes, debounce]
-    # Run when there are e2e-relevant changes AND either this is not a pull_request
-    # (push to main / merge_group always run) or the PR carries the 'e2e' label —
-    # and the debounce didn't see a newer push supersede this one.
-    if: >-
-      needs.debounce.outputs.superseded != 'true' &&
-      ((github.event_name == 'pull_request' &&
-        contains(github.event.pull_request.labels.*.name, 'e2e')) ||
-       (github.event_name != 'pull_request' &&
-        needs.check_changes.outputs.has_changes == 'true'))
     runs-on:
       labels: ubicloud-standard-16
     permissions:
@@ -267,8 +227,13 @@ jobs:
         run: |
           SELECT_ARGS=""
           if [ "$IS_PR" == "true" ] && [ "$HAS_FULL_LABEL" != "true" ] && [ "$SMOKE_DISABLED" != "true" ]; then
-            git diff --name-only "origin/${BASE_REF:-main}" ${{ github.sha }} > /tmp/pw-changed-files.txt
-            SELECT_ARGS="--select-for-changes /tmp/pw-changed-files.txt"
+            # Three-dot: diff from the merge base, so commits that landed on the base branch
+            # after this PR's merge commit was cut never leak into the selection.
+            if git diff --name-only "origin/${BASE_REF:-main}...${{ github.sha }}" > /tmp/pw-changed-files.txt; then
+              SELECT_ARGS="--select-for-changes /tmp/pw-changed-files.txt"
+            else
+              echo "::warning::changed-file diff failed — running the full matrix"
+            fi
           fi
           MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json $SELECT_ARGS)
           if [ -z "$MATRIX" ]; then echo "::error::matrix generation failed (build-ci-matrix produced no output)"; exit 1; fi
@@ -837,7 +802,6 @@ jobs:
     needs:
       [
         check_changes,
-        debounce,
         build_binary,
         ui_integration_tests,
       ]
@@ -845,13 +809,6 @@ jobs:
     steps:
       - name: Check test results
         run: |
-          # 0. A newer push superseded this run during the debounce quiet period. The newer
-          #    head commit carries its own required checks, so this stale run passes through.
-          if [ "${{ needs.debounce.outputs.superseded }}" == "true" ]; then
-            echo "✅ Superseded by a newer push to this PR — the newer run's checks gate the merge."
-            exit 0
-          fi
-
           # 1. check_changes must have succeeded — if it failed, downstream jobs skipped
           #    and we must not report a false success.
           if [ "${{ needs.check_changes.result }}" != "success" ]; then
