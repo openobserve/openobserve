@@ -185,7 +185,7 @@
               <span>
                 {{ t("aiObservability.experiments.rowDetail.latency") }}
                 <span class="text-text-body">{{
-                  raw(milliseconds(activeTrial.execution?.latencyMs))
+                  raw(durationLabel(activeTrial.execution?.latencyMs))
                 }}</span>
               </span>
               <span>
@@ -261,6 +261,7 @@ import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import ExperimentRowNav from "./ExperimentRowNav.vue";
+import { durationLabel } from "./experimentRowContent";
 import {
   experimentScoreSummaryValue,
   experimentScoreValue,
@@ -435,7 +436,6 @@ function scoreFor(trial: ExperimentResultSlot, summary: ExperimentScoreSummary) 
   );
 }
 
-const milliseconds = (value: number | null | undefined) => (value == null ? "—" : `${value} ms`);
 const numberValue = (value: number | null | undefined) => (value == null ? "—" : String(value));
 const costValue = (value: number | null | undefined) =>
   value == null ? "—" : `$${value.toFixed(6)}`;

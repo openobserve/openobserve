@@ -77,6 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :loading="loading"
                 selectable
                 :selected-key="roleFilter"
+                default-key="total"
                 @select="onStatSelect"
               />
             </div>
@@ -710,7 +711,11 @@ export default defineComponent({
         .catch(() => true);
     };
     const getCustomRoles = async (options: { silent?: boolean } = {}) => {
-      if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
+      if (
+        (config.isEnterprise !== "true" && config.isCloud !== "true") ||
+        !store.state.zoConfig.rbac_enabled
+      )
+        return;
       try {
         // Same endpoint as the IAM roles list — one cache entry, not one per page.
         const data = await queryClient.fetchQuery(
@@ -869,7 +874,7 @@ export default defineComponent({
             // fire-and-forget — and re-render the rows when it resolves,
             // keeping the table responsive instead of blocking the whole UI
             // on the role API.
-            if (isEnterpriseOrCloud) {
+            if (isEnterpriseOrCloud && store.state.zoConfig.rbac_enabled) {
               const orgId = store.state.selectedOrganization.identifier;
               // Don't await — let the batched role fetch run in the background.
               queryClient

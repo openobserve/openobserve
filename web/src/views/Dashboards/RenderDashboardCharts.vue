@@ -451,14 +451,11 @@ export default defineComponent({
 
     // Helper function to set up panel visibility observers
     const setupPanelObservers = async () => {
-      // Clean up existing observer
-      if (panelObserver.value) {
-        panelObserver.value.disconnect();
-        panelObserver.value = null;
-      }
-
       // Wait for DOM to be ready
       await nextTick();
+
+      // Disconnect right before reassigning; an await in between orphans the old observer.
+      panelObserver.value?.disconnect();
 
       // Create new IntersectionObserver
       const observer = new IntersectionObserver(

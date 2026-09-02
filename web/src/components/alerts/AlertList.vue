@@ -128,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :loading="loading"
                     selectable
                     :selected-key="stateFilter"
+                    default-key="total"
                     @select="onStatSelect"
                   />
                 </div>
@@ -311,6 +312,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template #cell-owner="{ row }">
                 <OUserCell :value="row.owner" />
+              </template>
+
+              <template #cell-frequency="{ row }">
+                {{
+                  row.frequency
+                    ? row.frequency_type == "cron"
+                      ? row.frequency
+                      : t("pipeline.frequencyMins", { count: row.frequency })
+                    : "--"
+                }}
               </template>
 
               <template #cell-last_triggered_at="{ row }">
@@ -1231,6 +1242,7 @@ export default defineComponent({
         t("alerts.historyTimeline.error"),
         t("alerts.historyTimeline.skipped"),
         t("alerts.historyTimeline.unknown"),
+        t("alerts.historyTimeline.pending"),
       );
       return raw(at ? `${label} ${t("alerts.asOf")} ${at}` : label);
     };
@@ -1516,6 +1528,22 @@ export default defineComponent({
           size: COL.owner,
           meta: { align: "left" },
         },
+        // "frequency" — the "Check every" cadence, meaningless for real-time alerts
+        ...(activeTab.value !== "realTime"
+          ? [
+              {
+                id: "frequency",
+                accessorKey: "frequency",
+                header: t("alerts.frequency"),
+                cell: " ",
+                sortable: true,
+                resizable: true,
+                hideable: true,
+                size: COL.frequency,
+                meta: { align: "left" },
+              } as OTableColumnDef,
+            ]
+          : []),
         {
           id: "last_triggered_at",
           accessorKey: "last_triggered_at",
@@ -1682,6 +1710,11 @@ export default defineComponent({
       firing_count: anomaly.firing_count ?? "--",
       status: anomaly.status || "--",
       last_error: anomaly.last_error || null,
+      // Built field by field: anything unlisted is invisible to the table.
+      last_outcome: anomaly.last_outcome ?? null,
+      last_outcome_at: anomaly.last_outcome_at ?? null,
+      priority: anomaly.priority ?? null,
+      tags: anomaly.tags ?? [],
       selected: false,
       type: "anomaly",
       folder_name: {

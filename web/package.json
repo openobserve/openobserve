@@ -8,6 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "postinstall": "patch-package --error-on-fail",
     "dev": "vite --base /web/",
     "devcloud": "NODE_ENV=devcloud vite --mode=devcloud",
     "build-alpha1": "run-p type-check build-only-alpha1",
@@ -151,6 +152,7 @@
     "jsdom": "^27.4.0",
     "msw": "^2.15.0",
     "npm-run-all": "^4.1.5",
+    "patch-package": "^8.0.1",
     "postcss": "^8.5.26",
     "postcss-html": "^1.8.1",
     "prettier": "^3.9.6",

@@ -46,6 +46,7 @@ function makeEvaluation(overrides: Record<string, any> = {}) {
     evaluation_took_in_secs: 0.412,
     query_took: 231,
     error: null,
+    retries: 0,
     ...overrides,
   };
 }
@@ -54,12 +55,13 @@ async function mountComp({
   hits = [makeEvaluation()],
   total = hits.length,
   alertId = "alert-1",
-}: { hits?: any[]; total?: number; alertId?: string } = {}) {
+  isAnomaly = false,
+}: { hits?: any[]; total?: number; alertId?: string; isAnomaly?: boolean } = {}) {
   vi.mocked(alertsService.getHistory).mockResolvedValue({
     data: { hits, total },
   } as any);
   const wrapper = mount(AlertEvaluationHistory, {
-    props: { alertId },
+    props: { alertId, isAnomaly },
     global: { plugins: [i18n, store] },
   });
   await flushPromises();
@@ -102,6 +104,27 @@ describe("AlertEvaluationHistory", () => {
     // Evaluation and query durations.
     expect(wrapper.text()).toContain("0.412s");
     expect(wrapper.text()).toContain("231ms");
+  });
+
+  it("renders the retries count so retried deliveries are distinguishable from separate evaluations", async () => {
+    wrapper = await mountComp({
+      hits: [
+        makeEvaluation({ timestamp: 1700000000000000, status: "notify_failed", retries: 0 }),
+        makeEvaluation({ timestamp: 1700000010000000, status: "notify_failed", retries: 1 }),
+        makeEvaluation({ timestamp: 1700000020000000, status: "notify_failed", retries: 2 }),
+      ],
+    });
+    const retryCells = wrapper.findAll('[data-test="alerts-alertevaluationhistory-retries"]');
+    expect(retryCells).toHaveLength(3);
+    // Rows are sorted newest-first by timestamp, so highest retries value comes first.
+    expect(retryCells.map((c) => c.text())).toEqual(["2", "1", "0"]);
+  });
+
+  it("renders an em dash when retries is absent", async () => {
+    wrapper = await mountComp({
+      hits: [makeEvaluation({ retries: null })],
+    });
+    expect(wrapper.find('[data-test="alerts-alertevaluationhistory-retries"]').text()).toBe("—");
   });
 
   it("queries the history endpoint scoped to this alert", async () => {
@@ -168,5 +191,47 @@ describe("AlertEvaluationHistory", () => {
     await wrapper.find('[data-test="alerts-alertevaluationhistory-refresh"]').trigger("click");
     await flushPromises();
     expect(alertsService.getHistory).toHaveBeenCalledTimes(2);
+  });
+});
+
+/** Anomaly configs reach the same endpoint by a different parameter: their id
+ *  fails the handler's `alert_id` existence check outright
+ *  (src/api/management/src/request/alerts/history.rs). */
+describe("AlertEvaluationHistory — anomaly detection configs", () => {
+  let wrapper: VueWrapper;
+
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => wrapper?.unmount());
+
+  it("asks for anomaly history by anomaly_id, never alert_id", async () => {
+    wrapper = await mountComp({ alertId: "anomaly-1", isAnomaly: true, hits: [] });
+
+    const query = vi.mocked(alertsService.getHistory).mock.calls[0][1];
+    expect(query.anomaly_id).toBe("anomaly-1");
+    expect(query.alert_id).toBeUndefined();
+  });
+
+  it("still asks by alert_id for an ordinary alert", async () => {
+    wrapper = await mountComp({ alertId: "alert-1", hits: [] });
+
+    const query = vi.mocked(alertsService.getHistory).mock.calls[0][1];
+    expect(query.alert_id).toBe("alert-1");
+    expect(query.anomaly_id).toBeUndefined();
+  });
+
+  // Those two generic columns would be permanent em dashes for an anomaly run.
+  it("swaps the threshold columns for the anomaly count", async () => {
+    wrapper = await mountComp({
+      isAnomaly: true,
+      hits: [makeEvaluation({ anomaly_count: 4, actual_value: 4, query_took: null })],
+    });
+
+    const text = wrapper.text();
+    expect(text).toContain(i18n.global.t("alerts.historyTable.anomalies"));
+    expect(text).not.toContain(i18n.global.t("alerts.historyTable.condition"));
+    expect(text).not.toContain(i18n.global.t("alerts.historyTable.queryTime"));
+    // The cell itself, not the row: any timestamp digit would satisfy a
+    // whole-table `toContain`.
+    expect(wrapper.find('[data-test="o2-table-cell-anomaly_count"]').text().trim()).toBe("4");
   });
 });

@@ -87,6 +87,14 @@ const props = defineProps({
   },
 });
 
+// SQL tab's Multi Alert value-column dropdown (sql_simple_multi_alert_fe_prd.md
+// §11): reuses this component's own /result_schema call below rather than a
+// second, separately-triggered fetch — the dropdown's options refresh in
+// lockstep with "the preview query firing", not on a different cadence.
+const emit = defineEmits<{
+  (e: "schema-updated", payload: { projections: string[]; hasHaving: boolean }): void;
+}>();
+
 // Strip axis labels from field config so ECharts doesn't render axis titles
 // and the grid margins shrink accordingly (hasXAxisName/hasYAxisName become false)
 const clearFieldLabels = (data: any) => {
@@ -324,7 +332,7 @@ const fetchQuerySchema = async () => {
     //             concat(group[0]) AS x_axis_2, concat(group[1]) AS x_axis_3 …
     // We clean the query, rename zo_sql_val→zo_sql_num, and wire the fields
     // directly so we get a multi-series line chart with a threshold mark-line.
-    if (props.isAggregationEnabled) {
+    if (props.selectedTab === "custom" && props.isAggregationEnabled) {
       const queryForPreview = cleanAggregationQuery(props.query);
 
       // Build breakdown from aggregation group_by fields.
@@ -437,6 +445,19 @@ const fetchQuerySchema = async () => {
     if (requestId !== schemaRequestId.value) return;
 
     const extractedFields = schemaRes.data;
+
+    // SQL tab's Multi Alert value-column dropdown — see the emit declaration
+    // above. Only meaningful for the raw SQL tab (this branch only runs when
+    // selectedTab === "sql"; the aggregation branch above, Custom's
+    // BE-generated SQL, returns before reaching here). `having` is the user's
+    // own SQL HAVING clause (parsed server-side), not the alert's "Alert if
+    // [column]" condition — its presence warns that it filters the result
+    // set before that condition ever sees it.
+    emit("schema-updated", {
+      projections: extractedFields.projections,
+      hasHaving: !!extractedFields.having,
+    });
+
     const chartType = determineChartType(extractedFields);
     dashboardPanelData.data.type = chartType;
 
@@ -1376,8 +1397,6 @@ const refreshData = () => {
   // Note: Alert status evaluation now happens via handleChartDataUpdate event from PanelSchemaRenderer
 };
 
-// Track if this is the initial load to prevent duplicate API calls
-let isInitialLoad = true;
 let lastRefreshTime = 0;
 
 const refreshDataOnce = () => {
@@ -1410,13 +1429,6 @@ watch(
   () => {
     // Skip if editor is open - we'll refresh when it closes
     if (props.isEditorOpen) {
-      return;
-    }
-
-    // Skip the first watch trigger on mount since onMounted will handle it
-    if (isInitialLoad) {
-      isInitialLoad = false;
-      lastRefreshTime = Date.now(); // stamp so 200ms debounce blocks rapid follow-up
       return;
     }
 

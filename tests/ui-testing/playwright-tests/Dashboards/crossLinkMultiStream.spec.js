@@ -166,7 +166,7 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
             await pm.logsPage.runQueryAndWaitForResults();
             await page.waitForTimeout(3000);
 
-            const captured = await crossLinkCapture.waitForAtLeast(2, { timeout: 8000 });
+            const captured = await crossLinkCapture.waitForAtLeast(1, { timeout: 8000 });
             await page.waitForTimeout(500);
 
             const nonEmpty = crossLinkCapture.getNonEmptyCount();
@@ -247,24 +247,21 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await pm.logsPage.ensureQuickModeState(false);
         // ensureQuickModeState already waits for the toggle data-state to flip
 
-        // Run query and wait for BOTH result_schema cross-linking responses
-        // (UNION ALL fires one per stream — we need both before checking cross-links)
-        let schemaCount = 0;
-        const bothSchemasPromise = new Promise((resolve) => {
+        // Run query and wait for the result_schema cross-linking response. One call
+        // covers every stream in the query: the backend resolves each table in the
+        // UNION and merges their cross-links into a single response.
+        const schemaPromise = new Promise((resolve) => {
             const handler = (resp) => {
                 if (resp.url().includes('result_schema') && resp.url().includes('cross_linking=true') && resp.status() === 200) {
-                    schemaCount++;
-                    if (schemaCount >= 2) {
-                        page.off('response', handler);
-                        resolve();
-                    }
+                    page.off('response', handler);
+                    resolve();
                 }
             };
             page.on('response', handler);
             setTimeout(() => { page.off('response', handler); resolve(); }, 20000);
         });
         await pm.logsPage.selectRunQuery();
-        await bothSchemasPromise;
+        await schemaPromise;
 
         // Step 4: Expand a log row
         // expandFirstLogRow waits up to 30 s for the first row to appear —
@@ -284,8 +281,8 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         testLogger.info('PASSED: Both streams cross-links visible in UNION ALL SQL query');
     });
 
-    // P1: Network verification — multiple result_schema calls for multi-stream
-    test("should fire separate result_schema calls for each stream in multi-stream mode", {
+    // P1: Network verification — one result_schema call covering every selected stream
+    test("should fire one result_schema call covering both streams in multi-stream mode", {
         tag: ['@crossLinking', '@multiStream', '@functional', '@P1', '@all']
     }, async ({ page }) => {
         testLogger.info('Testing network calls for multi-stream cross-links');
@@ -302,17 +299,24 @@ test.describe("Cross-Linking Multi-Stream testcases", () => {
         await pm.logsPage.runQueryAndWaitForResults();
         await page.waitForTimeout(3000);
 
-        // Step 4: Verify multiple result_schema calls were fired
+        // Step 4: Verify the cross-linking call fired for the union query
         testLogger.info('result_schema calls captured', {
             count: requestCapture.getCount(),
             urls: requestCapture.getUrls(),
         });
 
+        // Multi-stream search is one UNION ALL BY NAME query, so cross-linking needs a
+        // single result_schema call — the backend resolves every table in the query and
+        // merges their links (see resolve_stream_names in the cross_linking branch).
         expect(requestCapture.getCount(),
-            'Should fire at least 2 result_schema calls for 2 streams'
-        ).toBeGreaterThanOrEqual(2);
+            'Should fire exactly one result_schema call for the union query'
+        ).toBe(1);
 
-        testLogger.info('PASSED: Multiple result_schema calls verified for multi-stream');
+        const payload = requestCapture.getPayloads()[0] || '';
+        expect(payload, `result_schema payload should query ${STREAM_A}`).toContain(STREAM_A);
+        expect(payload, `result_schema payload should query ${STREAM_B}`).toContain(STREAM_B);
+
+        testLogger.info('PASSED: single result_schema call covers both streams');
     });
 
     // P1: Dashboard table panel — single stream cross-link in drilldown menu

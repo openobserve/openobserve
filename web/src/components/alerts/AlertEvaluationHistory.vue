@@ -108,11 +108,26 @@
       </div>
     </template>
 
+    <template #cell-retries="{ row }">
+      <span class="text-compact tabular-nums" data-test="alerts-alertevaluationhistory-retries">
+        {{ row.retries != null ? row.retries : "—" }}
+      </span>
+    </template>
+
     <template #cell-evaluation_time="{ row }">
       <span class="text-compact tabular-nums">
         {{
           row.evaluation_took_in_secs != null ? row.evaluation_took_in_secs.toFixed(3) + "s" : "—"
         }}
+      </span>
+    </template>
+
+    <template #cell-anomaly_count="{ row }">
+      <span
+        class="text-compact tabular-nums"
+        :class="row.anomaly_count > 0 ? 'text-status-error-text font-medium' : ''"
+      >
+        {{ row.anomaly_count ?? "—" }}
       </span>
     </template>
 
@@ -159,9 +174,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { conditionSummary } from "@/utils/alerts/runOutcome";
 
-const props = withDefaults(defineProps<{ alertId: string; isComposite?: boolean }>(), {
-  isComposite: false,
-});
+const props = withDefaults(
+  defineProps<{ alertId: string; isComposite?: boolean; isAnomaly?: boolean }>(),
+  { isComposite: false, isAnomaly: false },
+);
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -223,7 +239,8 @@ const fetchHistory = async (force = false) => {
       return queryClient.fetchQuery(options);
     };
     const data = await read<any>(alertHistoryQuery(orgId, {
-      alert_id: props.alertId,
+      // An anomaly id fails the endpoint's `alert_id` existence check outright.
+      ...(props.isAnomaly ? { anomaly_id: props.alertId } : { alert_id: props.alertId }),
       start_time: startTime,
       end_time: endTime,
       from: (currentPage.value - 1) * pageSize.value,
@@ -281,13 +298,38 @@ const columns = computed<OTableColumnDef[]>(() => [
     resizable: true,
     meta: { align: "left" },
   },
+  // An anomaly run reports no threshold and no query timing, but does report a count.
+  ...(props.isAnomaly
+    ? [
+        {
+          id: "anomaly_count",
+          accessorKey: "anomaly_count",
+          header: t("alerts.historyTable.anomalies"),
+          cell: " ",
+          size: 140,
+          resizable: true,
+          meta: { align: "left" },
+        } as OTableColumnDef,
+      ]
+    : [
+        {
+          id: "condition",
+          accessorKey: "actual_value",
+          header: t("alerts.historyTable.condition"),
+          cell: " ",
+          resizable: true,
+          meta: { align: "left", flex: true },
+        } as OTableColumnDef,
+      ]),
   {
-    id: "condition",
-    accessorKey: "actual_value",
-    header: t("alerts.historyTable.condition"),
+    id: "retries",
+    accessorKey: "retries",
+    header: t("alerts.retries"),
     cell: " ",
+    size: 90,
     resizable: true,
-    meta: { align: "left", flex: true },
+    hideable: true,
+    meta: { align: "left" },
   },
   {
     id: "evaluation_time",
@@ -299,16 +341,20 @@ const columns = computed<OTableColumnDef[]>(() => [
     hideable: true,
     meta: { align: "left" },
   },
-  {
-    id: "query_time",
-    accessorKey: "query_took",
-    header: t("alerts.historyTable.queryTime"),
-    cell: " ",
-    size: 120,
-    resizable: true,
-    hideable: true,
-    meta: { align: "left" },
-  },
+  ...(props.isAnomaly
+    ? []
+    : [
+        {
+          id: "query_time",
+          accessorKey: "query_took",
+          header: t("alerts.historyTable.queryTime"),
+          cell: " ",
+          size: 120,
+          resizable: true,
+          hideable: true,
+          meta: { align: "left" },
+        } as OTableColumnDef,
+      ]),
   {
     id: "error",
     accessorKey: "error",

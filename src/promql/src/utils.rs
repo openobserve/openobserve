@@ -20,7 +20,7 @@ use config::{
     meta::promql::{BUCKET_LABEL, HASH_LABEL, NAME_LABEL, VALUE_LABEL},
 };
 use datafusion::{
-    arrow::datatypes::{DataType, Schema},
+    arrow::datatypes::{DataType, Field, Schema},
     common::ScalarValue,
     error::Result,
     functions::regex::regexp_like,
@@ -28,7 +28,28 @@ use datafusion::{
     prelude::{DataFrame, Expr, col, lit},
 };
 use hashbrown::HashSet;
-use promql_parser::label::{MatchOp, Matchers};
+use promql_parser::label::{MatchOp, Matcher, Matchers};
+
+/// The schema field a residual matcher filters on; `None` when
+/// `matcher_predicates` skips the matcher entirely.
+pub fn matcher_residual_field<'a>(schema: &'a Schema, matcher: &Matcher) -> Option<&'a Field> {
+    // `__name__` is consumed by stream selection; the stored column may hold the
+    // pre-`format_stream_name` metric name (e.g. mixed case), so filtering on it
+    // would drop every row of a stream that was already selected by name.
+    if matcher.name == TIMESTAMP_COL_NAME
+        || matcher.name == VALUE_LABEL
+        || matcher.name == NAME_LABEL
+    {
+        return None;
+    }
+    schema.field_with_name(&matcher.name).ok()
+}
+
+/// Whether `matcher_predicates` evaluates this matcher on the given schema.
+/// Index pruning may claim exactness only for matchers covered under this rule.
+pub fn matcher_is_residual(schema: &Schema, matcher: &Matcher) -> bool {
+    matcher_residual_field(schema, matcher).is_some()
+}
 
 /// Build the DataFusion predicates used for PromQL label matchers.
 ///
@@ -37,13 +58,7 @@ use promql_parser::label::{MatchOp, Matchers};
 pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
     let mut predicates = Vec::new();
     for mat in matchers.matchers.iter() {
-        // `__name__` is consumed by stream selection; the stored column may hold the
-        // pre-`format_stream_name` metric name (e.g. mixed case), so filtering on it
-        // would drop every row of a stream that was already selected by name.
-        if mat.name == TIMESTAMP_COL_NAME || mat.name == VALUE_LABEL || mat.name == NAME_LABEL {
-            continue;
-        }
-        let Ok(field) = schema.field_with_name(&mat.name) else {
+        let Some(field) = matcher_residual_field(schema, mat) else {
             continue;
         };
         let field_type = field.data_type().clone();

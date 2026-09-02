@@ -6,6 +6,14 @@
     :back="{ onClick: closeSearchHistory }"
     bleed
   >
+    <template #subtitle>
+      <div class="flex min-w-0 items-center gap-2">
+        <OTag type="streamType" :value="activeStreamType" />
+        <span v-if="activeStreamName" class="min-w-0 truncate leading-normal">{{
+          activeStreamName
+        }}</span>
+      </div>
+    </template>
     <template #actions>
       <OButton
         data-test="search-history-wrap-content-btn"
@@ -141,7 +149,7 @@
                   @click.stop="goToLogs(row)"
                 >
                   <template #icon-left><OIcon name="search" size="xs" /></template>
-                  {{ t("logs.searchHistory.logs") }}
+                  {{ goToLogsLabel(row) }}
                 </OButton>
                 <OButton
                   v-if="
@@ -297,6 +305,8 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -321,6 +331,7 @@ export default defineComponent({
     QueryEditor,
     OButton,
     OIcon,
+    OTag,
     OTooltip,
     OTable,
     OTimeCell,
@@ -359,6 +370,25 @@ export default defineComponent({
     const moreDetailsToDisplay = ref("");
 
     const { extractTimestamps } = logsUtils();
+
+    const ALLOWED_HISTORY_STREAM_TYPES = ["logs", "metrics", "traces"];
+
+    // The route query (set by the page the user navigated from, e.g. Data
+    // Sources or the Logs page itself) is the source of truth for which
+    // telemetry type/stream this history view is scoped to; searchObj is the
+    // fallback for a same-session deep link that didn't carry the query.
+    // The query param is attacker-controlled (URL), so it's whitelisted here
+    // as defense in depth on top of the backend validation.
+    const activeStreamType = computed(() => {
+      const fromRoute = route.query.stream_type as string;
+      if (ALLOWED_HISTORY_STREAM_TYPES.includes(fromRoute)) return fromRoute;
+      return searchObj.data.stream.streamType || "logs";
+    });
+    const activeStreamName = computed(() =>
+      route.query.stream === undefined
+        ? searchObj.data.stream.selectedStream[0] || ""
+        : (route.query.stream as string),
+    );
 
     const activeTab = ref("query");
     const tabs = ref([
@@ -446,7 +476,13 @@ export default defineComponent({
           return;
         }
 
-        const response = await searchService.get_history(org_identifier, startTime, endTime);
+        const response = await searchService.get_history(
+          org_identifier,
+          startTime,
+          endTime,
+          activeStreamType.value,
+          activeStreamName.value,
+        );
         const limitedHits = response.data.hits;
         const filteredHits = limitedHits.filter((hit) => hit.event === "Search");
         if (filteredHits.length > 0) {
@@ -611,6 +647,11 @@ export default defineComponent({
         colorizeRow(row);
       }
     };
+    // goToLogs re-opens the row's own stream_type (logs/metrics/traces), so the
+    // button label must match that destination rather than always saying "Logs".
+    const goToLogsLabel = (row: { stream_type?: string }) =>
+      resolveBadgeLabel("streamType", row.stream_type || "logs");
+
     const goToLogs = (row) => {
       // emit('closeSearchHistory');
       const stream: string = row.stream_name;
@@ -619,7 +660,7 @@ export default defineComponent({
       const query = b64EncodeUnicode(row.sql);
 
       const queryObject = {
-        stream_type: "logs",
+        stream_type: row.stream_type || "logs",
         stream,
         period: "15m",
         refresh,
@@ -697,6 +738,8 @@ export default defineComponent({
     });
     return {
       searchObj,
+      activeStreamType,
+      activeStreamName,
       store,
       generateColumns,
       fetchSearchHistory,
@@ -709,6 +752,7 @@ export default defineComponent({
       searchDateTimeRef,
       expandedIds,
       goToLogs,
+      goToLogsLabel,
       goToInspector,
       onExpandedIdsChange,
       colorizedSql,

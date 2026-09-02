@@ -323,7 +323,7 @@ const labels = computed(() =>
 const chartOptions = computed(() => {
   void store.state.theme; // getComputedStyle is not reactive — re-resolve on flip.
   const accent = resolveToken("--color-accent", "#5960b2");
-  const danger = resolveToken("--color-severity-error-color", "#ef5350");
+  const danger = resolveToken("--color-severity-error-color", "#ea1a17");
   const axisColor = resolveToken("--color-text-secondary", "#6b7280");
   const gridColor = resolveToken("--color-border-default", "#e5e7eb");
 

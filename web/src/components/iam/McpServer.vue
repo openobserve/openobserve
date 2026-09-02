@@ -42,7 +42,7 @@ const subs = computed<CardSubstitutions>(() => {
   const email = store.state.userInfo?.email ?? "";
   const passcode = store.state.organizationData?.organizationPasscode ?? "";
   return {
-    url: endpoint.value?.url ?? "",
+    url: store.state.zoConfig?.web_url || endpoint.value?.url || "",
     org: store.state.selectedOrganization?.identifier ?? "",
     token: b64EncodeStandard(`${email}:${passcode}`) ?? "",
   };
