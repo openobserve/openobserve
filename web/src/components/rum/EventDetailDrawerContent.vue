@@ -644,14 +644,14 @@ const navigateToSpecificTrace = async (traceId: string) => {
     const location = await resolveTraceLocation(canonicalTraceId, startTime, endTime);
     // The ±10s guess above only frames the lookup; the indexed range is what
     // the trace actually spans, so a slow call is no longer cut off.
-    const window = traceQueryWindow(location.range, startTime, endTime);
+    const traceWindow = traceQueryWindow(location.range, startTime, endTime);
     const route = router.resolve({
       name: "traceDetails",
       query: {
         stream: location.stream,
         trace_id: canonicalTraceId,
-        from: window.startTime,
-        to: window.endTime,
+        from: traceWindow.startTime,
+        to: traceWindow.endTime,
         org_identifier: store.state.selectedOrganization.identifier,
       },
     });

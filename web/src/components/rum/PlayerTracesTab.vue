@@ -376,11 +376,11 @@ function unionTraceWindow(
     start_time: Math.min(acc.start_time, range.start_time),
     end_time: Math.max(acc.end_time, range.end_time),
   }));
-  const window = traceQueryWindow(merged, fallbackStartUs, fallbackEndUs);
-  if (known.length === ranges.length) return window;
+  const traceWindow = traceQueryWindow(merged, fallbackStartUs, fallbackEndUs);
+  if (known.length === ranges.length) return traceWindow;
   return {
-    startTime: Math.min(window.startTime, fallbackStartUs),
-    endTime: Math.max(window.endTime, fallbackEndUs),
+    startTime: Math.min(traceWindow.startTime, fallbackStartUs),
+    endTime: Math.max(traceWindow.endTime, fallbackEndUs),
   };
 }
 
@@ -631,9 +631,9 @@ function openTraceDetail(view: any) {
   } else {
     // The indexed range beats the session window: a trace running past the
     // session's picker window would otherwise open truncated.
-    const window = traceQueryWindow(view.range, fallbackStart, fallbackEnd);
-    selectedTraceStartTime.value = window.startTime;
-    selectedTraceEndTime.value = window.endTime;
+    const traceWindow = traceQueryWindow(view.range, fallbackStart, fallbackEnd);
+    selectedTraceStartTime.value = traceWindow.startTime;
+    selectedTraceEndTime.value = traceWindow.endTime;
   }
 }
 

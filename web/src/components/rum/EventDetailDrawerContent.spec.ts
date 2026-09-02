@@ -905,6 +905,25 @@ describe("EventDetailDrawerContent", () => {
       windowOpenSpy.mockRestore();
     });
 
+    it("falls back to a direct open when the popup handle is blocked", async () => {
+      // window.open returning null is the blocked-popup case: the route must
+      // still be opened, which a local named `window` would silently break.
+      await waitForRelatedResources(wrapper);
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      mockResolveTraceLocation.mockResolvedValueOnce({ stream: "payments_traces" });
+
+      const traceButtons = wrapper.findAll('[data-test="view-trace-btn"]');
+      await traceButtons[0].trigger("click");
+      await flushPromises();
+
+      expect(windowOpenSpy).toHaveBeenCalledTimes(2);
+      const [href, target] = windowOpenSpy.mock.calls[1];
+      expect(String(href)).toContain("stream=payments_traces");
+      expect(target).toBe("_blank");
+
+      windowOpenSpy.mockRestore();
+    });
+
     it("opens trace in a new browser tab when view-trace-btn is clicked", async () => {
       // Arrange
       await waitForRelatedResources(wrapper);
