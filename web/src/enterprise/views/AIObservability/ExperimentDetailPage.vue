@@ -130,10 +130,10 @@
 
       <div class="min-h-0 flex-1 overflow-hidden">
         <OTable
-          :data="visibleSlots"
+          :data="visibleRows"
           :columns="columns"
-          row-key="slotKey"
-          :loading="loading"
+          row-key="rowKey"
+          :loading="loading || rowsLoading"
           :show-global-filter="false"
           :default-columns="false"
           :enable-column-resize="true"
@@ -150,7 +150,13 @@
               <OInput
                 v-model="rowSearch"
                 class="min-w-0 flex-1"
-                :placeholder="t('aiObservability.experiments.detail.searchPlaceholder')"
+                :placeholder="
+                  t(
+                    isMultiTrial
+                      ? 'aiObservability.experiments.detail.searchInputPlaceholder'
+                      : 'aiObservability.experiments.detail.searchPlaceholder',
+                  )
+                "
                 clearable
                 data-test="ai-experiment-detail-search"
               />
@@ -163,6 +169,15 @@
                 :searchable="false"
                 clearable
                 data-test="ai-experiment-detail-status-filter"
+              />
+              <OSelect
+                v-if="isMultiTrial"
+                v-model="dispersionView"
+                class="shrink-0"
+                width="md"
+                :options="dispersionOptions"
+                :searchable="false"
+                data-test="ai-experiment-detail-dispersion-filter"
               />
             </div>
           </template>
@@ -183,9 +198,9 @@
           <template #cell-slotStatus="{ row }: { row: any }">
             <OTag
               size="sm"
-              :variant="statusVariant(row.taskStatus, 'eval').variant"
-              :label="statusVariant(row.taskStatus, 'eval').label"
-              :data-test="`ai-experiment-slot-status-${row.slotKey}`"
+              :variant="statusVariant(row.status, 'eval').variant"
+              :label="statusVariant(row.status, 'eval').label"
+              :data-test="`ai-experiment-row-status-${row.rowKey}`"
             />
           </template>
 
@@ -197,6 +212,20 @@
             <span class="text-text-secondary truncate">
               {{ raw(row.output) }}
             </span>
+          </template>
+
+          <template #cell-trialCount="{ row }: { row: any }">
+            <span class="text-text-secondary">{{ raw(row.trialLabel) }}</span>
+          </template>
+
+          <template #cell-dispersion="{ row }: { row: any }">
+            <OTag
+              v-if="row.highDispersion"
+              size="sm"
+              variant="warning"
+              :label="`${t('aiObservability.experiments.detail.highDispersionBadge')} · ${raw(row.dispersionLabel)}`"
+            />
+            <span v-else class="text-text-secondary">{{ raw(row.dispersionLabel) }}</span>
           </template>
 
           <template #cell-latency="{ row }: { row: any }">
@@ -257,6 +286,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import llmExperimentsService, {
   type ExperimentDetail,
   type ExperimentExecution,
+  type ExperimentResultRow,
+  type ExperimentResultRowSort,
   type ExperimentResultSlot,
   type ExperimentRowDetail,
 } from "@/services/llm-experiments.service";
@@ -273,7 +304,7 @@ import {
   durationUnit,
   formatDuration,
 } from "@/enterprise/components/AIObservability/experimentRowContent";
-import { experimentScoreValue, openExperimentTrace } from "./experimentResults";
+import { experimentScoreSummaryValue, openExperimentTrace } from "./experimentResults";
 
 defineOptions({ name: "AIExperimentDetailPage" });
 
@@ -286,14 +317,14 @@ const orgId = computed<string>(() => store.state.selectedOrganization?.identifie
 const experimentId = computed<string>(() => String(route.params.id ?? ""));
 const detail = ref<ExperimentDetail | null>(null);
 const loading = ref(false);
+const rowsLoading = ref(false);
 const acting = ref(false);
 const comparePickerOpen = ref(false);
-// The server caps a single page at MAX_RESULT_PAGE_SIZE (100) — refresh()
-// below loops pages until hasMore is false so the search box and status
-// filter still see every slot in a run bigger than one page.
 const RESULTS_PAGE_SIZE = 100;
+const resultRows = ref<ExperimentResultRow[]>([]);
 const rowSearch = ref("");
 const statusFilter = ref("");
+const dispersionView = ref<"dataset" | "dispersion_desc" | "high_only">("dataset");
 const rowDrawerOpen = ref(false);
 const retryingRow = ref(false);
 const selectedRowDetail = ref<ExperimentRowDetail | null>(null);
@@ -302,7 +333,7 @@ const backTarget = computed(() => ({
   label: t("aiObservability.nav.experiments"),
   to: aiExperimentsRoute(orgId.value),
 }));
-const slots = computed<ExperimentResultSlot[]>(() => detail.value?.results.slots ?? []);
+const isMultiTrial = computed(() => (detail.value?.experiment.trialCount ?? 1) > 1);
 
 /** Scorer columns come from the pinned scorers, so a run with two scorers gets
  *  two score columns exactly like the dataset grouping on the list page. */
@@ -324,31 +355,45 @@ const scorerNames = computed<Record<string, string>>(() => {
     }
   }
   for (const score of detail.value?.results.scores ?? []) record(score);
-  for (const slot of slots.value) {
-    for (const entry of slot.scores) record(entry.score as Record<string, unknown> | undefined);
-  }
   return names;
 });
 
-const slotRows = computed(() =>
-  slots.value.map((slot) => {
+const tableRows = computed(() =>
+  resultRows.value.map((row) => {
     const scores: Record<string, string> = {};
     for (const id of scorerIds.value) {
-      const entry = slot.scores.find((s) => s.scorerId === id);
-      scores[`score:${id}`] = entry?.status === "success" ? experimentScoreValue(entry.score) : "—";
+      const summary = row.scoreSummaries.find((candidate) => candidate.scorerId === id);
+      scores[`score:${id}`] = experimentScoreSummaryValue(summary?.value ?? null);
     }
+    const maxDispersion = row.dispersion?.maxNormalized ?? null;
     return {
-      ...slot,
+      ...row,
       ...scores,
-      slotKey: `${slot.rowId}:${slot.trialIndex}`,
-      input: slot.input ?? "—",
-      output: slot.execution?.output ?? "—",
-      latency: durationLabel(slot.execution?.latencyMs),
+      rowKey: row.rowId,
+      input: row.input ?? "—",
+      output: row.output ?? "—",
+      trialLabel: gt(
+        "aiObservability.experiments.detail.trialCount",
+        { count: row.trialCount },
+        row.trialCount,
+      ),
+      latency: durationLabel(row.p50LatencyMs),
+      dispersion: maxDispersion ?? -1,
+      dispersionLabel: maxDispersion === null ? "—" : `${Math.round(maxDispersion * 100)}%`,
+      highDispersion: row.dispersion?.high ?? false,
     };
   }),
 );
 
-const STATUS_FILTERS = ["pending", "in_progress", "ok", "skipped", "error"] as const;
+const STATUS_FILTERS = [
+  "pending",
+  "running",
+  "scoring",
+  "completed",
+  "skipped",
+  "task_failed",
+  "score_failed",
+] as const;
 
 const statusOptions = computed(() =>
   STATUS_FILTERS.map((status) => ({
@@ -357,19 +402,30 @@ const statusOptions = computed(() =>
   })),
 );
 
-// Every slot is loaded, so filtering here covers the whole run rather than the
-// page in view.
-const visibleSlots = computed(() => {
+const dispersionOptions = computed(() => [
+  {
+    label: t("aiObservability.experiments.detail.dispersionDatasetOrder"),
+    value: "dataset",
+  },
+  {
+    label: t("aiObservability.experiments.detail.dispersionHighestFirst"),
+    value: "dispersion_desc",
+  },
+  {
+    label: t("aiObservability.experiments.detail.dispersionHighOnly"),
+    value: "high_only",
+  },
+]);
+
+const visibleRows = computed(() => {
   const term = rowSearch.value.trim().toLowerCase();
-  return slotRows.value.filter((row) => {
-    if (statusFilter.value && row.taskStatus !== statusFilter.value) return false;
+  return tableRows.value.filter((row) => {
+    if (statusFilter.value && row.status !== statusFilter.value) return false;
     if (!term) return true;
     return `${row.input} ${row.output}`.toLowerCase().includes(term);
   });
 });
 
-// Run-level: a page-local count would show or hide the action depending on
-// which page happened to be loaded.
 const failedSlotCount = computed(
   () => detail.value?.results.aggregateSummary?.incompleteTaskSlots ?? 0,
 );
@@ -492,7 +548,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "slotStatus",
     header: t("aiObservability.experiments.detail.slotStatus"),
-    accessorKey: "taskStatus",
+    accessorKey: "status",
     sortable: true,
     size: COL.status,
     meta: { align: "left" as const },
@@ -506,14 +562,27 @@ const columns = computed<OTableColumnDef[]>(() => [
     minSize: 160,
     meta: { align: "left" as const, flex: true, isName: true },
   },
-  {
-    id: "output",
-    header: t("aiObservability.experiments.detail.columns.output"),
-    accessorKey: "output",
-    sortable: false,
-    size: 320,
-    meta: { align: "left" as const },
-  },
+  ...(isMultiTrial.value
+    ? [
+        {
+          id: "trialCount",
+          header: t("aiObservability.experiments.detail.columns.trials"),
+          accessorKey: "trialCount",
+          sortable: true,
+          size: 120,
+          meta: { align: "left" as const },
+        },
+      ]
+    : [
+        {
+          id: "output",
+          header: t("aiObservability.experiments.detail.columns.output"),
+          accessorKey: "output",
+          sortable: false,
+          size: 320,
+          meta: { align: "left" as const },
+        },
+      ]),
   ...scorerIds.value.map((id) => ({
     id: `score:${id}`,
     header: raw(scorerNames.value[id] ?? id),
@@ -523,9 +592,23 @@ const columns = computed<OTableColumnDef[]>(() => [
     size: 140,
     meta: { align: "left" as const },
   })),
+  ...(isMultiTrial.value
+    ? [
+        {
+          id: "dispersion",
+          header: t("aiObservability.experiments.detail.columns.dispersion"),
+          accessorKey: "dispersion",
+          sortable: true,
+          size: 130,
+          meta: { align: "left" as const },
+        },
+      ]
+    : []),
   {
     id: "latency",
-    header: t("aiObservability.experiments.detail.columns.latency"),
+    header: isMultiTrial.value
+      ? t("aiObservability.experiments.detail.columns.p50Latency")
+      : t("aiObservability.experiments.detail.columns.latency"),
     accessorKey: "latency",
     sortable: true,
     size: 120,
@@ -533,39 +616,73 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
+function resultRowOptions(page: number) {
+  const sort: ExperimentResultRowSort =
+    dispersionView.value === "dataset" ? "dataset" : "dispersion_desc";
+  return {
+    page,
+    pageSize: RESULTS_PAGE_SIZE,
+    sort,
+    highDispersionOnly: dispersionView.value === "high_only",
+  };
+}
+
+async function fetchAllResultRows() {
+  const rows: ExperimentResultRow[] = [];
+  let page = 1;
+  let hasMore = true;
+  while (hasMore) {
+    const next = await llmExperimentsService.listRows(
+      orgId.value,
+      experimentId.value,
+      resultRowOptions(page),
+    );
+    rows.push(...next.rows);
+    hasMore = next.pagination.hasMore;
+    page += 1;
+  }
+  return rows;
+}
+
+function showLoadError(error: any) {
+  toast({
+    variant: "error",
+    message:
+      raw(error?.response?.data?.message) || t("aiObservability.experiments.detail.loadError"),
+  });
+}
+
+async function refreshRows() {
+  if (!orgId.value || !experimentId.value) return;
+  rowsLoading.value = true;
+  try {
+    resultRows.value = await fetchAllResultRows();
+  } catch (error: any) {
+    showLoadError(error);
+  } finally {
+    rowsLoading.value = false;
+  }
+}
+
 async function refresh() {
   if (!orgId.value || !experimentId.value) return;
   loading.value = true;
+  rowsLoading.value = true;
   try {
-    const first = await llmExperimentsService.get(orgId.value, experimentId.value, {
-      resultPage: 1,
-      resultPageSize: RESULTS_PAGE_SIZE,
-    });
-    const slots = [...(first.results.slots ?? [])];
-    let page = first.results.pagination?.page ?? 1;
-    let hasMore = first.results.pagination?.hasMore ?? false;
-    // Summary/progress/score fields are already computed over the WHOLE
-    // experiment on every page — only `slots` is page-scoped, so later pages
-    // only need to contribute more slots, not replace `first`.
-    while (hasMore) {
-      page += 1;
-      const next = await llmExperimentsService.get(orgId.value, experimentId.value, {
-        resultPage: page,
-        resultPageSize: RESULTS_PAGE_SIZE,
-      });
-      slots.push(...(next.results.slots ?? []));
-      hasMore = next.results.pagination?.hasMore ?? false;
-    }
-    first.results.slots = slots;
-    detail.value = first;
+    const [nextDetail, rows] = await Promise.all([
+      llmExperimentsService.get(orgId.value, experimentId.value, {
+        resultPage: 1,
+        resultPageSize: 1,
+      }),
+      fetchAllResultRows(),
+    ]);
+    detail.value = nextDetail;
+    resultRows.value = rows;
   } catch (error: any) {
-    toast({
-      variant: "error",
-      message:
-        raw(error?.response?.data?.message) || t("aiObservability.experiments.detail.loadError"),
-    });
+    showLoadError(error);
   } finally {
     loading.value = false;
+    rowsLoading.value = false;
   }
 }
 
@@ -688,4 +805,5 @@ async function runAction(
 }
 
 watch([orgId, experimentId], refresh, { immediate: true });
+watch(dispersionView, refreshRows);
 </script>

@@ -10961,7 +10961,10 @@
         "columns": {
           "input": "Input",
           "output": "Output",
-          "latency": "Latency"
+          "trials": "Trials",
+          "dispersion": "Dispersion",
+          "latency": "Latency",
+          "p50Latency": "P50 Latency"
         },
         "retryFailed": "Retry Failed Slots",
         "loadError": "Failed to load the experiment",
@@ -10999,8 +11002,13 @@
         },
         "slotStatus": "Status",
         "searchPlaceholder": "Search input or output",
+        "searchInputPlaceholder": "Search input",
         "statusFilter": "Status",
-        "statusFilterAll": "All Statuses"
+        "statusFilterAll": "All Statuses",
+        "dispersionDatasetOrder": "Dataset order",
+        "dispersionHighestFirst": "Highest dispersion",
+        "dispersionHighOnly": "High dispersion only",
+        "highDispersionBadge": "High"
       },
       "rowDetail": {
         "fallbackTitle": "Experiment Row",

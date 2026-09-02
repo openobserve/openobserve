@@ -15,7 +15,7 @@
 
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { reactive } from "vue";
 import {
@@ -33,12 +33,15 @@ vi.mock("vuex", () => ({
   useStore: () => ({ state: { selectedOrganization: { identifier: "acme" } } }),
 }));
 const get = vi.fn();
+const getRow = vi.fn();
+const listRows = vi.fn();
 const clone = vi.fn();
 const toast = vi.fn();
 vi.mock("@/services/llm-experiments.service", () => ({
   default: {
     get: (...a: any[]) => get(...a),
-    getRow: vi.fn(),
+    getRow: (...a: any[]) => getRow(...a),
+    listRows: (...a: any[]) => listRows(...a),
     cancel: vi.fn(),
     retry: vi.fn(),
     clone: (...a: any[]) => clone(...a),
@@ -53,6 +56,16 @@ vi.mock("@/services/llm-datasets.service", () => ({
 }));
 
 import ExperimentDetailPage from "@/enterprise/views/AIObservability/ExperimentDetailPage.vue";
+
+beforeEach(() => {
+  getRow.mockReset();
+  getRow.mockResolvedValue(undefined);
+  listRows.mockReset();
+  listRows.mockResolvedValue({
+    rows: [],
+    pagination: { page: 1, pageSize: 100, totalRows: 0, hasMore: false },
+  });
+});
 
 describe("ExperimentDetailPage", () => {
   it("renders the experiment without runtime errors", async () => {
@@ -295,13 +308,48 @@ describe("ExperimentDetailPage", () => {
       },
     });
     get.mockResolvedValue(detail);
+    listRows.mockResolvedValue({
+      rows: taskStatuses.map((_, index) => ({
+        rowIndex: index,
+        rowId: `row-${index}`,
+        logicalId: `case-${index}`,
+        input: `input-${index}`,
+        expectedOutput: null,
+        trialCount: 1,
+        status: slotStatuses[index],
+        output: null,
+        p50LatencyMs: null,
+        dispersion: null,
+        scoreSummaries:
+          index === 2
+            ? [
+                {
+                  scorerId: "numeric",
+                  scorerVersion: 1,
+                  value: { kind: "numeric", mean: 0.718418 },
+                },
+                {
+                  scorerId: "boolean",
+                  scorerVersion: 1,
+                  value: { kind: "boolean", trueCount: 0, falseCount: 1 },
+                },
+                {
+                  scorerId: "category",
+                  scorerVersion: 1,
+                  value: { kind: "categorical", counts: { safe: 1 } },
+                },
+              ]
+            : [],
+      })),
+      pagination: { page: 1, pageSize: 100, totalRows: 5, hasMore: false },
+    });
 
     const wrapper = mount(ExperimentDetailPage, {
       global: {
         stubs: {
           OTable: {
             props: ["data", "columns", "getRowStyle", "rowClass"],
-            template: `<table><slot name="toolbar-trailing" /><tbody><tr v-for="row in data" :key="row.slotKey"
+            template: `<table><slot name="toolbar-trailing" /><tbody><tr v-for="row in data" :key="row.rowKey"
                 :data-rail="getRowStyle ? 'yes' : ''">
               <td v-for="column in columns" :key="column.id">
                 <slot :name="'cell-' + column.id" :row="row">{{ row[column.accessorKey] }}</slot>
@@ -320,10 +368,9 @@ describe("ExperimentDetailPage", () => {
     expect(wrapper.text()).toContain("0.718");
     expect(wrapper.text()).toContain("false");
     expect(wrapper.text()).toContain("safe");
-    // Every slot state is a labelled chip in its own column — status is carried
-    // by TEXT, so it never depends on a reader separating red from green.
+    // Text labels keep row status accessible without relying on color.
     const chipText = taskStatuses.map((_, index) =>
-      wrapper.get(`[data-test="ai-experiment-slot-status-row-${index}:0"]`).text(),
+      wrapper.get(`[data-test="ai-experiment-row-status-row-${index}"]`).text(),
     );
     expect(chipText.every((label) => label.length > 0)).toBe(true);
     expect(new Set(chipText).size).toBe(taskStatuses.length);
@@ -333,9 +380,7 @@ describe("ExperimentDetailPage", () => {
     expect(wrapper.findAll("tbody tr").every((row) => !row.attributes("data-rail"))).toBe(true);
   });
 
-  // The whole run is loaded before rendering, so search and the status filter
-  // cover every slot rather than the page that happened to be fetched.
-  it("asks for the largest server page and paginates on the client", async () => {
+  it("asks for the largest row page and paginates on the client", async () => {
     get.mockResolvedValue(makeExperimentDetail(makeExperiment({ id: "exp-1" })));
     const seen: any[] = [];
     const wrapper = mount(ExperimentDetailPage, {
@@ -356,46 +401,44 @@ describe("ExperimentDetailPage", () => {
     expect(get).toHaveBeenCalledWith(
       "acme",
       "exp-1",
-      // Pinned to the server's MAX_RESULT_PAGE_SIZE.
-      expect.objectContaining({ resultPage: 1, resultPageSize: 100 }),
+      expect.objectContaining({ resultPage: 1, resultPageSize: 1 }),
+    );
+    expect(listRows).toHaveBeenCalledWith(
+      "acme",
+      "exp-1",
+      expect.objectContaining({ page: 1, pageSize: 100, sort: "dataset" }),
     );
     expect(seen[0].pagination).toBe("client");
     wrapper.unmount();
   });
 
-  // A run larger than one server page used to render only its first page, so a
-  // failure sorted past the cut-off was invisible on an all-green table.
-  it("walks every result page so late-sorting slots are visible", async () => {
+  it("walks every result-row page so late dataset cases are visible", async () => {
     const experiment = makeExperiment({ id: "exp-1" });
-    const slot = (index: number, taskStatus: string) => ({
+    const row = (index: number, status: string) => ({
+      rowIndex: index,
       rowId: `row-${index}`,
       logicalId: `case-${index}`,
-      trialIndex: 0,
       input: `q${index}`,
       expectedOutput: null,
-      taskStatus,
-      execution: null,
-      scores: [],
-      clientScores: [],
+      trialCount: 1,
+      status,
+      output: null,
+      scoreSummaries: [],
+      p50LatencyMs: null,
+      dispersion: null,
     });
-    const page = (n: number, slots: any[], totalSlots: number) =>
-      makeExperimentDetail(experiment, {
-        results: {
-          executions: [],
-          scores: [],
-          slots,
-          pagination: { page: n, pageSize: 100, totalSlots, hasMore: n * 100 < totalSlots },
-        },
-      });
-    get.mockImplementation((_org: string, _id: string, options: any) =>
+    get.mockResolvedValue(makeExperimentDetail(experiment));
+    listRows.mockImplementation((_org: string, _id: string, options: any) =>
       Promise.resolve(
-        options.resultPage === 1
-          ? page(
-              1,
-              Array.from({ length: 100 }, (_, index) => slot(index, "ok")),
-              101,
-            )
-          : page(2, [slot(100, "error")], 101),
+        options.page === 1
+          ? {
+              rows: Array.from({ length: 100 }, (_, index) => row(index, "completed")),
+              pagination: { page: 1, pageSize: 100, totalRows: 101, hasMore: true },
+            }
+          : {
+              rows: [row(100, "task_failed")],
+              pagination: { page: 2, pageSize: 100, totalRows: 101, hasMore: false },
+            },
       ),
     );
     const wrapper = mount(ExperimentDetailPage, {
@@ -410,14 +453,14 @@ describe("ExperimentDetailPage", () => {
     });
     await flushPromises();
 
-    expect(get).toHaveBeenCalledWith(
+    expect(listRows).toHaveBeenCalledWith(
       "acme",
       "exp-1",
-      expect.objectContaining({ resultPage: 2, resultPageSize: 100 }),
+      expect.objectContaining({ page: 2, pageSize: 100 }),
     );
-    expect(
-      wrapper.get('[data-test="ai-experiment-detail-table"]').attributes("data-rows"),
-    ).toBe("101");
+    expect(wrapper.get('[data-test="ai-experiment-detail-table"]').attributes("data-rows")).toBe(
+      "101",
+    );
     wrapper.unmount();
   });
 
@@ -448,39 +491,40 @@ describe("ExperimentDetailPage", () => {
     wrapper.unmount();
   });
 
-  it("filters the loaded slots by search text and by status", async () => {
+  it("filters the loaded dataset rows by search text and aggregate status", async () => {
     const experiment = makeExperiment({ id: "exp-1" });
-    const detail = makeExperimentDetail(experiment, {
-      results: {
-        executions: [],
-        scores: [],
-        slots: [
-          {
-            rowId: "r0",
-            logicalId: "c0",
-            trialIndex: 0,
-            input: "alpha question",
-            expectedOutput: null,
-            status: "completed",
-            taskStatus: "ok",
-            execution: null,
-            scores: [],
-          },
-          {
-            rowId: "r1",
-            logicalId: "c1",
-            trialIndex: 0,
-            input: "beta question",
-            expectedOutput: null,
-            status: "task_failed",
-            taskStatus: "error",
-            execution: null,
-            scores: [],
-          },
-        ],
-      },
-    } as any);
-    get.mockResolvedValue(detail);
+    get.mockResolvedValue(makeExperimentDetail(experiment));
+    listRows.mockResolvedValue({
+      rows: [
+        {
+          rowIndex: 0,
+          rowId: "r0",
+          logicalId: "c0",
+          input: "alpha question",
+          expectedOutput: null,
+          trialCount: 2,
+          status: "completed",
+          output: null,
+          scoreSummaries: [],
+          p50LatencyMs: 10,
+          dispersion: null,
+        },
+        {
+          rowIndex: 1,
+          rowId: "r1",
+          logicalId: "c1",
+          input: "beta question",
+          expectedOutput: null,
+          trialCount: 2,
+          status: "task_failed",
+          output: null,
+          scoreSummaries: [],
+          p50LatencyMs: 20,
+          dispersion: null,
+        },
+      ],
+      pagination: { page: 1, pageSize: 100, totalRows: 2, hasMore: false },
+    });
 
     let rows: any[] = [];
     const wrapper = mount(ExperimentDetailPage, {
@@ -512,6 +556,107 @@ describe("ExperimentDetailPage", () => {
     (wrapper.vm as any).statusFilter = "task_failed";
     await flushPromises();
     expect(rows.map((r) => r.status)).toEqual(["task_failed"]);
+  });
+
+  it("renders one dataset row with aggregate scores and opens all of its trials", async () => {
+    const experiment = makeExperiment({
+      id: "exp-1",
+      trialCount: 3,
+      scorers: [{ id: "judge", version: 1 }],
+    });
+    get.mockResolvedValue(
+      makeExperimentDetail(experiment, {
+        results: {
+          executions: [],
+          scores: [],
+          scoreSummaries: [
+            {
+              scorerId: "judge",
+              scorerVersion: 1,
+              name: "answer_quality",
+              scoreConfigId: "quality",
+              scoreConfigName: "answer_quality",
+              scoreConfigVersion: 2,
+              sampleCount: 3,
+              errorCount: 0,
+              pendingCount: 0,
+              noReferenceCount: 0,
+              noTraceCount: 0,
+              skippedCount: 0,
+              value: { kind: "numeric", mean: 0.75 },
+            },
+          ],
+        },
+      }),
+    );
+    listRows.mockResolvedValue({
+      rows: [
+        {
+          rowIndex: 0,
+          rowId: "row-1",
+          logicalId: "case-1",
+          input: "question",
+          expectedOutput: null,
+          trialCount: 3,
+          status: "completed",
+          output: null,
+          scoreSummaries: [
+            {
+              scorerId: "judge",
+              scorerVersion: 1,
+              value: { kind: "numeric", mean: 0.75 },
+            },
+          ],
+          p50LatencyMs: 840,
+          dispersion: {
+            rowId: "row-1",
+            logicalId: "case-1",
+            maxNormalized: 0.42,
+            high: true,
+            outlierTrialIndex: 2,
+          },
+        },
+      ],
+      pagination: { page: 1, pageSize: 100, totalRows: 1, hasMore: false },
+    });
+    const wrapper = mount(ExperimentDetailPage, {
+      global: {
+        stubs: {
+          OTable: {
+            props: ["data", "columns"],
+            emits: ["row-click"],
+            template: `<table><tbody><tr v-for="row in data" :key="row.rowKey"
+              @click="$emit('row-click', row)"><td v-for="column in columns" :key="column.id">
+                <slot :name="'cell-' + column.id" :row="row">{{ row[column.accessorKey] }}</slot>
+              </td></tr></tbody></table>`,
+          },
+          OTag: {
+            props: ["label"],
+            template: `<span>{{ label }}<slot /></span>`,
+          },
+        },
+      },
+    });
+    await flushPromises();
+
+    expect(wrapper.findAll("tbody tr")).toHaveLength(1);
+    expect(wrapper.text()).toContain("3 trials");
+    expect(wrapper.text()).toContain("0.75");
+    expect(wrapper.text()).toContain("High");
+    expect(wrapper.text()).toContain("42%");
+
+    await wrapper.get("tbody tr").trigger("click");
+    await flushPromises();
+    expect(getRow).toHaveBeenCalledWith("acme", "exp-1", "row-1");
+
+    listRows.mockClear();
+    (wrapper.vm as any).dispersionView = "high_only";
+    await flushPromises();
+    expect(listRows).toHaveBeenCalledWith(
+      "acme",
+      "exp-1",
+      expect.objectContaining({ sort: "dispersion_desc", highDispersionOnly: true }),
+    );
   });
 
   // A clone costs a full run, and it is normally made in order to change

@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import http from "./http";
 import llmExperimentsService, {
   normalizeExperimentComparison,
+  normalizeExperimentResultRowPage,
   normalizeExperimentRowDetail,
 } from "./llm-experiments.service";
 
@@ -86,6 +87,72 @@ describe("get() slot status", () => {
       "scoring",
       "completed",
     ]);
+  });
+});
+
+describe("listRows()", () => {
+  it("normalizes row aggregates and sends dispersion ordering", async () => {
+    mockClient.get.mockResolvedValue({
+      data: {
+        rows: [
+          {
+            row_index: 4,
+            row_id: "row-4",
+            logical_id: "case-4",
+            input: "question",
+            trial_count: 3,
+            status: "completed",
+            p50_latency_ms: 840,
+            score_summaries: [
+              {
+                scorer_id: "judge",
+                scorer_version: 2,
+                score_config_name: "answer_quality",
+                value: { kind: "numeric", mean: 0.75 },
+              },
+            ],
+            dispersion: {
+              row_id: "row-4",
+              logical_id: "case-4",
+              max_normalized: 0.42,
+              high: true,
+            },
+          },
+        ],
+        pagination: { page: 1, page_size: 100, total_rows: 1, has_more: false },
+      },
+    });
+
+    const page = await llmExperimentsService.listRows("acme", "exp-1", {
+      page: 1,
+      pageSize: 100,
+      sort: "dispersion_desc",
+      highDispersionOnly: true,
+    });
+
+    expect(mockClient.get).toHaveBeenCalledWith("/api/acme/experiments/exp-1/rows", {
+      params: {
+        page: 1,
+        pageSize: 100,
+        sort: "dispersion_desc",
+        highDispersionOnly: true,
+      },
+    });
+    expect(page.rows[0]).toMatchObject({
+      rowIndex: 4,
+      rowId: "row-4",
+      trialCount: 3,
+      p50LatencyMs: 840,
+      scoreSummaries: [{ scoreConfigName: "answer_quality" }],
+      dispersion: { maxNormalized: 0.42, high: true },
+    });
+    expect(page.pagination).toEqual({ page: 1, pageSize: 100, totalRows: 1, hasMore: false });
+  });
+
+  it("normalizes snake-case row pages directly", () => {
+    expect(
+      normalizeExperimentResultRowPage({ pagination: { total_rows: 0 }, rows: [] }),
+    ).toMatchObject({ pagination: { totalRows: 0 }, rows: [] });
   });
 });
 
