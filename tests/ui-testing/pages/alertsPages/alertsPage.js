@@ -333,7 +333,8 @@ export class AlertsPage {
             errorOrNegativeElements: '[class*="error"], [class*="negative"]',
             errorToastOrAlert: '[data-test-variant="error"], [role="alert"]',
             monacoEditor: '.monaco-editor',
-            alertInlineSqlEditor: '#alert-inline-sql-editor-sql',
+            alertInlineSqlEditorId: 'alert-inline-sql-editor-sql',
+            monacoViewLines: '.view-lines',
             alertDestinationsSelectPopover: '[data-test="alert-destinations-select-popover"]',
             alertDestinationsSelectOption: '[data-test="alert-destinations-select-option"]',
             groupBySelectFirstTrigger: '[data-test="alert-group-by-select-0-trigger"]',
@@ -479,7 +480,31 @@ export class AlertsPage {
 
     /** Step-2 inline SQL editor; the wizard's DOM-last Monaco instance is offscreen. */
     getInlineSqlEditor() {
-        return this.page.locator(this.locators.alertInlineSqlEditor);
+        return this.page.locator(`#${this.locators.alertInlineSqlEditorId}`);
+    }
+
+    /** Sets the inline SQL editor via the Monaco API; Monaco swallows synthesized keystrokes. */
+    async setInlineSqlEditorValue(sql) {
+        await expect(async () => {
+            const content = await this.page.evaluate(({ id, value }) => {
+                const container = document.getElementById(id);
+                const editors = window.monaco?.editor?.getEditors?.() || [];
+                const editor = editors.find((e) => container?.contains(e.getContainerDomNode()));
+                if (!editor) return null;
+                editor.setValue(value);
+                return editor.getValue();
+            }, { id: this.locators.alertInlineSqlEditorId, value: sql });
+            expect(content).toContain(sql);
+        }).toPass({ timeout: 10000, intervals: [1000] });
+    }
+
+    /** Rendered text of the inline SQL editor. */
+    async getInlineSqlEditorLinesText() {
+        return await this.getInlineSqlEditor()
+            .locator(this.locators.monacoViewLines)
+            .first()
+            .textContent()
+            .catch(() => '');
     }
 
     /** Elements matching error/negative CSS classes (bug pre-check). */

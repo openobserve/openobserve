@@ -367,27 +367,11 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await sqlEditor.click({ force: true });
     await page.waitForTimeout(500);
 
-    // Use Monaco API to set editor content reliably.
-    // Keyboard shortcuts (Cmd/Ctrl+A + type) are unreliable
-    // with Monaco because the virtualised viewport, focus management,
-    // and IME handling can swallow synthesized keystrokes.
-    // Retry until Monaco editors are fully initialized (parallel test runs
-    // may delay Monaco boot).
-    await expect(async () => {
-      const content = await page.evaluate(() => {
-        const container = document.getElementById('alert-inline-sql-editor-sql');
-        const editors = window.monaco?.editor?.getEditors?.() || [];
-        const editor = editors.find((e) => container?.contains(e.getContainerDomNode()));
-        if (!editor) return null;
-        editor.setValue('SELECT * FROM default');
-        return editor.getValue();
-      });
-      expect(content).toContain('default');
-    }).toPass({ timeout: 10000, intervals: [1000] });
+    // Monaco swallows synthesized keystrokes, so the value is set through its API.
+    await pm.alertsPage.setInlineSqlEditorValue('SELECT * FROM default');
     await page.waitForTimeout(500);
 
-    // Verify the rendered .view-lines contain "default"
-    const linesText = await sqlEditor.locator('.view-lines').first().textContent().catch(() => '');
+    const linesText = await pm.alertsPage.getInlineSqlEditorLinesText();
     testLogger.info(`Monaco view-lines content: "${linesText.substring(0, 100)}"`);
 
     expect(linesText,
