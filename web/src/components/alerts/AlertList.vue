@@ -145,7 +145,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- max-md:contents flattens this wrapper so the tabs, the search
                      and OTable's own controls share one wrapping toolbar: tabs
                      row, then search + columns + refresh on a single row. -->
-                <div class="flex w-full items-center gap-2 max-md:contents">
+                <!-- ≥ md it is a named container: the folder rail can squeeze this
+                     toolbar at any viewport width, so the tab labels key off the
+                     container's own width, not a viewport breakpoint. -->
+                <div
+                  class="@container/alert-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
+                >
                   <OToggleGroup
                     :model-value="activeTab"
                     data-test="alert-list-tabs"
@@ -160,12 +165,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="tab.label"
                       :data-test="`alert-list-tab-${tab.value}`"
                     >
-                      <span class="max-md:hidden">{{ tab.label }}</span>
+                      <span class="max-md:hidden @max-[34rem]/alert-toolbar:hidden">{{
+                        tab.label
+                      }}</span>
                     </OToggleGroupItem>
                   </OToggleGroup>
                   <!-- < md search takes its own full row below the icon controls
                        instead of being crushed between them. -->
-                  <div class="min-w-0 flex-1 max-md:order-last max-md:basis-full">
+                  <!-- md:min-w-80: flex-1 is basis-0, so without a floor the input
+                       shrinks and its embedded folder-scope chips spill out of the
+                       box; the floor makes it wrap to its own row instead. -->
+                  <div class="min-w-0 flex-1 max-md:order-last max-md:basis-full md:min-w-80">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
