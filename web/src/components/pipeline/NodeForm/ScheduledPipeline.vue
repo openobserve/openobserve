@@ -1522,6 +1522,8 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   removeAiContextHandler();
+  contextRegistry.unregister("pipelines");
+  contextRegistry.setActive("");
 });
 
 const importSqlParser = async () => {
