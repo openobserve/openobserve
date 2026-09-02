@@ -112,7 +112,7 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
     @update:global-filter="emit('update:globalFilter', $event)"
   >
     <template #toolbar>
-      <div class="flex w-full items-center gap-2 max-md:contents">
+      <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
         <OSearchInput
           :model-value="globalFilter"
           :placeholder="t('iam.searchRole')"

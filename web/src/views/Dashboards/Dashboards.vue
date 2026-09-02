@@ -155,7 +155,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #toolbar>
               <!-- max-md:contents flattens this wrapper so the search and
                    OTable's own controls share one row on mobile. -->
-              <div class="flex w-full items-center gap-2 max-md:contents">
+              <!-- min-w-0: without it the wrapper cannot shrink below the search
+                   box's min-content width, so a rail-narrowed toolbar pushes the
+                   trailing controls off the right edge instead of squeezing. -->
+              <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
                 <div class="min-w-0 flex-1 max-md:min-w-40">
                   <OInput
                     v-model="dynamicQueryModel"
