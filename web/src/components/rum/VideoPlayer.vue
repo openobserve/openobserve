@@ -275,6 +275,16 @@ onBeforeUnmount(() => {
   if (worker.value) {
     worker.value.terminate();
   }
+  // $destroy frees the replayer's events, canvas/iframe, timers, and listeners.
+  if (player.value) {
+    try {
+      player.value.pause?.();
+      player.value.$destroy?.();
+    } catch {
+      // teardown race — the instance is already gone
+    }
+    player.value = null;
+  }
   rrwebPlayer = null;
 });
 

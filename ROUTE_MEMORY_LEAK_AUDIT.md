@@ -361,7 +361,39 @@ probe now tracks its `probeTraceId` in a set (added before fetch, deleted in
 `EventDetailDrawerContent`, and (via `useTraceCorrelation.cancelTracesStream`)
 `TraceCorrelationCard` on unmount.
 
-**Total: 18 leaks fixed** (7 committed in `21b78c96f4` + fixes #8–#18).
+**Total: 20 leaks fixed** (7 committed in `21b78c96f4` + fixes #8–#20).
+
+## RUM + Synthetics deep-dive
+
+| # | Component | Leak | Fix |
+|---|---|---|---|
+| **19** | `components/rum/VideoPlayer.vue` | `onBeforeUnmount` terminated the CSS worker but never destroyed the rrweb player instance (`new rrwebPlayer(...)`), leaking the whole recorded session (events, canvas/iframe, playback timers, its 4 event listeners) on every session-view close | added `player.value.pause?.()` + `player.value.$destroy?.()` in `onBeforeUnmount`, then null the ref |
+| **20** | `components/synthetics/results/RunDetailDrawer.vue` | `useLLMStreamQuery` in-flight stream not cancelled on unmount (only cancelled before the next query) | added `onUnmounted(() => cancelAll())` |
+
+Clean in RUM/synthetics: `MobileSessionPlayer` (`pause()` cancels its rAF on unmount),
+`SessionViewer` (delegates to `VideoPlayer`, owns no replayer), `PlayerTracesTab`
+(#11/#16), and the remaining player-named files (no rrweb instance — delegate).
+
+## AI Observability deep-dive (`/ai/*`, enterprise)
+
+Routes: `/ai` shell (`AIObservabilityShell`) + sub-routes llm-insights, sessions,
+agent-graph, agent-behavior, discovery, queues, datasets, evaluations — **all
+`keepAlive:false`**. Pages are thin shells; shared composables (`useAiDateController`,
+`useChildRefresh`, `useAgentScope`) carry no timers/listeners/streams. Structurally clean.
+
+**Coverage:** all 22 AI routes / 69 view+component files scanned — no leak primitive
+with missing cleanup (the one flag, `AiLastRefreshed.vue`, was a false positive: a
+`ReturnType<typeof setInterval>` type annotation, its one interval cleared in
+`onBeforeUnmount`). 13 AI pages live-cycled — `roDetached` 0, DOM flat. Detail/form
+routes covered statically.
+
+**No AI-specific leak.** Two accumulating `window` listeners once affected these
+pages but are already fixed in current code, not by this pass:
+- `load`→`storage` deferral — old per-call-site `useLocalStorage`; `utils/storage.ts`
+  is now a single guarded shared listener (`168d8b4a48`, #14072).
+- `form-devtools:request-*` — `@tanstack/vue-form`; the vue-form patch calls
+  `mount()`'s cleanup on `onUnmounted`.
+
 
 ## Traces page deep-dive (`/traces` + sub-routes)
 
@@ -824,4 +856,4 @@ route sweep, the retainer analysis, or the full-tree static audit.
 
 **By route:** Logs (#7, #14, #15) · Traces/LLM (#8, #9, #18) · RUM & correlation (#10, #11, #16) · Metrics (#17) · IAM (#12) · Pipelines (#3) · Synthetics (#1, #2) · Dashboards & app-wide dialogs/chat (#4, #5, #6) · Dependency hygiene (#13).
 
-**Dominant class:** streaming/timer/listener not cancelled on unmount (#7–#11, #15, #16, #17, #18). **Verification:** all lint- + type-clean; 10 pages/views live-benchmarked (roDetached 0, DOM flat); #17 live-verified (interval cleared on `/metrics` unmount).
+**Dominant class:** streaming/timer/listener/player not cancelled or destroyed on unmount (#7–#11, #15, #16, #17, #18, #19, #20). **Verification:** all lint- + type-clean; 10 pages/views live-benchmarked (roDetached 0, DOM flat); #17 live-verified (interval cleared on `/metrics` unmount).
