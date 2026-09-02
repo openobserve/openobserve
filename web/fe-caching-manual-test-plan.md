@@ -2388,6 +2388,33 @@ will report leaks that are not.
 | **Filter survives refresh** | Apply a node filter → press Refresh (or `r`) | Filter and filtered rows preserved. *Refresh used to reset it* |
 | **Not persisted to disk** | Check Local Storage | No `o2q-` entry for the node list — stale cluster topology is deliberately memory-only |
 
+
+#### Measured results — 2026-09-01, `feat/fe-caching`, local dev (`_meta` org)
+
+**One branch-caused defect found: [Issue 26](#) — the table renders empty on every warm visit and
+Refresh does not repair it.** The disk row passes cleanly; the rest are blocked by the defect.
+
+| Check | Measured | Verdict |
+| --- | --- | --- |
+| C1 — cold read | On a cold URL load the node fetch **never fires** (3 app requests, none for nodes; query stuck `pending`/`idle`) and the page shows "No nodes available". **Pre-existing, not filed** — the one-shot `if (isMetaOrg.value) { getData(false); }` runs at setup before the org store hydrates, and the guard is byte-identical on `main` (`main:927`) with no retry watcher in either version | ⚠️ pre-existing |
+| C2 — warm revisit | **0 requests** with the entry provably fresh (age 0.5 s, `staleTime` 5 min) — the cache is doing its job. But the table shows **0 rows**, `everBlank: true` → **Issue 26** | ❌ |
+| C3 — past the window | Not meaningfully runnable: the table is empty regardless of freshness | ⛔ |
+| C4 — Refresh button | **1 request** per click (correct), but the rows **do not come back**: `dataUpdateCount` 6 → 7 while the table stays at 0 → **Issue 26** | ❌ |
+| C5 — `r` shortcut | Issues **1** request, same as the button; rows still 0 for the same reason | ❌ |
+| **Filter survives refresh** | ⛔ **Not assessable** — the term (`6ee6`) *is* preserved in the box across Refresh, but with 0 rows on screen there is nothing to filter, so "filtered rows preserved" cannot be judged. Re-run after Issue 26 is fixed | ⛔ |
+| **Not persisted to disk** | ✅ **Confirmed** — **no `o2q-` key mentions nodes** (4 `o2q-` keys present, none for the node list). Matches the declaration in `common.queries.ts`: *"Not persisted: stale cluster state is more confusing than a second of loading."* `staleTime: CONFIG_STALE_TIME`, `gcTime: LONG_GC_TIME`, memory-only | ✅ |
+
+**The cache layer is working; the render path is not.** Worth separating, because the request
+counts all look right — 0 on a warm revisit, exactly 1 per Refresh, entry `success` and fresh in
+memory. What fails is getting that data onto the screen: a `watch(nodesList.data, …)` without
+`immediate: true` never fires when the value is already present, and TanStack's structural sharing
+means an identical refetch reuses the same object reference, so even Refresh cannot wake it. Full
+analysis in Issue 26.
+
+**Verify the disk row this way** — the key never appears, so a plain "is it absent?" check can pass
+for the wrong reason (e.g. the page never loaded). Confirm the query *has data in memory* first
+(`status: "success"`, group `zo1`), then assert no `o2q-` key mentions nodes. Both were true here.
+
 ### 15.3 Cipher Keys
 
 **UI path:** Settings → **Cipher Keys**

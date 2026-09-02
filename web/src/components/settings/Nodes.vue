@@ -929,9 +929,14 @@ export default defineComponent({
 
     // The table is the query now: once the page has asked once, anything that
     // invalidates the nodes scope repaints it without asking again.
-    watch(nodesList.data, (data: any) => {
-      if (data) applyNodes(data, lastFilterFlag.value);
-    });
+    // Immediate: on a warm remount the value is already there, so a change-only watcher never fires.
+    watch(
+      nodesList.data,
+      (data: any) => {
+        if (data) applyNodes(data, lastFilterFlag.value);
+      },
+      { immediate: true },
+    );
 
     // The cold-read toast, kept: shown only while there is nothing on screen.
     let dismissLoadingToast: (() => void) | null = null;

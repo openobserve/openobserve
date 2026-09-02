@@ -1533,6 +1533,118 @@ every consumer reads Vuex. The revert only appears once something re-runs
 
 ---
 
+### 26. Nodes page renders EMPTY on every warm visit — cached data never reaches the table, and Refresh does not fix it — ✅ FIXED
+
+```
+Module:            Settings -> Nodes (§15.2, _meta org)
+UI path:           Settings -> Nodes -> navigate away -> come back
+What to check:     The node rows
+What to expect:    The cluster's nodes (main showed them on every visit)
+What you get:      "No nodes available" — and clicking Refresh does NOT repair it,
+                   even though the request fires and returns 200 with the node.
+```
+
+**Severity: High.** The page is unusable on any warm visit. The cluster is healthy, the API
+returns the node, the query cache holds it — and the operator is told there are no nodes. Because
+Refresh does not help either, the only escape is a full page reload.
+
+**Measured** (browser, `_meta` org, one Online node `6ee6fb41b69a`):
+
+```
+cache            status "success", data present (group "zo1"), age 27 s -> FRESH
+table            0 rows, "No nodes available"
+click Refresh    GET /_meta/node/list -> 200, dataUpdateCount 6 -> 7
+table            STILL 0 rows
+```
+
+**Cause — a non-immediate watcher plus TanStack's structural sharing.** The table is fed by
+copying query data into local state:
+
+```ts
+// Nodes.vue — no `immediate: true`
+watch(nodesList.data, (data: any) => {
+  if (data) applyNodes(data, lastFilterFlag.value);
+});
+```
+
+On a warm remount `nodesList.data` **already holds** the cached value, so there is no *change* and
+the watcher never fires — `applyNodes()` is never called and the table's local state stays empty.
+Refresh cannot rescue it either: TanStack v5 uses **structural sharing**, so a refetch that returns
+identical data hands back the *same object reference*. `dataUpdateCount` increments (7 above) but
+the watched ref does not change, so the watcher stays silent.
+
+A second, compounding gate: `hasRequested` is a component-local `ref(false)` that resets on every
+remount, and the query is `enabled: hasRequested.value && !!orgIdForList.value`. So the query is
+also disabled until something calls `getData()`. Fixing only that would still leave the table empty,
+because the watcher problem is independent.
+
+**Caused by this branch.** `main` had no query and no watcher — `getData()` fetched and assigned the
+table directly, so every visit painted:
+
+```ts
+// main: Nodes.vue:892
+CommonService.list_nodes(store.state.selectedOrganization.identifier).then((response) => {
+  const { flattenedData, uniqueValues } = flattenObject(response.data);
+  tabledata.value = flattenedData;   // assigned unconditionally, every time
+});
+```
+
+**Fix applied** — the watcher now fires for data that is already present:
+
+```ts
+watch(
+  nodesList.data,
+  (data: any) => {
+    if (data) applyNodes(data, lastFilterFlag.value);
+  },
+  // Immediate: on a warm remount the value is already there, so a change-only watcher never fires.
+  { immediate: true },
+);
+```
+
+**Verified live, same scenario that failed:**
+
+| Step | Before | After |
+| --- | --- | --- |
+| Warm the cache (Refresh) | 1 row | 1 row |
+| Navigate away and back | **0 rows, "No nodes available"** | **1 row, 0 requests** |
+| First sampled frame on return | 0 | **1** — paints straight from cache |
+| Refresh on a populated cache | **stayed 0 rows** | **1 row**, 1 request |
+
+`vue-tsc --noEmit` exit 0 · `Nodes.spec.ts` **28/28 passing**.
+
+**Audit of every other `watch(query.data, …)` — 2 more lack `immediate`, and neither is broken.**
+Nine such watchers exist; seven already pass `{ immediate: true }`. The two that do not are
+`ServiceAccountsList.vue:785` and `ReportList.vue:527` — **both were tested and both repaint
+correctly**, so they were deliberately left alone rather than "fixed" on pattern match:
+
+```
+Reports, cache provably fresh (age 0.4 s, not stale):
+  revisit -> 0 requests, 20 rows from the FIRST sampled frame, never zero
+Service accounts (§14.5 C2): revisit -> 0 requests, 20 rows
+```
+
+**Why Nodes broke and they do not.** A missing `immediate` only bites when the query is *also
+disabled* on remount. Nodes gates on `enabled: hasRequested.value && …`, and `hasRequested` is a
+component-local `ref(false)` that resets, so `data` stayed `undefined` forever — no transition, no
+watcher, empty table. Reports and service accounts keep their queries enabled, so on remount
+`data` goes `undefined → cached value`, and *that* counts as a change which fires the watcher.
+Service accounts is additionally insulated by `serviceAccountsState`, a module-level `reactive()`
+singleton that survives the remount.
+
+Adding `{ immediate: true }` to those two would be harmless hardening — it removes the reliance on
+that transition — but it is **not** a bug fix, and this issue does not claim they are defective.
+Same defect family as **#21**; the accurate rule is *a `watch(query.data, …)` feeding local state
+needs `immediate: true` whenever the query can be disabled on mount.*
+
+**Not part of this issue — a pre-existing cold-load gap.** On a cold URL load the initial fetch is
+skipped entirely because the one-shot `if (isMetaOrg.value) { getData(false); }` runs at setup
+before the org store hydrates, and nothing retries. That guard is **byte-identical on `main`**
+(`main:927`), and neither version has a watcher on `isMetaOrg`/`selectedOrganization`, so it is
+pre-existing rather than a regression. Not filed.
+
+---
+
 ### Verified fixed — not filed
 
 - **AI -> Evaluations force-refetching on every visit** (originally #2 in the parallel run)
