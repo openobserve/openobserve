@@ -43,8 +43,7 @@
       <button
         v-if="canRetype(message)"
         type="button"
-        class="flex w-20 shrink-0 cursor-pointer"
-        :class="message.role === 'tool' ? 'mt-0.5 self-start' : 'self-center'"
+        class="flex w-20 shrink-0 cursor-pointer self-center"
         :data-test="`ai-playground-message-role-${message.id}`"
         @click="emit('set-role', message.id, nextRoleAfter(message.role))"
       >
@@ -88,7 +87,7 @@
         class="min-w-0 flex-1"
         :class="
           message.role === 'tool'
-            ? 'grid grid-cols-[minmax(7.5rem,12.5rem)_minmax(0,1fr)] gap-1.5'
+            ? 'grid grid-cols-1 gap-1.5 @min-[28rem]/variant:grid-cols-[minmax(7.5rem,12.5rem)_minmax(0,1fr)]'
             : ''
         "
         :data-test="
@@ -130,7 +129,10 @@
           />
         </div>
 
-        <div class="relative min-w-0" :class="message.role === 'tool' ? 'col-span-2' : ''">
+        <div
+          class="relative min-w-0"
+          :class="message.role === 'tool' ? '@min-[28rem]/variant:col-span-2' : ''"
+        >
           <OTextarea
             :model-value="message.content"
             :placeholder="

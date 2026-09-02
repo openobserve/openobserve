@@ -13,8 +13,7 @@
 -->
 <template>
   <section
-    class="border-border-default bg-surface-base rounded-surface flex min-h-0 snap-start flex-col overflow-hidden border"
-    :class="solo ? 'min-w-85 flex-1' : 'w-[clamp(21.25rem,30%,35rem)] shrink-0'"
+    class="border-border-default bg-surface-base rounded-surface @container/variant flex min-h-0 min-w-93.5 flex-1 snap-start flex-col overflow-hidden border"
     :data-test="`ai-playground-variant-${label}`"
   >
     <div class="border-border-default shrink-0 border-b px-2.5 py-1.5">
@@ -174,9 +173,6 @@ const props = withDefaults(
     runDisabled?: boolean;
     canRemove?: boolean;
     canDuplicate?: boolean;
-    /** The only visible column, so it takes the full width instead of leaving
-     *  dead space beside a comparison that has no second participant. */
-    solo?: boolean;
     /** Baseline output text, when this column should render as a change. */
   }>(),
   {
@@ -184,7 +180,6 @@ const props = withDefaults(
     runDisabled: false,
     canRemove: true,
     canDuplicate: true,
-    solo: false,
   },
 );
 

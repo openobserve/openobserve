@@ -227,7 +227,6 @@
             :providers="providers"
             :var-names="varNames"
             :vars="draft.vars"
-            :solo="draft.variants.length === 1"
             :running="isVariantRunning(variant.id)"
             :run-disabled="variantRunDisabled(variant.id)"
             :can-remove="draft.variants.length > 1"

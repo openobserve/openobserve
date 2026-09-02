@@ -28,7 +28,11 @@ const OSplitter = {
   template: '<div><slot name="before" /><slot name="after" /></div>',
 };
 
-function mountColumn(variant: PlaygroundVariant, runDisabled = false) {
+function mountColumn(
+  variant: PlaygroundVariant,
+  runDisabled = false,
+  props: Record<string, unknown> = {},
+) {
   return mount(PlaygroundVariantColumn, {
     props: {
       variant,
@@ -46,6 +50,7 @@ function mountColumn(variant: PlaygroundVariant, runDisabled = false) {
       varNames: [],
       vars: {},
       runDisabled,
+      ...props,
     },
     global: {
       stubs: {
@@ -88,5 +93,25 @@ describe("PlaygroundVariantColumn", () => {
     expect(
       wrapper.get('[data-test="ai-playground-variant-submit-A"]').attributes("disabled"),
     ).toBeDefined();
+  });
+});
+
+describe("PlaygroundVariantColumn — width", () => {
+  // Every column always grows to fill whatever space the bench strip has,
+  // down to a comfortable floor — the same rule at any column count, so
+  // existing columns are free to narrow as more are added rather than
+  // stranding leftover space behind an artificial cap. The strip's own
+  // overflow-x-auto (PlaygroundPage.vue) is what takes over once the floor
+  // is hit by enough columns.
+  it("always grows to fill the row, with a floor and no ceiling", () => {
+    // A stray columnCount prop, if the component still read one, would be
+    // exactly what used to trigger the fixed/frozen width — passing it here
+    // proves sizing no longer depends on sibling count at all.
+    const wrapper = mountColumn(emptyVariant("provider-1", "model-1"), false, { columnCount: 4 });
+    const classes = wrapper.get('[data-test="ai-playground-variant-A"]').classes();
+    expect(classes).toContain("flex-1");
+    expect(classes).toContain("min-w-93.5");
+    expect(classes).not.toContain("shrink-0");
+    expect(classes.some((c) => c.startsWith("max-w-"))).toBe(false);
   });
 });
