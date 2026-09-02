@@ -88,9 +88,8 @@
       </OButton>
       <OButton
         v-if="runningAll"
-        variant="primary"
+        variant="cancel-query"
         size="sm-action"
-        class="bg-cancel-query-bg! text-button-primary-foreground!"
         :title="t('common.cancel')"
         data-test="ai-playground-run-all-cancel-btn"
         @click="stopAll()"
