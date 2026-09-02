@@ -37,8 +37,7 @@
 /** Org segment for reads that are not org-scoped (app config, build info). */
 export const GLOBAL_SCOPE = "__global__";
 
-export const orgKey = (org: string, ...rest: readonly unknown[]) =>
-  ["org", org, ...rest] as const;
+export const orgKey = (org: string, ...rest: readonly unknown[]) => ["org", org, ...rest] as const;
 
 /** The same, for a read that has no org — `/config`, the license, the org list. */
 export const globalKey = (...rest: readonly unknown[]) => orgKey(GLOBAL_SCOPE, ...rest);

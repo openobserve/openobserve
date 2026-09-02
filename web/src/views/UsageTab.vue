@@ -638,7 +638,8 @@ const getSummary = (org_id: any) => {
     message: t("toastMessages.views.pleaseWaitWhileLoadingSummary"),
     timeout: 0,
   });
-  queryClient.fetchQuery(orgSummaryQuery(org_id))
+  queryClient
+    .fetchQuery(orgSummaryQuery(org_id))
     .then((data: any) => {
       const res = { data };
       if (
@@ -965,7 +966,13 @@ const refreshConfig = async () => {
     // than the one the banner is already rendering.
     store.dispatch(
       "setConfig",
-      await queryClient.invalidateQueries({ queryKey: configFullQuery(orgId.value).queryKey, exact: true, refetchType: "none" }).then(() => queryClient.fetchQuery(configFullQuery(orgId.value))),
+      await queryClient
+        .invalidateQueries({
+          queryKey: configFullQuery(orgId.value).queryKey,
+          exact: true,
+          refetchType: "none",
+        })
+        .then(() => queryClient.fetchQuery(configFullQuery(orgId.value))),
     );
   } catch (error) {
     console.log(error);

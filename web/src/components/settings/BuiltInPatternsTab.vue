@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { builtInRegexPatternsQuery } from "@/services/regex_pattern.queries";
-import { defineComponent, ref, computed, onMounted , watch , nextTick } from "vue";
+import { defineComponent, ref, computed, onMounted, watch, nextTick } from "vue";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -366,7 +366,6 @@ export default defineComponent({
       error.value = "";
 
       try {
-
         // `clearCache` is the manual refresh button — it must reach the server.
         // Otherwise `suspense()` settles from the cache without a request, which
         // is what "cache hit" means here.

@@ -371,9 +371,14 @@ export default defineComponent({
 
       // TODO: fold into `useQuery` when this list drops its imperative refresh.
       if (force) {
-        void queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+        void queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
       }
-      return queryClient.fetchQuery(options)
+      return queryClient
+        .fetchQuery(options)
         .then((list: any[]) => applyRows(list))
         .catch((err: any) => {
           if (err.response.status != 403) {
@@ -562,9 +567,7 @@ export default defineComponent({
     );
 
     const orgIdForWrites = useOrgId();
-    const bulkDeleteWrite = useMutation(() =>
-      bulkDeleteDestinationsMutation(orgIdForWrites.value),
-    );
+    const bulkDeleteWrite = useMutation(() => bulkDeleteDestinationsMutation(orgIdForWrites.value));
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;

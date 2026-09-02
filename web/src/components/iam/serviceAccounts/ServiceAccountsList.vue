@@ -441,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { serviceAccountsQuery } from "@/services/service_accounts.queries";
-import { defineComponent, ref, onBeforeMount, computed , watch } from "vue";
+import { defineComponent, ref, onBeforeMount, computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";

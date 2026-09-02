@@ -306,10 +306,9 @@ export default defineComponent({
     const qTableRef: any = ref(null);
     const orgIdForList = useOrgId();
     const incidentsList = useQuery(() =>
-      Object.assign(
-        incidentsQuery(orgIdForList.value, undefined as unknown as string, 1000, 0),
-        { enabled: !!orgIdForList.value },
-      ),
+      Object.assign(incidentsQuery(orgIdForList.value, undefined as unknown as string, 1000, 0), {
+        enabled: !!orgIdForList.value,
+      }),
     );
 
     const loading = incidentsList.isPending;

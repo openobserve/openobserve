@@ -104,7 +104,8 @@ const useSqlSuggestions = () => {
     // Cached: reopening the editor for the same org inside the tier's staleTime
     // costs nothing. The org/sequence guards below still matter — they cover a
     // fast org switch, which the cache key alone would not sequence.
-    inFlight = queryClient.fetchQuery(queryFunctionsQuery(org))
+    inFlight = queryClient
+      .fetchQuery(queryFunctionsQuery(org))
       .then((list: any[]) => {
         // Discard if the org changed, or if the catalog was superseded while we
         // were waiting (setServerFunctions, or a newer request).

@@ -416,7 +416,7 @@ import { syntheticsKeys } from "@/services/synthetics.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { useQuery } from "@tanstack/vue-query";
 import { syntheticsMonitorsQuery } from "@/services/synthetics.queries";
-import { ref, computed, onMounted, watch , nextTick } from "vue";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -1043,9 +1043,7 @@ async function loadLocations() {
 
 // The list is the query, not a copy of it: a monitor write invalidates the
 // synthetics scope and these rows repaint with no wiring here.
-const monitors = computed<DisplayMonitor[]>(() =>
-  (monitorsList.data.value ?? []).map(mapMonitor),
-);
+const monitors = computed<DisplayMonitor[]>(() => (monitorsList.data.value ?? []).map(mapMonitor));
 
 // Enrich monitors with folder names from Vuex store
 const enrichedMonitors = computed(() => {
@@ -1528,11 +1526,11 @@ async function deleteMonitor(m: any) {
   try {
     await syntheticsService.delete(org, String(m.id), activeFolderId.value);
     // Drop it from the cached entry rather than waiting for the invalidation's
-  // refetch to repaint.
-  queryClient.setQueryData<any[]>(
-    syntheticsKeys.monitors(orgIdentifier.value, readFolder.value),
-    (old) => (old ?? []).filter((mon: any) => String(mon.id) !== String(m.id)),
-  );
+    // refetch to repaint.
+    queryClient.setQueryData<any[]>(
+      syntheticsKeys.monitors(orgIdentifier.value, readFolder.value),
+      (old) => (old ?? []).filter((mon: any) => String(mon.id) !== String(m.id)),
+    );
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.deleteSuccessSingle") });
   } catch (err: any) {

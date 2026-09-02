@@ -67,7 +67,9 @@ const useStreams = (t: TranslateFn) => {
           // `force` must reach the server: drop the cached list first, otherwise
           // the query would answer from cache and force would be a no-op.
           if (force) {
-            await queryClient.invalidateQueries({ queryKey: streamKeys.all(store.state.selectedOrganization.identifier) });
+            await queryClient.invalidateQueries({
+              queryKey: streamKeys.all(store.state.selectedOrganization.identifier),
+            });
           }
           if (!isStreamFetched(streamName || "all") || force) {
             // Added adddtional check to fetch all streamstype separately if streamName is all
@@ -98,7 +100,9 @@ const useStreams = (t: TranslateFn) => {
               // One cached query per type: a hit resolves without a request.
               Promise.allSettled(
                 [...streamsToFetch].map((streamType) =>
-                  queryClient.fetchQuery(streamNameListQuery(store.state.selectedOrganization.identifier, streamType)),
+                  queryClient.fetchQuery(
+                    streamNameListQuery(store.state.selectedOrganization.identifier, streamType),
+                  ),
                 ),
               )
                 .then((results: any) => {
@@ -120,7 +124,10 @@ const useStreams = (t: TranslateFn) => {
                   reject(new Error(e.message));
                 });
             } else {
-              queryClient.fetchQuery(streamNameListQuery(store.state.selectedOrganization.identifier, _streamName))
+              queryClient
+                .fetchQuery(
+                  streamNameListQuery(store.state.selectedOrganization.identifier, _streamName),
+                )
                 .then((list: any) => {
                   setStreams(streamName, list, force);
                   const streamData = {
@@ -485,7 +492,9 @@ const useStreams = (t: TranslateFn) => {
     }
     // Whole streams prefix, not just this type's name list: the paginated
     // Log Streams pages cache the deleted row too.
-    void queryClient.invalidateQueries({ queryKey: streamKeys.all(store.state.selectedOrganization.identifier) });
+    void queryClient.invalidateQueries({
+      queryKey: streamKeys.all(store.state.selectedOrganization.identifier),
+    });
   };
 
   const addStream = async (stream: any) => {

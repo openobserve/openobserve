@@ -482,7 +482,8 @@ const updateActiveTab = (tab: string) => {
 const getRoleDetails = () => {
   isFetchingInitialRoles.value = true;
 
-  queryClient.fetchQuery(resourcesQuery(store.state.selectedOrganization.identifier))
+  queryClient
+    .fetchQuery(resourcesQuery(store.state.selectedOrganization.identifier))
     .then(async (res: any) => {
       permissionsState.resources = res
         .sort((a: any, b: any) => a.order - b.order)
@@ -1644,7 +1645,9 @@ const getFunctions = async () => {
 };
 
 const getDestinations = async () => {
-  const destinations = await queryClient.fetchQuery(destinationsQuery(store.state.selectedOrganization.identifier));
+  const destinations = await queryClient.fetchQuery(
+    destinationsQuery(store.state.selectedOrganization.identifier),
+  );
 
   updateResourceEntities("destination", ["name"], [...destinations]);
 
@@ -1654,7 +1657,9 @@ const getDestinations = async () => {
 };
 
 const getTemplates = async () => {
-  const templates = await queryClient.fetchQuery(templatesQuery(store.state.selectedOrganization.identifier));
+  const templates = await queryClient.fetchQuery(
+    templatesQuery(store.state.selectedOrganization.identifier),
+  );
 
   updateResourceEntities("template", ["name"], [...templates]);
 

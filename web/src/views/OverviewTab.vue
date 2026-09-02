@@ -708,9 +708,13 @@ const loadAnomalies = async (force = false) => {
     let rawHits: Array<{ cfg: any; hits: any[] }>;
 
     // `force` bypasses staleTime; the options object is the same either way.
-    const read = <T>(options: any): Promise<T> => {
+    const read = <T,>(options: any): Promise<T> => {
       if (force) {
-        void queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+        void queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
       }
       return queryClient.fetchQuery(options);
     };
@@ -810,7 +814,11 @@ const loadHistoryAndSplit = async (force = false) => {
       sort_order: "desc",
     });
     if (force) {
-      await queryClient.invalidateQueries({ queryKey: historyOptions.queryKey, exact: true, refetchType: "none" });
+      await queryClient.invalidateQueries({
+        queryKey: historyOptions.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
     }
     const res: any = await queryClient.fetchQuery(historyOptions);
     const hits: any[] = res?.hits ?? [];
@@ -871,7 +879,11 @@ const loadIncidents = async (force = false) => {
   try {
     const incidentOptions = incidentsQuery(orgId.value, "open", 4, 0);
     if (force) {
-      await queryClient.invalidateQueries({ queryKey: incidentOptions.queryKey, exact: true, refetchType: "none" });
+      await queryClient.invalidateQueries({
+        queryKey: incidentOptions.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
     }
     const res: any = await queryClient.fetchQuery(incidentOptions);
     incidents.value = res?.incidents ?? [];
@@ -892,7 +904,11 @@ const loadServiceGraph = async (force = false) => {
       endTime: timeRange.value.endTime,
     });
     if (force) {
-      await queryClient.invalidateQueries({ queryKey: topologyOptions.queryKey, exact: true, refetchType: "none" });
+      await queryClient.invalidateQueries({
+        queryKey: topologyOptions.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
     }
     const res: any = await queryClient.fetchQuery(topologyOptions);
     const nodes: any[] = res?.nodes ?? [];

@@ -554,7 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { nodesQuery } from "@/services/common.queries";
-import { defineComponent, reactive, ref, computed  , watch , nextTick } from "vue";
+import { defineComponent, reactive, ref, computed, watch, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";

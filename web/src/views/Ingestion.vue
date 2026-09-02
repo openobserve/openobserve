@@ -388,7 +388,8 @@ export default defineComponent({
     const getOrganizationPasscode = () => {
       // Returned so callers can await the load — it never was, which only
       // worked while the fetch resolved in a single microtask.
-      return queryClient.fetchQuery(orgPasscodeQuery(store.state.selectedOrganization.identifier))
+      return queryClient
+        .fetchQuery(orgPasscodeQuery(store.state.selectedOrganization.identifier))
         .then((res: any) => {
           if (res.data.passcode == "") {
             toast({
@@ -408,9 +409,11 @@ export default defineComponent({
     };
 
     const getRUMToken = () => {
-      return queryClient.fetchQuery(rumTokensQuery(store.state.selectedOrganization.identifier)).then((res: any) => {
-        store.dispatch("setRUMToken", res.data);
-      });
+      return queryClient
+        .fetchQuery(rumTokensQuery(store.state.selectedOrganization.identifier))
+        .then((res: any) => {
+          store.dispatch("setRUMToken", res.data);
+        });
     };
 
     const updatePasscode = () => {
@@ -464,7 +467,8 @@ export default defineComponent({
     };
 
     const fetchOrgTokens = () => {
-      return queryClient.fetchQuery(ingestionTokensQuery(store.state.selectedOrganization.identifier))
+      return queryClient
+        .fetchQuery(ingestionTokensQuery(store.state.selectedOrganization.identifier))
         .then((res: any) => {
           store.dispatch("setOrgTokens", res.data);
         })

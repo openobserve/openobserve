@@ -854,9 +854,8 @@ async function doMove() {
     // They left the folder being shown, so drop them from the cached entry
     // rather than waiting for the invalidation's refetch to repaint.
     const moved = new Set(targets.map((r) => r.id));
-    queryClient.setQueryData<SloListItem[]>(
-      sloKeys.list(readOrg.value, readFolder.value),
-      (old) => (old ?? []).filter((r) => !moved.has(r.id)),
+    queryClient.setQueryData<SloListItem[]>(sloKeys.list(readOrg.value, readFolder.value), (old) =>
+      (old ?? []).filter((r) => !moved.has(r.id)),
     );
     selectedIds.value = selectedIds.value.filter((id) => !moved.has(id));
     toast({
@@ -937,9 +936,8 @@ async function doDelete() {
   if (!row) return;
   try {
     await deleteSlo.mutateAsync(row.id);
-    queryClient.setQueryData<SloListItem[]>(
-      sloKeys.list(readOrg.value, readFolder.value),
-      (old) => (old ?? []).filter((r) => r.id !== row.id),
+    queryClient.setQueryData<SloListItem[]>(sloKeys.list(readOrg.value, readFolder.value), (old) =>
+      (old ?? []).filter((r) => r.id !== row.id),
     );
     toast({ variant: "success", message: t("slos.deleted") });
   } catch (e: any) {

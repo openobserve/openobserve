@@ -493,7 +493,7 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { pipelinesQuery } from "@/services/pipelines.queries";
 import { pipelineKeys } from "@/services/pipelines.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
-import { ref, computed, watch, onMounted  , nextTick } from "vue";
+import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { normalizeNodeErrorMessages } from "@/utils/pipelines/nodeErrors";
 import { MarkerType } from "@vue-flow/core";
 import { useI18nTyped } from "@/types/i18n";
@@ -1115,7 +1115,8 @@ const deletePipeline = async () => {
       // Drop the row from the cache first so it disappears now, not when the
       // reload in `finally` lands.
       queryClient.setQueriesData({ queryKey: pipelineKeys.all(org_id) }, (list: any) =>
-        Array.isArray(list) ? list.filter((p: any) => p.pipeline_id !== pipeline_id) : list);
+        Array.isArray(list) ? list.filter((p: any) => p.pipeline_id !== pipeline_id) : list,
+      );
     })
     .catch((error) => {
       if (error.response.status != 403) {

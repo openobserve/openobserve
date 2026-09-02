@@ -24,7 +24,9 @@ export const usePipelines = (t: TranslateFn) => {
     }
   }
   const getPipelineDestinations = async () => {
-    const destinations = await queryClient.fetchQuery(destinationsQuery(store.state.selectedOrganization.identifier, "pipeline"));
+    const destinations = await queryClient.fetchQuery(
+      destinationsQuery(store.state.selectedOrganization.identifier, "pipeline"),
+    );
     return destinations.map((dest: any) => dest.name);
   };
   return {

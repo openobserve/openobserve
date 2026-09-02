@@ -165,7 +165,11 @@ export const getAllDashboards = async (store: any, folderId: any, force = false)
   // reach the server.
   const options = dashboardsByFolderQuery(org, folderId);
   if (force) {
-    await queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+    await queryClient.invalidateQueries({
+      queryKey: options.queryKey,
+      exact: true,
+      refetchType: "none",
+    });
   }
   const dashboards = await queryClient.fetchQuery(options);
 
@@ -195,12 +199,17 @@ export const loadDashboardsByFolderId = (
     if (opts.loading) opts.loading.value = false;
   }
 
-  return fetchInto(dashboardsByFolderQuery(org, folderId), { apply: (list: any[]) => opts.apply(applyDashboards(store, folderId, list)), ...(fallback ? {} : { loading: opts.loading }) });
+  return fetchInto(dashboardsByFolderQuery(org, folderId), {
+    apply: (list: any[]) => opts.apply(applyDashboards(store, folderId, list)),
+    ...(fallback ? {} : { loading: opts.loading }),
+  });
 };
 export const getFoldersListByType = async (store: any, type: any) => {
   // Reads the query cache: within the tier's staleTime a remount is a cache hit
   // instead of a request, and concurrent callers share one in-flight fetch.
-  const folders = await queryClient.fetchQuery(foldersQuery(store.state.selectedOrganization.identifier, type));
+  const folders = await queryClient.fetchQuery(
+    foldersQuery(store.state.selectedOrganization.identifier, type),
+  );
 
   // Bridge for consumers still reading Vuex directly. Deleted with the last one.
   store.dispatch("setFoldersByType", { [type]: folders });
@@ -432,12 +441,7 @@ export const deletePanel = async (
 
   // The panel is gone, so its cached results are unreachable — without this they
   // sit in IndexedDB until the 24 h TTL or the record cap reclaims them.
-  await dropPanelCache(
-    store.state.selectedOrganization.identifier,
-    folderId,
-    dashboardId,
-    panelId,
-  );
+  await dropPanelCache(store.state.selectedOrganization.identifier, folderId, dashboardId, panelId);
 };
 
 export const updateVariable = async (
@@ -750,11 +754,7 @@ export const deleteDashboardById = async (store: any, dashboardId: any, folderId
 
   pruneDashboardQueryCache(store, folderId, [dashboardId]);
 
-  await dropDashboardPanelCache(
-    store.state.selectedOrganization.identifier,
-    folderId,
-    dashboardId,
-  );
+  await dropDashboardPanelCache(store.state.selectedOrganization.identifier, folderId, dashboardId);
 
   const allDashboardData = store.state.organizationData.allDashboardData;
 
@@ -971,7 +971,9 @@ export const movePanelToAnotherTab = async (
  * loading the dashboards page no longer issues the request twice.
  */
 export const getFoldersList = async (store: any) => {
-  const folders = await queryClient.fetchQuery(foldersQuery(store.state.selectedOrganization.identifier, "dashboards"));
+  const folders = await queryClient.fetchQuery(
+    foldersQuery(store.state.selectedOrganization.identifier, "dashboards"),
+  );
 
   store.dispatch("setFolders", folders);
 
@@ -987,7 +989,9 @@ const refreshFolderLists = async (store: any, type: any) => {
   // The list just changed on the server, so drop the cached copy first —
   // `getFoldersListByType` reads the query cache and would otherwise return the
   // still-fresh pre-mutation entry.
-  await queryClient.invalidateQueries({ queryKey: folderKeys.all(store.state.selectedOrganization.identifier) });
+  await queryClient.invalidateQueries({
+    queryKey: folderKeys.all(store.state.selectedOrganization.identifier),
+  });
   return Promise.all([
     getFoldersListByType(store, type),
     ...(type === "dashboards" ? [getFoldersList(store)] : []),

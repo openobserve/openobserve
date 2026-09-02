@@ -24,11 +24,13 @@ export const useAnnotations = (
       // Cached per dashboard + window: every panel on a dashboard asks for its
       // own annotations over the same range, so this collapses N requests to one
       // per distinct window.
-      return await queryClient.fetchQuery(dashboardAnnotationsQuery(organization, dashboardId, {
-        panels: [panelId],
-        start_time,
-        end_time,
-      }));
+      return await queryClient.fetchQuery(
+        dashboardAnnotationsQuery(organization, dashboardId, {
+          panels: [panelId],
+          start_time,
+          end_time,
+        }),
+      );
     } catch (err: any) {
       console.error("Error fetching annotations:", err);
       return null;

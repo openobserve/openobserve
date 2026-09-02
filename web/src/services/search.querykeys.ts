@@ -24,11 +24,6 @@ import { orgKey } from "@/composables/query/keys";
  */
 export const traceDagKeys = {
   all: (org: string) => orgKey(org, "traces", "dag"),
-  detail: (
-    org: string,
-    streamName: string,
-    traceId: string,
-    startTime: number,
-    endTime: number,
-  ) => orgKey(org, "traces", "dag", traceId, streamName, startTime, endTime),
+  detail: (org: string, streamName: string, traceId: string, startTime: number, endTime: number) =>
+    orgKey(org, "traces", "dag", traceId, streamName, startTime, endTime),
 };

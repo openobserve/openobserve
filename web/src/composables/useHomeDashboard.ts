@@ -48,7 +48,11 @@ export function useHomeDashboard(t: TranslateFn) {
       if (force) {
         isLoading.value = true;
         const options = settingQuery(org, SETTING_KEY);
-        await queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+        await queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
         apply(await queryClient.fetchQuery(options));
         return;
       }

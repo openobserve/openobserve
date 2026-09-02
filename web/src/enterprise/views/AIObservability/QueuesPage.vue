@@ -368,7 +368,11 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
-import llmQueuesService, { type LlmQueue, type LlmQueueBinding, type LlmScoreConfigOption } from "@/services/llm-queues.service";
+import llmQueuesService, {
+  type LlmQueue,
+  type LlmQueueBinding,
+  type LlmScoreConfigOption,
+} from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
 import { makeQueueFormSchema, type QueueForm, type QueueBoundConfig } from "./QueueForm.schema";
 

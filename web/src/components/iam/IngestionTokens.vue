@@ -227,7 +227,7 @@ import {
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
 import { ingestionTokensQuery } from "@/services/organizations.queries";
-import { ref, computed, defineComponent, onBeforeMount , watch } from "vue";
+import { ref, computed, defineComponent, onBeforeMount, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";

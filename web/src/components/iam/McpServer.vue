@@ -53,7 +53,8 @@ onMounted(() => {
   // snippet, copied in full). IAM can be opened without visiting Ingestion
   // first, so fetch it if the store doesn't already have it.
   if (!store.state.organizationData?.organizationPasscode) {
-    queryClient.fetchQuery(orgPasscodeQuery(store.state.selectedOrganization.identifier))
+    queryClient
+      .fetchQuery(orgPasscodeQuery(store.state.selectedOrganization.identifier))
       .then((res: any) => {
         if (res.data?.passcode) {
           store.dispatch("setOrganizationPasscode", res.data.passcode);

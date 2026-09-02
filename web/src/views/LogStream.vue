@@ -708,7 +708,13 @@ export default defineComponent({
         if (painted) applyStreams(cachedPage);
         isRefreshing.value = true;
         const streamResponse = _refresh
-          ? queryClient.invalidateQueries({ queryKey: streamPageQuery(org, type, params).queryKey, exact: true, refetchType: "none" }).then(() => queryClient.fetchQuery(streamPageQuery(org, type, params)))
+          ? queryClient
+              .invalidateQueries({
+                queryKey: streamPageQuery(org, type, params).queryKey,
+                exact: true,
+                refetchType: "none",
+              })
+              .then(() => queryClient.fetchQuery(streamPageQuery(org, type, params)))
           : queryClient.fetchQuery(streamPageQuery(org, type, params));
 
         loadingState.value = !painted;
@@ -735,10 +741,12 @@ export default defineComponent({
 
             // Warm the next page so paging forward is a cache hit.
             if (params.offset + params.limit < res.total) {
-              queryClient.prefetchQuery(streamPageQuery(org, type, {
-                ...params,
-                offset: params.offset + params.limit,
-              }));
+              queryClient.prefetchQuery(
+                streamPageQuery(org, type, {
+                  ...params,
+                  offset: params.offset + params.limit,
+                }),
+              );
             }
 
             dismiss();
@@ -967,16 +975,19 @@ export default defineComponent({
       // Prune every cached page, not just the one on screen: navigation is
       // cache-first, so a page still holding the deleted row would paint it
       // again — and inside staleTime nothing would refetch to correct it.
-      queryClient.setQueriesData({ queryKey: streamKeys.all(store.state.selectedOrganization.identifier) }, (page: any) => {
-        if (!page?.list) return page;
-        const list = page.list.filter((s: any) => !removedKeys.has(`${s.name}-${s.stream_type}`));
-        if (list.length === page.list.length) return page;
-        return {
-          ...page,
-          list,
-          total: Math.max(0, (page.total ?? 0) - (page.list.length - list.length)),
-        };
-      });
+      queryClient.setQueriesData(
+        { queryKey: streamKeys.all(store.state.selectedOrganization.identifier) },
+        (page: any) => {
+          if (!page?.list) return page;
+          const list = page.list.filter((s: any) => !removedKeys.has(`${s.name}-${s.stream_type}`));
+          if (list.length === page.list.length) return page;
+          return {
+            ...page,
+            list,
+            total: Math.max(0, (page.total ?? 0) - (page.list.length - list.length)),
+          };
+        },
+      );
 
       items.forEach((stream) => {
         removeStream(stream.name, stream.stream_type);

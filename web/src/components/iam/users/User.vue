@@ -280,11 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  orgUsersQuery,
-  assignableRolesQuery,
-  allUserRolesQuery,
-} from "@/services/users.queries";
+import { orgUsersQuery, assignableRolesQuery, allUserRolesQuery } from "@/services/users.queries";
 import { rolesQuery } from "@/services/iam.queries";
 import { userKeys } from "@/services/users.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
@@ -850,7 +846,16 @@ export default defineComponent({
       loading.value = !warm;
       fetching.value = true;
       return new Promise((resolve, reject) => {
-        (force ? queryClient.invalidateQueries({ queryKey: orgUsersQuery(org).queryKey, exact: true, refetchType: "none" }).then(() => queryClient.fetchQuery(orgUsersQuery(org))) : queryClient.fetchQuery(orgUsersQuery(org)))
+        (force
+          ? queryClient
+              .invalidateQueries({
+                queryKey: orgUsersQuery(org).queryKey,
+                exact: true,
+                refetchType: "none",
+              })
+              .then(() => queryClient.fetchQuery(orgUsersQuery(org)))
+          : queryClient.fetchQuery(orgUsersQuery(org))
+        )
           .then(async (orgUsers: any[]) => {
             let users = [...orgUsers];
 

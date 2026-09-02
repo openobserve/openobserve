@@ -247,7 +247,9 @@ async function openAgentSetup(locationId?: string) {
 
 async function loadDestinations() {
   try {
-    const list = await queryClient.fetchQuery(destinationsQuery(store.state.selectedOrganization.identifier));
+    const list = await queryClient.fetchQuery(
+      destinationsQuery(store.state.selectedOrganization.identifier),
+    );
     destinations.value = list.map((d: any) => d.name as string);
   } catch {
     destinations.value = [];

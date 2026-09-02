@@ -405,7 +405,9 @@ export default defineComponent({
         error.value = null;
 
         const org = store.state.selectedOrganization.identifier;
-        dagData.value = await queryClient.fetchQuery(traceDagQuery(org, props.streamName, props.traceId, props.startTime, props.endTime));
+        dagData.value = await queryClient.fetchQuery(
+          traceDagQuery(org, props.streamName, props.traceId, props.startTime, props.endTime),
+        );
       } catch (err: any) {
         console.error("[TraceDAG] Failed to fetch DAG:", err);
         error.value =

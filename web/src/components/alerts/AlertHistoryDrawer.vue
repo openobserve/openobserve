@@ -795,7 +795,9 @@ const fetchAlertHistory = async (alertId: string) => {
     }
     // Same cached page query as the Alert History page — paging back to a page
     // already fetched keeps its rows instead of blanking.
-    const data = await queryClient.fetchQuery(alertHistoryQuery(store?.state?.selectedOrganization?.identifier, historyParams));
+    const data = await queryClient.fetchQuery(
+      alertHistoryQuery(store?.state?.selectedOrganization?.identifier, historyParams),
+    );
     alertHistory.value = data?.hits || [];
     resultTotal.value = data?.total || 0;
   } catch (error: any) {

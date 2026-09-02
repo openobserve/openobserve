@@ -234,18 +234,24 @@ const fetchHistory = async (force = false) => {
     const startTime = endTime - (RANGE_MS[range.value] ?? RANGE_MS["1h"]) * 1000;
     const read = <T,>(options: any): Promise<T> => {
       if (force) {
-        void queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+        void queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
       }
       return queryClient.fetchQuery(options);
     };
-    const data = await read<any>(alertHistoryQuery(orgId, {
-      // An anomaly id fails the endpoint's `alert_id` existence check outright.
-      ...(props.isAnomaly ? { anomaly_id: props.alertId } : { alert_id: props.alertId }),
-      start_time: startTime,
-      end_time: endTime,
-      from: (currentPage.value - 1) * pageSize.value,
-      size: pageSize.value,
-    }));
+    const data = await read<any>(
+      alertHistoryQuery(orgId, {
+        // An anomaly id fails the endpoint's `alert_id` existence check outright.
+        ...(props.isAnomaly ? { anomaly_id: props.alertId } : { alert_id: props.alertId }),
+        start_time: startTime,
+        end_time: endTime,
+        from: (currentPage.value - 1) * pageSize.value,
+        size: pageSize.value,
+      }),
+    );
     history.value = data?.hits || [];
     totalCount.value = data?.total || 0;
   } catch {

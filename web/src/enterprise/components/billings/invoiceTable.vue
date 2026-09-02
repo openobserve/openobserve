@@ -168,7 +168,8 @@ const getInvoiceHistory = () => {
     timeout: 0,
   });
 
-  queryClient.fetchQuery(invoiceHistoryQuery(store.state.selectedOrganization.identifier))
+  queryClient
+    .fetchQuery(invoiceHistoryQuery(store.state.selectedOrganization.identifier))
     .then((res: any) => {
       dismiss();
       const invoiceList = res.invoices;

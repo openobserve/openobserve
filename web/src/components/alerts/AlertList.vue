@@ -1944,7 +1944,13 @@ export default defineComponent({
       );
       const painted = cachedRows ? renderAlerts(cachedRows) : false;
       const pending = force
-        ? queryClient.invalidateQueries({ queryKey: alertsListQuery(org, folderId, query, alertType).queryKey, exact: true, refetchType: "none" }).then(() => queryClient.fetchQuery(alertsListQuery(org, folderId, query, alertType)))
+        ? queryClient
+            .invalidateQueries({
+              queryKey: alertsListQuery(org, folderId, query, alertType).queryKey,
+              exact: true,
+              refetchType: "none",
+            })
+            .then(() => queryClient.fetchQuery(alertsListQuery(org, folderId, query, alertType)))
         : queryClient.fetchQuery(alertsListQuery(org, folderId, query, alertType));
 
       loading.value = !painted;
@@ -2024,7 +2030,9 @@ export default defineComponent({
         // Cached for the editor-open path only. The read-modify-write in
         // WorkflowLinkAlertsDialog deliberately still goes straight to the
         // service — a stale alert there would overwrite someone else's edit.
-        const data = await queryClient.fetchQuery(alertDetailQuery(store.state.selectedOrganization.identifier, id));
+        const data = await queryClient.fetchQuery(
+          alertDetailQuery(store.state.selectedOrganization.identifier, id),
+        );
         dismiss();
         return data;
       } catch (error) {

@@ -908,7 +908,9 @@ export default defineComponent({
       //so we need to get the roles from the api
       try {
         isRolesLoading.value = true;
-        const response = await queryClient.fetchQuery(rolesQuery(selectedOrganization.value?.value));
+        const response = await queryClient.fetchQuery(
+          rolesQuery(selectedOrganization.value?.value),
+        );
         rolesLimitRows.value = response.map((role: any) => ({
           role_name: role,
           uuid: getUUID(),

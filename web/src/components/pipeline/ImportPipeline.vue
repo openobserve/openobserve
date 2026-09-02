@@ -652,7 +652,9 @@ export default defineComponent({
     };
 
     const getAlertDestinations = async () => {
-      const destinations = await queryClient.fetchQuery(destinationsQuery(store.state.selectedOrganization.identifier, "alert"));
+      const destinations = await queryClient.fetchQuery(
+        destinationsQuery(store.state.selectedOrganization.identifier, "alert"),
+      );
       alertDestinations.value = destinations.map((dest: any) => dest.name);
     };
 

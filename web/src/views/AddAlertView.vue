@@ -94,7 +94,9 @@ export default defineComponent({
 
       isLoadingAlert.value = true;
       try {
-        editedAlert.value = await queryClient.fetchQuery(alertDetailQuery(store.state.selectedOrganization.identifier, alertId));
+        editedAlert.value = await queryClient.fetchQuery(
+          alertDetailQuery(store.state.selectedOrganization.identifier, alertId),
+        );
         isUpdated.value = true;
       } catch (error) {
         toast({
@@ -119,7 +121,9 @@ export default defineComponent({
 
     const getDestinations = async () => {
       try {
-        destinations.value = (await queryClient.fetchQuery(destinationsQuery(store.state.selectedOrganization.identifier, "alert"))) as any;
+        destinations.value = (await queryClient.fetchQuery(
+          destinationsQuery(store.state.selectedOrganization.identifier, "alert"),
+        )) as any;
       } catch (error) {
         toast({
           variant: "error",
@@ -131,7 +135,9 @@ export default defineComponent({
     // Explicit refresh from the alert form (a destination was just created or
     // edited) — drop the cached list so this is a real refetch.
     const refreshDestinations = async () => {
-      await queryClient.invalidateQueries({ queryKey: destinationKeys.all(store.state.selectedOrganization.identifier) });
+      await queryClient.invalidateQueries({
+        queryKey: destinationKeys.all(store.state.selectedOrganization.identifier),
+      });
       await getDestinations();
     };
 
@@ -144,7 +150,9 @@ export default defineComponent({
 
       // Drop the cached alerts (list and any search) so AlertList refetches on
       // mount instead of rendering the pre-save rows.
-      queryClient.invalidateQueries({ queryKey: alertKeys.all(store.state.selectedOrganization.identifier) });
+      queryClient.invalidateQueries({
+        queryKey: alertKeys.all(store.state.selectedOrganization.identifier),
+      });
 
       // AlertList still renders this folder from Vuex, so the query invalidation
       // above does not reach it — drop the folder's entry as well.

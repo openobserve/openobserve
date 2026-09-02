@@ -61,7 +61,11 @@ import { evalJobsQuery } from "@/services/online-evals.service.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import onlineEvalsService, { type EvalJob, type EvalTargetScope, type ManualEvalJobResult } from "@/services/online-evals.service";
+import onlineEvalsService, {
+  type EvalJob,
+  type EvalTargetScope,
+  type ManualEvalJobResult,
+} from "@/services/online-evals.service";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";

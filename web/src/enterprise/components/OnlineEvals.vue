@@ -378,7 +378,12 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { type EvalJob, type ScoreConfig, type Scorer, type ScorerType } from "@/services/online-evals.service";
+import {
+  type EvalJob,
+  type ScoreConfig,
+  type Scorer,
+  type ScorerType,
+} from "@/services/online-evals.service";
 import { useOnlineEvalsData } from "./onlineEvals/composables/useOnlineEvalsData";
 import { entityId } from "./onlineEvals/utils/evalEntity";
 import { showError } from "./onlineEvals/utils/evalFormat";

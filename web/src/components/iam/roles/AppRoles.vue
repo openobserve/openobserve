@@ -88,7 +88,7 @@ import { deleteRoleMutation, bulkDeleteRolesMutation } from "@/services/iam.quer
 import { rolesQuery } from "@/services/iam.queries";
 import { allUserRolesQuery } from "@/services/users.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { onBeforeMount, ref , watch } from "vue";
+import { onBeforeMount, ref, watch } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

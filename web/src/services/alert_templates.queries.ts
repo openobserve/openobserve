@@ -22,8 +22,7 @@ import { localStoragePersister } from "@/composables/query/persisters";
 export const templatesQuery = (org: string) =>
   queryOptions({
     queryKey: templateKeys.list(org),
-    queryFn: async (): Promise<any[]> =>
-      (await template.list({ org_identifier: org })).data ?? [],
+    queryFn: async (): Promise<any[]> => (await template.list({ org_identifier: org })).data ?? [],
     staleTime: CONFIG_STALE_TIME,
     gcTime: LONG_GC_TIME,
     persister: localStoragePersister,

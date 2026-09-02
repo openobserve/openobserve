@@ -493,7 +493,9 @@ const loadDestinations = async () => {
   try {
     // Same shared query the alert form and destination lists read, so opening
     // this panel reuses their cached list instead of issuing its own request.
-    const destinations = await queryClient.fetchQuery(destinationsQuery(store.state.selectedOrganization?.identifier, "alert"));
+    const destinations = await queryClient.fetchQuery(
+      destinationsQuery(store.state.selectedOrganization?.identifier, "alert"),
+    );
     destinationOptions.value = destinations.map((dest: { name: string }) => ({
       // Destination names are user data, not prose — nothing to translate.
       label: raw(dest.name),

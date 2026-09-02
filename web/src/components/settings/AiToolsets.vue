@@ -278,9 +278,14 @@ export default defineComponent({
       // TODO: fold into `useQuery` — this call site drives its own flags because
       // the surrounding refresh/toast flow is imperative.
       if (force) {
-        void queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+        void queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
       }
-      const source = queryClient.fetchQuery(options)
+      const source = queryClient
+        .fetchQuery(options)
         .then((data) => {
           applyToolsets(data);
           return data;
@@ -406,8 +411,11 @@ export default defineComponent({
           toast({ variant: "success", message: t("aiToolset.deletedSuccessfully") });
           // Drop the row from the cache first so it disappears now, not when
           // the refetch lands; the forced reload re-persists the list.
-          queryClient.setQueriesData({ queryKey: aiToolsetKeys.all(store.state.selectedOrganization.identifier) }, (list: any) =>
-            Array.isArray(list) ? list.filter((tool: any) => tool.id !== row.id) : list);
+          queryClient.setQueriesData(
+            { queryKey: aiToolsetKeys.all(store.state.selectedOrganization.identifier) },
+            (list: any) =>
+              Array.isArray(list) ? list.filter((tool: any) => tool.id !== row.id) : list,
+          );
           getData(true);
         })
         .catch((err) => {

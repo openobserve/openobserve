@@ -1070,7 +1070,9 @@ export default defineComponent({
         // Cached: MainLayout re-reads this on every org switch, and the
         // settings pages read it again on mount.
         const orgSettings: any = {
-          data: await queryClient.fetchQuery(orgSettingsQuery(store.state?.selectedOrganization?.identifier)),
+          data: await queryClient.fetchQuery(
+            orgSettingsQuery(store.state?.selectedOrganization?.identifier),
+          ),
         };
 
         //set settings in store
@@ -1165,9 +1167,14 @@ export default defineComponent({
       // below forces a real fetch, since the failure it recovers from is the
       // reason there is nothing cached to serve.
       if (attempt > 0) {
-        await queryClient.invalidateQueries({ queryKey: configFullQuery(orgIdentifier).queryKey, exact: true, refetchType: "none" });
+        await queryClient.invalidateQueries({
+          queryKey: configFullQuery(orgIdentifier).queryKey,
+          exact: true,
+          refetchType: "none",
+        });
       }
-      await queryClient.fetchQuery(configFullQuery(orgIdentifier))
+      await queryClient
+        .fetchQuery(configFullQuery(orgIdentifier))
         .then(async (data: any) => {
           const res = { data };
           if (config.isCloud == "false") {

@@ -90,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { rolesQuery } from "@/services/iam.queries";
-import { watch, onBeforeMount , computed , nextTick } from "vue";
+import { watch, onBeforeMount, computed, nextTick } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";

@@ -729,12 +729,15 @@ const fetchPipelineHistory = async (force = false) => {
     // request; the Refresh button forces.
     const options = pipelineHistoryQuery(org, params);
     if (force) {
-      await queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
     }
     const historyData: any = await queryClient.fetchQuery(options);
 
     if (historyData) {
-
       // Map the hits array or handle empty response
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,

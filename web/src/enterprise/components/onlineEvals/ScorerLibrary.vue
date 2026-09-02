@@ -132,7 +132,10 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService, { type Provider, type ScoreConfig } from "@/services/online-evals.service";
+import onlineEvalsService, {
+  type Provider,
+  type ScoreConfig,
+} from "@/services/online-evals.service";
 import {
   fetchOnlineEvalsCatalog,
   type CatalogScoreConfig,
@@ -317,7 +320,11 @@ async function resolveRequiredScoreConfig(name: string): Promise<ScoreConfig> {
   } catch (err: any) {
     if (err?.response?.status === 409) {
       const options = scoreConfigsQuery(props.orgId);
-      await queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
       const refreshed = await queryClient.fetchQuery(options);
       const found = refreshed.find((row: any) => row.name === name);
       if (found) return found;

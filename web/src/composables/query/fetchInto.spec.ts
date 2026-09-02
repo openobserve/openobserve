@@ -67,21 +67,27 @@ describe("fetchInto", () => {
     };
 
     // cold: nothing on screen yet, so the skeleton is allowed
-    await fetchInto({ ...queryOptions({ queryKey: key, queryFn }), staleTime: 0 }, {
-      apply: () => {},
-      loading,
-      fetching,
-    });
+    await fetchInto(
+      { ...queryOptions({ queryKey: key, queryFn }), staleTime: 0 },
+      {
+        apply: () => {},
+        loading,
+        fetching,
+      },
+    );
     expect(peakLoading).toBe(true);
     expect(peakFetching).toBe(true);
 
     // warm: rows are already painted, so only the refresh spinner turns on
-    await fetchInto({ ...queryOptions({ queryKey: key, queryFn }), staleTime: 0 }, {
-      apply: () => {},
-      loading,
-      fetching,
-      force: true,
-    });
+    await fetchInto(
+      { ...queryOptions({ queryKey: key, queryFn }), staleTime: 0 },
+      {
+        apply: () => {},
+        loading,
+        fetching,
+        force: true,
+      },
+    );
     expect(peakLoading).toBe(false);
     expect(peakFetching).toBe(true);
   });

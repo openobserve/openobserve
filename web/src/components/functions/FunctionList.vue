@@ -366,7 +366,10 @@ export default defineComponent({
       if (!err) return;
       console.error("Error while pulling function", err);
       if (err?.response?.status && err?.response?.status != 403) {
-        toast({ variant: "error", message: t("toastMessages.functions.errorWhilePullingFunction") });
+        toast({
+          variant: "error",
+          message: t("toastMessages.functions.errorWhilePullingFunction"),
+        });
       }
     });
 

@@ -578,7 +578,7 @@ import { useQuery } from "@tanstack/vue-query";
 import { modelPricingQuery } from "@/services/model_pricing.queries";
 import { modelPricingKeys } from "@/services/model_pricing.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
-import { ref, computed, onBeforeMount, onActivated , watch } from "vue";
+import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
@@ -955,8 +955,10 @@ function confirmDelete(model: any) {
         });
         // Drop the row from the cache first so it disappears now, not when the
         // refetch lands; the forced reload re-persists the corrected list.
-        queryClient.setQueriesData({ queryKey: modelPricingKeys.all(orgIdentifier.value) }, (list: any) =>
-          Array.isArray(list) ? list.filter((m: any) => m.id !== model.id) : list);
+        queryClient.setQueriesData(
+          { queryKey: modelPricingKeys.all(orgIdentifier.value) },
+          (list: any) => (Array.isArray(list) ? list.filter((m: any) => m.id !== model.id) : list),
+        );
         await fetchModels(true);
       } catch (e: any) {
         notifyError(t("modelPricing.errDelete"), e);

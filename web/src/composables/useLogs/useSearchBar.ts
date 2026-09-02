@@ -91,7 +91,16 @@ export const useSearchBar = (t: TranslateFn) => {
     try {
       searchObj.loadingSavedView = true;
       const org = store.state.selectedOrganization.identifier;
-      (force ? queryClient.invalidateQueries({ queryKey: savedViewsQuery(org).queryKey, exact: true, refetchType: "none" }).then(() => queryClient.fetchQuery(savedViewsQuery(org))) : queryClient.fetchQuery(savedViewsQuery(org)))
+      (force
+        ? queryClient
+            .invalidateQueries({
+              queryKey: savedViewsQuery(org).queryKey,
+              exact: true,
+              refetchType: "none",
+            })
+            .then(() => queryClient.fetchQuery(savedViewsQuery(org)))
+        : queryClient.fetchQuery(savedViewsQuery(org))
+      )
         .then((views: any[]) => {
           searchObj.loadingSavedView = false;
           searchObj.data.savedViews = views;

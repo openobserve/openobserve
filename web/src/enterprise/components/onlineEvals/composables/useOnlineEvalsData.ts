@@ -7,7 +7,12 @@ import { queryClient } from "@/composables/query/queryClient";
 import { fetchInto } from "@/composables/query/fetchInto";
 import { ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import onlineEvalsService, { type EvalJob, type Provider, type ScoreConfig, type Scorer } from "@/services/online-evals.service";
+import onlineEvalsService, {
+  type EvalJob,
+  type Provider,
+  type ScoreConfig,
+  type Scorer,
+} from "@/services/online-evals.service";
 import { entityId } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
 
@@ -70,7 +75,11 @@ export function useOnlineEvalsData() {
     if (!orgId) return;
     try {
       const options = providersQuery(orgId);
-      await queryClient.invalidateQueries({ queryKey: options.queryKey, exact: true, refetchType: "none" });
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
       providers.value = await queryClient.fetchQuery(options);
     } catch (err: any) {
       showError(err, t("onlineEvals.loadError"));

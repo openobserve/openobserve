@@ -472,7 +472,7 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { alertHistoryQuery, alertsListQuery } from "@/services/alerts.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { ref, onMounted, watch , nextTick } from "vue";
+import { ref, onMounted, watch, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -517,12 +517,9 @@ const EMPTY_HISTORY_QUERY = {
 } as unknown as AlertHistoryQuery;
 
 const historyList = useQuery(() =>
-  Object.assign(
-    alertHistoryQuery(orgIdForHistory.value, readQuery.value ?? EMPTY_HISTORY_QUERY),
-    {
-      enabled: hasRequestedHistory.value && !!readQuery.value && !!orgIdForHistory.value,
-    },
-  ),
+  Object.assign(alertHistoryQuery(orgIdForHistory.value, readQuery.value ?? EMPTY_HISTORY_QUERY), {
+    enabled: hasRequestedHistory.value && !!readQuery.value && !!orgIdForHistory.value,
+  }),
 );
 
 const loading = historyList.isLoading;

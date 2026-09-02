@@ -156,7 +156,7 @@ import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { deleteGroupMutation, bulkDeleteGroupsMutation } from "@/services/iam.queries";
 import { groupsQuery } from "@/services/iam.queries";
-import { ref, onBeforeMount, computed , watch } from "vue";
+import { ref, onBeforeMount, computed, watch } from "vue";
 import AddGroup from "./AddGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";

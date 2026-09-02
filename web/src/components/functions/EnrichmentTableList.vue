@@ -605,7 +605,9 @@ export default defineComponent({
       // refresh there are rows to keep — only a cold read spins and toasts.
       const warm =
         jsTransforms.value.length > 0 ||
-        queryClient.getQueryData(streamKeys.nameList(store.state.selectedOrganization.identifier, "enrichment_tables")) !== undefined;
+        queryClient.getQueryData(
+          streamKeys.nameList(store.state.selectedOrganization.identifier, "enrichment_tables"),
+        ) !== undefined;
       loading.value = !warm;
       fetching.value = true;
       const dismiss = warm
@@ -621,11 +623,19 @@ export default defineComponent({
         const [streamsRes, statusRes] = await Promise.all([
           getStreams("enrichment_tables", false, false, force),
           (force
-            ? queryClient.invalidateQueries({ queryKey: enrichmentTableStatusesQuery(store.state.selectedOrganization.identifier).queryKey, exact: true, refetchType: "none" }).then(() =>
-                queryClient.fetchQuery(
-                  enrichmentTableStatusesQuery(store.state.selectedOrganization.identifier),
-                ),
-              )
+            ? queryClient
+                .invalidateQueries({
+                  queryKey: enrichmentTableStatusesQuery(
+                    store.state.selectedOrganization.identifier,
+                  ).queryKey,
+                  exact: true,
+                  refetchType: "none",
+                })
+                .then(() =>
+                  queryClient.fetchQuery(
+                    enrichmentTableStatusesQuery(store.state.selectedOrganization.identifier),
+                  ),
+                )
             : queryClient.fetchQuery(
                 enrichmentTableStatusesQuery(store.state.selectedOrganization.identifier),
               )

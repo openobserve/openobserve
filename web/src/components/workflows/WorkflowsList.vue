@@ -505,7 +505,8 @@ const deleteWorkflow = async () => {
     // Drop the row from the cache first so it disappears now, not when the
     // refetch lands; the forced reload re-persists the corrected list.
     queryClient.setQueriesData({ queryKey: workflowKeys.all(orgId.value) }, (list: any) =>
-      Array.isArray(list) ? list.filter((w: any) => w.id !== row.id) : list);
+      Array.isArray(list) ? list.filter((w: any) => w.id !== row.id) : list,
+    );
     await getWorkflows(true);
   } catch (error: any) {
     if (error?.response?.status !== 403) {
