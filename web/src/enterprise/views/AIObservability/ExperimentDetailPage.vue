@@ -238,7 +238,9 @@
               size="sm"
               variant="warning"
               :label="
-                raw(`${t('aiObservability.experiments.detail.highDispersionBadge')} · ${row.dispersionLabel}`)
+                raw(
+                  `${t('aiObservability.experiments.detail.highDispersionBadge')} · ${row.dispersionLabel}`,
+                )
               "
             />
             <span v-else class="text-text-secondary">{{ raw(row.dispersionLabel) }}</span>
@@ -252,11 +254,7 @@
                row.violations[id] — everything else (numeric, categorical, or
                a boolean with no healthy value set yet) renders exactly as
                before: plain text, no false "everything is fine" green. -->
-          <template
-            v-for="id in scorerIds"
-            :key="id"
-            #[`cell-score:${id}`]="{ row }: { row: any }"
-          >
+          <template v-for="id in scorerIds" :key="id" #[`cell-score:${id}`]="{ row }: { row: any }">
             <OTag
               v-if="row.violations[id]"
               size="sm"
