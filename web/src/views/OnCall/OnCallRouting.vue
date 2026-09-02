@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OEmptyState
       v-else-if="loaded && !teams.length"
       size="hero"
-      preset="no-oncall-rules"
+      preset="no-oncall-teams"
       data-test="oncall-routing-empty"
       @action="goToTeams"
     />

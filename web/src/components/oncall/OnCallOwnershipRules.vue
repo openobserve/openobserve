@@ -121,10 +121,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #empty>
         <OEmptyState
-          size="inline"
-          preset="no-data"
+          size="block"
+          preset="no-oncall-rules"
           :description="emptyDescription"
           data-test="oncall-ownership-empty"
+          @action="emit('add')"
         />
       </template>
     </OTable>
