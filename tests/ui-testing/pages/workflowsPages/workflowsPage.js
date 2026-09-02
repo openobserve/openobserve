@@ -119,6 +119,10 @@ class WorkflowsPage {
     this.paletteCollapseBtn = '[data-test="workflow-palette-collapse-btn"]';
     this.nodeFor = (t) => `[data-test="workflow-node-${t}"]`;
     this.nodeTestOkFor = (t) => `[data-test="workflow-node-${t}-test-ok"]`;
+    // A pass renders as the green ✓ on a draft but as the rehearsal flask on a
+    // published workflow (a test run must not read as production verification).
+    this.nodeTestPassedFor = (t) =>
+      `[data-test="workflow-node-${t}-test-ok"], [data-test="workflow-node-${t}-test-rehearsal"]`;
     this.nodeTestErrorFor = (t) => `[data-test="workflow-node-${t}-test-error"]`;
     this.listRowPrefixFor = (n) => `[data-test^="workflow-list-${n}-"]`;
     this.listRowActionFor = (n, a) => `[data-test="workflow-list-${n}-${a}"]`;
@@ -597,6 +601,12 @@ class WorkflowsPage {
   /** Assert a node painted a success badge after a test run. */
   async expectNodeTestOk(nodeType, timeout = 60000) {
     await expect(this.page.locator(this.nodeTestOkFor(nodeType)))
+      .toBeVisible({ timeout });
+  }
+
+  /** Assert a node passed its test run — green ✓ (draft) or rehearsal flask (published). */
+  async expectNodeTestPassed(nodeType, timeout = 60000) {
+    await expect(this.page.locator(this.nodeTestPassedFor(nodeType)).first())
       .toBeVisible({ timeout });
   }
 
