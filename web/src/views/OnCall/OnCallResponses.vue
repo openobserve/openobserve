@@ -1272,15 +1272,18 @@ const myShift = computed(() => {
   };
 });
 
-/// Whether an escalating record can still reach anybody. The ladder can exhaust
-/// with nobody left to ring — a priority with no channels behind it does this
-/// the instant its page opens — and from then on the wire `state` alone (still
-/// `triggered` forever; there is no backend state for "the ladder gave up")
-/// can no longer be trusted to mean "ringing". Unknown while the ladder detail
-/// has not loaded yet — first paint, or past ESCALATION_DETAIL_LIMIT — defaults
-/// to still-ringing, so a genuinely live page is never hidden for lack of a
-/// fetch.
+/// Whether an escalating record can still reach anybody. Two independent ways
+/// this is knowable: the ladder ran and used up every rung (`exhausted`), or
+/// the priority's policy defines zero rungs for it, so no ladder was ever
+/// going to run — a P4 with nobody configured behind it, say. The zero-rung
+/// case is checked first because it is synchronous (already loaded in
+/// `policyByTeam`) and correct from the first paint, unlike `exhausted`,
+/// which needs a per-record fetch that a policy fact should not have to wait
+/// on. Unknown while the ladder detail has not loaded yet — first paint, or
+/// past ESCALATION_DETAIL_LIMIT — defaults to still-ringing, so a genuinely
+/// live page is never hidden for lack of a fetch.
 function isStillRinging(record: OnCallResponse): boolean {
+  if (totalRungsFor(record) === 0) return false;
   return !(progressById.value[record.id]?.exhausted ?? false);
 }
 

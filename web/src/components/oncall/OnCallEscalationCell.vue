@@ -77,6 +77,10 @@ const toneClass = computed(() => {
   if (props.state === "resolved") return "text-text-secondary";
   if (props.progress?.stopped_because === "snoozed") return "text-status-warning-text";
   if (props.state === "acknowledged") return "text-text-body";
+  // Nothing was ever going to page here — the priority's policy has no rungs
+  // behind it — so this is not the "wake somebody now" state the error tone
+  // is reserved for.
+  if (props.totalRungs === 0) return "text-text-secondary";
   return "text-status-error-text";
 });
 
@@ -100,6 +104,9 @@ const headline = computed<I18nText>(() => {
   // "Level 6 of 6" and "nobody is coming" are the same number and opposite
   // situations. A finished ladder says so in words.
   if (props.progress?.exhausted) return t("oncall.ladderFinished");
+  // "Not paged yet" implies a page is coming; a priority with no rungs never
+  // pages at all, which is a policy fact, not a pending one.
+  if (props.totalRungs === 0) return t("oncall.escalationPagesNobody");
   if (firedCount.value === 0) return t("oncall.escalationNotStarted");
   // Who is being woken RIGHT NOW, not just how far up the ladder we are — that
   // is the name a responder checks against their own.
