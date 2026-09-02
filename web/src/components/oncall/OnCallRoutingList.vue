@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="oncall-routing-list-add"
           @click="setEditor('new')"
         >
-          {{ t("oncall.addRule") }}
+          {{ t("oncall.newRule") }}
         </OButton>
       </span>
 

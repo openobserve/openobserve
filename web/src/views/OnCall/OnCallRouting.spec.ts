@@ -77,7 +77,7 @@ const stubs = {
   },
   OnCallUnroutedQueue: {
     name: "OnCallUnroutedQueue",
-    props: ["signals", "loading", "teams", "filterable"],
+    props: ["signals", "loading", "teams"],
     template: "<div />",
   },
   OnCallDefaultTeamCard: {
@@ -125,6 +125,12 @@ const stubs = {
     props: ["modelValue", "options"],
     emits: ["update:modelValue"],
     template: `<select :value="modelValue" />`,
+  },
+  OSwitch: {
+    name: "OSwitch",
+    props: ["modelValue", "label"],
+    emits: ["update:modelValue"],
+    template: "<button />",
   },
 };
 
@@ -362,17 +368,22 @@ describe("OnCallRouting", () => {
   });
 
   /// The queue's filters are the server's — a change refetches with the params
-  /// rather than sieving rows the client already has.
+  /// rather than sieving rows the client already has. They live in the page's
+  /// own toolbar now, next to the tabs, so the tabs' OToggleGroup is index 0
+  /// and the landing filter's is index 1.
   it("refetches the queue with the announced filters", async () => {
     const wrapper = render();
     await flushPromises();
     await showSignals(wrapper);
 
-    unrouted(wrapper).vm.$emit("change-filters", {
-      landing: "nobody",
-      include_dismissed: true,
-    });
+    wrapper
+      .findAllComponents({ name: "OToggleGroup" })[1]
+      .vm.$emit("update:modelValue", "nobody");
     await flushPromises();
+
+    wrapper.findComponent({ name: "OSwitch" }).vm.$emit("update:modelValue", true);
+    await flushPromises();
+
     expect(service.unroutedSignals).toHaveBeenLastCalledWith({
       org_identifier: ORG,
       landing: "nobody",
@@ -431,22 +442,5 @@ describe("OnCallRouting", () => {
 
     expect(wrapper.find('[data-test="oncall-routing-test-signal"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-routing-add-rule"]').exists()).toBe(true);
-  });
-
-  /// On-Call owns one rail entry, so routing — reached only from the On-Call
-  /// header — had no way out but the browser's own Back. Real layout again:
-  /// the button lives in OPageHeader, which a stubbed layout never renders.
-  it("offers a way back to the On-Call pages it was opened from", async () => {
-    const { OPageLayout: _stubbedLayout, ...realLayout } = stubs;
-    const wrapper = mount(OnCallRouting, {
-      global: { plugins: [i18n, store], stubs: realLayout },
-    });
-    await flushPromises();
-
-    const back = wrapper.find('[data-test="oncall-routing-back-btn"]');
-    expect(back.exists()).toBe(true);
-    await back.trigger("click");
-
-    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallResponses" }));
   });
 });

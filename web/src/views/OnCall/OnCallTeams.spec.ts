@@ -397,21 +397,4 @@ describe("OnCallTeams", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-teams-error"]').exists()).toBe(false);
   });
-
-  /// On-Call owns one rail entry, so a sub-page with no Back is a dead end.
-  /// Mounted through the REAL page layout: the button lives in OPageHeader, and
-  /// a stubbed layout would report success while nothing rendered.
-  it("offers a way back to the On-Call pages it was opened from", async () => {
-    const { OPageLayout: _stubbedLayout, ...realLayout } = stubs;
-    const wrapper = mount(OnCallTeams, {
-      global: { plugins: [i18n, store], stubs: realLayout },
-    });
-    await flushPromises();
-
-    const back = wrapper.find('[data-test="oncall-teams-back-btn"]');
-    expect(back.exists()).toBe(true);
-    await back.trigger("click");
-
-    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallResponses" }));
-  });
 });

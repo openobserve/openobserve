@@ -143,28 +143,6 @@ describe("OnCallUnroutedQueue", () => {
     );
   });
 
-  /// The filtering is the SERVER'S — include_dismissed also drops entries a
-  /// since-written rule would now catch, which no client can compute. So the
-  /// component only announces what was chosen; the host refetches.
-  it("announces filter choices for the host to refetch with", async () => {
-    const wrapper = mount(OnCallUnroutedQueue, {
-      props: { signals: [signal()], filterable: true },
-      global: { plugins: [i18n, store], stubs },
-    });
-
-    await wrapper.findComponent({ name: "OToggleGroup" }).vm.$emit("update:modelValue", "nobody");
-    expect(wrapper.emitted("change-filters")?.[0][0]).toEqual({
-      landing: "nobody",
-      include_dismissed: false,
-    });
-
-    await wrapper.find('[data-test="oncall-unrouted-show-dismissed"]').trigger("click");
-    expect(wrapper.emitted("change-filters")?.[1][0]).toEqual({
-      landing: "nobody",
-      include_dismissed: true,
-    });
-  });
-
   /// A tab strip already names this list; repeating the title inside it reads
   /// as two sections.
   it("drops its own title when the host names the section", () => {
@@ -174,10 +152,6 @@ describe("OnCallUnroutedQueue", () => {
     });
     expect(wrapper.find('[data-test="oncall-unrouted-header"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-unrouted-claim-s1"]').exists()).toBe(true);
-  });
-
-  it("offers no filters unless the host asks for them", () => {
-    expect(render().find('[data-test="oncall-unrouted-filters"]').exists()).toBe(false);
   });
 
   /// Dismissing stamps the field and keeps the row — the evidence that a page

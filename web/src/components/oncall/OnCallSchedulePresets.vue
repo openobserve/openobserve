@@ -293,7 +293,7 @@
             data-test="oncall-presets-apply"
             @click="rotationCount ? (confirmReplace = true) : apply()"
           >
-            {{ t("oncall.presetsApply") }}
+            {{ t("oncall.save") }}
           </OButton>
         </div>
       </div>
@@ -306,7 +306,7 @@
     v-model="confirmReplace"
     :title="t('oncall.presetsReplaceTitle')"
     :message="t('oncall.presetsReplaceMessage')"
-    :ok-label="t('oncall.presetsApply')"
+    :ok-label="t('oncall.save')"
     @update:ok="apply"
   />
 </template>

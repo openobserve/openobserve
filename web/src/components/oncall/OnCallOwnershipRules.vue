@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   belonging to teams this screen cannot see.
 -->
 <template>
-  <div class="flex flex-col gap-3" data-test="oncall-ownership-rules">
+  <div class="flex min-h-0 flex-1 flex-col gap-3" data-test="oncall-ownership-rules">
     <span
       v-if="showHeader"
       class="flex flex-wrap items-baseline gap-x-2 gap-y-1"

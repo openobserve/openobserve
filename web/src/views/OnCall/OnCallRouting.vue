@@ -29,19 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   default team sits above the queue it exists to drain.
 -->
 <template>
-  <!-- Configuration reached from the On-Call header; the rail has no second
-       entry to return through, so the header carries the way back. -->
   <OPageLayout
+    bleed
     data-test="oncall-routing-page"
     :title="t('oncall.routingTitle')"
     :subtitle="t('oncall.routingSubtitle')"
     icon="alt-route"
-    :back="{
-      label: t('oncall.backToResponses'),
-      to: { name: 'onCallResponses', query: { org_identifier: orgId } },
-      dataTest: 'oncall-routing-back-btn',
-    }"
-    scroll
   >
     <!-- All on demand: the page's own answer is the rule list, so the tester
          opens in a drawer rather than pushing the lists down the screen, and
@@ -53,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="ready"
         variant="outline"
         size="sm-action"
-        icon-left="science"
         :active="testerOpen"
         data-test="oncall-routing-test-signal"
         @click="testerOpen = !testerOpen"
@@ -67,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-routing-add-rule"
         @click="openAdd"
       >
-        {{ t("oncall.addRule") }}
+        {{ t("oncall.newRule") }}
       </OButton>
     </template>
 
@@ -107,62 +99,103 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @action="goToTeams"
     />
 
-    <div v-else class="flex flex-col gap-5 py-4" data-test="oncall-routing-content">
+    <div v-else class="flex min-h-0 flex-1 flex-col" data-test="oncall-routing-content">
       <!-- Two lists, one question apart: what the org already owns, and what
-           nothing owns yet. The count on each is the reason to switch. -->
-      <OToggleGroup
-        :model-value="tab"
-        type="single"
-        class="self-start"
-        data-test="oncall-routing-tabs"
-        @update:model-value="setTab"
+           nothing owns yet. The count on each is the reason to switch. Same
+           px-page-edge/py-2 bar an OTable toolbar uses, so the tabs line up
+           with the search box on the Teams page. -->
+      <div
+        class="px-page-edge border-table-row-divider flex flex-wrap items-center gap-2 border-b py-2"
       >
-        <OToggleGroupItem value="rules" size="sm" data-test="oncall-routing-tab-rules">
-          {{ t("oncall.ownershipRules") }}
-          <OTag variant="default-soft" size="sm">{{ rules.length }}</OTag>
-        </OToggleGroupItem>
-        <OToggleGroupItem value="signals" size="sm" data-test="oncall-routing-tab-signals">
-          {{ t("oncall.routingTabNeedsRule") }}
-          <OTag :variant="openSignalCount ? 'error-soft' : 'default-soft'" size="sm">
-            {{ openSignalCount }}
-          </OTag>
-        </OToggleGroupItem>
-      </OToggleGroup>
+        <OToggleGroup
+          :model-value="tab"
+          type="single"
+          data-test="oncall-routing-tabs"
+          @update:model-value="setTab"
+        >
+          <OToggleGroupItem value="rules" size="sm" data-test="oncall-routing-tab-rules">
+            {{ t("oncall.ownershipRules") }}
+            <OTag variant="default-soft" size="sm">{{ rules.length }}</OTag>
+          </OToggleGroupItem>
+          <OToggleGroupItem value="signals" size="sm" data-test="oncall-routing-tab-signals">
+            {{ t("oncall.routingTabNeedsRule") }}
+            <OTag :variant="openSignalCount ? 'error-soft' : 'default-soft'" size="sm">
+              {{ openSignalCount }}
+            </OTag>
+          </OToggleGroupItem>
+        </OToggleGroup>
 
-      <OnCallOwnershipRules
-        v-if="tab === 'rules'"
-        :rules="rules"
-        :aliases="aliases"
-        :loading="loadingRules"
-        :show-team="true"
-        :show-header="false"
-        @add="openAdd"
-        @edit="openEdit"
-        @remove="(rule) => (ruleToDelete = rule)"
-      />
+        <!-- Server-side filters for the unrouted queue, folded into the same
+             bar as the tabs rather than a second row: `landing` splits the two
+             emergencies the row tags name; `include_dismissed` swaps the
+             outstanding worklist for the raw historical record. -->
+        <template v-if="tab === 'signals'">
+          <div class="bg-border-default h-4 w-px shrink-0" />
 
-      <!-- The queue's own failure must not read as "nothing is unrouted" —
-           that is this screen's core claim, and it has to be honest (B8). -->
-      <OEmptyState
-        v-else-if="signalsError"
-        size="inline"
-        variant="error"
-        :title="t('oncall.unroutedLoadFailed')"
-        :action-label="t('oncall.retry')"
-        data-test="oncall-unrouted-error"
-        @action="fetchSignals"
-      />
-      <OnCallUnroutedQueue
-        v-else
-        :signals="signals"
-        :teams="teams"
-        filterable
-        :loading="loadingSignals"
-        :show-header="false"
-        @claim="openClaim"
-        @dismiss="dismissSignal"
-        @change-filters="onFiltersChange"
-      />
+          <OToggleGroup
+            :model-value="signalFilters.landing || 'both'"
+            @update:model-value="setSignalLanding"
+          >
+            <OToggleGroupItem value="both" size="sm" data-test="oncall-unrouted-filter-both">
+              {{ t("oncall.unroutedFilterBoth") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem value="nobody" size="sm" data-test="oncall-unrouted-filter-nobody">
+              {{ t("oncall.unroutedPagedNobody") }}
+            </OToggleGroupItem>
+            <OToggleGroupItem
+              value="default_team"
+              size="sm"
+              data-test="oncall-unrouted-filter-default"
+            >
+              {{ t("oncall.unroutedFilterDefault") }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+
+          <div class="bg-border-default h-4 w-px shrink-0" />
+
+          <OSwitch
+            :model-value="signalFilters.include_dismissed"
+            :label="t('oncall.unroutedShowDismissed')"
+            data-test="oncall-unrouted-show-dismissed"
+            @update:model-value="setSignalIncludeDismissed"
+          />
+        </template>
+      </div>
+
+      <div class="flex min-h-0 flex-1 flex-col">
+        <OnCallOwnershipRules
+          v-if="tab === 'rules'"
+          :rules="rules"
+          :aliases="aliases"
+          :loading="loadingRules"
+          :show-team="true"
+          :show-header="false"
+          @add="openAdd"
+          @edit="openEdit"
+          @remove="(rule) => (ruleToDelete = rule)"
+        />
+
+        <!-- The queue's own failure must not read as "nothing is unrouted" —
+             that is this screen's core claim, and it has to be honest (B8). -->
+        <OEmptyState
+          v-else-if="signalsError"
+          size="inline"
+          variant="error"
+          :title="t('oncall.unroutedLoadFailed')"
+          :action-label="t('oncall.retry')"
+          data-test="oncall-unrouted-error"
+          @action="fetchSignals"
+        />
+        <OnCallUnroutedQueue
+          v-else
+          :signals="signals"
+          :teams="teams"
+          :loading="loadingSignals"
+          :show-header="false"
+          @claim="openClaim"
+          @dismiss="dismissSignal"
+        />
+      </div>
     </div>
 
     <!-- The tester answers a hypothetical about the rules; it should not cost
@@ -247,6 +280,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import alertsService from "@/services/alerts";
@@ -421,8 +455,17 @@ async function fetchRules() {
 /// can compute.
 const signalFilters = ref<UnroutedFilters>({ include_dismissed: false });
 
-function onFiltersChange(filters: UnroutedFilters) {
-  signalFilters.value = filters;
+function setSignalLanding(value: unknown) {
+  const landing = value === "default_team" || value === "nobody" ? value : undefined;
+  signalFilters.value = {
+    ...(landing ? { landing } : {}),
+    include_dismissed: signalFilters.value.include_dismissed,
+  };
+  fetchSignals();
+}
+
+function setSignalIncludeDismissed(value: unknown) {
+  signalFilters.value = { ...signalFilters.value, include_dismissed: !!value };
   fetchSignals();
 }
 

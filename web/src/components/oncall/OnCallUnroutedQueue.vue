@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   so it stops being unrouted.
 -->
 <template>
-  <div class="flex flex-col gap-3" data-test="oncall-unrouted">
+  <div class="flex min-h-0 flex-1 flex-col gap-3" data-test="oncall-unrouted">
     <span
       v-if="showHeader"
       class="flex flex-wrap items-baseline gap-x-2 gap-y-1"
@@ -49,35 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("oncall.unroutedClaimAll", { count: signals.length }) }}
       </OButton>
-    </span>
-
-    <!-- Server-side filters, offered only where the host wants the whole
-         queue worked (the org screen). `landing` splits the two emergencies
-         the row tags name; `include_dismissed` swaps the outstanding worklist
-         for the raw historical record. -->
-    <span
-      v-if="filterable"
-      class="flex flex-wrap items-center gap-3"
-      data-test="oncall-unrouted-filters"
-    >
-      <OToggleGroup :model-value="landing || 'both'" @update:model-value="setLanding">
-        <OToggleGroupItem value="both" size="sm" data-test="oncall-unrouted-filter-both">
-          {{ t("oncall.unroutedFilterBoth") }}
-        </OToggleGroupItem>
-        <OToggleGroupItem value="nobody" size="sm" data-test="oncall-unrouted-filter-nobody">
-          {{ t("oncall.unroutedPagedNobody") }}
-        </OToggleGroupItem>
-        <OToggleGroupItem value="default_team" size="sm" data-test="oncall-unrouted-filter-default">
-          {{ t("oncall.unroutedFilterDefault") }}
-        </OToggleGroupItem>
-      </OToggleGroup>
-
-      <OSwitch
-        :model-value="includeDismissed"
-        :label="t('oncall.unroutedShowDismissed')"
-        data-test="oncall-unrouted-show-dismissed"
-        @update:model-value="setIncludeDismissed"
-      />
     </span>
 
     <OTable
@@ -181,6 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OEmptyState
           size="inline"
           preset="no-data"
+          :title="t('oncall.unroutedNoneTitle')"
           :description="t('oncall.unroutedNone')"
           data-test="oncall-unrouted-empty"
         />
@@ -190,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -198,10 +170,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import type { UnroutedSignal } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -219,9 +188,6 @@ const props = withDefaults(
     teamName?: string;
     /** Resolves `defaulted_team_id` to a name the operator recognises. */
     teams?: { id: string; name: string }[];
-    /** Offer the server-side filters. The host owns the fetch, so a change is
-     *  emitted rather than applied — the filtering is the endpoint's. */
-    filterable?: boolean;
     loading?: boolean;
     claiming?: boolean;
     /** Hosts that already name the section — a tab strip, a page header — turn
@@ -232,7 +198,6 @@ const props = withDefaults(
     signals: () => [],
     teamName: "",
     teams: () => [],
-    filterable: false,
     loading: false,
     claiming: false,
     showHeader: true,
@@ -243,7 +208,6 @@ const emit = defineEmits<{
   (e: "claim", signal: UnroutedSignal): void;
   (e: "claim-all", signals: UnroutedSignal[]): void;
   (e: "dismiss", signal: UnroutedSignal): void;
-  (e: "change-filters", filters: UnroutedFilters): void;
 }>();
 
 const { t } = useI18nTyped();
@@ -288,26 +252,6 @@ const columns = computed<OTableColumnDef<UnroutedSignal>[]>(() => [
 /// work still reads first.
 function rowClass(row: UnroutedSignal): string {
   return row.dismissed_at ? "opacity-60" : "";
-}
-
-const landing = ref<"" | "default_team" | "nobody">("");
-const includeDismissed = ref(false);
-
-function announceFilters() {
-  emit("change-filters", {
-    ...(landing.value ? { landing: landing.value } : {}),
-    include_dismissed: includeDismissed.value,
-  });
-}
-
-function setLanding(value: unknown) {
-  landing.value = value === "default_team" || value === "nobody" ? value : "";
-  announceFilters();
-}
-
-function setIncludeDismissed(value: unknown) {
-  includeDismissed.value = !!value;
-  announceFilters();
 }
 
 /// The alert's own title when the server captured one. Its `description` is

@@ -72,7 +72,7 @@ describe("OnCallDefaultTeamCard", () => {
     const unset = render({ dialog: true });
     await flushPromises();
     expect(unset.find('[data-test="oncall-default-team-open"]').text()).toContain(
-      "Set a catch-all team",
+      "Set a fallback team",
     );
 
     // Two mounts, two answers — so the shared read has to be dropped between
@@ -82,7 +82,7 @@ describe("OnCallDefaultTeamCard", () => {
     const set = render({ dialog: true });
     await flushPromises();
     expect(set.find('[data-test="oncall-default-team-open"]').text()).toContain(
-      "Catch-all team: Platform",
+      "Fallback team: Platform",
     );
   });
 
