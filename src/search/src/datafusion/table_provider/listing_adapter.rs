@@ -18,7 +18,7 @@ use std::sync::Arc;
 use arrow_schema::SchemaRef;
 use config::{TIMESTAMP_COL_NAME, get_config};
 use datafusion::{
-    catalog::{Session, TableProvider, memory::DataSourceExec},
+    catalog::{Session, TableProvider},
     common::Result,
     datasource::{
         TableType,
@@ -30,13 +30,15 @@ use datafusion::{
     physical_plan::ExecutionPlan,
     prelude::Expr,
 };
-use rayon::prelude::*;
 use tonic::async_trait;
 
 use crate::{
     datafusion::{
         sort_order::FileSortOrder,
-        table_provider::helpers::{apply_combined_filter, generate_access_plan},
+        table_provider::{
+            helpers::{apply_combined_filter, file_scan_config, with_access_plans},
+            metrics::{handler_metrics_band_scan, hash_interval},
+        },
     },
     index::IndexCondition,
 };
@@ -139,19 +141,30 @@ impl TableProvider for ListingTableAdapter {
             .scan(state, parquet_projection, filters, limit)
             .await?;
 
-        // The files are sorted but DataFusion dropped the ordering (overlapping
-        // files in one group): regroup them by statistics ourselves.
-        let regroup_order = (self.sort_order.is_sorted()
-            && parquet_exec.properties().output_ordering().is_none())
-        .then_some(self.sort_order);
         let target_partitions = self.listing_table.options().target_partitions;
-        let parquet_exec = handler_tantivy_index(
-            &self.trace_id,
-            state,
-            parquet_exec,
-            regroup_order,
-            target_partitions,
-        );
+        let parquet_exec = match hash_interval(filters) {
+            Some(hash_range) if self.sort_order.is_sorted() => handler_metrics_band_scan(
+                &self.trace_id,
+                parquet_exec,
+                self.sort_order,
+                hash_range,
+                target_partitions,
+            ),
+            _ => {
+                // The files are sorted but DataFusion dropped the ordering (overlapping
+                // files in one group): regroup them by statistics ourselves.
+                let regroup_order = (self.sort_order.is_sorted()
+                    && parquet_exec.properties().output_ordering().is_none())
+                .then_some(self.sort_order);
+                handler_tantivy_index(
+                    &self.trace_id,
+                    state,
+                    parquet_exec,
+                    regroup_order,
+                    target_partitions,
+                )
+            }
+        };
 
         // if the index condition can remove filter, we can skip the config
         // feature_query_remove_filter_with_index
@@ -193,95 +206,62 @@ fn handler_tantivy_index(
     regroup_order: Option<FileSortOrder>,
     target_partitions: usize,
 ) -> Arc<dyn ExecutionPlan> {
-    if let Some(data_source_exec) = plan.downcast_ref::<DataSourceExec>()
-        && let Some(config) = data_source_exec
-            .data_source()
-            .downcast_ref::<FileScanConfig>()
-    {
-        let mut file_groups = config.file_groups.clone();
+    let Some(config) = file_scan_config(&plan) else {
+        return plan;
+    };
+    let mut file_groups = config.file_groups.clone();
 
-        if let Some(sort_order) = regroup_order {
-            let schema = config.file_source().table_schema().table_schema();
-            match sort_order.physical_ordering(schema) {
-                Some(ordering) => {
-                    match FileScanConfig::split_groups_by_statistics_with_target_partitions(
-                        schema,
-                        &file_groups,
-                        &ordering,
-                        target_partitions,
-                    ) {
-                        Ok(new_file_groups) => {
-                            file_groups = new_file_groups;
-                        }
-                        Err(e) if sort_order.is_timestamp_desc() => {
-                            // files are listed oldest first; reversing each group
-                            // is the best effort approximation of `_timestamp DESC`
-                            log::warn!(
-                                "[trace_id {trace_id}] failed to split file groups by statistics: {e}, falling back to reversing file groups"
-                            );
-                            file_groups = file_groups
-                                .into_iter()
-                                .map(|file_group| {
-                                    let mut files = file_group.into_inner();
-                                    files.reverse();
-                                    FileGroup::new(files)
-                                })
-                                .collect();
-                        }
-                        Err(e) => {
-                            log::warn!(
-                                "[trace_id {trace_id}] failed to split file groups by statistics for {sort_order}: {e}, keeping file groups as is"
-                            );
-                        }
+    if let Some(sort_order) = regroup_order {
+        let schema = config.file_source().table_schema().table_schema();
+        match sort_order.physical_ordering(schema) {
+            Some(ordering) => {
+                match FileScanConfig::split_groups_by_statistics_with_target_partitions(
+                    schema,
+                    &file_groups,
+                    &ordering,
+                    target_partitions,
+                ) {
+                    Ok(new_file_groups) => {
+                        file_groups = new_file_groups;
+                    }
+                    Err(e) if sort_order.is_timestamp_desc() => {
+                        // files are listed oldest first; reversing each group
+                        // is the best effort approximation of `_timestamp DESC`
+                        log::warn!(
+                            "[trace_id {trace_id}] failed to split file groups by statistics: {e}, falling back to reversing file groups"
+                        );
+                        file_groups = file_groups
+                            .into_iter()
+                            .map(|file_group| {
+                                let mut files = file_group.into_inner();
+                                files.reverse();
+                                FileGroup::new(files)
+                            })
+                            .collect();
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "[trace_id {trace_id}] failed to split file groups by statistics for {sort_order}: {e}, keeping file groups as is"
+                        );
                     }
                 }
-                None => {
-                    log::warn!(
-                        "[trace_id {trace_id}] sort columns of {sort_order} not found in schema, skipping split_groups_by_statistics"
-                    );
-                }
+            }
+            None => {
+                log::warn!(
+                    "[trace_id {trace_id}] sort columns of {sort_order} not found in schema, skipping split_groups_by_statistics"
+                );
             }
         }
+    }
 
-        let start = std::time::Instant::now();
-        let new_file_groups: Vec<_> = file_groups
-            .into_par_iter()
-            .map(|file_group| {
-                let group: Vec<_> = file_group
-                    .into_inner()
-                    .into_iter()
-                    .map(|mut file| {
-                        generate_access_plan(&mut file);
-                        file
-                    })
-                    .collect();
-                // TODO: check if we need statistics for FileGroup
-                // the statistics in FileGroup is used in ExecutionPlan::partition_statistics
-                FileGroup::new(group)
-            })
-            .collect();
-
-        let groups_len = new_file_groups.len();
-        let max_group_len = new_file_groups.iter().map(|g| g.len()).max().unwrap_or(0);
-        let files_nums = new_file_groups.iter().map(|g| g.len()).sum::<usize>();
-
-        log::info!(
-            "[trace_id {trace_id}] listing table adapter, target_partitions: {target_partitions}, file groups: {groups_len}, max group len: {max_group_len}, total files: {files_nums}, took: {} ms",
-            start.elapsed().as_millis() as usize,
-        );
-
-        let mut config = config.clone();
-        config.file_groups = new_file_groups;
-        let mut plan = Arc::new(DataSourceExec::new(Arc::new(config))) as Arc<dyn ExecutionPlan>;
-        // skip repartitioning when the files were regrouped by statistics: the
-        // groups already carry the ordering and there are plenty of them
-        if regroup_order.is_none()
-            && let Ok(Some(repartition_plan)) =
-                plan.repartitioned(target_partitions, state.config_options())
-        {
-            plan = repartition_plan;
-        }
-        return plan;
+    let mut plan = with_access_plans(trace_id, config, file_groups, target_partitions);
+    // skip repartitioning when the files were regrouped by statistics: the
+    // groups already carry the ordering and there are plenty of them
+    if regroup_order.is_none()
+        && let Ok(Some(repartition_plan)) =
+            plan.repartitioned(target_partitions, state.config_options())
+    {
+        plan = repartition_plan;
     }
     plan
 }
@@ -321,6 +301,89 @@ mod tests {
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("value", DataType::Float64, false),
         ]))
+    }
+
+    #[tokio::test]
+    async fn test_scan_prunes_files_outside_hash_interval() {
+        let dir = tempfile::tempdir().unwrap();
+        write_hash_sorted_file(
+            dir.path(),
+            "a.parquet",
+            &[(1, 10), (3, 20)],
+            FileFormat::Parquet,
+        )
+        .await;
+        write_hash_sorted_file(
+            dir.path(),
+            "b.parquet",
+            &[(5, 10), (7, 20)],
+            FileFormat::Parquet,
+        )
+        .await;
+        write_hash_sorted_file(
+            dir.path(),
+            "c.parquet",
+            &[(9, 10), (11, 20)],
+            FileFormat::Parquet,
+        )
+        .await;
+
+        let sort_order = FileSortOrder::HashTimestampAsc;
+        let ctx = DataFusionContextBuilder::new()
+            .trace_id("test_hash_prune")
+            .sort_order(sort_order)
+            .build(2)
+            .await
+            .unwrap();
+        let listing_options = ListingOptions::new(Arc::new(ParquetFormat::default()))
+            .with_target_partitions(2)
+            .with_collect_stat(true)
+            .with_file_sort_order(vec![sort_order.logical_sort_exprs()]);
+        let url = ListingTableUrl::parse(format!("file://{}/", dir.path().display())).unwrap();
+        let config = ListingTableConfig::new(url)
+            .with_listing_options(listing_options)
+            .with_schema(hash_sorted_schema());
+        let table = ListingTableAdapter::try_new(
+            config,
+            "test_hash_prune".to_string(),
+            sort_order,
+            None,
+            vec![],
+            None,
+        )
+        .unwrap();
+        ctx.register_table("t", Arc::new(table)).unwrap();
+
+        let plan = ctx
+            .state()
+            .create_logical_plan(&format!(
+                "SELECT * FROM t WHERE {HASH_LABEL} >= 5 AND {HASH_LABEL} <= 7 ORDER BY {}",
+                sort_order.order_by_clause().unwrap()
+            ))
+            .await
+            .unwrap();
+        let physical_plan = ctx.state().create_physical_plan(&plan).await.unwrap();
+        let display = displayable(physical_plan.as_ref()).indent(true).to_string();
+        assert!(
+            display.contains("b.parquet") && !display.contains("a.parquet"),
+            "expected only the intersecting file in the scan, got:\n{display}"
+        );
+        assert!(!display.contains("c.parquet"), "got:\n{display}");
+
+        let batches = collect(physical_plan, ctx.task_ctx()).await.unwrap();
+        let hashes: Vec<u64> = batches
+            .iter()
+            .flat_map(|batch| {
+                batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<UInt64Array>()
+                    .unwrap()
+                    .values()
+                    .to_vec()
+            })
+            .collect();
+        assert_eq!(hashes, vec![5, 7]);
     }
 
     /// Write one file whose rows are ordered by (__hash__, _timestamp).
