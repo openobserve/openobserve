@@ -20,8 +20,8 @@
 //! - **New (`gen_ai_*`)** — emitted since PR #11626 ("refactor llm attribute trace"). Tokens, cost,
 //!   model, user, session id all use the OTEL Gen-AI spec names: `gen_ai_usage_input_tokens`,
 //!   `gen_ai_response_model`, `user.id`, `gen_ai_conversation_id`, etc. Ingestion flattens every
-//!   attribute key with `flatten::format_key` (dot → underscore), so the spec's `user.id` is
-//!   stored — and must be queried — as the `user_id` column.
+//!   attribute key with `flatten::format_key` (dot → underscore), so the spec's `user.id` is stored
+//!   — and must be queried — as the `user_id` column.
 //! - **Legacy (`_o2_llm`)** — pre-PR #11626. Tokens live under
 //!   `llm_usage_tokens_{input,output,total}`, cost under `llm_usage_cost_total`, model under
 //!   `llm_model_name`, and user/session ids under `llm_user_id`/`llm_session_id`.
