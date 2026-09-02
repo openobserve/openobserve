@@ -26,7 +26,12 @@ function run(changedFiles, { base = BASE, env = {} } = {}) {
     fs.writeFileSync(tmp, changedFiles.join("\n") + "\n");
     args.push("--select-for-changes", tmp);
   }
-  const out = execFileSync("node", args, { encoding: "utf8", env: { ...process.env, ...env } });
+  // Pin the event so the suite passes wherever it runs (generate_matrix also runs on
+  // merge_group, where the script's pull_request-only guard would otherwise fail 17 tests).
+  const out = execFileSync("node", args, {
+    encoding: "utf8",
+    env: { ...process.env, GITHUB_EVENT_NAME: "pull_request", ...env },
+  });
   return JSON.parse(out).include.map((s) => s.testfolder);
 }
 
