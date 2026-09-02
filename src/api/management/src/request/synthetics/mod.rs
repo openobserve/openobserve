@@ -1922,6 +1922,7 @@ mod tests {
             consecutive_failures: 0,
             failing_locations: Vec::new(),
             passing_locations: Vec::new(),
+            failing_environments: Vec::new(),
             usage_events,
             pool_adjustment: None,
         }
