@@ -23,10 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      just the URL, no header; the server's OAuth discovery drives the login.
      Enterprise/Cloud only: the discovery endpoints are compiled out of the OSS
      build (they 404), so the tab is hidden there and token mode is the default.
-   • Access token — Basic auth. A one-click "Generate" creates a read-only
-     service account and injects its show-once token into every snippet; until
-     then the snippets carry an inert placeholder. The credential MUST be a user
-     or service account — the org ingestion token (`o2oi_`) that fills
+   • Access token — Basic auth from a service account: pick one you are already
+     permitted to see and its token is read back in full, or "Generate" creates
+     a read-only account and selects it. The credential MUST be a user or
+     service account — the org ingestion token (`o2oi_`) that fills
      [BASIC_PASSCODE] elsewhere in Ingestion is scoped to ingestion routes and
      is rejected on /mcp, so it is never used here.
 
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   the OAuth (auth=null → no header) and token variants can never drift.
 -->
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -48,6 +48,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 const props = defineProps<{
   subs: CardSubstitutions;
@@ -57,7 +58,17 @@ const props = defineProps<{
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
-const { generate, generating, error: genError, credential, canGenerate } = useMcpCredential();
+const {
+  generate,
+  generating,
+  error: genError,
+  credential,
+  canGenerate,
+  accounts,
+  loadingAccounts,
+  loadAccounts,
+  selectAccount,
+} = useMcpCredential();
 
 const endpoint = computed(() => `${props.subs.url}/api/${props.subs.org}/mcp`);
 
@@ -283,7 +294,28 @@ const openDeepLink = () => {
   }
 };
 
-const onGenerate = () => generate();
+const selectedAccount = ref<string | null>(null);
+const accountOptions = computed(() =>
+  accounts.value.map((a) => ({ label: a.label, value: a.email })),
+);
+
+const onSelectAccount = async (email: string | null) => {
+  selectedAccount.value = email;
+  if (email) await selectAccount(email);
+  else credential.value = null;
+};
+
+const onGenerate = async () => {
+  const created = await generate();
+  if (created) selectedAccount.value = created.email;
+};
+
+// The list is only needed once token mode is actually on screen.
+const ensureAccountsLoaded = () => {
+  if (authMode.value === "token") loadAccounts();
+};
+onMounted(ensureAccountsLoaded);
+watch(authMode, ensureAccountsLoaded);
 
 const downloadCredential = () => {
   if (!credentialHeader.value) return;
@@ -360,50 +392,65 @@ const openDocs = () => {
       class="rounded-surface border-border-default bg-surface-panel flex flex-col gap-3 border p-3"
       data-test="ai-integrations-mcp-credential"
     >
-      <!-- Before generation: quick-start note + generate button -->
-      <template v-if="!credential">
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex flex-col gap-1">
-            <div class="font-semibold">
-              {{ t("ingestion.mcp.credential.quickStartTitle") }}
-            </div>
-            <p class="text-text-secondary">
-              {{ t("ingestion.mcp.credential.quickStartBody") }}
-            </p>
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex flex-col gap-1">
+          <div class="font-semibold">
+            {{ t("ingestion.mcp.credential.quickStartTitle") }}
           </div>
-          <OButton
-            v-if="canGenerate()"
-            variant="primary"
-            size="sm-action"
-            :loading="generating"
-            data-test="ai-integrations-mcp-generate-btn"
-            @click="onGenerate"
-          >
-            {{ t("ingestion.mcp.credential.generate") }}
-          </OButton>
+          <p class="text-text-secondary">
+            {{ t("ingestion.mcp.credential.quickStartBody") }}
+          </p>
         </div>
-        <p
-          v-if="!canGenerate()"
-          class="text-text-secondary"
-          data-test="ai-integrations-mcp-credential-unavailable"
+        <OButton
+          v-if="canGenerate()"
+          variant="primary"
+          size="sm-action"
+          :loading="generating"
+          data-test="ai-integrations-mcp-generate-btn"
+          @click="onGenerate"
         >
-          {{ t("ingestion.mcp.credential.unavailable") }}
-        </p>
-        <p v-if="genError" class="text-error" data-test="ai-integrations-mcp-credential-error">
-          {{ genError }}
-        </p>
-      </template>
+          {{ t("ingestion.mcp.credential.generate") }}
+        </OButton>
+      </div>
 
-      <!-- After generation: show-once reveal + manage -->
-      <template v-else>
+      <OSelect
+        v-if="canGenerate() && accounts.length"
+        :model-value="selectedAccount"
+        :options="accountOptions"
+        :label="t('ingestion.mcp.credential.accountLabel')"
+        :placeholder="t('ingestion.mcp.credential.accountPlaceholder')"
+        :loading="loadingAccounts"
+        searchable
+        clearable
+        size="sm"
+        data-test="ai-integrations-mcp-account-select"
+        @update:model-value="onSelectAccount($event as string | null)"
+      />
+
+      <p
+        v-if="!canGenerate()"
+        class="text-text-secondary"
+        data-test="ai-integrations-mcp-credential-unavailable"
+      >
+        {{ t("ingestion.mcp.credential.unavailable") }}
+      </p>
+      <p v-if="genError" class="text-error" data-test="ai-integrations-mcp-credential-error">
+        {{ genError }}
+      </p>
+
+      <template v-if="credential">
         <div class="flex items-center gap-2">
           <OIcon name="check-circle" size="sm" class="text-success" />
           <span class="font-semibold">
-            {{ t("ingestion.mcp.credential.created") }}
+            {{
+              credential.source === "generated"
+                ? t("ingestion.mcp.credential.created")
+                : t("ingestion.mcp.credential.selected")
+            }}
           </span>
         </div>
         <p class="text-text-secondary">
-          {{ t("ingestion.mcp.credential.shownOnce", { email: credential.email }) }}
+          {{ t("ingestion.mcp.credential.inUse", { email: credential.email }) }}
         </p>
         <CopyContent :content="raw(credentialHeader)" />
         <div class="flex gap-2">
@@ -427,7 +474,7 @@ const openDocs = () => {
           </OButton>
         </div>
         <p
-          v-if="!credential.readonlyApplied"
+          v-if="credential.source === 'generated' && !credential.readonlyApplied"
           class="text-warning"
           data-test="ai-integrations-mcp-readonly-warn"
         >

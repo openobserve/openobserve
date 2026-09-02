@@ -37,6 +37,20 @@ use crate::{
     service::users,
 };
 
+// True when the handler must verify the caller's role itself: non-enterprise has
+// no RBAC middleware, and enterprise without OpenFGA runs it as a no-op. With
+// OpenFGA on, the middleware already authorized the call before we got here.
+fn needs_explicit_role_check() -> bool {
+    #[cfg(not(feature = "enterprise"))]
+    {
+        true
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        !o2_openfga::config::get_config().enabled
+    }
+}
+
 /// ListServiceAccounts
 
 #[utoipa::path(
@@ -106,6 +120,95 @@ pub async fn list(Path(org_id): Path<String>, Headers(user_email): Headers<UserE
     {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+/// GetServiceAccountPasscode
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/service_accounts/{email_id}/passcode",
+    context_path = "/api",
+    tag = "ServiceAccounts",
+    operation_id = "ServiceAccountGetPasscode",
+    summary = "Get service account token",
+    description = "Returns the service account's API token in full, so an already-issued credential can be \
+                   re-read instead of rotated. The list endpoint redacts the token, and rotation invalidates \
+                   the previous one — this is the read path for setup screens that must show the same \
+                   credential every visit. Accounts with 'allow_static_token' disabled return NOT_AVAILABLE.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("email_id" = String, Path, description = "Service Account email id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = APIToken),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Service Accounts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn get_passcode(
+    Path((org_id, email_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    let config = config::get_config();
+    if !config.auth.service_account_enabled {
+        return MetaHttpResponse::forbidden("Service Accounts Not Enabled");
+    }
+
+    let email_id = email_id.trim().to_string();
+
+    // Reading a system account's static token would hand out a credential the
+    // operator can neither scope nor rotate through this API.
+    if openobserve_core::organization::is_system_service_account(&email_id) {
+        return MetaHttpResponse::forbidden("System service accounts cannot be read");
+    }
+
+    // `get_service_account_passcode` resolves any user record, so without this
+    // the route would disclose a regular user's ingestion token.
+    match db::org_users::get(&org_id, &email_id).await {
+        Ok(user_record) if user_record.role.is_service_account() => {
+            if user_record.role == UserRole::SreAgent {
+                return MetaHttpResponse::forbidden("System service accounts cannot be read");
+            }
+        }
+        Ok(_) => return MetaHttpResponse::forbidden("Not a service account"),
+        Err(_) => return MetaHttpResponse::not_found("Service account not found"),
+    }
+
+    if needs_explicit_role_check() {
+        match users::get_user(Some(&org_id), &user_email.user_id).await {
+            Some(initiator)
+                if initiator.role == UserRole::Admin || initiator.role == UserRole::Root => {}
+            _ => {
+                return MetaHttpResponse::forbidden(
+                    "Admin or Root role required to read service account tokens",
+                );
+            }
+        }
+    }
+
+    match openobserve_core::organization::get_service_account_passcode(Some(&org_id), &email_id)
+        .await
+    {
+        Ok(passcode) => (
+            StatusCode::OK,
+            Json(APIToken {
+                token: passcode.passcode,
+                user: passcode.user,
+            }),
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::NOT_FOUND,
+            Json(MetaHttpResponse::error(StatusCode::NOT_FOUND, e)),
+        )
+            .into_response(),
     }
 }
 
@@ -233,19 +336,7 @@ pub async fn update(
     };
 
     if rotate_token {
-        // Non-enterprise: no RBAC middleware, so enforce Admin/Root role explicitly here.
-        // Enterprise without OpenFGA: same — middleware is a no-op, so enforce here.
-        // Enterprise with OpenFGA enabled: RBAC middleware already verified the caller has
-        // permission before the handler was invoked, so no additional check is needed.
-        #[cfg(not(feature = "enterprise"))]
-        let needs_role_check = true;
-        #[cfg(feature = "enterprise")]
-        let needs_role_check = {
-            use o2_openfga::config::get_config as get_openfga_config;
-            !get_openfga_config().enabled
-        };
-
-        if needs_role_check {
+        if needs_explicit_role_check() {
             match users::get_user(Some(&org_id), &user_email.user_id).await {
                 Some(initiator)
                     if initiator.role == UserRole::Admin || initiator.role == UserRole::Root => {}

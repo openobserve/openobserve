@@ -31,6 +31,11 @@ const service_accounts = {
   bulkDelete: (org_identifier: string, data: any) => {
     return http().delete(`/api/${org_identifier}/service_accounts/bulk`, { data });
   },
+  // The list endpoint redacts tokens; this returns one in full so an issued
+  // credential can be re-read instead of rotated.
+  get_passcode: (org_identifier: string, user_email: string) => {
+    return http().get(`/api/${org_identifier}/service_accounts/${user_email}/passcode`);
+  },
   refresh_token: (org_identifier: string, user_email: string) => {
     return http().put(`/api/${org_identifier}/service_accounts/${user_email}?rotateToken=true`, {});
   },

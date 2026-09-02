@@ -1,13 +1,23 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { mount, VueWrapper } from "@vue/test-utils";
-import { describe, expect, it, afterEach, vi } from "vitest";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
+import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
 import { createStore } from "vuex";
 
 // Non-enterprise: OAuth discovery is compiled out, so token mode is the default and
 // the snippets under test are the Basic-auth ones.
 vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "false", isCloud: "false" },
+}));
+
+const listMock = vi.fn();
+const getPasscodeMock = vi.fn();
+vi.mock("@/services/service_accounts", () => ({
+  default: {
+    list: (...args: unknown[]) => listMock(...args),
+    get_passcode: (...args: unknown[]) => getPasscodeMock(...args),
+    create: vi.fn(),
+  },
 }));
 
 import McpServerCard from "./McpServerCard.vue";
@@ -38,6 +48,11 @@ describe("McpServerCard", () => {
     });
 
   const snippets = () => wrapper.findAll('[data-test="copy-stub"]').map((c) => c.text());
+
+  beforeEach(() => {
+    listMock.mockResolvedValue({ data: { data: [] } });
+    getPasscodeMock.mockResolvedValue({ data: {} });
+  });
 
   afterEach(() => {
     wrapper?.unmount();
@@ -71,5 +86,52 @@ describe("McpServerCard", () => {
     expect(wrapper.find('[data-test="ai-integrations-mcp-credential-unavailable"]').exists()).toBe(
       true,
     );
+    expect(listMock).not.toHaveBeenCalled();
+  });
+
+  it("offers the service accounts the caller is permitted to see", async () => {
+    listMock.mockResolvedValue({
+      data: { data: [{ email: "mcp.default@sa.internal", first_name: "MCP client" }] },
+    });
+    wrapper = mountCard();
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-integrations-mcp-account-select"]').exists()).toBe(true);
+  });
+
+  it("fills every snippet with the selected account's token", async () => {
+    listMock.mockResolvedValue({
+      data: { data: [{ email: "mcp.default@sa.internal", first_name: "MCP client" }] },
+    });
+    getPasscodeMock.mockResolvedValue({
+      data: { user: "mcp.default@sa.internal", token: "sa-secret" },
+    });
+    wrapper = mountCard();
+    await flushPromises();
+
+    await (wrapper.vm as any).onSelectAccount("mcp.default@sa.internal");
+    await flushPromises();
+
+    const expected = `Basic ${btoa("mcp.default@sa.internal:sa-secret")}`;
+    const snippet = snippets().find((c) => c.includes("claude mcp add"));
+    expect(snippet).toContain(expected);
+    expect(wrapper.text()).not.toContain("BASE64_OF_EMAIL");
+  });
+
+  // An account with allow_static_token off returns NOT_AVAILABLE, not a token.
+  it("refuses a masked token instead of pasting it into a snippet", async () => {
+    listMock.mockResolvedValue({
+      data: { data: [{ email: "mcp.default@sa.internal", first_name: "MCP client" }] },
+    });
+    getPasscodeMock.mockResolvedValue({
+      data: { user: "mcp.default@sa.internal", token: "NOT_AVAILABLE" },
+    });
+    wrapper = mountCard();
+    await flushPromises();
+
+    await (wrapper.vm as any).onSelectAccount("mcp.default@sa.internal");
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain("NOT_AVAILABLE");
+    expect(wrapper.find('[data-test="ai-integrations-mcp-credential-error"]').exists()).toBe(true);
   });
 });

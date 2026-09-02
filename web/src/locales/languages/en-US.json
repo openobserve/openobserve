@@ -3597,16 +3597,20 @@
         "oauthNote": "No credential to manage: your MCP client opens a browser to sign in, and access is scoped by your existing permissions. Use it whenever your client supports OAuth."
       },
       "credential": {
-        "quickStartTitle": "Generate a credential",
-        "quickStartBody": "The snippets below carry a placeholder until you generate one. MCP needs a user or service account credential — the org ingestion token used elsewhere in Ingestion is accepted on ingestion routes only and is rejected here.",
-        "unavailable": "Service accounts are disabled for this deployment, so no credential can be generated here. Enable them, or Base64-encode \"email:password\" for an existing account and use that as the Basic value.",
+        "quickStartTitle": "Choose a credential",
+        "quickStartBody": "Pick a service account below to fill the snippets with its credential, or generate a new read-only one. MCP needs a user or service account — the org ingestion token used elsewhere in Ingestion is accepted on ingestion routes only and is rejected here.",
+        "unavailable": "Service accounts are disabled for this deployment, so no credential can be selected or generated here. Enable them, or Base64-encode \"email:password\" for an existing account and use that as the Basic value.",
         "generate": "Generate read-only credential",
         "created": "Read-only credential created",
-        "shownOnce": "For {email}. Copy it now — the token is shown only once and the snippets below now use it.",
         "download": "Download",
         "manage": "Manage / revoke",
         "readonlyWarn": "The account was created but the read-only role couldn't be applied automatically — review its permissions in Service Accounts.",
-        "error": "Couldn't create the credential. Try again, or create a service account manually in IAM."
+        "error": "Couldn't create the credential. Try again, or create a service account manually in IAM.",
+        "accountLabel": "Service account",
+        "accountPlaceholder": "Select a service account",
+        "selected": "Using an existing service account",
+        "inUse": "For {email}. The snippets below use this credential.",
+        "tokenUnavailable": "This account's token can't be read — static token use is disabled for it. Pick another account or generate a new credential."
       },
       "securityTitle": "Use a dedicated, least-privilege credential",
       "securityBody": "Generate a read-only credential above (or create a scoped service account in IAM) rather than reusing a personal login, and never commit tokens to source control.",

@@ -187,6 +187,7 @@ use crate::{
         ratelimit::list_role_ratelimit,
         ratelimit::update_ratelimit,
         service_accounts::list,
+        service_accounts::get_passcode,
         service_accounts::save,
         service_accounts::update,
         service_accounts::delete,
