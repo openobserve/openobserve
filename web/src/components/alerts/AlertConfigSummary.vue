@@ -85,6 +85,22 @@ const aggregation = computed(() => queryCondition.value?.aggregation);
 
 const isBlank = (v: any) => v === undefined || v === null || v === "";
 
+/** Renders a minutes-granularity duration with its unit — minutes normally,
+ *  hours when the value is a whole multiple of 60. `period` / `frequency` /
+ *  `silence` / the pending-period-in-minutes are all whole minutes on the
+ *  wire, so the sub-minute branch never actually fires today; it stays for
+ *  correctness if that ever changes, rather than silently dropping to "0 min". */
+const formatMinutesDuration = (minutes: number | null | undefined): string => {
+  if (minutes == null || Number.isNaN(minutes)) return EMPTY;
+  if (minutes > 0 && minutes < 1) {
+    return t("common.secShort", { count: Math.round(minutes * 60) });
+  }
+  if (minutes >= 60 && minutes % 60 === 0) {
+    return t("common.hrShort", { count: minutes / 60 });
+  }
+  return t("common.minShort", { count: minutes });
+};
+
 const conditionText = computed(() => {
   const qc = queryCondition.value;
   // PromQL keeps its threshold on promql_condition (the expression itself is the
@@ -270,18 +286,26 @@ const sections = computed(() => [
             {
               key: "period",
               label: t("alerts.period"),
-              value: props.alert?.trigger_condition?.period ?? EMPTY,
+              value: formatMinutesDuration(props.alert?.trigger_condition?.period),
             },
           ]),
       {
         key: "frequency",
         label: t("alerts.frequency"),
-        value: props.alert?.trigger_condition?.frequency ?? EMPTY,
+        value: formatMinutesDuration(props.alert?.trigger_condition?.frequency),
       },
       {
         key: "silence",
         label: t("alerts.silence"),
-        value: props.alert?.trigger_condition?.silence ?? EMPTY,
+        value: formatMinutesDuration(props.alert?.trigger_condition?.silence),
+      },
+      {
+        key: "pending-period",
+        label: t("alerts.queryConfig.pendingPeriod"),
+        // Seconds on the alert, minutes everywhere else in this summary.
+        value: formatMinutesDuration(
+          props.alert?.pending_period_sec != null ? props.alert.pending_period_sec / 60 : null,
+        ),
       },
       {
         key: "destinations",

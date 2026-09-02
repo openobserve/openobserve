@@ -155,6 +155,11 @@ export const defaultAlertValue: any = () => {
       frequency_type: "minutes",
       timezone: "UTC",
     },
+    // Minutes while the form is open — the CANONICAL stored value (mirrors
+    // trigger_condition.frequency); `_ui.pendingPeriod` is the DISPLAY value,
+    // which may be in hours. getAlertPayload converts to seconds on save.
+    // 0 = fire immediately.
+    pending_period_sec: 0,
     destinations: [],
     // Enterprise-only: workflows linked to this alert (run when it fires).
     workflows: [],
@@ -285,12 +290,29 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     };
   };
 
+  /** Split the alert's STORED pending period (always MINUTES, mirroring
+   *  `frequencyDisplay`) into the display unit + the number the user actually
+   *  sees. AlertSettings.vue derives its own initial unit the same way — see
+   *  its `initialPendingPeriodMode`, kept in sync by rule, not shared code
+   *  (matching how `frequencyMode` and this helper stay independent). */
+  const pendingPeriodDisplay = (obj: any): { mode: "minutes" | "hours"; value: number } => {
+    const mins = Number(obj?.pending_period_sec ?? 0);
+    const isHours = mins >= 60 && mins % 60 === 0;
+    return {
+      mode: isHours ? "hours" : "minutes",
+      value: isHours ? mins / 60 : mins,
+    };
+  };
+
   const buildDefaultForm = (): any => {
     const base = defaultAlertValue();
     return {
       ...base,
       logGroupBy: [] as string[],
-      _ui: { checkEvery: frequencyDisplay(base).checkEvery },
+      _ui: {
+        checkEvery: frequencyDisplay(base).checkEvery,
+        pendingPeriod: pendingPeriodDisplay(base).value,
+      },
       _meta: defaultAddAlertMeta({
         frequencyMode: frequencyDisplay(base).mode,
         minAutoRefreshInterval: minAutoRefreshInterval(),
@@ -311,7 +333,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return {
       ...obj,
       logGroupBy: groupBy,
-      _ui: obj?._ui ?? { checkEvery: freq.checkEvery },
+      _ui: obj?._ui ?? {
+        checkEvery: freq.checkEvery,
+        pendingPeriod: pendingPeriodDisplay(obj).value,
+      },
       _meta:
         obj?._meta ??
         defaultAddAlertMeta({
@@ -1042,6 +1067,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         trigger_condition: {
           silence: Number(source.trigger_condition?.silence ?? 0),
         },
+        // Stored and evaluated for composite alerts server-side (see
+        // handle_composite_alert_trigger). Note the detail GET response
+        // doesn't return it yet on edit — see the fallback comment on the
+        // edit-prefill conversion above.
+        pending_period_sec: Math.round((Number(source.pending_period_sec) || 0) * 60),
         owner: source.owner || undefined,
         creates_incident: source.creates_incident ?? false,
         workflows: source.workflows ?? [],
@@ -2289,6 +2319,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // silently wipe existing links. Must run AFTER the swap above, which
       // replaces every key on `data`.
       if (!Array.isArray(data.workflows)) data.workflows = [];
+      // BE stores seconds; the form field displays minutes (mirrors the
+      // frequency field's display unit). Falls back to 0 for any alert type
+      // where the field is absent from the GET response (older cached
+      // response shape, etc.) rather than showing NaN.
+      data.pending_period_sec = Math.round((Number(data.pending_period_sec) || 0) / 60);
       isAggregationEnabled.value = !!data.query_condition?.aggregation;
 
       if (data.query_condition?.promql_condition) {
@@ -2614,6 +2649,18 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           if ((newVal as any).destinationsFieldRef) {
             focusManager.registerField("destinations", {
               ref: (newVal as any).destinationsFieldRef,
+              onBeforeFocus: () => {
+                if (isAnomalyMode.value) {
+                  activeTab.value = "anomaly-alerting";
+                } else {
+                  activeTab.value = "condition";
+                }
+              },
+            });
+          }
+          if ((newVal as any).pendingPeriodFieldRef) {
+            focusManager.registerField("pending_period", {
+              ref: (newVal as any).pendingPeriodFieldRef,
               onBeforeFocus: () => {
                 if (isAnomalyMode.value) {
                   activeTab.value = "anomaly-alerting";

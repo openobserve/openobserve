@@ -41,6 +41,9 @@ export interface Alert {
     threshold: number;
     silence: number;
   };
+  /** Seconds. A condition must hold continuously this long before the alert
+   *  transitions from `pending` to `firing`. 0 = fire immediately (default). */
+  pending_period_sec: number;
   is_real_time: boolean;
   enabled: boolean;
   context_attributes: { [key: string]: string };
