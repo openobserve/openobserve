@@ -21,12 +21,28 @@
             ? t("aiObservability.playground.variablesCount", { count: varNames.length })
             : t("aiObservability.playground.variables")
         }}
+        <!-- A value can sit here (e.g. just sampled) with no message
+             referencing it yet — the toast on sample says so once; this dot
+             is what still says so on the next glance, without opening the
+             dropdown to find out. -->
+        <span
+          v-if="unusedWithValue.length"
+          class="bg-accent ml-1 inline-block size-1.5 rounded-full"
+          data-test="ai-playground-variables-unused-dot"
+        />
       </OButton>
     </template>
 
     <div class="flex w-96 flex-col gap-2 p-2">
       <p v-if="!varNames.length" class="text-text-secondary m-0 text-xs leading-relaxed">
         {{ t("aiObservability.playground.noVariables", { token: variableToken }) }}
+      </p>
+      <p
+        v-else-if="unusedWithValue.length"
+        class="text-accent bg-accent/8 rounded-default m-0 px-2 py-1.5 text-xs leading-relaxed"
+        data-test="ai-playground-var-unused-hint"
+      >
+        {{ t("aiObservability.playground.unusedSampledValue", { tokens: unusedTokensText }) }}
       </p>
 
       <div v-for="name in varNames" :key="name" class="flex flex-col gap-1">
@@ -155,6 +171,17 @@ const variableToken = raw("{{variables}}");
 const expectedToken = raw(`{{${EXPECTED_OUTPUT_TOKEN}}}`);
 
 const used = computed(() => props.used);
+
+/** Declared, has a real value, but no message references it yet — the state
+ *  a fresh sample leaves behind. Distinct from "declared, no value" (a
+ *  manually-added variable someone hasn't filled in), which has nothing
+ *  urgent to surface. */
+const unusedWithValue = computed(() =>
+  props.varNames.filter((name) => !used.value.includes(name) && (props.vars[name] ?? "").trim()),
+);
+const unusedTokensText = computed(() =>
+  unusedWithValue.value.map((name) => tokenFor(name)).join(", "),
+);
 
 /** A token is `{{name}}`, so anything that would not survive the braces is not
  *  a name. Trimmed to the identifier characters rather than rejected, so a

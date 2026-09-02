@@ -237,13 +237,34 @@
               v-if="row.highDispersion"
               size="sm"
               variant="warning"
-              :label="`${t('aiObservability.experiments.detail.highDispersionBadge')} · ${raw(row.dispersionLabel)}`"
+              :label="
+                raw(`${t('aiObservability.experiments.detail.highDispersionBadge')} · ${row.dispersionLabel}`)
+              "
             />
             <span v-else class="text-text-secondary">{{ raw(row.dispersionLabel) }}</span>
           </template>
 
           <template #cell-latency="{ row }: { row: any }">
             <span class="text-text-secondary">{{ raw(row.latency) }}</span>
+          </template>
+
+          <!-- Only boolean scores with a configured healthy value ever set
+               row.violations[id] — everything else (numeric, categorical, or
+               a boolean with no healthy value set yet) renders exactly as
+               before: plain text, no false "everything is fine" green. -->
+          <template
+            v-for="id in scorerIds"
+            :key="id"
+            #[`cell-score:${id}`]="{ row }: { row: any }"
+          >
+            <OTag
+              v-if="row.violations[id]"
+              size="sm"
+              variant="error"
+              :label="raw(row[`score:${id}`])"
+              :data-test="`ai-experiment-score-violation-${row.rowKey}-${id}`"
+            />
+            <span v-else class="text-text-secondary">{{ raw(row[`score:${id}`]) }}</span>
           </template>
 
           <template #empty>
@@ -297,6 +318,8 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import onlineEvalsService, { type ScoreConfig } from "@/services/online-evals.service";
+import { healthyBooleanValue } from "@/enterprise/components/onlineEvals/utils/qualitySummary";
 import llmExperimentsService, {
   type ExperimentDetail,
   type ExperimentExecution,
@@ -354,6 +377,38 @@ const isMultiTrial = computed(() => (detail.value?.experiment.trialCount ?? 1) >
  *  two score columns exactly like the dataset grouping on the list page. */
 const scorerIds = computed(() => (detail.value?.preview.pinnedScorers ?? []).map((s) => s.id));
 
+// Fetched once per org, not re-fetched on every refresh() — Score Configs
+// change far less often than an Experiment's results.
+const scoreConfigs = ref<ScoreConfig[]>([]);
+async function loadScoreConfigs() {
+  if (!orgId.value) return;
+  try {
+    scoreConfigs.value = await onlineEvalsService.scoreConfigs.list(orgId.value);
+  } catch {
+    // Non-fatal: without configs, boolean cells just render unhighlighted —
+    // same as before this feature existed.
+    scoreConfigs.value = [];
+  }
+}
+
+/** scorerId -> the healthy boolean for its produced Score Config, when that
+ *  config is boolean-typed and has one configured. `undefined` means "don't
+ *  know" (non-boolean, no config found, or no healthy value set) — the cell
+ *  renders plain in that case rather than guessing. */
+const scorerHealthyBoolean = computed<Record<string, boolean | undefined>>(() => {
+  const map: Record<string, boolean | undefined> = {};
+  for (const summary of detail.value?.results.scoreSummaries ?? []) {
+    if (!summary.scoreConfigId) continue;
+    const config = scoreConfigs.value.find(
+      (c) => c.entityId === summary.scoreConfigId || c.id === summary.scoreConfigId,
+    );
+    if (!config) continue;
+    const healthy = healthyBooleanValue(config);
+    if (healthy !== null) map[summary.scorerId] = healthy;
+  }
+  return map;
+});
+
 /** Score summaries carry the pinned Score Config name even before the first
  *  Score exists. Completed Score records remain a compatibility fallback. */
 const scorerNames = computed<Record<string, string>>(() => {
@@ -376,14 +431,28 @@ const scorerNames = computed<Record<string, string>>(() => {
 const tableRows = computed(() =>
   resultRows.value.map((row) => {
     const scores: Record<string, string> = {};
+    // Which score columns are a violated boolean policy on THIS row — set
+    // only when the config's healthy value is known and this row disagrees
+    // with it, so a normal (non-boolean, or unconfigured) score never lights
+    // up red by accident.
+    const violations: Record<string, boolean> = {};
     for (const id of scorerIds.value) {
       const summary = row.scoreSummaries.find((candidate) => candidate.scorerId === id);
       scores[`score:${id}`] = experimentScoreSummaryValue(summary?.value ?? null);
+      const healthy = scorerHealthyBoolean.value[id];
+      const aggregate = summary?.value as Record<string, unknown> | null | undefined;
+      if (healthy !== undefined && aggregate?.kind === "boolean") {
+        const trueCount = Number(aggregate.trueCount ?? aggregate.true_count ?? 0);
+        const falseCount = Number(aggregate.falseCount ?? aggregate.false_count ?? 0);
+        const unhealthyCount = healthy ? falseCount : trueCount;
+        if (unhealthyCount > 0) violations[id] = true;
+      }
     }
     const maxDispersion = row.dispersion?.maxNormalized ?? null;
     return {
       ...row,
       ...scores,
+      violations,
       rowKey: row.rowId,
       input: row.input ?? "—",
       output: row.output ?? "—",
@@ -426,6 +495,8 @@ const visibleRows = computed(() => {
   });
 });
 
+// Run-level: a page-local count would show or hide the action depending on
+// which page happened to be loaded.
 const failedSlotCount = computed(
   () => detail.value?.results.aggregateSummary?.incompleteTaskSlots ?? 0,
 );
@@ -821,4 +892,5 @@ async function runAction(
 
 watch([orgId, experimentId], refresh, { immediate: true });
 watch([sortByDispersion, highDispersionOnly], refreshRows);
+watch(orgId, loadScoreConfigs, { immediate: true });
 </script>

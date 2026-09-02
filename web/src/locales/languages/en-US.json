@@ -11006,7 +11006,8 @@
         "statusFilter": "Status",
         "statusFilterAll": "All Statuses",
         "sortByDispersion": "Sort by dispersion",
-        "highDispersionBadge": "High"
+        "highDispersionBadge": "High",
+        "trialNumber": "Trial {n}"
       },
       "rowDetail": {
         "fallbackTitle": "Experiment Row",
@@ -11651,7 +11652,6 @@
       "title": "Playground",
       "runAll": "Run All",
       "runAllTooltip": "Run every variant",
-      "stop": "Stop",
       "recentDrafts": "Recent Drafts",
       "recentDraftsSection": "This browser · last 10",
       "draftVersus": "vs",
@@ -11660,6 +11660,7 @@
       "fromExperiment": "Cloned from experiment {name}",
       "variables": "Variables",
       "noVariables": "No {token} in the messages — add one to parameterize the input.",
+      "unusedSampledValue": "Not yet referenced in a message: {tokens}. Type it into a message to use it.",
       "variablePlaceholder": "Value for {name}",
       "addExpected": "+ Expected Output",
       "expectedLabel": "Expected",
@@ -11733,6 +11734,7 @@
       "sampleDatasetPlaceholder": "Select a dataset",
       "sampleSubmit": "Sample",
       "sampleLoadError": "Could not load rows from that dataset.",
+      "sampleApplied": "Loaded sample {index} of {total} — reference it with {token} in a message.",
       "sampleEmpty": "This dataset has no items yet.",
       "noProviderTitle": "The Playground needs an LLM provider",
       "noProviderBody": "Connect a provider to run prompts. It takes about a minute.",
@@ -12089,7 +12091,7 @@
       "nameLabel": "Name",
       "typeLabel": "Provider type",
       "endpointLabel": "Endpoint",
-      "endpointPlaceholder": "Optional custom endpoint",
+      "endpointPlaceholder": "Full completions URL, e.g. https://your-host/v1/chat/completions",
       "defaultModelLabel": "Default model",
       "availableModelsLabel": "Available models",
       "apiKeyLabel": "API Key",

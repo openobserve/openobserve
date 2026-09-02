@@ -134,9 +134,7 @@ describe("PlaygroundOutputCell", () => {
       error: { message: "provider 429", retryable: true },
     });
 
-    expect(
-      wrapper.find('[data-test="ai-playground-output-error"]').attributes("data-content"),
-    ).toBe("provider 429");
+    expect(wrapper.find('[data-test="ai-playground-output-error"]').text()).toBe("provider 429");
     await wrapper.find('[data-test="ai-playground-output-retry"]').trigger("click");
     expect(wrapper.emitted("retry")).toHaveLength(1);
   });

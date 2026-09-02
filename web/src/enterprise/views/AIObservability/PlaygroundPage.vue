@@ -49,16 +49,6 @@
       </ODropdown>
 
       <OButton
-        v-if="running"
-        variant="outline"
-        size="sm-action"
-        icon-left="close"
-        data-test="ai-playground-stop-btn"
-        @click="stopAll"
-      >
-        {{ t("aiObservability.playground.stop") }}
-      </OButton>
-      <OButton
         variant="outline"
         size="sm-action"
         :disabled="running"
@@ -875,12 +865,27 @@ async function resetVariant(variantId: string) {
   seedDefaultProvider();
 }
 
-function applySample(sample: PlaygroundSample, item: LlmDatasetItem) {
+function applySample(sample: PlaygroundSample, item: LlmDatasetItem, notify = true) {
   draft.sample = sample;
   draft.vars = { ...draft.vars, input: item.inputPreview || item.input };
   draft.expectedSingle = item.expectedOutput;
   // New question ⇒ the answers on screen are answers to the old one.
   for (const key of Object.keys(results)) delete results[key];
+  // Sampling only ever fills a value — it never rewrites a message the user
+  // wrote — so without this, the value sits there with nothing telling the
+  // user it arrived or how to reach it. Only on the initial pick, though —
+  // stepSample() passes notify=false, since a toast on every Prev/Next click
+  // was noise once you're already stepping through rows you know are sampled.
+  if (notify) {
+    toast({
+      variant: "success",
+      message: t("aiObservability.playground.sampleApplied", {
+        index: sample.index + 1,
+        total: sample.total,
+        token: "{{input}}",
+      }),
+    });
+  }
 }
 
 /** Walk to a neighbouring dataset item without leaving the bench — this is what
@@ -898,7 +903,7 @@ async function stepSample(delta: number) {
     });
     const item = page.items[0];
     if (!item) return;
-    applySample({ ...sample, itemId: item.id, index, total: page.total }, item);
+    applySample({ ...sample, itemId: item.id, index, total: page.total }, item, false);
   } catch {
     toast({ variant: "error", message: t("aiObservability.playground.sampleLoadError") });
   } finally {
