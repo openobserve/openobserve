@@ -27,7 +27,7 @@
     <template v-else-if="cell.status === 'error'">
       <div
         role="alert"
-        class="bg-banner-error-bg text-banner-error-text rounded-default wrap-break-word p-2 text-sm whitespace-pre-wrap"
+        class="bg-banner-error-bg text-banner-error-text rounded-default p-2 text-sm wrap-break-word whitespace-pre-wrap"
         data-test="ai-playground-output-error"
       >
         {{ raw(cell.error?.message) }}
