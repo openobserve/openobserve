@@ -475,7 +475,10 @@ const readOrg = ref<string>(store.state.selectedOrganization?.identifier ?? "");
 const readFolder = ref<string | undefined>(undefined);
 
 const slosList = useQuery(() =>
-  Object.assign(slosQuery(readOrg.value, readFolder.value), { enabled: !!readOrg.value }),
+  // Held until the folder resolves: the reactive key would otherwise fetch an unscoped list first.
+  Object.assign(slosQuery(readOrg.value, readFolder.value), {
+    enabled: !!readOrg.value && readFolder.value !== undefined,
+  }),
 );
 
 // The list is the query, not a copy of it: a write that invalidates the SLO

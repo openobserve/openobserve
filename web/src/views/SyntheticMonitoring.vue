@@ -573,10 +573,12 @@ const orgIdentifier = computed<string>(
 );
 
 const readFolder = ref<string | undefined>(undefined);
+// Distinct from readFolder being undefined, which is the "All folders" scope.
+const folderResolved = ref(false);
 
 const monitorsList = useQuery(() =>
   Object.assign(syntheticsMonitorsQuery(orgIdentifier.value, readFolder.value), {
-    enabled: !!orgIdentifier.value,
+    enabled: !!orgIdentifier.value && folderResolved.value,
   }),
 );
 
@@ -608,6 +610,7 @@ async function loadMonitors(folderId?: string, force = false) {
         ? undefined
         : activeFolderId.value;
   readFolder.value = targetFolder;
+  folderResolved.value = true;
   // Let the key pick up the new folder before asking for the data.
   await nextTick();
   if (force) await monitorsList.refetch();

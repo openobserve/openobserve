@@ -275,7 +275,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { templatesQuery } from "@/services/alert_templates.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { templateKeys } from "@/services/alert_templates.querykeys";
-import { ref, onActivated, onMounted, watch, defineAsyncComponent, computed } from "vue";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { ref, onActivated, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -315,7 +317,12 @@ const { t } = useI18nTyped();
 const router = useRouter();
 const { track } = useReo();
 const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
-const templates: Ref<Template[]> = ref([]);
+const orgIdForList = useOrgId();
+const templatesList = useQuery(() =>
+  Object.assign(templatesQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+);
+// The rows are the query, not a copy: only an observer applies `staleTime` and revalidates on mount.
+const templates = computed<Template[]>(() => (templatesList.data.value ?? []) as Template[]);
 const columns: OTableColumnDef[] = [
   {
     id: "name",
@@ -383,10 +390,6 @@ const isTemplateRowSelectable = (row: any) => !row?.isPrebuilt;
 onActivated(() => {
   if (!templates.value.length) updateRoute();
 });
-onMounted(() => {
-  getTemplates();
-});
-
 watch(
   () => router.currentRoute.value.query.action,
   (action) => {
@@ -397,71 +400,45 @@ watch(
   },
 );
 
-const loading = ref(false);
+const loading = templatesList.isPending;
 // Request in flight with rows still on screen — the refresh button's spinner.
 // `loading` is the skeleton, for a cold read only.
-const fetching = ref(false);
+const fetching = templatesList.isFetching;
 // Bound to refresh / post-write reloads: always reaches the server.
 const refreshTemplates = () => getTemplates(true);
 
-const getTemplates = (force = false) => {
-  const org = store.state.selectedOrganization.identifier;
-  // Only a cold read spins and toasts — the rows stay put on a refresh.
-  const warm = queryClient.getQueryData(templateKeys.list(org)) !== undefined;
-  const dismiss = warm
-    ? () => {}
-    : toast({
+const getTemplates = async (force = false) => {
+  if (!force) return;
+  // Rebuilding the graph costs three more list calls, so only a forced read pays for it.
+  invalidateDependencyGraphCache();
+  await templatesList.refetch();
+};
+
+let dismissLoading: (() => void) | null = null;
+watch(
+  loading,
+  (pending) => {
+    if (pending && !dismissLoading) {
+      dismissLoading = toast({
         variant: "loading",
         message: t("toastMessages.alerts.pleaseWaitWhileLoadingTemplates"),
         timeout: 0,
       });
+    } else if (!pending && dismissLoading) {
+      dismissLoading();
+      dismissLoading = null;
+    }
+  },
+  { immediate: true },
+);
 
-  const options = templatesQuery(org);
-  const applyRows = (list: any[]) => {
-    resultTotal.value = list.length;
-    templates.value = list;
-    updateRoute();
-  };
-  const cached = queryClient.getQueryData<any[]>(options.queryKey);
-  if (cached !== undefined) applyRows(cached);
-  loading.value = cached === undefined;
-  fetching.value = true;
-
-  // TODO: fold into `useQuery` when this list drops its imperative refresh.
-  if (force) {
-    void queryClient.invalidateQueries({
-      queryKey: options.queryKey,
-      exact: true,
-      refetchType: "none",
-    });
-  }
-  return queryClient
-    .fetchQuery(options)
-    .then((list: any[]) => {
-      applyRows(list);
-      // Kept out of `apply`, which runs again for the cached paint: rebuilding
-      // the graph is three more list calls. Only a forced read can have changed
-      // it — every add/edit/delete reloads with force — so a plain mount leaves
-      // the graph's own cache to answer, and the "Used by" counts still follow
-      // every write.
-      if (force) invalidateDependencyGraphCache();
-      loadDepGraph(org);
-    })
-    .catch((err) => {
-      dismiss();
-      if (err.response.status !== 403) {
-        toast({
-          variant: "error",
-          message: t("toastMessages.alerts.errorWhilePullingTemplates"),
-        });
-      }
-    })
-    .finally(() => {
-      dismiss();
-      loading.value = false;
-      fetching.value = false;
-    });
-};
+watch(templatesList.error, (err: any) => {
+  if (!err || err?.response?.status === 403) return;
+  toast({
+    variant: "error",
+    message: t("toastMessages.alerts.errorWhilePullingTemplates"),
+  });
+});
 // A delete is one row leaving a list the server has already confirmed. Splice it
 // out and prune the shared dependency graph rather than refetching: a refetch
 // blanks the table behind its spinner and a "please wait" toast, which reads as a
@@ -469,14 +446,10 @@ const getTemplates = (force = false) => {
 const dropTemplates = (names: string[]) => {
   if (!names.length) return;
   const gone = new Set(names);
-  templates.value = templates.value.filter((tpl: any) => !gone.has(tpl.name));
   // Anything that failed to delete stays selected, so a bulk retry is one click.
   selectedTemplates.value = selectedTemplates.value.filter((tpl: any) => !gone.has(tpl.name));
   const org = store.state.selectedOrganization.identifier;
-  // The rows above are a render of the cached list, not the cache itself — splice
-  // the names out of every cached module list too, or the row returns on the next
-  // visit inside staleTime (and, since this query persists, on a browser reload
-  // that hydrates from its localStorage copy).
+  // The rows render straight from the cache, so pruning it is what removes them.
   queryClient.setQueriesData({ queryKey: templateKeys.all(org) }, (list: any) =>
     Array.isArray(list) ? list.filter((tpl: any) => !gone.has(tpl.name)) : list,
   );
@@ -484,12 +457,9 @@ const dropTemplates = (names: string[]) => {
     depGraph.value = applyDependencyDeletion(org, depNodeId("template", name), depGraph.value);
 };
 
-// Deleting an alert or a destination in the impact dialog leaves this list's rows
-// untouched, so re-read the (already pruned) shared graph for the Used by counts
-// instead of reloading the page's data.
-const onDependencyDeleted = (kind: DepNodeKind) => {
-  if (kind === "template") getTemplates();
-  else loadDepGraph(store.state.selectedOrganization.identifier);
+// Both kinds need only the shared graph now: the rows re-render from the cache.
+const onDependencyDeleted = (_kind: DepNodeKind) => {
+  loadDepGraph(store.state.selectedOrganization.identifier);
 };
 const updateRoute = () => {
   if (router.currentRoute.value.query.action === "add") editTemplate();
@@ -655,6 +625,17 @@ const exportTemplate = (row: any) => {
   // Clean up the URL object after download
   URL.revokeObjectURL(url);
 };
+
+// Keyed on `dataUpdatedAt`: an unchanged refetch shares its object and would never wake a value watcher.
+watch(
+  () => templatesList.dataUpdatedAt.value,
+  () => {
+    if (!templatesList.data.value) return;
+    updateRoute();
+    loadDepGraph(orgIdForList.value);
+  },
+  { immediate: true },
+);
 
 const visibleRows = computed(() => {
   const base = templates.value || [];

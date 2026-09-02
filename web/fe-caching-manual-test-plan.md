@@ -2415,6 +2415,50 @@ analysis in Issue 26.
 for the wrong reason (e.g. the page never loaded). Confirm the query *has data in memory* first
 (`status: "success"`, group `zo1`), then assert no `o2q-` key mentions nodes. Both were true here.
 
+
+#### Re-verified after the Issue 26 fix — 2026-09-01
+
+Every row that Issue 26 had blocked now passes. Re-measured on `_meta` with the fix in place.
+
+| Check | Measured (post-fix) | Verdict |
+| --- | --- | --- |
+| C1 — cold read | Unchanged: on a cold URL load the fetch is still skipped and the page shows "No nodes available" until a Refresh. **Pre-existing, not this branch** — the one-shot `if (isMetaOrg.value) { getData(false); }` runs before the org store hydrates, byte-identical on `main:927`, with no retry watcher in either version | ⚠️ pre-existing |
+| C2 — warm revisit | **0 requests**, entry provably fresh (age 0.5 s). **1 row, `firstSample: 1`** — paints from cache on the first sampled frame, `everBlank: false` | ✅ |
+| C4 — Refresh button | **Exactly 1** request. Rows stay at 1, **0 visible skeletons** | ✅ |
+| C5 — `r` shortcut | Real keypress on `body` → **exactly 1** `GET /_meta/node/list` (200), rows stay | ✅ |
+| **Filter survives refresh** | Term `6ee6` preserved in the box, filtered rows **identical before and after** Refresh, **1** request | ✅ |
+| **Not persisted to disk** | **No `o2q-` key mentions nodes** — memory-only, as `common.queries.ts` declares | ✅ |
+
+**Filter caveat — the signal is weak on a one-node cluster.** With a single node, "1 of 1 row
+preserved" would also be true of a broken filter. What makes the row trustworthy is the
+surrounding cycle, which was measured: filter `6ee6` → **1 row**, filter `zzz_no_such_node` →
+**0 rows**, clear → **1 row**. That proves the filter genuinely applies and is genuinely restored.
+On a multi-node cluster this row should be re-checked with a term that matches a strict subset.
+
+**C3 was not re-run.** Waiting past the 5-minute `CONFIG_STALE_TIME` for a single background-refetch
+observation was not worth the wall-clock; C2 (cache-served, 0 requests) and C4 (forced refetch,
+1 request) together already exercise both sides of the freshness boundary.
+
+**Multi-node filtering is covered by spec, because nodes cannot be seeded.** `docker ps` shows a
+single container (`6ee6fb41b69a`) which *is* the one row in the UI — nodes are running processes
+that register with a cluster, not records, and this deployment has no cluster metadata store
+(no etcd/nats env, no compose file). Adding one means standing up another backend joined to a
+shared store, i.e. infrastructure surgery on a working instance. Instead, `Nodes.spec.ts` already
+exercises the filter against a **3-node fixture**, and all of it passes with the Issue 26 fix in
+place:
+
+| Spec test (3-node fixture) | Result |
+| --- | --- |
+| filter by search query — `"node-1"` → **1 of 3**, correct row | ✅ |
+| empty filter → back to **all 3** | ✅ |
+| filter by **region** / **node type** / **status** | ✅ ✅ ✅ |
+| `resultTotal` after filtering | ✅ |
+| `clearAll` resets and restores | ✅ |
+
+⚠️ **Residual gap:** neither leg proves *a multi-node filtered set survives a Refresh* — the live
+Refresh test had only one row, and the specs do not drive Refresh. Closing that needs a real
+multi-node cluster; it is the one check worth repeating if such an environment exists.
+
 ### 15.3 Cipher Keys
 
 **UI path:** Settings → **Cipher Keys**
@@ -2454,6 +2498,49 @@ for the wrong reason (e.g. the page never loaded). Confirm the query *has data i
 | **Key material never written to disk** | Local Storage has **no** `o2q-` entry containing cipher key material; IndexedDB likewise. This is an explicit design decision — verify it holds |
 | Open a key's detail, go back, reopen | ⚠️ **A request on every open is EXPECTED — not a bug.** `cipherKeyDetailQuery` is declared but unread (§24 item 8). Only the *list* is cached |
 | Create / delete a key | List updates without a manual refresh; deleted key stays gone |
+
+
+#### Measured results — 2026-09-01, `feat/fe-caching`, local dev
+
+**No defect found on this page.** The org had 0 cipher keys, so 25 were seeded first
+(`cachetest_ck_*`; key material generated in-page and deliberately never recorded).
+
+| # | Expect | Measured | Verdict |
+| --- | --- | --- | --- |
+| C1 | Skeleton then rows, **1** request | **Exactly 1** `GET /cipher_keys` (CDP-verified: the only app request besides `config`, `announcements`, `organizations`) | ✅ |
+| C2 | Instant rows, no skeleton, **0** requests | **0 requests**, entry provably fresh (age 0.6 s, `staleTime` 5 min). 20 rows, **`firstSample: 20`**, `everBlank: false` | ✅ |
+| C3 | Instant rows, then **1** background request, never blanks | Waited the full **5 min 10 s** past `CONFIG_STALE_TIME`: **exactly 1** background request. 45 samples, **min = max = 20**, `firstSample: 20`, `everBlank: false` | ✅ |
+| C4 | **1** request, rows stay, spinner on the button | **Exactly 1.** Rows constant at 20, **0 visible skeletons** | ✅ |
+| C5 | Same as C4 | Real keypress on `body` → **exactly 1** `GET /cipher_keys` (200), rows stay | ✅ |
+| C6 | Already on the list, no manual refresh | Created through the **real dialog**: `POST /cipher_keys → 200` **+ 1** `GET`. Count **26 → 27**, key present **on screen *and* in the query cache** | ✅ |
+| C7 | Gone immediately and still gone on return | Deleted through the row action: gone from screen **and** cache. On return with a fresh entry: **0 / 30 frames** showed it, **0 requests** | ✅ |
+| C8 | Term and filtered rows preserved | Term `charlie` preserved, the single filtered row preserved identically, **1** request | ✅ |
+
+| # | Smoke check | Measured | Verdict |
+| --- | --- | --- | --- |
+| S1 | Sort | Order changed, 18 samples never blank, min rows 20, **0 requests** — sorted in the browser | ✅ |
+| S2 | Page forward / back | Page 1 = 20, page 2 = 6 ("Showing 21 - 26 of 26"). **26 across the pages, 26 unique, 0 duplicates**, back matched page 1, no blank flash, **0 requests** | ✅ |
+| S3 | Bulk action | Selected 3 → `DELETE /cipher_keys/bulk → 200` **+ 1** `GET`. Count **27 → 24**, none of the three left, **selection cleared** | ✅ |
+| S4 | No matches | **0 rows**, "No cipher keys found", **0 visible spinners**, no stale rows | ✅ |
+| S5 | Clear the search | 20 rows restored, "Showing 1 - 20 of 26" | ✅ |
+| S6 | Export / download | **N/A — no export control**, confirmed in the DOM | — |
+
+| Own check | Measured | Verdict |
+| --- | --- | --- |
+| **Key material never written to disk** | **0 leaks.** Fetched the real material for 6 keys via `get_by_name` and searched every store for those exact values: 20 localStorage keys (6 `o2q-`) → 0 hits, and **no `o2q-` key for the cipher scope at all**; sessionStorage → 0; IndexedDB `PanelCache` (416 entries), `o2Cache` (0), `o2ChatDB` (6), `o2FieldValues` (0) → **0 hits**. The design decision holds | ✅ |
+| Open a key's detail, go back, reopen | **1 `GET /cipher_keys/{name}` per open, 3 opens → 3 requests (all 200)** — exactly the documented expectation. Confirmed in code: `cipherKeyDetailQuery` is declared in `cipher_keys.queries.ts:29` and **read nowhere** | ✅ as documented |
+| Create / delete a key | Both covered above — create (C6) lands on the list with no manual refresh; delete (C7) stays gone across navigation, and bulk delete (S3) clears three at once | ✅ |
+
+**A C6 result that was nearly a false pass.** The first attempt created the key by calling
+`cipher_keys.ts` **directly**, which bypasses the dialog's save handler entirely — it reported
+`cacheHasNew: false, cacheInvalidated: false` and looked like a defect. It proved nothing: the same
+mistake produced the retracted service-accounts issue in §14.5. Re-run through the real dialog, the
+save issues `POST` + one invalidation `GET` and the cache gains the key. **Always drive the
+component's own save path when testing a write.**
+
+**Seeding note.** `POST /cipher_keys` rejects most key material — `aes-256-siv` needs
+**base64 of 64 random bytes**. Hex (32 B or 64 B) and base64-of-32-B all fail with
+`AES256 creation failed : Invalid Length`.
 
 ### 15.4 Regex Patterns
 
@@ -2501,6 +2588,52 @@ Run **C1–C8**.
 | **Old sessionStorage cache is gone** | DevTools → Application → **Session Storage** | No `regex_patterns_cache_*` key is ever written |
 | Stale sessionStorage residue is harmless | If an older build left a `regex_patterns_cache_*` key, reload with it present | The page ignores it entirely — nothing reads that key any more |
 
+
+#### Measured results — 2026-09-01, `feat/fe-caching`, local dev
+
+**No defect found on this page.** 31 patterns already existed, so nothing was seeded. Every row
+below was run, including both 5-minute waits.
+
+| # | Expect | Measured | Verdict |
+| --- | --- | --- | --- |
+| C1 | Skeleton then rows, **1** request | **Exactly 1** `GET /re_patterns` on a *true* cold read (after clearing the persisted entry). With the persisted entry present it is **0** — see the note below | ✅ |
+| C2 | Instant rows, no skeleton, **0** requests | **0 requests**, entry provably fresh (age 0.5 s, `staleTime` 5 min). 20 rows, **`firstSample: 20`**, `everBlank: false` | ✅ |
+| C3 | Instant rows, then **1** background request, never blanks | Waited the full **5 min 10 s** past `CONFIG_STALE_TIME`: **exactly 1** request. 45 samples, **min = max = 20**, `everBlank: false` | ✅ |
+| C4 | **1** request, rows stay, spinner on the button | **Exactly 1.** Rows constant at 20, **0 visible skeletons** | ✅ |
+| C5 | Same as C4 | Real keypress on `body` → **exactly 1** `GET /re_patterns` (200), rows stay | ✅ |
+| C6 | Already on the list, no manual refresh | Created through the **real dialog**: `POST /re_patterns → 200` **+ 1** `GET`. Count **31 → 32**, present **on screen *and* in the query cache** | ✅ |
+| C7 | Gone immediately and still gone on return | `DELETE /re_patterns/{id} → 200` **+ 1** `GET`. Gone from screen **and** cache. On return with a fresh entry: **0 / 30 frames**, **0 requests** | ✅ |
+| C8 | Term and filtered rows preserved | Term `probe_pattern` preserved, the single filtered row preserved identically, **1** request | ✅ |
+
+| # | Smoke check | Measured | Verdict |
+| --- | --- | --- | --- |
+| S1 | Sort | Order changed, 18 samples never blank, min rows 20, **0 requests** | ✅ |
+| S2 | Page forward / back | Page 1 = 20, page 2 = 11 ("Showing 21 - 31 of 31"). **31 across the pages, 31 unique, 0 duplicates**, back matched page 1, no blank flash, **0 requests** | ✅ |
+| S3 | Bulk action | Selected 3 → `DELETE /re_patterns/bulk → 200` **+ 1** `GET`. Count **31 → 28**, none left, **selection cleared** | ✅ |
+| S4 | No matches | **0 rows**, "No regex patterns found", **0 visible spinners**, no stale rows | ✅ |
+| S5 | Clear the search | 20 rows restored, "Showing 1 - 20 of 31" | ✅ |
+| S6 | Export / download | **Per-row export exists** (`…-export-regex-pattern`, title "Export Regex Pattern") and downloads immediately with no dialog. Intercepted the generated file: **`probe_pattern.json`**, `application/json`, 80 bytes, containing exactly the row on screen — `{ "name": "probe_pattern", "pattern": "[0-9]{3}", "description": "probe" }` | ✅ |
+
+| Own check | Measured | Verdict |
+| --- | --- | --- |
+| **Revalidation actually happens** | Cache made fresh at **28** patterns, then one created **outside this tab** (`POST → 200`), then waited past 5 min and revisited: the list **revalidated to 29** and `cachetest_rp_external` was **in the cache and on screen**. The old failure mode — reading a local store copy and never consulting the cache — does not occur | ✅ |
+| Delete a pattern → navigate away → return | Covered by **C7**: gone from screen and cache, **0 / 30 frames** on return, **0 requests** | ✅ |
+| **Old sessionStorage cache is gone** | `sessionStorage` stayed **completely empty** across cold load, revisits, refreshes, sorting, paging, search, create, delete and bulk delete — **no `regex_patterns_cache_*` key is ever written** | ✅ |
+| **Stale sessionStorage residue is harmless** | Planted `regex_patterns_cache_default` holding a fake `ZZZ_STALE_RESIDUE_PATTERN`, then hard-reloaded: the page rendered **28 real rows**, the fake was **absent from both screen and cache**, and the residue was left **byte-untouched** — never read, never cleared | ✅ |
+
+**The deleted cache class, confirmed in the diff.** `main` carries
+`src/utils/regexPatternCache.ts` — `CACHE_KEY_PREFIX = "regex_patterns_cache_"`,
+`DEFAULT_TTL = 60 * 60 * 1000` (1 hour), `sessionStorage`-backed, with `get/set/clear/clearAll/getStats`.
+The branch **deletes both that file and its spec**. Worth noting for the reviewer: on `main` the
+class already had **no importers** — `git grep` finds no consumer — so this removed dead code
+rather than a live cache, which is why nothing regressed.
+
+**C1 reads 0 or 1 depending on persistence, and both are correct.** This entry *is* persisted
+(`o2q-["org","default","settings","regexPatterns"]`), so a hard reload with it present and fresh
+costs **0** requests — better than the plan's "1". The plan's intent (a cold read fetches exactly
+once) was verified by deleting that key first and reloading: **exactly 1** `GET /re_patterns`.
+When measuring C1 on a persisted page, clear the `o2q-` key first or the number will look wrong.
+
 ### 15.5 Built-in patterns
 
 **Scope:** run **C1–C5** (cold read, warm revisit, Refresh button, `r` shortcut) and **C8** (search survives refresh), plus the rows below. C6/C7 are covered by this section's own rows where they apply.
@@ -2511,6 +2644,41 @@ Run **C1–C8**.
 | --- | --- |
 | Open, navigate away, return, reload the page | Requested **once per session** and persisted — these never change |
 | Refresh button | Still forces a request |
+
+
+#### Measured results — 2026-09-01, `feat/fe-caching`, local dev
+
+**Both own-checks pass. No defect.** One deviation from the C-checklist is recorded below as an
+observation, not a bug.
+
+**Where this actually lives.** The Built-in tab is **not** a tab on the Regex Patterns page — it is
+the default tab inside the **Import** flow (`?action=import`), rendered by `BuiltInPatternsTab.vue`
+via `ImportRegexPattern.vue`. Reach it with Settings → Regex Patterns → **Import**.
+
+| # | Expect | Measured | Verdict |
+| --- | --- | --- | --- |
+| C1 | Cold read, **1** request | Opening Import issues **1** `GET /re_patterns/built-in`, returning **147** patterns | ✅ |
+| C2 | Warm revisit, **0** requests | Left the module entirely, came back, reopened Import: **0** requests, all **147** still present, tab renders | ✅ |
+| C4 | **1** request every click | Refresh **still forces a request** even against an `Infinity` staleTime: **exactly 1** | ✅ |
+| C5 | Same as C4 — 1 request | ⚠️ **0** built-in requests. `r` refreshes the **parent** Regex Patterns list (`GET /re_patterns`) instead — see below | ⚠️ observation |
+| C8 | Term and filtered rows preserved | Term `email` preserved across Refresh, same matches before and after, **1** request | ✅ |
+
+| Own check | Measured | Verdict |
+| --- | --- | --- |
+| **Requested once per session and persisted** | Declared `staleTime: SESSION_STALE_TIME` **and** `gcTime: SESSION_STALE_TIME` (both **Infinity**, verified at runtime) with `persister: localStoragePersister`. Navigate away and back → **0** requests. **Hard reload** → the tab rendered all **147** patterns from `o2q-["org","default","settings","builtInRegexPatterns"]` with **0** requests and `fetchStatus: idle` | ✅ |
+| **Refresh button still forces a request** | **Exactly 1** `GET /re_patterns/built-in` per click, despite the infinite freshness window | ✅ |
+
+**C5 deviates, and it is defensible.** Pressing `r` fires `GET /re_patterns` (the parent list) and
+**no** built-in request. The shortcut belongs to `RegexPatternList.vue`; the built-in list is a
+child of the Import dialog and owns its own Refresh button, which does force a fetch. Given the
+built-in set is declared as never-changing (`Infinity` staleTime, persisted), *not* re-fetching it
+from a generic page shortcut is consistent with the design rather than a miss. Recorded so the row
+is not silently marked green.
+
+⚠️ **`staleTime` reads as `null` when probed via JSON.** `Infinity` does not survive JSON
+serialisation, so a probe that stringifies query options reports `staleTime: null` and looks like
+"no staleTime configured". Compare with `=== Infinity` in-page instead: both `staleTime` and
+`gcTime` are genuinely `Infinity` here.
 
 ### 15.6 AI Toolsets
 

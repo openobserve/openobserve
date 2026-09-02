@@ -972,7 +972,7 @@ to localStorage or IndexedDB.
 
 ---
 
-### 20. Folder-scoped lists double-fetch on every mount — the reactive key fires before the folder is resolved (SLOs **and** Synthetics)
+### 20. Folder-scoped lists double-fetch on every mount — the reactive key fires before the folder is resolved (SLOs **and** Synthetics) — ✅ FIXED
 
 ```
 Module:            SLOs (§7)
@@ -1117,6 +1117,43 @@ It does not surface today: on remount the folder-scoped read overtakes it inside
 40-sample sweep across 4 s caught **0 frames** showing the deleted row (C7 passes). But only
 timing hides it — a slower folder resolution would paint the deleted check. Removing the
 double-fetch removes the bad entry and this latent risk together.
+
+**Fix applied — two different fixes, because `undefined` means different things in the two files.**
+
+```ts
+// SloList.vue — undefined only ever means "not resolved yet" here
+enabled: !!readOrg.value && readFolder.value !== undefined,
+
+// SyntheticMonitoring.vue — undefined is the "All folders" scope, so a separate flag
+const folderResolved = ref(false);          // set in loadMonitors(), the sole readFolder writer
+enabled: !!orgIdentifier.value && folderResolved.value,
+```
+
+**Verified live, before and after:**
+
+| | Before | After | `main` |
+| --- | --- | --- | --- |
+| SLOs cold load | **2** requests | **1** (`?folder=default`) | 1 |
+| Synthetics cold load | **2** requests | **1** (`?folder=default`) | 1 |
+| The `"all"` entry | 36 / 57 rows fetched, **0 observers** | **empty placeholder, no request** | n/a |
+| All-folders mode | 57 rows | **57 rows — still works** | works |
+
+**The All-folders regression was specifically checked**, since it is what the naive one-liner would
+have broken: toggling **All folders** issues `GET /synthetics` unscoped and returns **57** (the
+cross-folder set) against **53** in folder scope, and toggling back returns to 53. Both directions
+repaint correctly.
+
+**Safe by construction on Synthetics:** `readFolder` has exactly **one** assignment site
+(`loadMonitors`, line 612) and `folderResolved` is set on the next line, so no path can leave the
+query permanently disabled.
+
+**SLOs has no All-folders mode** — confirmed in the live DOM (`hasAllFoldersToggle: false`,
+`hasThisFolderToggle: false`, zero folder-scope buttons) as well as in code
+(`readFolder.value = folderId ?? activeFolderId.value` can never be deliberately `undefined`).
+
+**Verification:** `vue-tsc --noEmit` exit 0 · SLO + Synthetics + service specs **10 files / 210
+tests passing** · cold-load request counts measured via CDP on both pages · All-folders and
+folder-switch cycles exercised through the real UI.
 
 **Everything else in §7 passed** — C2/C4/C6/C7/C8 all green, sort/paging/search client-side at
 0 requests, the table never blanks, and `r` correctly does nothing (this page registers no
@@ -1642,6 +1679,244 @@ skipped entirely because the one-shot `if (isMetaOrg.value) { getData(false); }`
 before the org store hydrates, and nothing retries. That guard is **byte-identical on `main`**
 (`main:927`), and neither version has a watcher on `isMetaOrg`/`selectedOrganization`, so it is
 pre-existing rather than a regression. Not filed.
+
+---
+
+### 27. ✅ FIXED — AI Toolsets shows persisted data forever on a cold load (imperative read bypasses staleTime)
+
+```
+Module:            Settings -> AI Toolsets (§15.6)
+UI path:           Settings -> AI Toolsets, hard-reload the page
+What to check:     The list against the server
+What to expect:    The server's toolsets (main re-fetches on every load)
+What you get:      Whatever localStorage last held — however old — and NO revalidation.
+                   A deleted toolset stays listed indefinitely until Refresh is clicked.
+```
+
+**Severity: Medium** (downgraded from High — see reachability below). Silently wrong data presented
+as current. The list is stale with no spinner, no error and no indication anything is out of date, so
+there is nothing to prompt the user to refresh. Entries deleted by anyone — another tab, another
+user, this user before a reload — keep appearing.
+
+⚠️ **Reachability caps the practical impact.** The AI Toolsets page has **no link anywhere in the
+UI**: the Settings sidebar (`components/settings/index.vue`) lists 13 entries and `aiToolsets` is not
+one of them, and no other component navigates to the route — the only match is the page routing to
+itself after a save. It is reachable **only by direct URL**
+(`/web/settings/ai_toolsets?org_identifier=<org>`) or a bookmark. That is **not a branch
+regression**: `main`'s sidebar has the same 13 entries and likewise zero `aiToolsets` references, so
+the page was routed but never wired into navigation. The defect and the fix are unchanged; only the
+odds of a user meeting it are low.
+
+**Measured side by side against a running `main`, same backend, same moment:**
+
+```
+server truth: 25 toolsets  (cachetest_ts_whiskey deleted)
+persisted cache: 26, aged to 20.7 min (well past the 5-minute CONFIG_STALE_TIME)
+
+main   (:8083)   GET /api/default/ai/toolsets fired -> "Showing 1 - 20 of 25", deleted row ABSENT
+branch (:8081)   no toolsets request at all       -> "Showing 1 - 20 of 26", deleted row STILL LISTED
+```
+
+**Cause — the mount read races org hydration, and nothing retries it.** `AiToolsets.vue` calls
+`getData()` once at setup, and its first statement reads the org off the store:
+
+```ts
+const getData = (force = false) => {
+  const org = store.state.selectedOrganization.identifier;   // <- runs before the org resolves
+  const options = aiToolsetsQuery(org);
+  const cached = queryClient.getQueryData<any[]>(options.queryKey);
+  if (cached !== undefined) applyToolsets(cached);           // paints the persisted list
+  ...
+  queryClient.fetchQuery(options)                            // never reached / wrong key
+```
+
+Instrumenting a cold load shows `store.state.selectedOrganization` **unresolved for ~4592 ms**, and
+the console carries one `Uncaught (in promise)`. With the object missing the first line throws
+`TypeError: Cannot read properties of undefined (reading 'identifier')`; with it present but empty
+the org is `undefined` and the key is wrong. Either way `fetchQuery` never runs for the real org.
+
+Nothing repairs it afterwards: there is **no watcher on `selectedOrganization`**, and the only other
+`getData()` call sites are the Refresh button, the `r` shortcut and post-write reloads. So the page
+sits on the persisted snapshot for the whole visit.
+
+`fetchQuery` itself is fine — invoked directly against the same stale entry it refetched correctly
+and returned 26 → 25, so the caching layer is not at fault.
+
+**Why `main` is unaffected despite identical-looking code.** `main` has the same setup-time
+`getData()` and the same `selectedOrganization.identifier` read, but **no persistence and no cache**:
+it calls the service on every load, so a cold visit always reaches the network and always paints the
+truth. The branch added `persister: localStoragePersister` to `aiToolsetsQuery`, which turned a
+harmless race into a silent-stale-data bug — the same shape as **#25** and **#26**: a read moved onto
+the cache layer without the surrounding code being adjusted.
+
+**✅ FIXED — converted to `useQuery`, the structural fix its own `TODO` called for.**
+
+The imperative read is gone. `AiToolsets.vue` now declares the list as an observed query and derives
+the rows from it, so `staleTime` is applied and a stale entry revalidates on mount:
+
+```ts
+const orgIdForList = useOrgId();
+const toolsetsList = useQuery(() =>
+  Object.assign(aiToolsetsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+);
+
+// The list is the query, not a copy: only an observer applies `staleTime` and revalidates on mount.
+const tabledata: any = computed(() =>
+  (toolsetsList.data.value ?? []).map((item: any) => ({ ... })),
+);
+const loading = toolsetsList.isPending;
+const fetching = toolsetsList.isFetching;
+
+const getData = async (force = false) => {
+  if (force) await toolsetsList.refetch();
+};
+```
+
+The `enabled` gate replaces the org-hydration watcher outright — an `enabled`-gated query re-evaluates
+on its own when the org lands, so the race that caused the original throw cannot recur. The loading
+and error toasts were preserved as watchers on `isPending` and `error`.
+
+**Verified live on `:8081`, both directions:**
+
+```
+stale entry (backdated 12 min, 23 rows; server 24)
+  -> reload: GET /api/default/ai/toolsets?limit=100000 200  (exactly one)
+  -> UI "Showing 1 - 20 of 24", new toolset PRESENT
+
+fresh entry (just written, 24 rows; server 24)
+  -> reload: NO toolsets request at all
+  -> UI "Showing 1 - 20 of 24"
+```
+
+Both halves matter: the first is the bug fixed, the second proves the persister still does its job —
+a fix that simply refetched every load would have thrown away the caching this branch exists for.
+Delete was re-checked through the UI afterwards (server 24 -> 23, row gone from the table).
+
+`vue-tsc --noEmit -p tsconfig.app.json --composite false` exits 0; the AI-toolset specs pass (45).
+
+**Toast paths verified.** The toasts moved from `.then`/`.catch` on the promise to watchers on
+`isPending` and `error`, so both were re-tested by breaking the request at document-start (URL
+rewritten to a 404) with the persisted cache cleared: the page shows **"Failed to load"** and its
+"No AI toolsets yet" empty state, `Showing 0 - 0 of 0`. See **#28** for the loading-toast finding,
+which applies to both pages.
+
+---
+
+### 28. ✅ FIXED — Destination Templates serves a stale persisted list on a cold load and never revalidates
+
+```
+Module:            Alerts -> Destination Templates (TemplateList.vue)
+UI path:           Alerts -> Destination Templates, leave for >5 min, hard-reload
+What to check:     The row count and contents against the server
+What to expect:    The server's templates (main re-fetches on every load)
+What you get:      The localStorage snapshot, however old, with NO request fired
+```
+
+**Severity: Medium-High.** Same root cause as **#27**, but unlike AI Toolsets this page is **linked
+in the UI** and used routinely — Alerts -> Destination Templates. A template added, renamed or
+deleted anywhere else stays wrong until the user happens to click Refresh, with no spinner, error or
+staleness cue to suggest anything is out of date.
+
+**Reproduced live on the branch (`:8081`), backend `:5080`:**
+
+```
+1. cold visit /web/alert-templates       -> GET /alerts/templates 200, "Showing 1 - 20 of 43"
+                                            persisted as o2q-["org","default","alerts","templates"]
+2. create one template out-of-band (API) -> server now 44, page untouched
+3. backdate the persisted entry to 10 min old   (past CONFIG_STALE_TIME = 5 min)
+4. hard reload
+     UI              -> "Showing 1 - 20 of 43"      <- stale
+     server          -> 44
+     new template    -> ABSENT from the table
+     network         -> NO /alerts/templates request at all
+5. click Refresh     -> "Showing 1 - 20 of 44", new template present
+```
+
+Step 4 is the finding: the request is not merely late, it is **never made**. The same page load did
+fire `GET /api/v2/default/alerts` and `GET /alerts/destinations` — both read imperatively too, but
+**not persisted** — which isolates the persister as the differentiator rather than `fetchQuery`
+alone.
+
+**Cause.** `TemplateList.vue:419` builds `templatesQuery(org)` — persisted via
+`localStoragePersister` at `services/alert_templates.queries.ts` — and reads it at line 439 with
+`queryClient.fetchQuery(options)`. Because there is no observer, the persister's restore of the
+`o2q-` snapshot satisfies the fetch during hydration and `staleTime` is bypassed. The file already
+flags the shape at line 431: `// TODO: fold into 'useQuery' when this list drops its imperative refresh.`
+
+The `force` path is unaffected — Refresh calls `getTemplates(true)`, which invalidates first, so the
+restore no longer counts as fresh and a real request goes out. That is why step 5 recovers, and it is
+the only workaround.
+
+**Introduced by this branch.** `main` has no TanStack layer and no persister on this page: it calls
+the service on every mount, so a cold visit always reaches the network.
+
+**✅ FIXED — same conversion as #27.** The list moved onto `useQuery` with an `enabled` gate, the
+rows became a computed over the query data, and the imperative `fetchQuery` was removed:
+
+```ts
+const orgIdForList = useOrgId();
+const templatesList = useQuery(() =>
+  Object.assign(templatesQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+);
+// The rows are the query, not a copy: only an observer applies `staleTime` and revalidates on mount.
+const templates = computed<Template[]>(() => (templatesList.data.value ?? []) as Template[]);
+```
+
+Three pieces of surrounding wiring had to move with it, and each is a trap worth recording:
+
+1. **`dropTemplates` no longer splices `templates.value`.** The rows now render straight from the
+   cache, so the existing `setQueriesData` prune is what removes them — the local mutation would have
+   been overwritten on the next read anyway.
+2. **The post-load work is keyed on `dataUpdatedAt`, not `data`.** An unchanged refetch returns the
+   same object by structural sharing, so a value watcher would never wake and the "Used by" counts
+   would silently stop refreshing — the same trap as **#26**.
+3. **The watcher must be registered below `updateRoute`/`editTemplate`.** It runs `immediate: true`,
+   so at its original position it hit those `const`s in the temporal dead zone and threw *during
+   setup* — see the regression note below.
+
+**Regression caught and fixed during this work.** The first version of the fix put that watcher above
+the functions it calls. The throw aborted `setup()` part-way, which showed up only as three
+`[Vue warn] ... no active component instance` lines and one bare `Uncaught (in promise)` — the table
+still rendered, so nothing looked wrong. The user-visible break was that the deep link
+`/web/alert-templates?action=update&name=<template>` no longer opened the editor. Confirmed by
+stashing the change (HEAD opened the editor, the patched file did not), then fixed by moving the
+watcher below `editTemplate`. Worth noting for review: **an aborted `setup()` in this app renders a
+plausible-looking page**, so a working table is not evidence the component initialised.
+
+**Verified live on `:8081`, both directions:**
+
+```
+stale entry (backdated 12 min, 43 rows; server 44)
+  -> reload: GET /api/default/alerts/templates 200  (exactly one)
+  -> UI "Showing 1 - 20 of 44", new template PRESENT
+
+fresh entry (just written, 44 rows; server 44)
+  -> reload: NO templates request at all
+  -> UI "Showing 1 - 20 of 44"
+```
+
+Re-checked after the fix: Refresh fires one templates request plus the dep-graph reload; delete
+removes the row and drops the server count (44 -> 43); the "Used by" counts render unchanged
+(`cachetest_tmpl1` -> 3 destinations / 66 alerts, identical to HEAD); the `action=update` deep link
+opens the editor on a hard load and on client-side navigation.
+
+`vue-tsc --noEmit -p tsconfig.app.json --composite false` exits 0; `TemplateList.spec.ts` passes 6/6,
+including "drops the deleted row in place", which covers the `dropTemplates` change directly.
+
+**Toast paths verified — including one non-finding worth recording.**
+
+*Error toast (rewired from `.catch` to a watcher on `error`):* with the cache cleared and the list
+request rewritten to a 404 at document-start, the page shows **"Error while pulling templates."** and
+the empty state, `Showing 0 - 0 of 0`. Correct.
+
+*Loading toast:* with the cache cleared and the list request artificially delayed by 3 s, the
+"Please wait while loading templates..." toast **never appears**. That looked like a regression from
+moving it onto an `isPending` watcher — but it does **not** appear on HEAD either. Confirmed by
+stashing the change and re-running the identical harness against the unmodified file, verifying via
+the served module that it really was the old code (`fetchQuery` present, `useQuery` absent): same
+result, no toast, across a 3 s pending window. So the missing loading toast is **pre-existing
+behaviour on this page, not caused by the conversion**, and per the no-`main`-bugs rule it is not
+filed as a branch issue. The table's own `:loading` skeleton still covers the cold-load cue.
 
 ---
 

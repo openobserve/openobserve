@@ -133,6 +133,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { aiToolsetsQuery } from "@/services/ai_toolsets.queries";
 import { aiToolsetKeys } from "@/services/ai_toolsets.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
 import { defineComponent, ref, computed, watch, onMounted, onUpdated, Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -170,12 +172,25 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
 
-    const tabledata: any = ref([]);
+    const orgIdForList = useOrgId();
+    const toolsetsList = useQuery(() =>
+      Object.assign(aiToolsetsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+    );
+
+    // The list is the query, not a copy: only an observer applies `staleTime` and revalidates on mount.
+    const tabledata: any = computed(() =>
+      (toolsetsList.data.value ?? []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        kind: item.kind,
+        description: item.description || "",
+      })),
+    );
     const showAddDialog = ref(false);
-    const loading = ref(false);
+    const loading = toolsetsList.isPending;
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
-    const fetching = ref(false);
+    const fetching = toolsetsList.isFetching;
     const filterQuery = ref("");
 
     const columns: OTableColumnDef[] = [
@@ -252,75 +267,38 @@ export default defineComponent({
     // Bound to refresh / "list changed" events: always hits the server.
     const refreshData = () => getData(true);
 
-    const applyToolsets = (items: any[]) => {
-      tabledata.value = items.map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        kind: item.kind,
-        description: item.description || "",
-      }));
-      resultTotal.value = tabledata.value.length;
+    const getData = async (force = false) => {
+      if (force) await toolsetsList.refetch();
     };
 
-    const getData = (force = false) => {
-      const org = store.state.selectedOrganization.identifier;
-      // Only a cold cache spins and toasts — `load` paints whatever is already
-      // in hand, then swaps in the server's answer.
-      // Not gated on `force`: a manual refresh keeps its rows too, and only
-      // the toast is suppressed when there is already something on screen.
-      const options = aiToolsetsQuery(org);
-      const cached = queryClient.getQueryData<any[]>(options.queryKey);
-      const painted = cached !== undefined;
-      if (painted) applyToolsets(cached as any[]);
-
-      loading.value = !painted;
-      fetching.value = true;
-      // TODO: fold into `useQuery` — this call site drives its own flags because
-      // the surrounding refresh/toast flow is imperative.
-      if (force) {
-        void queryClient.invalidateQueries({
-          queryKey: options.queryKey,
-          exact: true,
-          refetchType: "none",
-        });
-      }
-      const source = queryClient
-        .fetchQuery(options)
-        .then((data) => {
-          applyToolsets(data);
-          return data;
-        })
-        .finally(() => {
-          loading.value = false;
-          fetching.value = false;
-        });
-
-      const dismiss = painted
-        ? () => {}
-        : toast({
+    let dismissLoading: (() => void) | null = null;
+    watch(
+      loading,
+      (pending) => {
+        if (pending && !dismissLoading) {
+          dismissLoading = toast({
             variant: "loading",
             message: t("common.loading"),
             timeout: 0,
           });
+        } else if (!pending && dismissLoading) {
+          dismissLoading();
+          dismissLoading = null;
+        }
+      },
+      { immediate: true },
+    );
 
-      source
-        .catch((err: any) => {
-          if (err?.status !== 403) {
-            toast({
-              variant: "error",
-              message:
-                err?.response?.data?.message ||
-                t("aiToolset.loadFailed", { product: raw("AI Toolsets") }),
-              timeout: 5000,
-            });
-          }
-        })
-        .finally(() => {
-          dismiss();
-        });
-    };
-
-    getData();
+    watch(toolsetsList.error, (err: any) => {
+      if (!err || err?.status === 403) return;
+      toast({
+        variant: "error",
+        message:
+          err?.response?.data?.message ||
+          t("aiToolset.loadFailed", { product: raw("AI Toolsets") }),
+        timeout: 5000,
+      });
+    });
 
     // -----------------------------------------------------------------------
     // Filter
