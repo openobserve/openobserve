@@ -382,10 +382,10 @@ describe("OnCallRuleEditor", () => {
     });
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-rule-editor-signal-s1"]').text()).toContain(
-      "caught by Payments",
+      "sent to Payments",
     );
     expect(wrapper.find('[data-test="oncall-rule-editor-signal-s2"]').text()).toContain(
-      "paged nobody",
+      "No one notified",
     );
   });
 

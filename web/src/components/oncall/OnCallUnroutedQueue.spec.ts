@@ -84,7 +84,7 @@ describe("OnCallUnroutedQueue", () => {
   });
 
   it("counts the firings, because one is a curiosity and forty is a problem", () => {
-    expect(render().text()).toContain("4 fires");
+    expect(render().text()).toContain("4 triggers");
   });
 
   it("offers to claim for the team whose screen this is", async () => {
@@ -113,7 +113,7 @@ describe("OnCallUnroutedQueue", () => {
   /// §G.3: `defaulted_team_id` present means the catch-all absorbed the gap —
   /// somebody WAS paged. Absent means nobody was woken at all. An operator
   /// triages those in opposite orders, so each row says which it is.
-  it("splits the queue's two emergencies: caught by the default team vs paged nobody", () => {
+  it("splits the queue's two emergencies: sent to the default team vs no one notified", () => {
     const wrapper = mount(OnCallUnroutedQueue, {
       props: {
         signals: [signal(), signal({ id: "s2", defaulted_team_id: "team_9" })],
@@ -123,7 +123,7 @@ describe("OnCallUnroutedQueue", () => {
       global: { plugins: [i18n, store], stubs },
     });
     const nobody = wrapper.find('[data-test="oncall-unrouted-nobody-s1"]');
-    expect(nobody.text()).toContain("paged nobody");
+    expect(nobody.text()).toContain("No one notified");
     const caught = wrapper.find('[data-test="oncall-unrouted-defaulted-s2"]');
     expect(caught.text()).toContain("Platform");
     // A row cannot claim both facts.

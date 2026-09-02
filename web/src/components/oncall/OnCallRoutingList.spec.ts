@@ -278,7 +278,7 @@ describe("OnCallRoutingList", () => {
       const wrapper = render();
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-routing-catch-all-volume"]').text()).toBe(
-        "2 signals · 9 fires, 30d",
+        "2 signals · 9 triggers, last 30 days",
       );
     });
 
