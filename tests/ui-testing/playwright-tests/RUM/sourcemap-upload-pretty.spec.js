@@ -56,6 +56,8 @@ const RUN_ID = Date.now();
 // service name would break reruns against the same instance.
 const SERVICE = `e2e-smap-${RUN_ID}`;
 const NOMAP_SERVICE = `e2e-smap-nomap-${RUN_ID}`;
+// Unique filename so this "no sourcemap" case can't collide with a sibling's map for the shared bundle (prod uses unique hashed names).
+const NOMAP_FILE = `main.nomap-${RUN_ID}.js`;
 // Dedicated group for the delete-flow test. Its stack trace must NEVER be
 // translated before the group is deleted: the backend memoizes translations
 // in an in-process LRU keyed by the exact (service, version, env) params of
@@ -72,13 +74,13 @@ let zipPath;
 let invalidZipPath;
 
 /** Build the raw browser-style stacktrace string for a manifest error. */
-function fixtureStack(errorKey) {
+function fixtureStack(errorKey, sourceFile = manifest.bundle) {
   const e = manifest.errors[errorKey];
-  return `${e.message}\n    at fn @ ${manifest.bundleUrlPrefix}/${manifest.bundle}:1:${e.generatedColumn}`;
+  return `${e.message}\n    at fn @ ${manifest.bundleUrlPrefix}/${sourceFile}:1:${e.generatedColumn}`;
 }
 
 /** SDK-shaped RUM error event pointing at the fixture bundle. */
-function fixtureErrorEvent(errorKey, service, index = 0) {
+function fixtureErrorEvent(errorKey, service, index = 0, sourceFile = manifest.bundle) {
   const e = manifest.errors[errorKey];
   const [type, ...msg] = e.message.split(': ');
   return {
@@ -88,7 +90,7 @@ function fixtureErrorEvent(errorKey, service, index = 0) {
     error: {
       message: msg.join(': '),
       type,
-      stack: fixtureStack(errorKey),
+      stack: fixtureStack(errorKey, sourceFile),
       source: 'source',
       is_crash: false,
       resource: { url: `${manifest.bundleUrlPrefix}/` },
@@ -333,7 +335,7 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', () => {
     tag: ['@rum', '@sourcemapPretty', '@ui', '@P0'],
   }, async ({ page }) => {
     const pm = new PageManager(page);
-    await ingestFixtureErrors(page, [fixtureErrorEvent('referenceError', NOMAP_SERVICE)], NOMAP_SERVICE);
+    await ingestFixtureErrors(page, [fixtureErrorEvent('referenceError', NOMAP_SERVICE, 0, NOMAP_FILE)], NOMAP_SERVICE);
     await openErrorDetail(pm, NOMAP_SERVICE);
 
     await pm.rumPage.clickPrettyTab();
