@@ -1,6 +1,0 @@
-src/config/src/config.rs
-src/search/src/sql/schema.rs
-tests/ui-testing/pages/dashboardPages/visualise.js
-tests/ui-testing/pages/pipelinesPages/pipelinesPage.js
-tests/ui-testing/playwright-tests/Logs/ftsDefaultColumn.spec.js
-tests/ui-testing/playwright-tests/RUM/sourcemap-upload-pretty.spec.js
