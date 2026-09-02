@@ -11115,7 +11115,7 @@
             "item": "항목",
             "versions": "버전"
           },
-          "versionPill": "v{version} · {count} 버전 | v{version} · {count} 버전",
+          "versionPill": "{count} 버전 | {count} 버전",
           "sourceSection": "소스",
           "sourceTrace": "트레이스",
           "sourceSpan": "스팬",

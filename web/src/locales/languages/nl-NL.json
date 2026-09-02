@@ -11115,7 +11115,7 @@
             "item": "Item",
             "versions": "Versies"
           },
-          "versionPill": "v{version} · {count} versie | v{version} · {count} versies",
+          "versionPill": "{count} versie | {count} versies",
           "sourceSection": "Bron",
           "sourceTrace": "Trace",
           "sourceSpan": "Span",

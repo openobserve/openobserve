@@ -11110,7 +11110,7 @@
             "item": "項目",
             "versions": "版本"
           },
-          "versionPill": "v{version} · {count} 版本 | v{version} · {count} 版本",
+          "versionPill": "{count} 版本 | {count} 版本",
           "sourceSection": "來源",
           "sourceTrace": "追蹤",
           "sourceSpan": "Span",

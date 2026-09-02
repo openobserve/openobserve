@@ -11115,7 +11115,7 @@
             "item": "Элемент",
             "versions": "Версии"
           },
-          "versionPill": "v{version} · {count} версия | v{version} · {count} версий",
+          "versionPill": "{count} версия | {count} версий",
           "sourceSection": "Источник",
           "sourceTrace": "Трейс",
           "sourceSpan": "Спан",

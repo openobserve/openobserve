@@ -11115,7 +11115,7 @@
             "item": "Element",
             "versions": "Versionen"
           },
-          "versionPill": "v{version} · {count} Version | v{version} · {count} Versionen",
+          "versionPill": "{count} Version | {count} Versionen",
           "sourceSection": "Quelle",
           "sourceTrace": "Trace",
           "sourceSpan": "Span",
