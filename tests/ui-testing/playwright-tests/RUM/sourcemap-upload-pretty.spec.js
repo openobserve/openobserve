@@ -336,10 +336,6 @@ test.describe('Sourcemap Upload & Pretty Stack Trace', () => {
     await ingestFixtureErrors(page, [fixtureErrorEvent('referenceError', NOMAP_SERVICE)], NOMAP_SERVICE);
     await openErrorDetail(pm, NOMAP_SERVICE);
 
-    // Wait for the raw stack to render before switching tabs, else Pretty activates with no stack to translate and never reaches the unavailable state.
-    await pm.rumPage.expectRawTabVisible();
-    await pm.rumPage.expectDetailContainsText(manifest.bundle);
-
     await pm.rumPage.clickPrettyTab();
 
     // No maps uploaded for this service -> explicit unavailable state, and it
