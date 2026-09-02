@@ -447,6 +447,21 @@ mod tests {
     }
 
     #[test]
+    fn test_generate_quick_mode_fields_keeps_builtin_fields() {
+        // Past the cutoff by construction, so only the built-in list can bring it back.
+        let over_cutoff = get_config().limit.quick_mode_num_fields + 100;
+        let mut fields = (0..over_cutoff)
+            .map(|i| Arc::new(Field::new(format!("field{i}"), DataType::Utf8, true)))
+            .collect::<Vec<_>>();
+        fields.push(Arc::new(Field::new("service", DataType::Utf8, true)));
+        let schema = Schema::new(fields);
+
+        let result = generate_quick_mode_fields(&schema, None, &[], false, false);
+
+        assert!(result.iter().any(|f| f.name() == "service"));
+    }
+
+    #[test]
     fn test_generate_quick_mode_fields_skip_original() {
         let fields = vec![
             Arc::new(Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false)),
