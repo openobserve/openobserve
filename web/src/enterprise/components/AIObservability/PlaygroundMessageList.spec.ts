@@ -20,7 +20,7 @@ const OTextarea = {
 };
 
 describe("PlaygroundMessageList", () => {
-  it("uses the textarea width contract for tool arguments", () => {
+  it("places the tool result below the tool metadata", () => {
     const variant = emptyVariant("provider-1", "model-1");
     variant.tools = [
       {
@@ -54,10 +54,15 @@ describe("PlaygroundMessageList", () => {
       },
     });
 
-    expect(
-      wrapper
-        .get("[data-test='ai-playground-message-tool-arguments-tool-result-1']")
-        .attributes("data-width"),
-    ).toBe("xs");
+    const editor = wrapper.get("[data-test='ai-playground-message-tool-editor-tool-result-1']");
+    const metadata = editor.get("[data-test='ai-playground-message-tool-metadata-tool-result-1']");
+    const argumentsField = editor.get(
+      "[data-test='ai-playground-message-tool-arguments-tool-result-1']",
+    );
+    const resultField = editor.get("[data-test='ai-playground-message-input-tool-result-1']");
+
+    expect(argumentsField.attributes("data-width")).toBe("full");
+    expect(metadata.element.contains(argumentsField.element)).toBe(true);
+    expect(metadata.element.contains(resultField.element)).toBe(false);
   });
 });
