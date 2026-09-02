@@ -30,7 +30,10 @@ use tokio::{
     task::JoinHandle,
 };
 
-use super::{job::job_range_end, plan::plan_batches};
+use super::{
+    job::job_range_end,
+    plan::{BatchLimits, plan_batches},
+};
 use crate::worker::{MergeBatch, MergeSender};
 
 /// compactor run steps on a stream:
@@ -166,13 +169,17 @@ pub async fn merge_by_stream(
                 }
             }
 
+            let limits = BatchLimits {
+                strategy: &job_strategy,
+                max_file_size: cfg.compact.max_file_size,
+                max_group_files: cfg.compact.max_group_files,
+                is_incremental,
+                merge_max_original_size: infra_file_list::merge_max_original_size(),
+            };
             let batch_groups: Vec<MergeBatch> = plan_batches(
                 files_with_size,
                 &mode,
-                &job_strategy,
-                cfg.compact.max_file_size,
-                cfg.compact.max_group_files,
-                is_incremental,
+                &limits,
                 &format!("{org_id}/{stream_type}/{stream_name}"),
             )
             .into_iter()

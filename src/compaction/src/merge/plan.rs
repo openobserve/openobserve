@@ -25,81 +25,93 @@ use super::metrics::{MetricsIndexMergeScope, metrics_index_merge_scope};
 /// One planned merge: the files and the mode they merge in.
 type PlannedBatch = (Vec<FileKey>, MergeMode);
 
-/// Splits a partition's files into merge batches. Legacy metrics files never
-/// join a hash-ordered batch: sorting them would be a full sort of the hour,
-/// so they keep their classic size-bounded merges beside the hash group.
-#[allow(clippy::too_many_arguments)]
+/// The size rules one merge round batches files under.
+pub(super) struct BatchLimits<'a> {
+    pub strategy: &'a MergeStrategy,
+    pub max_file_size: usize,
+    pub max_group_files: usize,
+    /// The hour is still open: an unfilled trailing group waits for more files.
+    pub is_incremental: bool,
+    /// The classic merge query's cap: larger files are at their target size.
+    pub merge_max_original_size: i64,
+}
+
+/// Splits a partition's files into merge batches: the legacy metrics files
+/// keep their classic size-bounded merges, everything else merges in `mode`.
 pub(super) fn plan_batches(
-    mut files: Vec<FileKey>,
+    files: Vec<FileKey>,
     mode: &MergeMode,
-    job_strategy: &MergeStrategy,
-    max_file_size: usize,
-    max_group_files: usize,
-    is_incremental: bool,
+    limits: &BatchLimits<'_>,
     stream: &str,
 ) -> Vec<PlannedBatch> {
-    let mut batches = Vec::new();
-    if mode.metrics_file_layout().is_some() {
-        let (hash_files, legacy_files): (Vec<_>, Vec<_>) = files
-            .into_iter()
-            .partition(|f| MetricsFileLayout::of(&f.key).is_some());
-        files = hash_files;
-        for group in size_bounded_groups(
-            &legacy_files,
-            job_strategy,
-            max_file_size,
-            max_group_files,
-            is_incremental,
-        ) {
-            batches.push((group, MergeMode::Classic));
-        }
-    }
-    // what a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`]
-    if mode.is_metrics_indexed() {
-        match metrics_index_merge_scope(&files, max_file_size) {
-            MetricsIndexMergeScope::Skip => files.clear(),
-            MetricsIndexMergeScope::LateFilesOnly => {
-                files.retain(|f| MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::Indexed));
-                log::debug!(
-                    "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed late merge of {} files, indexed files untouched",
-                    files.len()
-                );
-            }
-            MetricsIndexMergeScope::WholeHour => {
-                log::debug!(
-                    "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed fragmentation cap hit, full rewrite of {} files",
-                    files.len()
-                );
-            }
-        }
-    }
+    let (mode_files, mut legacy_files) = split_legacy_metrics(files, mode);
+    // a whole-hour query lists every file; the classic merge never rewrites the full-sized ones
+    legacy_files.retain(|f| f.meta.original_size <= limits.merge_max_original_size);
+    let mut batches: Vec<PlannedBatch> = size_bounded_groups(&legacy_files, limits)
+        .into_iter()
+        .map(|group| (group, MergeMode::Classic))
+        .collect();
+
+    let mode_files = indexed_hour_scope(mode_files, mode, limits.max_file_size, stream);
     if mode.merges_whole_batch() {
-        if !files.is_empty() {
-            batches.push((files, mode.clone()));
+        if !mode_files.is_empty() {
+            batches.push((mode_files, mode.clone()));
         }
     } else {
-        for group in size_bounded_groups(
-            &files,
-            job_strategy,
-            max_file_size,
-            max_group_files,
-            is_incremental,
-        ) {
-            batches.push((group, mode.clone()));
-        }
+        batches.extend(
+            size_bounded_groups(&mode_files, limits)
+                .into_iter()
+                .map(|group| (group, mode.clone())),
+        );
     }
     batches
 }
 
-/// Size-bounded merge groups in the planner's file order.
-fn size_bounded_groups(
-    files: &[FileKey],
-    job_strategy: &MergeStrategy,
+/// Legacy metrics files never join a hash-ordered batch: sorting them would
+/// be a full sort of the hour. Returns `(files for the mode, legacy files)`.
+fn split_legacy_metrics(files: Vec<FileKey>, mode: &MergeMode) -> (Vec<FileKey>, Vec<FileKey>) {
+    if mode.metrics_file_layout().is_none() {
+        return (files, Vec::new());
+    }
+    files
+        .into_iter()
+        .partition(|f| MetricsFileLayout::of(&f.key).is_some())
+}
+
+/// What a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`].
+fn indexed_hour_scope(
+    mut files: Vec<FileKey>,
+    mode: &MergeMode,
     max_file_size: usize,
-    max_group_files: usize,
-    is_incremental: bool,
-) -> Vec<Vec<FileKey>> {
-    let max_file_size = max_file_size as i64;
+    stream: &str,
+) -> Vec<FileKey> {
+    if !mode.is_metrics_indexed() {
+        return files;
+    }
+    match metrics_index_merge_scope(&files, max_file_size) {
+        MetricsIndexMergeScope::Skip => Vec::new(),
+        MetricsIndexMergeScope::LateFilesOnly => {
+            files.retain(|f| MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::Indexed));
+            log::debug!(
+                "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed late merge of {} files, indexed files untouched",
+                files.len()
+            );
+            files
+        }
+        MetricsIndexMergeScope::WholeHour => {
+            log::debug!(
+                "[COMPACTOR] merge_by_stream [{stream}] metrics_indexed fragmentation cap hit, full rewrite of {} files",
+                files.len()
+            );
+            files
+        }
+    }
+}
+
+/// Size-bounded merge groups in the planner's file order.
+fn size_bounded_groups(files: &[FileKey], limits: &BatchLimits<'_>) -> Vec<Vec<FileKey>> {
+    let max_file_size = limits.max_file_size as i64;
+    let max_group_files = limits.max_group_files;
     let mut groups = Vec::new();
     let mut new_file_list: Vec<FileKey> = Vec::new();
     let mut new_file_size = 0;
@@ -108,7 +120,7 @@ fn size_bounded_groups(
             || (max_group_files > 0 && new_file_list.len() >= max_group_files)
         {
             if new_file_list.len() <= 1 {
-                if *job_strategy == MergeStrategy::FileSize {
+                if *limits.strategy == MergeStrategy::FileSize {
                     break;
                 }
                 new_file_list.clear();
@@ -127,7 +139,7 @@ fn size_bounded_groups(
     // NOT seal this remainder: more files will arrive in the still-open hour, and
     // sealing now would force re-merging it later (write amplification). Carry it
     // to the next round; the scheduled hour-end pass seals whatever is left.
-    if new_file_list.len() > 1 && !is_incremental {
+    if new_file_list.len() > 1 && !limits.is_incremental {
         groups.push(new_file_list);
     }
     groups
@@ -157,6 +169,20 @@ mod tests {
             deleted: false,
             selection: None,
             row_group_size: None,
+        }
+    }
+
+    fn limits(
+        strategy: &MergeStrategy,
+        max_group_files: usize,
+        is_incremental: bool,
+    ) -> BatchLimits<'_> {
+        BatchLimits {
+            strategy,
+            max_file_size: 1000,
+            max_group_files,
+            is_incremental,
+            merge_max_original_size: 950,
         }
     }
 
@@ -190,10 +216,7 @@ mod tests {
         let batches = plan_batches(
             files,
             &MergeMode::MetricsIndexed,
-            &MergeStrategy::FileSize,
-            1000,
-            0,
-            false,
+            &limits(&MergeStrategy::FileSize, 0, false),
             "test",
         );
         assert_eq!(batches.len(), 2, "{batches:?}");
@@ -221,16 +244,33 @@ mod tests {
         let batches = plan_batches(
             files,
             &MergeMode::MetricsHashSorted,
-            &MergeStrategy::FileTime,
-            1000,
-            0,
-            true,
+            &limits(&MergeStrategy::FileTime, 0, true),
             "test",
         );
         assert_eq!(batches.len(), 1, "{batches:?}");
         let (legacy, mode) = &batches[0];
         assert!(matches!(mode, MergeMode::Classic), "{mode}");
         assert_eq!(names(legacy), ["1.parquet", "2.parquet", "3.parquet"]);
+    }
+
+    /// The whole-hour listing includes legacy files the classic query caps
+    /// away; they stay untouched instead of being rewritten with a small file.
+    #[test]
+    fn test_plan_batches_legacy_files_at_target_size_are_left_alone() {
+        let files = vec![
+            metrics_file("1.parquet", 960),
+            metrics_file("2.parquet", 10),
+            metrics_file("hash-sorted-v1-3.parquet", 300),
+        ];
+        let batches = plan_batches(
+            files,
+            &MergeMode::MetricsIndexed,
+            &limits(&MergeStrategy::FileTime, 0, false),
+            "test",
+        );
+        assert_eq!(batches.len(), 1, "{batches:?}");
+        assert!(matches!(batches[0].1, MergeMode::MetricsIndexed));
+        assert_eq!(names(&batches[0].0), ["hash-sorted-v1-3.parquet"]);
     }
 
     #[test]
@@ -244,10 +284,7 @@ mod tests {
         let batches = plan_batches(
             files,
             &MergeMode::MetricsIndexed,
-            &MergeStrategy::FileSize,
-            1000,
-            0,
-            false,
+            &limits(&MergeStrategy::FileSize, 0, false),
             "test",
         );
         // the indexed files are left alone; the legacy pair still merges classic
@@ -262,14 +299,14 @@ mod tests {
             .map(|i| metrics_file(&format!("{i}.parquet"), 300))
             .collect();
         // closed hour: [1,2,3] sealed by size, the [4,5] remainder sealed too
-        let closed = size_bounded_groups(&files, &MergeStrategy::FileTime, 1000, 0, false);
+        let closed = size_bounded_groups(&files, &limits(&MergeStrategy::FileTime, 0, false));
         assert_eq!(closed.len(), 2);
         assert_eq!(names(&closed[1]), ["4.parquet", "5.parquet"]);
         // open hour: the remainder waits for more files
-        let open = size_bounded_groups(&files, &MergeStrategy::FileTime, 1000, 0, true);
+        let open = size_bounded_groups(&files, &limits(&MergeStrategy::FileTime, 0, true));
         assert_eq!(open.len(), 1);
         // a group cap seals every two files
-        let capped = size_bounded_groups(&files, &MergeStrategy::FileTime, 1000, 2, false);
+        let capped = size_bounded_groups(&files, &limits(&MergeStrategy::FileTime, 2, false));
         assert_eq!(capped.len(), 2);
     }
 }
