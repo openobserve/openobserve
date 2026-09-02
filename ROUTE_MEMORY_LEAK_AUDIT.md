@@ -11,6 +11,26 @@ signal that looked like a leak — a ResizeObserver growing by +1 per visit on t
 table/list pages — was a **measurement false positive**, not an app bug (see
 §"False positive"). The app's route teardown is disciplined across the board.
 
+## Live cycle benchmark — 10× dashboards↔logs (20 navigations, dev build)
+
+Build-independent instrumentation (wrapped `ResizeObserver`, `window` listener
+net-count, `AbortController` made/fired, `setInterval` net) persisted across
+client-side router navigation; dev-build heap-MB is excluded (reactivity/HMR
+artifact), so only structural counters are reported.
+
+| Signal | Cycle 1 | Cycle 5 | Cycle 10 | Verdict |
+|---|---|---|---|---|
+| ResizeObservers **detached** | 0 | 0 | 0 | zero leaked observers (the reliable signal) |
+| ResizeObservers total | 2 | 2 | 2 | flat — no accumulation |
+| DOM nodes | 1386 | 1407 | 1408 | plateaus — no detached-subtree growth |
+| Intervals net | 0 | −14 | −28 | negative = cleared, not leaked |
+| Window listeners net | −219 | −1665 | −9176 | negative = removed, not leaked |
+| AbortControllers made/fired | 3/3 | 35/30 | 93/78 | small stable gap = normal completions |
+
+A leak drives observer/DOM counts monotonically **up** and listener/interval nets
+monotonically **positive**; here counts are flat and nets go negative — the
+opposite. Empirically confirms disciplined route teardown on the live build.
+
 ## Route inventory & coverage (all 236 routes)
 
 The app declares **236 named routes**, from SEVEN route sources:
@@ -311,7 +331,7 @@ Verified-clean consumers (cancel on unmount / deactivate): `usePanelDataLoader`,
 (`resolveTracesStream`) — a cache-backed one-shot stream-name resolver that fires
 only on cache-miss.
 
-**Total: 11 leaks fixed** (7 committed in `21b78c96f4` + fixes #8–#11 uncommitted).
+**Total: 12 leaks fixed** (7 committed in `21b78c96f4` + fixes #8–#12 uncommitted).
 
 ## App-wide sweep of the non-streaming classes — all clean
 
@@ -327,6 +347,38 @@ After the streaming class, every remaining leak class was swept across `web/src`
 
 **The streaming-cancel-on-unmount class was the last leak class with real defects
 (6 of the 11 fixes). All other classes are clean app-wide.**
+
+### Additional classes swept (also clean)
+
+| Class | Result |
+|---|---|
+| Web Workers (`new Worker`) | `streamWorker` is a module-level singleton (bounded at 1, reused for the app session — terminating it would break the next search); `VideoPlayer`/`useWorker` terminate on unmount |
+| Module-level `Map`/`Set`/array caches | all build-once constant lookups (parser tokens, error codes, level sets); runtime caches (`errorRowsCache`) are bounded by a finite `stream::agent::window` key space |
+| ECharts instances | no undisposed `echarts.init` found |
+| `useStreamingSearch` per-trace state | `cleanUpListeners` deletes both `traceMap[traceId]` and `abortControllers[traceId]` on completion/error — no dead-key accumulation |
+
+### Download-link / detached-node class
+
+| Site | Result |
+|---|---|
+| `Quota.vue` `downloadTemplate` | **FIX #12** — appended the `<a>` to `body` and clicked it but never removed it or revoked the Blob URL; every download leaked a detached-attached node + a Blob URL. Now `removeChild(a)` + `revokeObjectURL(url)` after click, matching the repo idiom (`utils/dom.ts`, SearchBar). |
+| All other download sites | clean — either never `appendChild` (unattached `<a>` is GC'd) or use `data:` URLs (nothing to revoke); `MainLayout` prefetch `<link>` is idempotent (guarded, appended once, persists for app life) |
+
+### npm-dependency (package-internal) leak audit
+
+The two committed patches are themselves package-internal leak fixes; the rest of the
+leak-prone dependency surface was swept and is clean:
+
+| Dependency | Result |
+|---|---|
+| `vue-draggable-next` (SortableJS) | **patched** — `onUnmounted` destroys the Sortable instance + drops the `__draggable_component__` back-ref (SortableJS holds every element in a module-level array) |
+| `@tanstack/vue-form` | **patched** — library called `onMounted(formApi.mount)` and discarded `mount()`'s cleanup return; patch captures it and calls it on unmount |
+| `@vue-flow/core` | clean — every `useVueFlow()` is id-less (library-managed injected store), destroyed by `<VueFlow>` on unmount; no app-owned store |
+| `gridstack` | clean — sole instance (`RenderDashboardCharts`) removes every `.off(...)` listener + `.destroy(false)` + null on `onBeforeUnmount` |
+| `echarts` / `echarts-gl` | clean — every `echarts.init` paired with `chart.dispose()` on unmount |
+| `monaco-editor` | clean — created only in `CodeQueryEditor`, disposed on unmount (window listeners removed, config entry dropped) |
+| `@tanstack/vue-virtual` | clean — disposes via `.unobserve()` (the earlier ResizeObserver net-count false positive) |
+| `leaflet` (via `echarts-extension-leaflet`) | clean — `GeoMapRenderer` unmount does `lmap.off()` + `chart.dispose()`; the extension owns and removes the map on dispose |
 
 ## Does route change clean the heap? (verified)
 
@@ -661,10 +713,9 @@ component. **However, `vue-drag-resize` is not imported anywhere in `src`** (no
 import, no global registration, no dynamic import; nothing else depends on it).
 It is a **dead dependency**, so the bug never executes.
 
-**Recommendation:** remove `vue-drag-resize` from `web/package.json` (dead dep).
-If it is ever actually used, it must first be patched to add
-`beforeUnmount(){ u(this.domEvents) }`. Not patched now — patching an unused
-package is noise, and removing the dependency is the correct fix.
+**DONE (fix #13):** `vue-drag-resize` removed from `web/package.json` and
+`package-lock.json` (verified zero usages in `src`). If it is ever reintroduced,
+it must first be patched to add `beforeUnmount(){ u(this.domEvents) }` for Vue 3.
 
 ## Production-build page sweep (all pages, live)
 
