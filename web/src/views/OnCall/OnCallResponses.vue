@@ -292,19 +292,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OText variant="meta">
             {{ t(`oncall.sectionHint_${sectionKey}`) }}
           </OText>
-
-          <!-- The one action the whole section shares, at its trailing edge. -->
-          <OButton
-            v-if="sectionKey === 'ringing' && sectionCounts.ringing"
-            variant="ghost-primary"
-            size="xs"
-            class="ms-auto"
-            :loading="bulkBusy"
-            data-test="oncall-section-ack-all"
-            @click="acknowledgeAllRinging"
-          >
-            {{ t("oncall.ackAllShort") }}
-          </OButton>
         </div>
       </template>
 
@@ -1457,26 +1444,6 @@ async function bulkResolve() {
     (id) => oncallService.resolveResponse({ org_identifier: orgId.value, response_id: id }),
     "bulkResolveDone",
     "bulkResolvePartial",
-  );
-}
-
-/**
- * Acknowledges every ringing page, not just the selected ones.
- *
- * The selection-driven bulk action still exists for a chosen subset. This is the
- * ringing section heading's action: the count it states is the set it acts on,
- * so claiming it cannot require selecting the rows first.
- */
-async function acknowledgeAllRinging() {
-  const ids = rows.value
-    .filter((row) => rowSection(row) === "ringing")
-    .flatMap((row) => row.escalating.filter((r) => !r.acked_by).map((r) => r.id));
-  if (!ids.length) return;
-  await runBulk(
-    ids,
-    (id) => oncallService.acknowledgeResponse({ org_identifier: orgId.value, response_id: id }),
-    "bulkAckDone",
-    "bulkAckPartial",
   );
 }
 

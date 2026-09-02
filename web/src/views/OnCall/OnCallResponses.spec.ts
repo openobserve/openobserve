@@ -1133,29 +1133,6 @@ describe("OnCallResponses", () => {
     });
   });
 
-  describe("clearing the ringing set", () => {
-    /// The heading states a count and acts on exactly that set, so claiming the
-    /// whole run cannot require selecting its rows first. It is also the only
-    /// place the count lives now: a second copy above the list was read before
-    /// the stat filter, so a filtered list could disagree with it.
-    it("acknowledges every ringing page from the section heading", async () => {
-      service.acknowledgeResponse.mockResolvedValue({} as any);
-      const wrapper = await withPages([
-        page({ id: "a" }),
-        page({ id: "b" }, "al_pay"),
-        page({ id: "c", state: "acknowledged", acked_by: "someone@o2.ai" }, "al_ord"),
-      ]);
-
-      await wrapper.find("[data-test='oncall-section-ack-all']").trigger("click");
-      await flushPromises();
-
-      // The acknowledged one is left alone.
-      expect(service.acknowledgeResponse).toHaveBeenCalledTimes(2);
-      const ids = service.acknowledgeResponse.mock.calls.map((c: any[]) => c[0].response_id);
-      expect(ids.sort()).toEqual(["a", "b"]);
-    });
-  });
-
 });
 
 /// Two things the triage list already held and did not use.
