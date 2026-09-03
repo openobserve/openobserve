@@ -662,23 +662,25 @@ impl Engine {
                 }
             } => {
                 log::info!("[trace_id {trace_id}] [PromQL] streaming fused agg canceled");
-                Err(search_error(ErrorCodes::SearchCancelQuery(
-                    "[PromQL] streaming fused agg canceled".to_string(),
-                )))
+                Err(DataFusionError::Plan(
+                    Error::ErrorCode(ErrorCodes::SearchCancelQuery(
+                        "[PromQL] streaming fused agg canceled".to_string(),
+                    ))
+                    .to_string(),
+                ))
             }
             _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
                 log::error!("[trace_id {trace_id}] [PromQL] streaming fused agg timeout");
-                Err(search_error(ErrorCodes::SearchTimeout(
-                    "[PromQL] streaming fused agg timeout".to_string(),
-                )))
+                Err(DataFusionError::Plan(
+                    Error::ErrorCode(ErrorCodes::SearchTimeout(
+                        "[PromQL] streaming fused agg timeout".to_string(),
+                    ))
+                    .to_string(),
+                ))
             }
             ret = &mut run => ret,
         }
     }
-}
-
-fn search_error(code: ErrorCodes) -> DataFusionError {
-    DataFusionError::Plan(Error::ErrorCode(code).to_string())
 }
 
 /// Discard the already-partitioned series hashes without rebuilding a global
