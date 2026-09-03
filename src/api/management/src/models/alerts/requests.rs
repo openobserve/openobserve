@@ -52,8 +52,8 @@ use super::{Alert, QueryCondition, StreamType};
 /// ```
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct CreateAlertRequestBody {
-    /// Optional folder ID indicating the folder in which to create the alert.
-    /// If omitted the alert will be created in the default folder.
+    /// Optional folder ID. Pass the destination folder in the `folder` query parameter;
+    /// the default folder is used when no folder is given.
     #[schema(example = "default")]
     pub folder_id: Option<String>,
 
