@@ -309,308 +309,326 @@ pub async fn update_user(
     let mut new_role = None;
     let conf = get_config();
     let password_ext_salt = conf.auth.ext_auth_salt.as_str();
-    if let Ok(existing_user) = existing_user {
-        let mut new_user;
-        let mut is_updated = false;
-        let mut password_changed = false;
-        let mut is_org_updated = false;
-        let mut message = "";
-        #[cfg(feature = "enterprise")]
-        let mut custom_roles = vec![];
-        #[cfg(feature = "enterprise")]
-        let mut custom_roles_need_change = false;
-        match existing_user {
-            Some(local_user) => {
-                #[cfg(not(feature = "cloud"))]
-                if local_user.is_external {
-                    return Ok(MetaHttpResponse::bad_request(
-                        "Updates not allowed with external users, please update with source system",
-                    ));
-                }
-                if !update_mode.is_self_update() {
-                    if is_root_user(initiator_id) {
-                        allow_password_update = true
-                    } else {
-                        let initiating_user = match db::user::get(Some(org_id), initiator_id).await
-                        {
-                            Ok(Some(u)) => u,
-                            Ok(None) => {
-                                return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
-                            }
-                            Err(e) => {
-                                log::error!("Error fetching initiating user {initiator_id}: {e}");
-                                return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
-                            }
-                        };
-                        if (local_user.role.eq(&UserRole::Root)
-                            && initiating_user.role.eq(&UserRole::Root))
-                            || (!local_user.role.eq(&UserRole::Root)
-                                && (initiating_user.role.eq(&UserRole::Admin)
-                                    || initiating_user.role.eq(&UserRole::Root)))
-                        {
-                            allow_password_update = true
-                        }
-                    }
-                }
-                if local_user.role.eq(&UserRole::Root)
-                    && !update_mode.is_self_update()
-                    && !update_mode.is_cli_update()
-                {
-                    return Ok(MetaHttpResponse::bad_request(
-                        "Only root user can update its details",
-                    ));
-                }
-                new_user = local_user.clone();
-                if update_mode.is_self_update()
-                    && let Some(old_pass) = &user.old_password
-                    && let Some(new_pass) = &user.new_password
-                {
-                    if local_user
-                        .password
-                        .eq(&get_hash(old_pass, &local_user.salt))
-                    {
-                        // Validated here, not only at the HTTP layer: this is the single funnel
-                        // every password change passes through, and clearing the reset flag below
-                        // must never happen for a password the current policy would reject.
-                        let policy = db::password_policy::get_effective_policy().await;
-                        if let Err(msg) = validate_password_strength_with_policy(new_pass, &policy)
-                        {
-                            return Ok(MetaHttpResponse::bad_request(msg));
-                        }
-                        match password_history::check_reuse_and_record(
-                            email,
-                            &local_user.salt,
-                            new_pass,
-                            &local_user.password,
-                            &policy,
-                        )
-                        .await
-                        {
-                            Ok(hash) => new_user.password = hash,
-                            Err(msg) => return Ok(MetaHttpResponse::bad_request(msg)),
-                        }
-                        new_user.password_ext = Some(get_hash(new_pass, password_ext_salt));
-                        log::info!("Password self updated for user: {email}");
-                        is_updated = true;
-                        password_changed = true;
-                    } else {
-                        message = "Existing/old password mismatch, please provide valid existing password";
-                        return Ok(MetaHttpResponse::bad_request(message));
-                    }
-                } else if update_mode.is_self_update()
-                    && user.new_password.is_some()
-                    && user.old_password.is_none()
-                {
-                    message = "Please provide existing password";
-                } else if !update_mode.is_self_update()
-                    && allow_password_update
-                    && !local_user.is_external
-                    && let Some(new_pass) = user.new_password
-                {
-                    let policy = db::password_policy::get_effective_policy().await;
-                    if let Err(msg) = validate_password_strength_with_policy(&new_pass, &policy) {
-                        return Ok(MetaHttpResponse::bad_request(msg));
-                    }
-                    match password_history::check_reuse_and_record(
-                        email,
-                        &local_user.salt,
-                        &new_pass,
-                        &local_user.password,
-                        &policy,
-                    )
-                    .await
-                    {
-                        Ok(hash) => new_user.password = hash,
-                        Err(msg) => return Ok(MetaHttpResponse::bad_request(msg)),
-                    }
-                    new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
-                    log::info!("Password by root updated for user: {email}");
 
-                    is_updated = true;
-                    password_changed = true;
-                } else if user.new_password.is_some() {
-                    message = "You are not authorised to change the password";
+    let Ok(existing_user) = existing_user else {
+        return Ok(MetaHttpResponse::not_found("User not found"));
+    };
+
+    let mut new_user;
+    let mut is_updated = false;
+    let mut password_changed = false;
+    let mut is_org_updated = false;
+    let mut message = "";
+    #[cfg(feature = "enterprise")]
+    let mut custom_roles = vec![];
+    #[cfg(feature = "enterprise")]
+    let mut custom_roles_need_change = false;
+
+    let Some(local_user) = existing_user else {
+        return Ok(MetaHttpResponse::not_found("User not found"));
+    };
+
+    #[cfg(not(feature = "cloud"))]
+    if local_user.is_external {
+        return Ok(MetaHttpResponse::bad_request(
+            "Updates not allowed with external users, please update with source system",
+        ));
+    }
+    if !update_mode.is_self_update() {
+        if is_root_user(initiator_id) {
+            allow_password_update = true
+        } else {
+            let initiating_user = match db::user::get(Some(org_id), initiator_id).await {
+                Ok(Some(u)) => u,
+                Ok(None) => {
+                    return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
                 }
-                if let Some(first_name) = user.first_name
-                    && !local_user.is_external
-                {
-                    new_user.first_name = first_name;
-                    is_updated = true;
+                Err(e) => {
+                    log::error!("Error fetching initiating user {initiator_id}: {e}");
+                    return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
                 }
-                if let Some(last_name) = user.last_name
-                    && !local_user.is_external
-                {
-                    new_user.last_name = last_name;
-                    is_updated = true;
-                }
-                if let Some(role) = user.role
-                    && (!local_user.is_external || is_cloud)
-                    && (!update_mode.is_self_update()
-                        || (local_user.role.eq(&UserRole::Admin)
+            };
+            if (local_user.role.eq(&UserRole::Root) && initiating_user.role.eq(&UserRole::Root))
+                || (!local_user.role.eq(&UserRole::Root)
+                    && (initiating_user.role.eq(&UserRole::Admin)
+                        || initiating_user.role.eq(&UserRole::Root)))
+            {
+                allow_password_update = true
+            }
+        }
+    }
+
+    if local_user.role.eq(&UserRole::Root)
+        && !update_mode.is_self_update()
+        && !update_mode.is_cli_update()
+    {
+        return Ok(MetaHttpResponse::bad_request(
+            "Only root user can update its details",
+        ));
+    }
+
+    // Clearing a lockout hands the account back its remaining guesses, so it answers to the same
+    // gate as replacing the password outright: root, or an administrator of this org. Never the
+    // locked-out user themselves, which `allow_password_update` already excludes by staying false
+    // on a self-update.
+    let remove_lockout = user.remove_lockout;
+    if remove_lockout && !allow_password_update {
+        return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
+    }
+
+    new_user = local_user.clone();
+    if update_mode.is_self_update()
+        && let Some(old_pass) = &user.old_password
+        && let Some(new_pass) = &user.new_password
+    {
+        if local_user
+            .password
+            .eq(&get_hash(old_pass, &local_user.salt))
+        {
+            // Validated here, not only at the HTTP layer: this is the single funnel
+            // every password change passes through, and clearing the reset flag below
+            // must never happen for a password the current policy would reject.
+            let policy = db::password_policy::get_effective_policy().await;
+            if let Err(msg) = validate_password_strength_with_policy(new_pass, &policy) {
+                return Ok(MetaHttpResponse::bad_request(msg));
+            }
+            match password_history::check_reuse_and_record(
+                email,
+                &local_user.salt,
+                new_pass,
+                &local_user.password,
+                &policy,
+            )
+            .await
+            {
+                Ok(hash) => new_user.password = hash,
+                Err(msg) => return Ok(MetaHttpResponse::bad_request(msg)),
+            }
+            new_user.password_ext = Some(get_hash(new_pass, password_ext_salt));
+            log::info!("Password self updated for user: {email}");
+            is_updated = true;
+            password_changed = true;
+        } else {
+            message = "Existing/old password mismatch, please provide valid existing password";
+            return Ok(MetaHttpResponse::bad_request(message));
+        }
+    } else if update_mode.is_self_update()
+        && user.new_password.is_some()
+        && user.old_password.is_none()
+    {
+        message = "Please provide existing password";
+    } else if !update_mode.is_self_update()
+        && allow_password_update
+        && !local_user.is_external
+        && let Some(new_pass) = user.new_password
+    {
+        let policy = db::password_policy::get_effective_policy().await;
+        if let Err(msg) = validate_password_strength_with_policy(&new_pass, &policy) {
+            return Ok(MetaHttpResponse::bad_request(msg));
+        }
+        match password_history::check_reuse_and_record(
+            email,
+            &local_user.salt,
+            &new_pass,
+            &local_user.password,
+            &policy,
+        )
+        .await
+        {
+            Ok(hash) => new_user.password = hash,
+            Err(msg) => return Ok(MetaHttpResponse::bad_request(msg)),
+        }
+        new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
+        log::info!("Password by root updated for user: {email}");
+
+        is_updated = true;
+        password_changed = true;
+    } else if user.new_password.is_some() {
+        message = "You are not authorised to change the password";
+    }
+    if let Some(first_name) = user.first_name
+        && !local_user.is_external
+    {
+        new_user.first_name = first_name;
+        is_updated = true;
+    }
+    if let Some(last_name) = user.last_name
+        && !local_user.is_external
+    {
+        new_user.last_name = last_name;
+        is_updated = true;
+    }
+    if let Some(role) = user.role
+        && (!local_user.is_external || is_cloud)
+        && (!update_mode.is_self_update()
+            || (local_user.role.eq(&UserRole::Admin)
                             // Editor can update other's roles, but viewer can update only self
                             || local_user.role.eq(&UserRole::Editor)
                             || local_user.role.eq(&UserRole::Viewer)
                             || local_user.role.eq(&UserRole::Root)))
-                // if the User Role is Root, we do not change the Role
-                // Admins Role can still be mutable.
-                {
-                    let new_org_role = UserOrgRole::from(&role);
-                    old_role = Some(new_user.role);
-                    new_user.role = new_org_role.base_role;
-                    new_role = Some(new_user.role.clone());
-                    if local_user.role.eq(&UserRole::Root) && new_user.role.ne(&UserRole::Root) {
-                        message = "Root user role cannot be changed";
-                    } else if update_mode.is_self_update() && local_user.role < new_user.role {
-                        message = "Self role cannot be upgraded";
-                    } else {
-                        is_org_updated |= local_user.role.ne(&new_user.role);
-                        #[cfg(feature = "enterprise")]
-                        if let Some(cr) = new_org_role.custom_role {
-                            custom_roles_need_change = true;
-                            custom_roles.extend(cr);
-                            is_org_updated = true;
-                        }
+    // if the User Role is Root, we do not change the Role
+    // Admins Role can still be mutable.
+    {
+        let new_org_role = UserOrgRole::from(&role);
+        old_role = Some(new_user.role);
+        new_user.role = new_org_role.base_role;
+        new_role = Some(new_user.role.clone());
+        if local_user.role.eq(&UserRole::Root) && new_user.role.ne(&UserRole::Root) {
+            message = "Root user role cannot be changed";
+        } else if update_mode.is_self_update() && local_user.role < new_user.role {
+            message = "Self role cannot be upgraded";
+        } else {
+            is_org_updated |= local_user.role.ne(&new_user.role);
+            #[cfg(feature = "enterprise")]
+            if let Some(cr) = new_org_role.custom_role {
+                custom_roles_need_change = true;
+                custom_roles.extend(cr);
+                is_org_updated = true;
+            }
+        }
+    }
+    // Token replacement is a privileged operation — only allow if the
+    // initiator is updating their own token OR has password-update rights
+    // (i.e. Root or Admin updating a non-root user).
+    if let Some(token) = user.token
+        && (update_mode.is_self_update() || allow_password_update)
+    {
+        new_user.token = token;
+        is_org_updated = true;
+    }
+
+    if !message.is_empty() {
+        return Ok(MetaHttpResponse::bad_request(message));
+    }
+
+    if !is_updated && !is_org_updated && !remove_lockout {
+        return Ok(MetaHttpResponse::bad_request("No changes to update"));
+    }
+
+    // Ahead of the record writes below: an unlock that the caller asked for must not be skipped
+    // because a later write failed, and it is safe to repeat if they retry the whole update.
+    if remove_lockout {
+        if let Err(e) = infra::table::user_auth_state::reset(email).await {
+            log::error!("Error clearing the lockout for {email}: {e}");
+            return Ok(MetaHttpResponse::internal_error(
+                "Failed to clear the lockout",
+            ));
+        }
+        log::info!("Lockout cleared for {email} by {initiator_id}");
+    }
+
+    // `password_changed` also clears whatever the user was flagged for and restarts
+    // their rotation clock, in the same statement as the new hash: the password has
+    // just been validated against the current policy, so there is nothing left to hold
+    // them to.
+    if is_updated
+        && db::user::update(
+            email,
+            &new_user.first_name,
+            &new_user.last_name,
+            &new_user.password,
+            new_user.password_ext,
+            password_changed,
+        )
+        .await
+        .is_err()
+    {
+        return Ok(MetaHttpResponse::internal_error("Failed to update user"));
+    }
+
+    // Update the organization membership
+    if is_org_updated {
+        if db::org_users::get(org_id, email).await.is_ok() {
+            if let Err(e) = db::org_users::update(
+                org_id,
+                email,
+                new_user.role,
+                &new_user.token,
+                new_user.rum_token,
+            )
+            .await
+            {
+                log::error!("Error updating org user relation: {e}");
+                return Ok(MetaHttpResponse::internal_error(
+                    "Failed to update organization membership for user",
+                ));
+            }
+        } else if let Err(e) = db::org_users::add(
+            org_id,
+            email,
+            new_user.role,
+            &new_user.token,
+            new_user.rum_token,
+        )
+        .await
+        {
+            log::error!("Error adding org user relation: {e}");
+            return Ok(MetaHttpResponse::internal_error(
+                "Failed to add organization membership for user",
+            ));
+        }
+
+        #[cfg(feature = "enterprise")]
+        {
+            use o2_openfga::authorizer::{
+                authz::{get_user_crole_tuple, update_tuples, update_user_role},
+                roles::{get_role_key, get_roles_for_org_user, get_user_crole_removal_tuples},
+            };
+
+            if get_openfga_config().enabled
+                && let Some(old) = old_role
+                && let Some(new) = new_role
+            {
+                if !old.eq(&new) {
+                    let mut old_str = old.to_string();
+                    let mut new_str = new.to_string();
+                    if old.eq(&UserRole::User) || old.is_service_account() {
+                        old_str = "allowed_user".to_string();
+                    }
+                    if new.eq(&UserRole::User) || new.is_service_account() {
+                        new_str = "allowed_user".to_string();
+                    }
+                    if old_str != new_str {
+                        log::debug!(
+                            "updating openfga role for {email} from {old_str} to {new_str}"
+                        );
+                        update_user_role(&old_str, &new_str, email, org_id).await;
                     }
                 }
-                // Token replacement is a privileged operation — only allow if the
-                // initiator is updating their own token OR has password-update rights
-                // (i.e. Root or Admin updating a non-root user).
-                if let Some(token) = user.token
-                    && (update_mode.is_self_update() || allow_password_update)
-                {
-                    new_user.token = token;
-                    is_org_updated = true;
-                }
-
-                if !message.is_empty() {
-                    return Ok(MetaHttpResponse::bad_request(message));
-                }
-
-                if !is_updated && !is_org_updated {
-                    return Ok(MetaHttpResponse::bad_request("No changes to update"));
-                }
-
-                // `password_changed` also clears whatever the user was flagged for and restarts
-                // their rotation clock, in the same statement as the new hash: the password has
-                // just been validated against the current policy, so there is nothing left to hold
-                // them to.
-                if is_updated
-                    && db::user::update(
-                        email,
-                        &new_user.first_name,
-                        &new_user.last_name,
-                        &new_user.password,
-                        new_user.password_ext,
-                        password_changed,
-                    )
-                    .await
-                    .is_err()
-                {
-                    return Ok(MetaHttpResponse::internal_error("Failed to update user"));
-                }
-
-                // Update the organization membership
-                if is_org_updated {
-                    if db::org_users::get(org_id, email).await.is_ok() {
-                        if let Err(e) = db::org_users::update(
-                            org_id,
-                            email,
-                            new_user.role,
-                            &new_user.token,
-                            new_user.rum_token,
-                        )
-                        .await
-                        {
-                            log::error!("Error updating org user relation: {e}");
-                            return Ok(MetaHttpResponse::internal_error(
-                                "Failed to update organization membership for user",
-                            ));
+                if custom_roles_need_change {
+                    let existing_roles = get_roles_for_org_user(org_id, email).await;
+                    let mut write_tuples = vec![];
+                    let mut delete_tuples = vec![];
+                    custom_roles.iter().for_each(|crole| {
+                        if !existing_roles.contains(crole) {
+                            write_tuples.push(get_user_crole_tuple(org_id, crole, email));
                         }
-                    } else if let Err(e) = db::org_users::add(
-                        org_id,
-                        email,
-                        new_user.role,
-                        &new_user.token,
-                        new_user.rum_token,
-                    )
-                    .await
-                    {
-                        log::error!("Error adding org user relation: {e}");
+                    });
+                    existing_roles.iter().for_each(|crole| {
+                        if !custom_roles.contains(crole) {
+                            get_user_crole_removal_tuples(
+                                email,
+                                &get_role_key(org_id, crole),
+                                &mut delete_tuples,
+                            );
+                        }
+                    });
+                    if let Err(e) = update_tuples(write_tuples, delete_tuples).await {
+                        log::error!(
+                            "Error updating custom roles for user {email} in {org_id} org : {e}"
+                        );
                         return Ok(MetaHttpResponse::internal_error(
-                            "Failed to add organization membership for user",
+                            "Failed to update custom roles for user",
                         ));
                     }
-
-                    #[cfg(feature = "enterprise")]
-                    {
-                        use o2_openfga::authorizer::{
-                            authz::{get_user_crole_tuple, update_tuples, update_user_role},
-                            roles::{
-                                get_role_key, get_roles_for_org_user, get_user_crole_removal_tuples,
-                            },
-                        };
-
-                        if get_openfga_config().enabled
-                            && let Some(old) = old_role
-                            && let Some(new) = new_role
-                        {
-                            if !old.eq(&new) {
-                                let mut old_str = old.to_string();
-                                let mut new_str = new.to_string();
-                                if old.eq(&UserRole::User) || old.is_service_account() {
-                                    old_str = "allowed_user".to_string();
-                                }
-                                if new.eq(&UserRole::User) || new.is_service_account() {
-                                    new_str = "allowed_user".to_string();
-                                }
-                                if old_str != new_str {
-                                    log::debug!(
-                                        "updating openfga role for {email} from {old_str} to {new_str}"
-                                    );
-                                    update_user_role(&old_str, &new_str, email, org_id).await;
-                                }
-                            }
-                            if custom_roles_need_change {
-                                let existing_roles = get_roles_for_org_user(org_id, email).await;
-                                let mut write_tuples = vec![];
-                                let mut delete_tuples = vec![];
-                                custom_roles.iter().for_each(|crole| {
-                                    if !existing_roles.contains(crole) {
-                                        write_tuples
-                                            .push(get_user_crole_tuple(org_id, crole, email));
-                                    }
-                                });
-                                existing_roles.iter().for_each(|crole| {
-                                    if !custom_roles.contains(crole) {
-                                        get_user_crole_removal_tuples(
-                                            email,
-                                            &get_role_key(org_id, crole),
-                                            &mut delete_tuples,
-                                        );
-                                    }
-                                });
-                                if let Err(e) = update_tuples(write_tuples, delete_tuples).await {
-                                    log::error!(
-                                        "Error updating custom roles for user {email} in {org_id} org : {e}"
-                                    );
-                                    return Ok(MetaHttpResponse::internal_error(
-                                        "Failed to update custom roles for user",
-                                    ));
-                                }
-                            }
-                        }
-                    }
                 }
-
-                #[cfg(not(feature = "enterprise"))]
-                log::debug!("Role changed from {old_role:?} to {new_role:?}");
-                Ok(MetaHttpResponse::ok("User updated successfully"))
             }
-            None => Ok(MetaHttpResponse::not_found("User not found")),
         }
-    } else {
-        Ok(MetaHttpResponse::not_found("User not found"))
     }
+
+    #[cfg(not(feature = "enterprise"))]
+    log::debug!("Role changed from {old_role:?} to {new_role:?}");
+    Ok(MetaHttpResponse::ok("User updated successfully"))
 }
 
 pub async fn add_admin_to_org(org_id: &str, user_email: &str) -> Result<(), anyhow::Error> {
@@ -770,6 +788,32 @@ pub async fn get_user(org_id: Option<&str>, name: &str) -> Option<User> {
         Some(loc_user) => Some(loc_user),
         None => db::user::get(Some(org_id), name).await.ok().flatten(),
     }
+}
+
+/// One member of `org_id`, shaped exactly as `list_users` reports them.
+///
+/// `None` means the account holds no membership in this organization. An account that exists
+/// elsewhere is not this organization's to describe, so it is absent rather than forbidden.
+pub async fn get_user_details(org_id: &str, email: &str) -> Option<UserResponse> {
+    let org_user = db::org_users::get(org_id, email).await.ok()?;
+    let user = get_user(Some(org_id), email).await?;
+    let token = user
+        .role
+        .is_service_account()
+        .then(|| redact_token(&org_user.token));
+    let is_system = organization::is_system_service_account(&user.email);
+    Some(UserResponse {
+        email: user.email,
+        role: user.role.to_string(),
+        first_name: user.first_name,
+        last_name: user.last_name,
+        is_external: user.is_external,
+        orgs: None,
+        created_at: org_user.created_at,
+        token,
+        is_system,
+        description: is_system.then(|| "Used by the AI SRE Agent.".to_string()),
+    })
 }
 
 pub async fn get_user_by_token(org_id: &str, token: &str) -> Option<User> {
@@ -1597,6 +1641,7 @@ mod tests {
                     custom: None,
                 }),
                 change_password: false,
+                remove_lockout: false,
             },
         )
         .await;
@@ -1619,6 +1664,7 @@ mod tests {
                     custom: None,
                 }),
                 change_password: false,
+                remove_lockout: false,
             },
         )
         .await;
@@ -1851,6 +1897,7 @@ mod tests {
                 new_password: None,
                 role: None,
                 change_password: false,
+                remove_lockout: false,
             },
         )
         .await;
@@ -1871,6 +1918,7 @@ mod tests {
                 new_password: None,
                 role: None,
                 change_password: false,
+                remove_lockout: false,
             },
         )
         .await;
@@ -1924,6 +1972,7 @@ mod tests {
                 new_password: Some("Newpass#1234".to_string()),
                 role: None,
                 change_password: true,
+                remove_lockout: false,
             },
         )
         .await
@@ -2064,6 +2113,98 @@ mod tests {
                 new_password: Some(new.to_string()),
                 role: None,
                 change_password: true,
+                remove_lockout: false,
+            },
+        )
+        .await
+        .unwrap()
+    }
+
+    /// Clearing a lockout is the one administrative act that leaves no trace on the user record,
+    /// so it has to be gated on its own: nothing else in the request tells the caller apart.
+    #[tokio::test]
+    async fn test_only_an_administrator_can_clear_a_lockout() {
+        let _guard = set_up().await;
+
+        let email = "locked@zo.dev";
+        let resp = post_user(
+            "dummy",
+            UserRequest {
+                email: email.to_string(),
+                password: "Pass#1234".to_string(),
+                role: common::meta::user::UserOrgRole {
+                    base_role: UserRole::Viewer,
+                    custom_role: None,
+                },
+                first_name: "locked".to_owned(),
+                last_name: "".to_owned(),
+                is_external: false,
+                token: None,
+            },
+            "admin@zo.dev",
+        )
+        .await;
+        assert!(resp.is_ok());
+
+        infra_table::user_auth_state::insert_first_failure(email, 1)
+            .await
+            .unwrap();
+
+        // The locked-out user is exactly who must not be able to lift their own lock.
+        assert_eq!(
+            clear_lockout(email, UserUpdateMode::SelfUpdate, email)
+                .await
+                .status(),
+            403
+        );
+        assert_eq!(
+            clear_lockout(email, UserUpdateMode::OtherUpdate, email)
+                .await
+                .status(),
+            403,
+            "a viewer administers nobody, itself included"
+        );
+        assert_eq!(
+            infra_table::user_auth_state::get(email)
+                .await
+                .unwrap()
+                .unwrap()
+                .failed_attempts,
+            1,
+            "a refused request must not have touched the counters"
+        );
+
+        assert_eq!(
+            clear_lockout(email, UserUpdateMode::OtherUpdate, "admin@zo.dev")
+                .await
+                .status(),
+            200
+        );
+        assert_eq!(
+            infra_table::user_auth_state::get(email)
+                .await
+                .unwrap()
+                .unwrap()
+                .failed_attempts,
+            0
+        );
+    }
+
+    async fn clear_lockout(email: &str, mode: UserUpdateMode, initiator: &str) -> Response {
+        update_user(
+            "dummy",
+            email,
+            mode,
+            initiator,
+            UpdateUser {
+                token: None,
+                first_name: None,
+                last_name: None,
+                old_password: None,
+                new_password: None,
+                role: None,
+                change_password: false,
+                remove_lockout: true,
             },
         )
         .await

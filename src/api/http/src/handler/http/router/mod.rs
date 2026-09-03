@@ -32,8 +32,8 @@ use openobserve_api_management::request::cloud;
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, folders, kv, model_pricing,
-    organization, password_policy, service_accounts, short_url, slos, sourcemaps, status,
-    status_pages, stream, synthetics, users,
+    organization, service_accounts, short_url, slos, sourcemaps, status, status_pages, stream,
+    synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{promql, search, traces};
@@ -783,7 +783,7 @@ pub fn service_routes() -> Router {
     router = router.route("/{org_id}/config", get(status::zo_config));
     // Users
     router = router.route("/{org_id}/users", get(users::list).post(users::save))
-        .route("/{org_id}/users/{email_id}", post(users::add_user_to_org).put(users::update).delete(users::delete))
+        .route("/{org_id}/users/{email_id}", get(users::get).post(users::add_user_to_org).put(users::update).delete(users::delete))
         .route("/{org_id}/users/bulk", delete(users::delete_bulk))
         .route("/{org_id}/users/roles", get(users::list_roles))
         .route("/invites", get(users::list_invitations))
@@ -809,8 +809,6 @@ pub fn service_routes() -> Router {
 
         // Instance-wide native-user auth policy: authored on the meta org, enforced everywhere
         .route("/{org_id}/settings/password_policy", get(organization::password_policy::get_policy).put(organization::password_policy::set_policy))
-        // Administering the lockout that policy enforces: the only thing that ends one early
-        .route("/{org_id}/settings/password_policy/lockouts/{email_id}", get(password_policy::lockout::get_lockout).delete(password_policy::lockout::delete_lockout))
         // Complexity requirements only: readable by any authenticated user, including one the
         // policy middleware has blocked, who needs to know what password will satisfy it
         .route("/{org_id}/password_complexity", get(organization::password_policy::get_password_complexity))
@@ -2104,20 +2102,20 @@ mod tests {
         let _ = service_routes();
     }
 
-    /// A caller who administers neither the named org nor the instance gets nothing from either
-    /// method — a read that leaks the counters and a write that unlocks the account are each worth
-    /// refusing on their own. Which administrators *are* admitted, and over whom, is unit-tested
-    /// against `validate_lockout_admin` in the handler crate.
+    /// The lockout counters ride along with the user record, and reading them tells the account
+    /// exactly how to pace attempts underneath the threshold — so a caller who does not administer
+    /// the named org gets nothing. Which administrators *are* admitted is unit-tested against
+    /// `validate_user_admin` in the handler crate.
     ///
     /// The caller is seeded as a real member of both organizations, holding a role that is not an
     /// administrator's. An unseeded caller would be refused for having no row to read a role from,
     /// which would pass this test against a check that admitted every user it could find.
     #[tokio::test]
-    async fn lockout_routes_refuse_a_caller_who_administers_nothing() {
+    async fn user_read_refuses_a_caller_who_administers_nothing() {
         use common::infra::config::{ORG_USERS, USERS};
         use config::meta::user::{UserRole, UserType};
 
-        let caller = "viewer@lockout-routes.test";
+        let caller = "viewer@user-read-routes.test";
         let target = "target@example.com";
         USERS.insert(
             caller.to_string(),
@@ -2139,9 +2137,8 @@ mod tests {
             },
         );
         // The target is seeded as a member too, so the caller's role is the ONLY thing left that
-        // can refuse these requests. Without it a check that admitted the caller would
-        // still answer 403 — for the target not being a member — and this test could not
-        // tell the two apart.
+        // can refuse these requests. Without it a check that admitted the caller would still
+        // answer — for the target not being a member — and this test could not tell the two apart.
         for (org, email) in [("acme", caller), ("_meta", caller), ("acme", target)] {
             ORG_USERS.insert(
                 format!("{org}/{email}"),
@@ -2157,39 +2154,22 @@ mod tests {
             );
         }
 
-        let app = Router::new().route(
-            "/{org_id}/settings/password_policy/lockouts/{email_id}",
-            get(password_policy::lockout::get_lockout)
-                .delete(password_policy::lockout::delete_lockout),
-        );
+        let app = Router::new().route("/{org_id}/users/{email_id}", get(users::get));
 
-        for (method, uri, case) in [
+        for (uri, case) in [
             (
-                Method::GET,
-                "/acme/settings/password_policy/lockouts/target@example.com",
+                "/acme/users/target@example.com",
                 "read on an org the caller does not administer",
             ),
             (
-                Method::DELETE,
-                "/acme/settings/password_policy/lockouts/target@example.com",
-                "unlock on an org the caller does not administer",
-            ),
-            (
-                Method::GET,
-                "/_meta/settings/password_policy/lockouts/target@example.com",
+                "/_meta/users/target@example.com",
                 "read by a non-admin on the meta org",
-            ),
-            (
-                Method::DELETE,
-                "/_meta/settings/password_policy/lockouts/target@example.com",
-                "unlock by a non-admin on the meta org",
             ),
         ] {
             let refused = app
                 .clone()
                 .oneshot(
                     Request::builder()
-                        .method(method)
                         .uri(uri)
                         .header("user_id", caller)
                         .body(Body::empty())

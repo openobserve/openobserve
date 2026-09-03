@@ -29,12 +29,19 @@ use config::{
     meta::user::UserRole,
     utils::{base64, json, password::validate_password_strength_with_policy},
 };
-use openobserve_api_common::{auth::validator::AuthError, extractors::Headers};
+use openobserve_api_common::{
+    auth::{
+        login_lockout::{self, LockoutState},
+        validator::AuthError,
+    },
+    extractors::Headers,
+};
 use openobserve_core::{
     auth::{UserEmail, generate_presigned_url, is_valid_email},
     users,
 };
 use serde::Serialize;
+use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
     audit::audit,
@@ -51,13 +58,25 @@ use crate::{
         http::HttpResponse as MetaHttpResponse,
         user::{
             AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser, UpdateUser,
-            UserOrgRole, UserRequest, UserRoleRequest, UserUpdateMode, get_roles,
+            UserOrgRole, UserRequest, UserResponse, UserRoleRequest, UserUpdateMode, get_roles,
         },
     },
     request::{BulkDeleteRequest, BulkDeleteResponse, password_policy::password_rotation},
 };
 
 pub mod service_accounts;
+
+/// One organization member, as the list endpoint reports them, plus their lockout state.
+///
+/// The counters are an administrator's view and must not be handed to the user they describe:
+/// someone who can read the escalation level and the remaining seconds can derive the thresholds
+/// behind them and pace attempts to stay underneath.
+#[derive(Serialize, ToSchema)]
+pub struct UserDetailsResponse {
+    #[serde(flatten)]
+    pub user: UserResponse,
+    pub lockout: LockoutState,
+}
 
 /// ListUsers
 #[utoipa::path(
@@ -131,6 +150,78 @@ pub async fn list(
     {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+/// GetUser
+#[utoipa::path(
+    get,
+    path = "/{org_id}/users/{email_id}",
+    context_path = "/api",
+    tag = "Users",
+    operation_id = "UserGet",
+    summary = "Get a single organization user",
+    description = "Returns one member of the organization — the same record the list endpoint \
+                   reports — together with their failed-login lockout state: whether they are \
+                   currently locked out of password authentication, how long is left on the lock, \
+                   and the failure counters behind it. Requires Root or Admin on the named \
+                   organization, and the user must belong to it. A user who has never failed a \
+                   login is reported as unlocked with zeroed counters rather than as missing.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("email_id" = String, Path, description = "User's email id"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = UserDetailsResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+        (status = 404, description = "Not Found", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Users", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "Get a user's details and lockout state", "category": "users"}))
+    )
+)]
+pub async fn get(
+    Path((org_id, email_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    let email_id = email_id.trim().to_lowercase();
+    if let Err(e) = validate_user_admin(&org_id, &user_email.user_id).await {
+        return MetaHttpResponse::forbidden(e);
+    }
+
+    let Some(user) = users::get_user_details(&org_id, &email_id).await else {
+        return MetaHttpResponse::not_found("User not found");
+    };
+
+    match login_lockout::lockout_state(&email_id).await {
+        Ok(lockout) => MetaHttpResponse::json(UserDetailsResponse { user, lockout }),
+        Err(e) => {
+            log::error!("{e}");
+            MetaHttpResponse::internal_error("Failed to read the lockout state")
+        }
+    }
+}
+
+/// Who may read another member's record, and the counters that come with it.
+///
+/// The same rule `update_user` applies before it will reset a password or clear a lockout: root
+/// administers the instance, everyone else must administer the organization named in the path.
+/// Whether the *target* belongs to that organization is not decided here — the record lookup is
+/// org-scoped, so a user outside it is simply not found.
+async fn validate_user_admin(org_id: &str, initiator_id: &str) -> Result<(), String> {
+    if db::user::is_root_user(initiator_id) {
+        return Ok(());
+    }
+
+    match users::get_user(Some(org_id), initiator_id).await {
+        Some(user) if matches!(user.role, UserRole::Root | UserRole::Admin) => Ok(()),
+        _ => Err(format!(
+            "Reading a user's details requires Root or Admin on {org_id}"
+        )),
     }
 }
 
@@ -233,7 +324,9 @@ pub async fn save(
     description = "Updates user account information including role assignments, password changes, or other profile details. \
                    Users can modify their own account settings, while administrators have broader permissions to update \
                    any user account. Password changes require the new password to be at least 8 characters long for \
-                   security compliance.",
+                   security compliance. Setting remove_lockout releases an active failed-login lockout and resets the \
+                   counters; it answers to the same gate as an administrative password reset, so Root or Admin on the \
+                   organization, and never the locked-out user themselves.",
     security(
         ("Authorization"= [])
     ),
@@ -1282,5 +1375,78 @@ mod tests {
         assert!(validate_org_id("default").is_none());
         assert!(validate_org_id("my-org").is_none());
         assert!(validate_org_id(" default ").is_none());
+    }
+
+    /// Seeds the caches a running node fills from the coordinator watcher. Nothing watches under
+    /// test, and every allow path below is answered from these two alone — a miss would reach for
+    /// the database.
+    fn join(org_id: &str, email: &str, role: UserRole) {
+        common::infra::config::USERS.insert(
+            email.to_string(),
+            infra::table::users::UserRecord {
+                email: email.to_string(),
+                first_name: "F".to_string(),
+                last_name: "L".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root: role == UserRole::Root,
+                password_ext: None,
+                user_type: config::meta::user::UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        common::infra::config::ORG_USERS.insert(
+            format!("{org_id}/{email}"),
+            infra::table::org_users::OrgUserRecord {
+                role,
+                token: "token".to_string(),
+                rum_token: None,
+                org_id: org_id.to_string(),
+                email: email.to_string(),
+                created_at: 0,
+                allow_static_token: true,
+            },
+        );
+    }
+
+    #[tokio::test]
+    async fn an_org_admin_reads_its_own_org() {
+        let org = "user-get-acme";
+        let admin = "admin@user-get-acme.test";
+        join(org, admin, UserRole::Admin);
+
+        assert!(validate_user_admin(org, admin).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn a_non_admin_is_refused_its_own_org() {
+        let org = "user-get-viewer";
+        let viewer = "viewer@user-get-viewer.test";
+        join(org, viewer, UserRole::Viewer);
+
+        assert!(validate_user_admin(org, viewer).await.is_err());
+    }
+
+    /// The org boundary is the whole point: administering one tenant must not reach into another.
+    #[tokio::test]
+    async fn administering_one_org_does_not_reach_another() {
+        let (mine, theirs) = ("user-get-mine", "user-get-theirs");
+        let admin = "admin@user-get-mine.test";
+        join(mine, admin, UserRole::Admin);
+
+        assert!(validate_user_admin(theirs, admin).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn root_reads_any_org() {
+        let root = "root@user-get-root.test";
+        join(config::DEFAULT_ORG, root, UserRole::Root);
+
+        assert!(validate_user_admin("user-get-any", root).await.is_ok());
     }
 }

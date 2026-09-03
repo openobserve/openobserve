@@ -257,6 +257,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                             } else {
                                 Some(cfg.auth.root_user_token.clone())
                             },
+                            remove_lockout: false,
                         },
                     )
                     .await?;

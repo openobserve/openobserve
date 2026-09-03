@@ -126,6 +126,11 @@ pub struct UpdateUser {
     pub role: Option<UserRoleRequest>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
+    /// Releases an active failed-login lockout and resets the counters. Nothing else ends one
+    /// early — not even a password change, since the lock records attempts rather than the
+    /// password — and it is gated like a password reset by an administrator.
+    #[serde(default)]
+    pub remove_lockout: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -621,6 +626,7 @@ mod tests {
                 custom: None,
             }),
             token: Some("token123".to_string()),
+            remove_lockout: false,
         };
 
         assert!(update.change_password);

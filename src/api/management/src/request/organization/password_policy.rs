@@ -60,9 +60,7 @@ fn validate_meta_org_access(org_id: &str) -> Result<(), String> {
 
 /// Both methods additionally require Root or Admin on `_meta`. See the module docs for why this is
 /// enforced here rather than left to the OpenFGA `settings` grant.
-///
-/// Shared with the lockout routes, which administer the same policy and answer to the same rule.
-pub async fn validate_meta_admin(org_id: &str, user_id: &str) -> Result<(), String> {
+async fn validate_meta_admin(org_id: &str, user_id: &str) -> Result<(), String> {
     validate_meta_org_access(org_id)?;
 
     // Root's membership lives on the default org, so it will not always be found under `_meta`.
