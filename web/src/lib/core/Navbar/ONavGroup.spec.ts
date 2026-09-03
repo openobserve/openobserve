@@ -298,6 +298,151 @@ describe("ONavGroup", () => {
     });
   });
 
+  // The always-present Infra tile and its anchor-child tile link (design 4.7/§6):
+  // the tile's destination follows the DECLARED child that resolves to
+  // parentLink (dbmDatabases); when that child gates out, the first visible
+  // child wins — NOT the first declared child, which is now ungated Hosts.
+  describe("Infra tile with workload children (Hosts first)", () => {
+    // Exposes the resolved tile link so the anchor-child rule is assertable.
+    const linkedTileStub = {
+      template:
+        '<a data-test="tile" href="#" :data-link="link" @click.prevent="$emit(\'click\')">{{ title }}</a>',
+      props: ["submenu", "asTrigger", "title", "icon", "link", "active", "expanded", "mini"],
+      emits: ["click", "keydown"],
+    };
+
+    const infraChildren = (): SubnavChild[] => [
+      { titleKey: "menu.hosts", icon: "dns", name: "infraHosts" },
+      {
+        titleKey: "menu.databases",
+        icon: "database",
+        name: "dbmDatabases",
+        gate: "databaseMonitoring",
+      },
+      { titleKey: "menu.kubernetes", icon: "hub", name: "infraKubernetes" },
+      { titleKey: "menu.awsInfra", icon: "cloud", name: "infraAws" },
+    ];
+
+    function infraRouter() {
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/", name: "home", component: { template: "<div />" } },
+          { path: "/infra/hosts", name: "infraHosts", component: { template: "<div />" } },
+          { path: "/infra/databases", name: "dbmDatabases", component: { template: "<div />" } },
+          {
+            path: "/infra/kubernetes",
+            name: "infraKubernetes",
+            component: { template: "<div />" },
+          },
+          { path: "/infra/aws", name: "infraAws", component: { template: "<div />" } },
+          { path: "/streams", name: "logstreams", component: { template: "<div />" } },
+          { path: "/pipelines", name: "pipelines", component: { template: "<div />" } },
+        ],
+      });
+    }
+
+    function infraStore(dbmEnabled: boolean, hiddenMenus = "") {
+      return createStore({
+        state: () => ({
+          theme: "light",
+          zoConfig: {
+            database_monitoring_enabled: dbmEnabled,
+            custom_hide_menus: hiddenMenus,
+          },
+          organizationData: {},
+          selectedOrganization: { identifier: "default" },
+        }),
+      });
+    }
+
+    function mountInfraTile(
+      dbmEnabled: boolean,
+      { hiddenMenus = "", children = infraChildren(), parentLink = "/infra/databases" } = {},
+    ) {
+      return mount(ONavGroup, {
+        props: {
+          groupKey: "infra",
+          title: "Infra",
+          icon: "dns",
+          children,
+          parentItem: { link: parentLink, title: "Infra", icon: "dns", name: "infra" },
+        },
+        global: {
+          plugins: [infraRouter(), infraStore(dbmEnabled, hiddenMenus), i18n],
+          stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+    }
+
+    const tileLink = () => wrapper.find('[data-test="tile"]').attributes("data-link");
+
+    async function hoverOpenInfra() {
+      await wrapper.trigger("mouseenter");
+      vi.advanceTimersByTime(OPEN_DELAY);
+      await flushPromises();
+    }
+
+    it("keeps the Infra tile with the ungated children when DBM is off", async () => {
+      wrapper = mountInfraTile(false);
+      expect(wrapper.find('[data-test="nav-group-infra"]').exists()).toBe(true);
+      await hoverOpenInfra();
+      const fly = wrapper.find('[data-test="nav-group-flyout-infra"]');
+      expect(fly.find('[data-test="nav-group-item-infraHosts"]').exists()).toBe(true);
+      expect(fly.find('[data-test="nav-group-item-infraKubernetes"]').exists()).toBe(true);
+      expect(fly.find('[data-test="nav-group-item-infraAws"]').exists()).toBe(true);
+      // Databases stays behind its runtime gate.
+      expect(fly.find('[data-test="nav-group-item-dbmDatabases"]').exists()).toBe(false);
+    });
+
+    it("lands the tile on /infra/hosts when the anchor child gates out (DBM off)", () => {
+      // The static parentLink would bounce off the DBM route guard onto Traces.
+      wrapper = mountInfraTile(false);
+      expect(tileLink()).toBe("/infra/hosts");
+    });
+
+    it("keeps /infra/databases as the tile link when DBM is on, despite Hosts being declared first", () => {
+      // The case that catches a first-declared-child regression: ungated Hosts
+      // always survives, so keying on "first declared" would re-break DBM-off.
+      wrapper = mountInfraTile(true);
+      expect(tileLink()).toBe("/infra/databases");
+    });
+
+    it.each(["infraHosts", "infraKubernetes", "infraAws"])(
+      "custom_hide_menus can hide %s by route name",
+      async (name) => {
+        wrapper = mountInfraTile(true, { hiddenMenus: name });
+        await hoverOpenInfra();
+        const fly = wrapper.find('[data-test="nav-group-flyout-infra"]');
+        expect(fly.find(`[data-test="nav-group-item-${name}"]`).exists()).toBe(false);
+      },
+    );
+
+    it("keeps parentLink verbatim for a group with no child resolving to it", () => {
+      wrapper = mountInfraTile(true, { parentLink: "/somewhere-else" });
+      expect(tileLink()).toBe("/somewhere-else");
+    });
+
+    it("leaves every other group's tile link byte-identical to its parentLink", () => {
+      // Regression guard on the fallback: the anchor child (logstreams →
+      // /streams) survives, so the existing groups render bit-identically.
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children,
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [infraRouter(), infraStore(true), i18n],
+          stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      expect(tileLink()).toBe("/streams");
+    });
+  });
+
   it("renders only children whose routes are registered", async () => {
     wrapper = mountGroup();
     await wrapper.setProps({

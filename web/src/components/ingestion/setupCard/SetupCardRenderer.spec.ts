@@ -19,7 +19,7 @@
 // data source's copy.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
@@ -29,6 +29,14 @@ import type { RichCardContent } from "./types";
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams: vi.fn() }),
 }));
+
+// useStreamDetect's stage-1 existence probe — driven per test for the
+// detected-emit cases; every other suite in this file never clicks Test.
+const nameListMock = vi.fn();
+vi.mock("@/services/stream", () => ({
+  default: { nameList: (...a: any[]) => nameListMock(...a) },
+}));
+vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
 
 const store = createStore({
   state: {
@@ -257,6 +265,99 @@ describe("SetupCardRenderer — footer doc links", () => {
     });
     const evil = wrapper.find('[data-test="ai-doc-link-evil"]');
     expect(evil.attributes("href")).toBe("#");
+  });
+});
+
+// T1.2 (design 4.2/§6): the renderer's ONE new emit and the detect-gated
+// step-action button. Existing cards listen to neither, so nothing changes
+// for them — pinned by the last case.
+describe("SetupCardRenderer — detected emit & showOnDetect actions", () => {
+  let wrapper: VueWrapper<any>;
+
+  const HOST_STREAMS = [
+    { name: "system_cpu_time" },
+    { name: "system_memory_usage" },
+    { name: "system_network_io" },
+  ];
+
+  const hostContent = (): RichCardContent => ({
+    ...CONTENT,
+    steps: [
+      CONTENT.steps[0],
+      CONTENT.steps[1],
+      {
+        id: "dashboard",
+        title: "Get your dashboard",
+        description: "Opens after detection.",
+        completeOn: "detect",
+        action: {
+          id: "view-host-dashboard",
+          label: "View dashboard",
+          showOnDetect: true,
+        } as any,
+      },
+    ],
+    detect: { streamType: "metrics", match: "keyword", streamName: "system_", filter: "" },
+  });
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+    nameListMock.mockReset();
+  });
+
+  it("emits `detected` exactly once, with the stream count, on idle→connected", async () => {
+    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
+    wrapper = mountCard(hostContent());
+    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("detected")).toHaveLength(1);
+    expect(wrapper.emitted("detected")![0]).toEqual([HOST_STREAMS.length]);
+  });
+
+  it("emits `detected` once on stalled→connected, not on the failed check", async () => {
+    nameListMock.mockResolvedValueOnce({ data: { list: [] } });
+    wrapper = mountCard(hostContent());
+    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("detected")).toBeUndefined();
+
+    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
+    await wrapper.find('[data-test="ai-c-recheck"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.emitted("detected")).toHaveLength(1);
+  });
+
+  it("does not emit `detected` on a fresh mount (no transition happened)", async () => {
+    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
+    wrapper = mountCard(hostContent());
+    await flushPromises();
+    // Detection is click-driven; a remount starts idle and must stay silent.
+    expect(wrapper.emitted("detected")).toBeUndefined();
+  });
+
+  it("hides a showOnDetect action pre-connect and reveals it post-connect", async () => {
+    nameListMock.mockResolvedValue({ data: { list: HOST_STREAMS } });
+    wrapper = mountCard(hostContent());
+    expect(wrapper.find('[data-test="ai-step-action-view-host-dashboard"]').exists()).toBe(false);
+    await wrapper.find('[data-test="ai-c-test"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.find('[data-test="ai-step-action-view-host-dashboard"]').exists()).toBe(true);
+  });
+
+  it("keeps actions WITHOUT showOnDetect visible regardless of detection state", () => {
+    // The ~30 existing cards must render identically (default false).
+    const content: RichCardContent = {
+      ...CONTENT,
+      steps: [
+        {
+          ...CONTENT.steps[0],
+          action: { id: "launch-console", label: "Launch" },
+        },
+        CONTENT.steps[1],
+      ],
+    };
+    wrapper = mountCard(content);
+    expect(wrapper.find('[data-test="ai-step-action-launch-console"]').exists()).toBe(true);
   });
 });
 
