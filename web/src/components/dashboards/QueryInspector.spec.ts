@@ -429,9 +429,10 @@ describe("QueryInspector", () => {
   });
 
   describe("Props Validation", () => {
-    it("should require metaData prop", () => {
+    it("should not require metaData prop (optional, defaults to null)", () => {
       const props = QueryInspector.props;
-      expect(props.metaData.required).toBe(true);
+      expect(props.metaData.required).toBe(false);
+      expect(props.metaData.default).toBe(null);
     });
 
     it("should require data prop", () => {
