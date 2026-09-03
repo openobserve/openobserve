@@ -13332,7 +13332,6 @@
       "removeOverrideNote": "Steps using {name} will now get the {scope} value.",
       "countOfCap": "{count} of {cap}",
       "local": "Local",
-      "hoverHint": "Hover a variable to see its value.",
       "resolutionOrder": "Resolution order: check, then environment, then global.",
       "overridesInherited": "Overrides an inherited variable — this value wins.",
       "valueTooltipEmpty": "{name}: no value yet"

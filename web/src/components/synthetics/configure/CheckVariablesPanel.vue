@@ -318,15 +318,6 @@ onBeforeUnmount(() => {
           />
         </OTooltip>
       </div>
-
-      <!-- Makes value-on-hover discoverable — the rows themselves are names only. -->
-      <p
-        class="text-text-secondary mb-3 flex items-center gap-1.5 text-xs"
-        data-test="synthetics-check-variables-panel-hover-hint"
-      >
-        <OIcon name="info" size="xs" aria-hidden="true" />
-        {{ t("synthetics.variablesPanel.hoverHint") }}
-      </p>
     </div>
 
     <!-- Scroll region -->
@@ -385,7 +376,7 @@ onBeforeUnmount(() => {
           </OButton>
         </div>
 
-        <ul v-if="variables.length" class="m-0 flex list-none flex-col gap-1 p-0">
+        <ul v-if="variables.length" class="m-0 flex list-none flex-col gap-2 p-0">
           <li
             v-for="(variable, index) in variables"
             :key="variable.id ?? index"
@@ -453,11 +444,11 @@ onBeforeUnmount(() => {
             <div v-else class="flex min-w-0 items-center gap-2 text-sm">
               <OIcon
                 name="edit-note"
-                size="xs"
+                size="sm"
                 class="text-text-secondary shrink-0"
                 aria-hidden="true"
               />
-              <span class="min-w-0 truncate font-mono">
+              <span class="text-text-secondary min-w-0 truncate font-mono">
                 {{ variable.name }}
                 <OTooltip :content="localValueTooltip(variable)" side="top" />
               </span>
@@ -467,7 +458,7 @@ onBeforeUnmount(() => {
                 <OTooltip :content="t('synthetics.variablesPanel.overridesInherited')" side="top">
                   <OIcon
                     name="warning"
-                    size="sm"
+                    size="xs"
                     class="text-warning cursor-help"
                     role="img"
                     :aria-label="t('synthetics.variablesPanel.overridesInherited')"
