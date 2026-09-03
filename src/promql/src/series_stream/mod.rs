@@ -14,10 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Sources that deliver a query's series one at a time, so a consumer can
-//! evaluate and drop each series without holding the full set: the matrix
-//! producer adapts an already-materialized matrix, and ordered-scan producers
-//! plug in behind the same contract.
+//! evaluate and drop each series without materializing the full set: the
+//! banded producer streams hash-ordered scans, the matrix producer adapts an
+//! already-materialized matrix behind the same contract.
 
+pub(crate) mod banded;
 pub(crate) mod matrix;
 
 use config::meta::promql::value::{Labels, Sample};
