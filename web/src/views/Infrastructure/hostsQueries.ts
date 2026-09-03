@@ -19,6 +19,11 @@
 
 export const HOSTS_DEVICE_EXCLUSION = "/dev/loop.*|tmpfs|nsfs|squashfs|overlay";
 
+// Default window, matching the bundled dashboard's defaultDatetimeDuration ("3h").
+export const HOSTS_DEFAULT_RELATIVE_PERIOD = "3h";
+
+export const HOSTS_DEFAULT_WINDOW_US = 3 * 60 * 60 * 1000 * 1000;
+
 export const HOSTS_LIVENESS_QUERY =
   "count by (host_name, os_type) (last_over_time(system_cpu_load_average_15m[10m]))";
 

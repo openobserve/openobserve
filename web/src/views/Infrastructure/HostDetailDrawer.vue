@@ -88,7 +88,11 @@ const logsHits = ref<any[]>([]);
 const logsLoading = ref(false);
 const logsLoaded = ref(false);
 
+// search takes no AbortSignal — a host/date change mid-flight must drop the stale response.
+let logsGeneration = 0;
+
 const fetchLogs = async () => {
+  const gen = ++logsGeneration;
   logsLoading.value = true;
   logsLoaded.value = true;
   try {
@@ -108,11 +112,13 @@ const fetchLogs = async () => {
       },
       "ui",
     );
+    if (gen !== logsGeneration) return;
     logsHits.value = res?.data?.hits ?? [];
   } catch {
+    if (gen !== logsGeneration) return;
     logsHits.value = [];
   } finally {
-    logsLoading.value = false;
+    if (gen === logsGeneration) logsLoading.value = false;
   }
 };
 

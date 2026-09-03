@@ -36,7 +36,7 @@ const isAwsName = (name: string) => name.startsWith("aws_") || name.includes("cl
 
 export function useWorkloadDetection(): {
   states: ComputedRef<Record<WorkloadId, WorkloadState>>;
-  refresh: () => Promise<void>;
+  refresh: (opts?: { force?: boolean }) => Promise<void>;
 } {
   const { getStreams } = useStreams(gt);
   // Per-instance refs, never module state — org switches reset the stream cache upstream.
@@ -46,10 +46,11 @@ export function useWorkloadDetection(): {
   const names = (res: unknown): string[] =>
     (((res as any)?.list ?? []) as Array<{ name: string }>).map((s) => s.name);
 
-  const refresh = async () => {
+  // getStreams caches even an empty list forever — detect-driven refreshes must force past it.
+  const refresh = async ({ force = false }: { force?: boolean } = {}) => {
     const [metrics, logs] = await Promise.all([
-      getStreams("metrics", false, false).catch(() => null),
-      getStreams("logs", false, false).catch(() => null),
+      getStreams("metrics", false, false, force).catch(() => null),
+      getStreams("logs", false, false, force).catch(() => null),
     ]);
     // A failed fetch stays null ⇒ "unknown", never a false "set up" state (design 4.6).
     metricsNames.value = metrics == null ? null : names(metrics);

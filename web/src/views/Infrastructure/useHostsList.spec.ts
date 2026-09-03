@@ -503,4 +503,41 @@ describe("useHostsList — sort, tint, staleness, facets, filter, paging", () =>
     await flushPromises();
     expect(h.list.pagedRows.value).toHaveLength(10);
   });
+
+  it("clamps the page to the last available page when filteredRows shrinks", async () => {
+    vi.useFakeTimers();
+    const many = Array.from({ length: 60 }, (_, i) => ({
+      metric: { host_name: `host-${String(i).padStart(2, "0")}` },
+      value: 10,
+    }));
+    primeFleet({
+      liveness: vector(many),
+      cpu: vector(many),
+      memUsed: vector(many),
+      memTotal: vector(many.map((r) => ({ ...r, value: 100 }))),
+      disk: vector(many),
+      load: vector(many),
+      lastSeen: sqlHits([]),
+    });
+    const h = withHostsList();
+    wrapper = h.wrapper;
+    await h.list.refresh(refreshArgs);
+    await flushPromises();
+    h.list.page.value = 2;
+    // A filter narrows the list below one page — page 2 would render empty.
+    h.list.nameFilter.value = "host-01";
+    await vi.advanceTimersByTimeAsync(300);
+    await flushPromises();
+    expect(h.list.page.value).toBe(1);
+    expect(h.list.pagedRows.value).toHaveLength(1);
+  });
+
+  it("pins the last-seen SQL row ceiling at 10000 (hosts beyond it silently drop)", async () => {
+    const h = withHostsList();
+    wrapper = h.wrapper;
+    await h.list.refresh(refreshArgs);
+    await flushPromises();
+    const sqlArgs: any = searchMock.mock.calls[0][0];
+    expect(sqlArgs.query.query.size).toBe(10000);
+  });
 });

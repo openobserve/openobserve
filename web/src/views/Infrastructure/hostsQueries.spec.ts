@@ -102,3 +102,20 @@ describe("hostsQueries — utilization shapes", () => {
     }
   });
 });
+
+describe("hostsQueries — default window constants", () => {
+  it("the microsecond window and the DateTime relative period agree (single 3h source)", () => {
+    const match = /^(\d+)h$/.exec(hostsQueries.HOSTS_DEFAULT_RELATIVE_PERIOD);
+    expect(match).not.toBeNull();
+    const hours = Number(match![1]);
+    expect(hostsQueries.HOSTS_DEFAULT_WINDOW_US).toBe(hours * 60 * 60 * 1000 * 1000);
+  });
+
+  it("matches the bundled dashboard's defaultDatetimeDuration", async () => {
+    const dashboard: any = (await import("@/assets/dashboards/host_metrics.dashboard.json"))
+      .default;
+    expect(dashboard.defaultDatetimeDuration.relativeTimePeriod).toBe(
+      hostsQueries.HOSTS_DEFAULT_RELATIVE_PERIOD,
+    );
+  });
+});

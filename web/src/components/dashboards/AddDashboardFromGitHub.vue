@@ -448,6 +448,8 @@ export default defineComponent({
       }
     };
 
+    // Closing the drawer must stop the batch — not just unpark the current confirm.
+    let importCancelled = false;
     // Replace-on-import needs an explicit user confirm (design 4.3); the import loop parks here.
     const replaceConfirm = ref<{ title: string; resolve: (ok: boolean) => void } | null>(null);
     const requestReplaceConfirm = (title: string) =>
@@ -463,6 +465,7 @@ export default defineComponent({
       if (selectedDashboards.value.length === 0 || !selectedFolderObj.value) return;
 
       importing.value = true;
+      importCancelled = false;
       try {
         const orgId = store.state.selectedOrganization.identifier;
         const folderId = selectedFolderObj.value;
@@ -472,7 +475,9 @@ export default defineComponent({
 
         // Import each selected dashboard and all its JSON files
         for (const dashboard of selectedDashboards.value) {
+          if (importCancelled) break;
           for (const jsonFile of dashboard.jsonFiles) {
+            if (importCancelled) break;
             try {
               // Check cache first
               const cacheKey = `${dashboard.folderPath}/${jsonFile}`;
@@ -524,6 +529,7 @@ export default defineComponent({
               if (existingDashboard) {
                 // Declining skips this file only; the rest of the batch proceeds.
                 const replace = await requestReplaceConfirm(dashboardTitle);
+                if (importCancelled) break;
                 if (!replace) continue;
                 const existingDashboardId =
                   existingDashboard?.dashboardId ||
@@ -553,6 +559,9 @@ export default defineComponent({
             }
           }
         }
+
+        // A cancelled batch shows no summary — the drawer is already gone.
+        if (importCancelled) return;
 
         // Show summary notification; a batch that was entirely declined is not a failure
         if (successCount === 0 && failCount === 0) {
@@ -611,6 +620,8 @@ export default defineComponent({
         searchQuery.value = props.initialSearch ?? "";
         loadDashboards();
       } else {
+        // Close aborts the batch: resolving the parked confirm alone would let later files re-park a dialog over a closed drawer.
+        importCancelled = true;
         // A confirm left parked by a programmatic close would leak `importing` forever.
         resolveReplaceConfirm(false);
         // Reset state when closing

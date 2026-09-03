@@ -54,7 +54,9 @@ async function doImport(orgId: string): Promise<HostMetricsImportResult> {
       (d: any) => d.title === HOST_METRICS_DASHBOARD_TITLE,
     );
     if (existing) {
-      return { status: "exists", dashboardId: existing.dashboardId, folderId: "default" };
+      // LIST rows are snake_case on the wire (ListDashboardsResponseBodyItem has no camelCase rename).
+      const existingId = existing.dashboard_id ?? existing.dashboardId ?? existing.id;
+      return { status: "exists", dashboardId: existingId, folderId: "default" };
     }
     const created = await dashboardsService.create(orgId, hostMetricsDashboard, "default");
     const dashboardId = created.data?.[`v${created.data?.version}`]?.dashboardId ?? "";
