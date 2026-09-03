@@ -33,6 +33,10 @@ import type { AssertionKind } from "@/types/synthetics";
  */
 type Translate = (_key: string, _params?: Record<string, unknown>) => string;
 
+// A placeholder-led navigate URL carries no literal scheme — the resolved
+// variable supplies it, so the scheme check has to wait until run time.
+const placeholderLedUrl = /^\{\{[A-Za-z0-9_]+\}\}\S*$/;
+
 /** The locator bundle, as it sits on an editor step. */
 const compositePartSchema = z.object({ value: z.string(), relation: z.string().optional() });
 const locatorCandidateSchema = z.object({
@@ -170,11 +174,15 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
       for (let i = 0; i < val.journey.length; i++) {
         const step = val.journey[i];
 
-        if (step.action === "navigate" && !/^https?:\/\/\S+$/i.test(step.value ?? "")) {
+        if (
+          step.action === "navigate" &&
+          !/^https?:\/\/\S+$/i.test(step.value ?? "") &&
+          !placeholderLedUrl.test(step.value ?? "")
+        ) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["journey", i, "value"],
-            message: t("synthetics.validation.urlInvalid"),
+            message: t("synthetics.validation.navigateUrlInvalid"),
           });
         }
 

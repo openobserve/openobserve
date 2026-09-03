@@ -540,6 +540,32 @@ describe("makeBrowserCheckSaveSchema field-level step rules", () => {
     expect(result.success).toBe(false);
     expect(issuePaths(result)).toContain("journey.0.value");
   });
+
+  // The resolved variable carries the scheme, so the client cannot check it.
+  it("should accept a navigate step whose URL starts with a placeholder", () => {
+    const result = schema.safeParse(
+      form([{ id: "1", action: "navigate", value: "{{BASE_URL}}/web/" }]),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it("should accept a navigate step that is a bare placeholder", () => {
+    const result = schema.safeParse(form([{ id: "1", action: "navigate", value: "{{BASE_URL}}" }]));
+
+    expect(result.success).toBe(true);
+  });
+
+  // Only the backend's variable-name grammar unlocks the exemption — anything
+  // else in the braces is still an invalid URL, not a resolvable placeholder.
+  it("should reject a navigate step whose placeholder has an invalid name", () => {
+    for (const value of ["{{BASE URL}}/web/", "{{}}/web/", "{{BASE_URL}} /web/"]) {
+      const result = schema.safeParse(form([{ id: "1", action: "navigate", value }]));
+
+      expect(result.success).toBe(false);
+      expect(issuePaths(result)).toContain("journey.0.value");
+    }
+  });
 });
 
 // `page_title` is the second page-level kind. `url_matches` is covered above; if
