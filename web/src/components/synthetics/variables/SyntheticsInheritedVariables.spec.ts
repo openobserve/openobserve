@@ -26,7 +26,8 @@ const OBadgeStub = {
 const OIconStub = { props: ["name", "size"], template: '<i v-bind="$attrs" :data-icon="name" />' };
 const OTooltipStub = {
   props: ["content", "side"],
-  template: '<span :data-tip="content"><slot /></span>',
+  template:
+    '<span :data-tip="content"><slot /><span v-if="$slots.content" class="tip-slot"><slot name="content" /></span></span>',
 };
 const OSelectStub = {
   props: ["modelValue", "options"],
@@ -87,7 +88,8 @@ describe("SyntheticsInheritedVariables", () => {
   it("strikes a shadowed name, with the relation on its accessible name", () => {
     wrapper = mountInherited({ rows: [row({ name: "USER", overridden: true })] });
     const struck = wrapper.find("span.line-through");
-    expect(struck.text()).toBe("USER");
+    // The tooltip stub inlines its content into the span's text.
+    expect(struck.text().startsWith("USER")).toBe(true);
     expect(struck.attributes("aria-label")).toBe("Overridden by local variable");
   });
 
@@ -104,8 +106,25 @@ describe("SyntheticsInheritedVariables", () => {
         }),
       ],
     });
-    const tip = wrapper.find(`${rowSel} span[data-tip]`).attributes("data-tip");
-    expect(tip).toBe("BASE_URL — staging: stage.shop.com · qa: Not set");
+    expect(wrapper.find(`${rowSel} .tip-slot`).text()).toBe(
+      "BASE_URL — staging: stage.shop.com · qa: Not set",
+    );
+  });
+
+  it("leads a shadowed name's tooltip with the overridden line, in warning colour", () => {
+    wrapper = mountInherited({
+      rows: [
+        row({
+          name: "USER",
+          overridden: true,
+          hints: [{ source: "staging", example: "u@stage", has_value: true }],
+        }),
+      ],
+    });
+    const tip = wrapper.find(`${rowSel} .tip-slot`);
+    expect(tip.text().indexOf("Overridden by local variable")).toBe(0);
+    expect(tip.text()).toContain("USER — staging: u@stage");
+    expect(tip.find("div").classes()).toContain("text-warning");
   });
 
   it("masks a secret's hints and marks the row with the lock", () => {
@@ -119,9 +138,7 @@ describe("SyntheticsInheritedVariables", () => {
       ],
     });
     expect(wrapper.find('[data-test="synthetics-inherited-secret-lock"]').exists()).toBe(true);
-    expect(wrapper.find(`${rowSel} span[data-tip]`).attributes("data-tip")).toBe(
-      "API_KEY — staging: ••••••",
-    );
+    expect(wrapper.find(`${rowSel} .tip-slot`).text()).toBe("API_KEY — staging: ••••••");
   });
 
   it("names the environments a variable is missing from, on the triangle's label", () => {
@@ -157,7 +174,9 @@ describe("SyntheticsInheritedVariables", () => {
 
     expect(wrapper.findAll(rowSel)).toHaveLength(2);
     await filter.setValue("__global__");
-    expect(wrapper.findAll(rowSel).map((r) => r.text())).toEqual(["ORG"]);
+    const globalRows = wrapper.findAll(rowSel);
+    expect(globalRows).toHaveLength(1);
+    expect(globalRows[0].text().startsWith("ORG")).toBe(true);
     await filter.setValue("qa");
     expect(wrapper.find('[data-test="synthetics-inherited-empty"]').text()).toBe(
       "No inherited variables in qa.",
