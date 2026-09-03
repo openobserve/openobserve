@@ -1,2 +1,0 @@
-web/src/components/QueryEditor.spec.ts
-web/src/components/QueryEditor.vue
