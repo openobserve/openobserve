@@ -69,6 +69,18 @@ test.describe(
       await pm.workflowsPage.testRunFromEditor({ liveSend: true });
       await pm.workflowsPage.expectNodeTestPassed('destination');
       await pm.workflowsPage.expectNodeTestPassed('workflow_trigger');
+
+      // A badge alone (✓ or rehearsal flask) is painted for a SUPPRESSED rehearsal too.
+      // Only the destination's OUTPUT distinguishes a real send: for the self-ingest
+      // sink that output is OpenObserve's own ingest receipt, where successful > 0 is
+      // delivery confirmed by the receiving side. Assert it here or a change that made
+      // every send silently suppress would still green this test.
+      const receipt = await pm.workflowsPage.destinationIngestReceipt();
+      testLogger.info('destination node output (ingest receipt)', { receipt });
+      const status = (receipt.status || [])[0] || {};
+      expect(status.name).toBe(sinkStream(id));
+      expect(status.successful).toBeGreaterThan(0);
+      expect(status.failed).toBe(0);
       testLogger.info('destination reported a successful send', { name });
     });
 

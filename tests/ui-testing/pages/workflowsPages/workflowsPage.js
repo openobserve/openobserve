@@ -549,10 +549,9 @@ class WorkflowsPage {
     await this.openTestDrawer();
     if (liveSend) {
       // Destination sends are suppressed by default; send-error tests need the real dispatch.
-      const sw = this.page.locator(this.testSuppressSwitch);
-      if ((await sw.getAttribute('aria-checked')) === 'true') {
-        await sw.click({ timeout: DRAWER_TIMEOUT_MS });
-      }
+      // Route through disableSuppression() so the toggle landing is GUARDED (a silent
+      // no-op flip would otherwise run a suppressed rehearsal and green a delivery test).
+      await this.disableSuppression();
     }
     // The Test panel is still a real ODrawer (WorkflowTestDialog.vue) — only the NODE
     // config panel became an ODialog. Its buttons stay `o-drawer-*`.
