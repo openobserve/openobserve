@@ -46,6 +46,7 @@ pub(super) struct FoldParams {
     func: Arc<dyn RangeFunc>,
     counter_kind: Option<ExtrapolationKind>,
     range: Duration,
+    eval_ctx: EvalContext,
     timestamps: Vec<i64>,
 }
 
@@ -61,6 +62,7 @@ impl FoldParams {
             counter_kind: func.counter_extrapolation(),
             func,
             range,
+            eval_ctx: eval_ctx.clone(),
             timestamps: eval_ctx.timestamps(),
         })
     }
@@ -115,6 +117,7 @@ async fn fold_partition<S: SeriesSource>(
             params.range,
             params.func.as_ref(),
             params.counter_kind,
+            &params.eval_ctx,
             &params.timestamps,
         );
         series_count += 1;
@@ -131,12 +134,13 @@ fn fold_series(
     range: Duration,
     func: &dyn RangeFunc,
     counter_kind: Option<ExtrapolationKind>,
+    eval_ctx: &EvalContext,
     timestamps: &[i64],
 ) {
     let range_micros = micros(range);
     let mut start_index = 0;
     let mut end_index = 0;
-    let counter = counter_kind.map(|kind| CounterSeries::new(samples, kind));
+    let counter = CounterSeries::try_new(samples, counter_kind, eval_ctx, range_micros);
 
     for (slot, &eval_ts) in timestamps.iter().enumerate() {
         let window_samples = advance_sample_window(

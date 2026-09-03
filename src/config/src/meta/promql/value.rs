@@ -420,6 +420,14 @@ impl EvalContext {
         self.start == self.end
     }
 
+    /// Adjacent windows share at most one sample, so a reset pair repeats only when `step < range`.
+    pub fn windows_overlap(&self, range_micros: i64) -> bool {
+        !self.is_instant()
+            && self.step > 0
+            && self.end - self.start >= self.step
+            && self.step < range_micros
+    }
+
     /// Get all evaluation timestamps
     pub fn timestamps(&self) -> Vec<i64> {
         if self.is_instant() {
@@ -664,6 +672,20 @@ pub struct CounterSeries<'a> {
 }
 
 impl<'a> CounterSeries<'a> {
+    /// The per-series reset list only pays off when windows overlap; `None` keeps the per-window
+    /// scan, which touches only the samples inside the windows.
+    pub fn try_new(
+        samples: &'a [Sample],
+        kind: Option<ExtrapolationKind>,
+        eval_ctx: &EvalContext,
+        range_micros: i64,
+    ) -> Option<Self> {
+        let kind = kind?;
+        eval_ctx
+            .windows_overlap(range_micros)
+            .then(|| Self::new(samples, kind))
+    }
+
     pub fn new(samples: &'a [Sample], kind: ExtrapolationKind) -> Self {
         let mut resets = Vec::new();
         // only counter kinds correct for resets; a delta keeps the raw difference
@@ -1098,6 +1120,73 @@ mod tests {
                 .resets
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn test_counter_series_preserves_small_resets_next_to_huge_ones() {
+        const MICROS: i64 = 1_000_000;
+        // A 1e16 reset before the window must not absorb the small reset
+        // inside it: a shared running prefix would round the +1 away.
+        let values = [1e16, 0.0, 0.0, 1.0, 0.0, 2.0];
+        let samples = values
+            .iter()
+            .enumerate()
+            .map(|(i, &value)| Sample::new((20 + 15 * i as i64) * MICROS, value))
+            .collect::<Vec<_>>();
+        let range = Duration::from_secs(60);
+        let eval_ts = 100 * MICROS;
+
+        for kind in [ExtrapolationKind::Rate, ExtrapolationKind::Increase] {
+            let windowed_only =
+                extrapolated_rate(&samples[2..6], eval_ts, range, Duration::ZERO, kind).unwrap();
+            let counter = CounterSeries::new(&samples, kind);
+            let sliced = counter.extrapolate(2, 6, eval_ts, range).unwrap();
+            assert_eq!(windowed_only.to_bits(), sliced.to_bits());
+            assert!(sliced.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_counter_series_infinite_reset_outside_window() {
+        const MICROS: i64 = 1_000_000;
+        // The +Inf -> 2.0 reset sits before the window; a shared prefix would
+        // produce inf - inf = NaN where the window-local sum stays finite.
+        let values = [f64::INFINITY, 2.0, 5.0, 9.0];
+        let samples = values
+            .iter()
+            .enumerate()
+            .map(|(i, &value)| Sample::new((20 + 15 * i as i64) * MICROS, value))
+            .collect::<Vec<_>>();
+        let range = Duration::from_secs(60);
+        let eval_ts = 80 * MICROS;
+
+        let windowed_only = extrapolated_rate(
+            &samples[1..4],
+            eval_ts,
+            range,
+            Duration::ZERO,
+            ExtrapolationKind::Rate,
+        )
+        .unwrap();
+        let counter = CounterSeries::new(&samples, ExtrapolationKind::Rate);
+        let sliced = counter.extrapolate(1, 4, eval_ts, range).unwrap();
+        assert!(sliced.is_finite());
+        assert_eq!(windowed_only.to_bits(), sliced.to_bits());
+    }
+
+    #[test]
+    fn test_eval_context_windows_overlap() {
+        const MINUTE: i64 = 60 * 1_000_000;
+        let ctx = |end, step| EvalContext::new(MINUTE, MINUTE + end, step, "test".into());
+        // Overlapping windows: 15s step inside a 5m range.
+        assert!(ctx(180 * MINUTE, MINUTE / 4).windows_overlap(5 * MINUTE));
+        // Adjacent windows share at most one sample, so no pair repeats.
+        assert!(!ctx(5 * MINUTE, 5 * MINUTE).windows_overlap(5 * MINUTE));
+        // Disjoint windows (1h step, 5m range) or a single window cannot.
+        assert!(!ctx(7 * 24 * 60 * MINUTE, 60 * MINUTE).windows_overlap(5 * MINUTE));
+        assert!(!ctx(0, MINUTE / 4).windows_overlap(5 * MINUTE));
+        assert!(!ctx(0, 0).windows_overlap(5 * MINUTE));
+        assert!(!ctx(MINUTE, 0).windows_overlap(5 * MINUTE));
     }
 
     #[test]
