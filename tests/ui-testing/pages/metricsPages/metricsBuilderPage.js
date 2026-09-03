@@ -1383,20 +1383,16 @@ export class MetricsBuilderPage {
         const visible = await this.dashboardPanelTable.isVisible({ timeout: 5000 }).catch(() => false);
         if (!visible) return { visible: false, rowCount: 0, headers: [] };
 
-        // Wait for the table to settle (rows hydrated, or loading complete) BEFORE counting.
-        // Loading attribute `data-test-loading="false"` on `o2-table` signals query completion.
-        await this.page.locator('[data-test="o2-table"][data-test-loading="false"]')
-            .first()
-            .waitFor({ state: 'attached', timeout: 15000 })
-            .catch(() => {});
-
-        // `data-test-loading="false"` is not enough on its own: switching the chart
-        // type re-mounts the panel, so a table left over from the previous render is
-        // already attached and "not loading" while the new one has yet to hydrate its
-        // rows — we would measure that stale, empty table. Wait for the first row to
-        // actually exist. Times out quietly when the query legitimately has no data,
-        // leaving the caller's rowCount assertion to fail on the real state.
-        await this.tableRows.first().waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+        // Switching chart type + re-running leaves a stale table (loading=false but empty)
+        // attached while the new one hydrates, and under CI load the query response can land
+        // late — so wait for a table that is BOTH done-loading AND has rows, not either alone.
+        // Times out quietly when the query legitimately has no data, leaving the caller's
+        // rowCount assertion to fail on the real state.
+        await this.page.waitForFunction(() => {
+            const doneLoading = document.querySelector('[data-test="o2-table"][data-test-loading="false"]');
+            const hasRows = document.querySelectorAll('[data-test^="o2-table-row-"]').length > 0;
+            return !!doneLoading && hasRows;
+        }, undefined, { timeout: 25000 }).catch(() => {});
 
         // Get header texts via the data-test header cells
         const headers = [];
