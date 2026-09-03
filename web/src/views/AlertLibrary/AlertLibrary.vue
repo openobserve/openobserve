@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <div class="flex min-h-0 flex-1">
-        <div class="w-rail border-border-default h-full shrink-0 border-r">
+        <div class="w-rail border-border-default h-full shrink-0 border-e">
           <LibraryRail
             :categories="categoryFacets"
             :selected-categories="selectedCategories"
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div
                   v-if="selectedCount > 0"
-                  class="border-border-default flex shrink-0 items-center gap-2 border-r pr-3"
+                  class="border-border-default flex shrink-0 items-center gap-2 border-e pe-3"
                   data-test="alert-library-selection-bar"
                   :data-selected="selectedCount"
                   :data-offscreen="offscreenCount"
@@ -252,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :id="`alert-library-select-group-id-${group.id}`"
                       variant="ghost"
                       size="xs"
-                      class="ml-auto"
+                      class="ms-auto"
                       :aria-labelledby="`alert-library-select-group-id-${group.id} alert-library-group-heading-${group.id}`"
                       :data-test="`alert-library-select-group-${group.id}`"
                       @click="toggleGroup(group.entries)"

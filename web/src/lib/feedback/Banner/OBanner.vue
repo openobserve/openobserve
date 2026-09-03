@@ -69,7 +69,7 @@ const variantClass = computed(() => {
     case "success":
       return "bg-banner-success-bg border border-banner-success-border text-banner-success-text";
     case "warning":
-      return "bg-banner-warning-bg border border-banner-warning-border border-l-4 border-l-banner-warning-border text-banner-warning-text";
+      return "bg-banner-warning-bg border border-banner-warning-border border-s-4 border-s-banner-warning-border text-banner-warning-text";
     case "error":
       return "bg-banner-error-bg text-banner-error-text";
     // Marketing gold, shared with the standalone webinar bar so the two match.
@@ -77,7 +77,7 @@ const variantClass = computed(() => {
       return "bg-promo-webinar-accent text-promo-webinar-text";
     // Tinted error for hints/insights — solid `error` stays for hard failures.
     case "error-soft":
-      return "bg-banner-error-soft-bg border border-banner-error-soft-border border-l-4 border-l-banner-error-soft-border text-banner-error-soft-text";
+      return "bg-banner-error-soft-bg border border-banner-error-soft-border border-s-4 border-s-banner-error-soft-border text-banner-error-soft-text";
     default:
       return "bg-banner-default-bg text-banner-default-text";
   }

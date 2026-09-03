@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ tpl.name }}
                       <span
                         v-if="isTemplateActive(idx, tpl.keys)"
-                        class="ml-0.5 text-sm leading-none opacity-75 hover:opacity-100"
+                        class="ms-0.5 text-sm leading-none opacity-75 hover:opacity-100"
                         @click.stop="clearTemplate(idx, tpl.keys)"
                       >
                         {{ "×" }}</span

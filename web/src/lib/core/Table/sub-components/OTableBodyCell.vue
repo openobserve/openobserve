@@ -328,11 +328,11 @@ const cellActionsStyle = computed(() => ({
 // the bar's border; the full square would notch any filled control (the AI chip) 3px in.
 const cellActionsArrowClass = computed(() =>
   cellActionsBelow.value
-    ? "-top-1 border-t border-l [clip-path:polygon(0_0,100%_0,100%_26%,26%_100%,0_100%)]"
-    : "-bottom-1 border-r border-b [clip-path:polygon(0_100%,100%_100%,100%_0,74%_0,0_74%)]",
+    ? "-top-1 border-t border-s [clip-path:polygon(0_0,100%_0,100%_26%,26%_100%,0_100%)]"
+    : "-bottom-1 border-e border-b [clip-path:polygon(0_100%,100%_100%,100%_0,74%_0,0_74%)]",
 );
 
-// Arrow centre within the bar (`-ml-1` offsets its box), so it stays under the pointer
+// Arrow centre within the bar (`-ms-1` offsets its box), so it stays under the pointer
 // after the bar is clamped to the window.
 const cellActionsArrowStyle = computed(() => ({ left: `${cellActionsArrowX.value}px` }));
 
@@ -549,7 +549,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
           :data-test="`o2-table-cell-copy-${cell.column.id}`"
           :data-copied="copied ? 'true' : undefined"
           class="h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100"
-          :class="align === 'right' ? 'order-first mr-1' : 'ml-1'"
+          :class="align === 'right' ? 'order-first me-1' : 'ms-1'"
           :title="copied ? t('common.copiedExclaim') : t('common.copy')"
           @click="handleCopy"
         >
@@ -609,7 +609,7 @@ onBeforeUnmount(() => window.removeEventListener("scroll", onScrollDismiss, true
           <!-- The bar sits clear of the hovered row, so this arrow is the only thing
                tying it to the row it acts on. -->
           <span
-            class="bg-surface-overlay border-border-default absolute -ml-1 size-2 rotate-45 border-solid peer-empty:hidden"
+            class="bg-surface-overlay border-border-default absolute -ms-1 size-2 rotate-45 border-solid peer-empty:hidden"
             :class="cellActionsArrowClass"
             :style="cellActionsArrowStyle"
             :data-test="`o2-table-cell-hover-arrow-${cell.column.id}`"

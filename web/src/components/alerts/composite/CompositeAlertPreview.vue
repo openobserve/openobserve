@@ -148,7 +148,7 @@ const warningText = (code: string) => {
           class="bg-border-default absolute top-1 bottom-1 left-2 w-0.5 rounded-full"
         />
 
-        <li v-for="token in operandTokens" :key="token.id" class="relative pl-7">
+        <li v-for="token in operandTokens" :key="token.id" class="relative ps-7">
           <span
             aria-hidden="true"
             class="absolute top-1 left-0.5 h-3.5 w-3.5 rounded-full"
@@ -171,7 +171,7 @@ const warningText = (code: string) => {
           </div>
         </li>
 
-        <li class="relative pl-7">
+        <li class="relative ps-7">
           <span
             aria-hidden="true"
             class="absolute top-1 left-0.5 h-3.5 w-3.5 rounded-full"

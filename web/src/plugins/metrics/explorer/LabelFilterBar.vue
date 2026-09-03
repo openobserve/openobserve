@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ filter.label }} {{ filter.operator || "=" }} {{ filter.value }}</span
         >
         <template #trailing>
-          <span class="ml-1 inline-flex items-center"><OIcon name="close" size="xs" /></span>
+          <span class="ms-1 inline-flex items-center"><OIcon name="close" size="xs" /></span>
         </template>
       </OTag>
     </div>
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #trailing>
           <button
             type="button"
-            class="ml-1 inline-flex cursor-pointer items-center"
+            class="ms-1 inline-flex cursor-pointer items-center"
             :aria-label="
               t('metrics.explorer.labels.removeFilterAria', {
                 filter: labelFilterKey(filter),

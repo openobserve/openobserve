@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="iam-roles-selection-section" class="flex h-full flex-col p-0">
     <div class="bg-card-glass-bg flex shrink-0 justify-start px-3 py-2">
-      <div class="mr-3">
+      <div class="me-3">
         <div data-test="iam-roles-selection-show-toggle" class="flex items-center">
           <span data-test="iam-roles-selection-show-text" style="font-size: var(--text-sm)">
             {{ t("iam.groupRoles.show") }}
           </span>
           <OToggleGroup
-            class="ml-1"
+            class="ms-1"
             :model-value="usersDisplay"
             @update:model-value="(v) => updateUserTable(v as string)"
           >
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroup>
         </div>
       </div>
-      <div data-test="iam-roles-selection-search-input" class="mr-3">
+      <div data-test="iam-roles-selection-search-input" class="me-3">
         <OSearchInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"

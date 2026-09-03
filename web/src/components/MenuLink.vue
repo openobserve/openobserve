@@ -192,12 +192,12 @@ export default defineComponent({
     const activePillClass = computed(() => {
       if (slideActive.value) {
         return isDark.value
-          ? "text-tabs-active-text border-l-2 border-transparent"
-          : "text-accent border-l-2 border-transparent";
+          ? "text-tabs-active-text border-s-2 border-transparent"
+          : "text-accent border-s-2 border-transparent";
       }
       return isDark.value
-        ? "text-tabs-active-text bg-tabs-active-bg border-l-2 border-accent"
-        : "text-accent bg-surface-base border-l-2 border-accent";
+        ? "text-tabs-active-text bg-tabs-active-bg border-s-2 border-accent"
+        : "text-accent bg-surface-base border-s-2 border-accent";
     });
     const activeIconClass = computed(() =>
       isDark.value ? "text-tabs-active-text!" : "text-accent!",
@@ -271,7 +271,7 @@ export default defineComponent({
       slideActive.value ? "z-10" : "",
       isActive.value
         ? activePillClass.value
-        : "text-tabs-inactive-text border-l-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",
+        : "text-tabs-inactive-text border-s-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",
       isActive.value ? "nav-menu-item--active" : "",
       props.title === "Functions" ? "menu-link-function" : "",
       // Reset native <button> chrome so the trigger looks EXACTLY like a link.

@@ -25,7 +25,7 @@
                 data-test="no-license-get-license-btn"
                 variant="primary"
                 size="sm-action"
-                class="mt-2 ml-2"
+                class="ms-2 mt-2"
                 @click="redirectToGetLicense"
               >
                 {{ t("about.get_license") }}
@@ -56,7 +56,7 @@
                   <div
                     class="bg-banner-success-bg border-banner-success-border rounded-default flex items-center border border-solid px-4 py-3 backdrop-blur-md transition-all duration-200 dark:shadow-md"
                   >
-                    <OIcon name="check-circle" class="text-status-positive mr-2" size="md" />
+                    <OIcon name="check-circle" class="text-status-positive me-2" size="md" />
                     <span class="text-sm">{{ t("about.license_auto_filled") }}</span>
                   </div>
                 </div>
@@ -83,7 +83,7 @@
                 <tbody>
                   <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.installation_id") }}
                     </td>
@@ -91,7 +91,7 @@
                   </tr>
                   <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.license_id") }}
                     </td>
@@ -99,7 +99,7 @@
                   </tr>
                   <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.status_lbl") }}
                     </td>
@@ -111,7 +111,7 @@
                   </tr>
                   <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.create_at_lbl") }}
                     </td>
@@ -121,7 +121,7 @@
                   </tr>
                   <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.expires_at_lbl") }}
                     </td>
@@ -131,7 +131,7 @@
                   </tr>
                   <tr class="border-table-row-divider border-b border-solid">
                     <td
-                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.company") }}
                     </td>
@@ -139,7 +139,7 @@
                   </tr>
                   <tr v-if="licenseData.key" class="border-table-row-divider border-b border-solid">
                     <td
-                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.license_key") }}
                     </td>
@@ -149,7 +149,7 @@
                         <OButton
                           variant="ghost"
                           size="icon"
-                          class="ml-2"
+                          class="ms-2"
                           data-test="show-license-key-btn"
                           @click="showLicenseKeyModal = true"
                         >
@@ -163,7 +163,7 @@
                     class="border-table-row-divider border-b border-solid"
                   >
                     <td
-                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.contact_name") }}
                     </td>
@@ -174,7 +174,7 @@
                     class="border-table-row-divider border-b border-solid"
                   >
                     <td
-                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.contact_email") }}
                     </td>
@@ -182,7 +182,7 @@
                   </tr>
                   <tr v-if="licenseData.license.environment_type">
                     <td
-                      class="border-table-row-divider border-r border-solid px-3 py-2 leading-[1.2] font-bold"
+                      class="border-table-row-divider border-e border-solid px-3 py-2 leading-[1.2] font-bold"
                     >
                       {{ t("about.environment_type") }}
                     </td>
@@ -245,7 +245,7 @@
                   <div
                     class="bg-banner-success-bg border-banner-success-border rounded-default flex items-center border border-solid px-4 py-3 backdrop-blur-md transition-all duration-200 dark:shadow-md"
                   >
-                    <OIcon name="check-circle" class="text-status-positive mr-2" size="md" />
+                    <OIcon name="check-circle" class="text-status-positive me-2" size="md" />
                     <span class="text-sm">{{ t("about.license_auto_filled") }}</span>
                   </div>
                 </div>
@@ -386,7 +386,7 @@
                         ></span
                         ><span
                           v-else
-                          class="ml-1 text-xs italic opacity-80"
+                          class="ms-1 text-xs italic opacity-80"
                           v-html="
                             DOMPurify.sanitize(
                               t(

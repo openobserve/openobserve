@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #empty>
           <div data-test="logs-search-no-field-found-text" class="mx-0 w-5/6 pt-3 text-center">
-            <OIcon name="info" size="sm" class="mr-1 align-middle" />
+            <OIcon name="info" size="sm" class="me-1 align-middle" />
             {{ t("search.noFieldFoundInStream") }}
           </div>
         </template>

@@ -197,7 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >
-            <OIcon size="xs" class="mr-2" :name="drilldown._isCrossLink ? 'open-in-new' : 'link'" />
+            <OIcon size="xs" class="me-2" :name="drilldown._isCrossLink ? 'open-in-new' : 'link'" />
             <span class="select-none">{{ drilldown.name }}</span>
           </div>
         </template>

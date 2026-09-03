@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`${type}-index-dropdown-stream_type`"
       labelKey="label"
       valueKey="value"
-      class="mr-1 flex-1"
+      class="me-1 flex-1"
       :disabled="disableDropdown"
     >
       <!-- The trigger paints no per-option icon of its own, so the selected

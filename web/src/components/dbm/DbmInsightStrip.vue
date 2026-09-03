@@ -50,9 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="(insight, index) in ranked"
       :key="insight.id"
       type="button"
-      class="border-border-subtle hover:bg-surface-subtle group flex shrink-0 cursor-pointer items-center gap-2 border-r px-2.5 py-1 text-left whitespace-nowrap"
+      class="border-border-subtle hover:bg-surface-subtle group flex shrink-0 cursor-pointer items-center gap-2 border-e px-2.5 py-1 text-left whitespace-nowrap"
       :class="[
-        index === 0 ? 'pl-0' : '',
+        index === 0 ? 'ps-0' : '',
         activeId === insight.id ? 'bg-surface-accent-active' : '',
       ]"
       :data-test="`dbm-insight-${insight.id}`"
@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex-1"></div>
 
-    <div class="flex shrink-0 items-center pl-2">
+    <div class="flex shrink-0 items-center ps-2">
       <OButton
         variant="ghost-muted"
         size="xs"

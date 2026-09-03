@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Custom SQL mode -->
         <div v-if="queryMode === 'custom_sql'" class="mb-4! flex items-start pb-0!">
           <div class="flex items-center font-semibold" style="width: 11.875rem; height: 2.25rem">
-            {{ t("alerts.alertDetails.sql") }} <span class="text-status-error-text ml-1">*</span>
+            {{ t("alerts.alertDetails.sql") }} <span class="text-status-error-text ms-1">*</span>
           </div>
           <div style="width: calc(100% - 11.875rem)">
             <div
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
               {{ t("alerts.detectionFunction") }}
-              <span class="text-status-error-text ml-1">*</span>
+              <span class="text-status-error-text ms-1">*</span>
             </div>
             <!-- items-start, not items-center: the field select renders its
                  validation message inside its own column (OSelect's root is
@@ -218,8 +218,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
               {{ t("alerts.anomaly.detectionResolution") }}
-              <span class="text-status-error-text ml-1">*</span>
-              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+              <span class="text-status-error-text ms-1">*</span>
+              <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -267,8 +267,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="mb-4! flex items-start pb-0!">
           <div class="flex items-center font-semibold" style="width: 11.875rem; height: 2.25rem">
             {{ t("alerts.anomaly.detectionResolution") }}
-            <span class="text-status-error-text ml-1">*</span>
-            <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+            <span class="text-status-error-text ms-1">*</span>
+            <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
               <OTooltip
                 side="right"
                 align="center"
@@ -319,8 +319,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
               {{ t("alerts.anomaly.checkEvery") }}
-              <span class="text-status-error-text ml-1">*</span>
-              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+              <span class="text-status-error-text ms-1">*</span>
+              <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -368,8 +368,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
               {{ t("alerts.anomaly.lookBackWindow") }}
-              <span class="text-status-error-text ml-1">*</span>
-              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+              <span class="text-status-error-text ms-1">*</span>
+              <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -422,8 +422,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
               {{ t("alerts.trainingWindow") }}
-              <span class="text-status-error-text ml-1">*</span>
-              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+              <span class="text-status-error-text ms-1">*</span>
+              <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
                 <OTooltip side="right" align="center" max-width="18.75rem">
                   <!-- Uses a #content slot (not :content) so the font-size
                        span survives. -->
@@ -462,7 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
             >
               {{ t("alerts.anomaly.retrainEvery") }}
-              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+              <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -487,8 +487,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mb-4! flex flex-row items-start gap-2 pb-0!">
           <div class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold">
             {{ t("alerts.sensitivity") }}
-            <span class="text-status-error-text ml-1">*</span>
-            <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+            <span class="text-status-error-text ms-1">*</span>
+            <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
               <OTooltip
                 side="right"
                 align="center"

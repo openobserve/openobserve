@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("iam.editRole.show") }}
               </span>
               <OToggleGroup
-                class="ml-1"
+                class="ms-1"
                 :model-value="filter.permissions"
                 @update:model-value="(v) => updateTableData(v as string)"
               >
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <OToggleGroup
               data-test="edit-role-permissions-ui-type-toggle"
-              class="my-1 mr-3"
+              class="my-1 me-3"
               :model-value="permissionsUiType"
               @update:model-value="(v) => updatePermissionsUi(v as string)"
             >
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="toggleHelpSection"
               >
                 <OIcon name="help" size="sm" />
-                <span class="ml-1"> {{ t("iam.editRole.help") }} </span>
+                <span class="ms-1"> {{ t("iam.editRole.help") }} </span>
               </div>
             </div>
             <div class="flex flex-nowrap">
