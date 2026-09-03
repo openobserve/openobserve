@@ -49,6 +49,8 @@ export class AlertLibraryPage {
       drawerLoadFailed: '[data-test="alert-library-drawer-load-failed"]',
       drawerPreview: '[data-test="alert-library-drawer-preview"]',
       drawerEvaluation: '[data-test="alert-library-drawer-evaluation"]',
+      drawerNeedsData: '[data-test="alert-library-drawer-needs-data"]',
+      drawerAvailability: '[data-test="alert-library-drawer-availability"]',
       drawerInstall: '[data-test="alert-library-drawer-install"]',
       drawerCustomize: '[data-test="alert-library-drawer-customize"]',
       // install wizard
@@ -56,6 +58,9 @@ export class AlertLibraryPage {
       destinationStep: '[data-test="alert-library-install-destination-step"]',
       destination: '[data-test="alert-library-install-destination"]',
       destinationsEmpty: '[data-test="alert-library-install-destinations-empty"]',
+      destinationsFailed: '[data-test="alert-library-install-destinations-failed"]',
+      destinationsRetry: '[data-test="alert-library-install-destinations-retry"]',
+      openDestinations: '[data-test="alert-library-install-open-destinations"]',
       installSelectAll: '[data-test="alert-library-install-select-all"]',
       installClear: '[data-test="alert-library-install-clear"]',
       installCount: '[data-test="alert-library-install-count"]',
@@ -216,13 +221,10 @@ export class AlertLibraryPage {
     }
     const options = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
     await expect(options.first()).toBeVisible({ timeout: 8000 });
+    // Fail loudly if the named destination is absent — never silently pick another.
     const match = options.filter({ hasText: name }).first();
-    if (await match.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await match.click();
-    } else {
-      testLogger.warn('destination option not found by name; selecting first', { name });
-      await options.first().click();
-    }
+    await expect(match, `destination "${name}" not in the wizard's list`).toBeVisible({ timeout: 8000 });
+    await match.click();
   }
 
   async next() { await this.page.locator(this.l.next).click(); }
@@ -240,8 +242,6 @@ export class AlertLibraryPage {
     const box = this.page.locator(this.l.confirmLarge);
     if ((await box.getAttribute('aria-checked')) !== 'true') await box.click();
   }
-
-  isLargeConfirmVisible() { return this.page.locator(this.l.confirmLarge).isVisible(); }
 
   async run() { await this.page.locator(this.l.run).click(); }
   async retryFailed() { await this.page.locator(this.l.retry).click(); }
@@ -283,6 +283,72 @@ export class AlertLibraryPage {
     if (!detailResp.ok()) return meta;
     return (await detailResp.json().catch(() => meta)) || meta;
   }
+
+  // ── assertions (selectors + expects live here, never in the spec) ─────────
+  async expectGalleryVisible() { await expect(this.page.locator(this.l.grid)).toBeVisible(); }
+  async expectCardVisible(id) { await expect(this.card(id)).toBeVisible(); }
+  async expectCardAbsent(id) { await expect(this.card(id)).toHaveCount(0); }
+  async expectCardNeedsData(id) { await expect(this.needsDataChip(id)).toBeVisible(); }
+  async expectCardReady(id) { await expect(this.needsDataChip(id)).toHaveCount(0); }
+  async expectDrawerPreviewVisible() { await expect(this.page.locator(this.l.drawerPreview)).toBeVisible(); }
+  async expectDrawerNeedsData() { await expect(this.page.locator(this.l.drawerNeedsData)).toBeVisible(); }
+  async expectDrawerAvailability() { await expect(this.page.locator(this.l.drawerAvailability)).toBeVisible(); }
+
+  async closeDrawer() {
+    await this.page.keyboard.press('Escape');
+    await expect(this.page.locator(this.l.drawer)).toBeHidden();
+  }
+
+  async expectNextDisabled() { await expect(this.page.locator(this.l.next)).toBeDisabled(); }
+  async expectNextEnabled() { await expect(this.page.locator(this.l.next)).toBeEnabled(); }
+  async expectRunDisabled() { await expect(this.page.locator(this.l.run)).toBeDisabled(); }
+  async expectRunEnabled() { await expect(this.page.locator(this.l.run)).toBeEnabled(); }
+  async expectLargeConfirmVisible() { await expect(this.page.locator(this.l.confirmLarge)).toBeVisible(); }
+  async expectLargeConfirmAbsent() { await expect(this.page.locator(this.l.confirmLarge)).toHaveCount(0); }
+
+  async expectErrorState(label) {
+    await expect(this.page.locator(this.l.error), label).toBeVisible({ timeout: 20000 });
+  }
+  async expectEmptyCatalog() {
+    await expect(this.page.locator(this.l.emptyCatalog)).toBeVisible({ timeout: 20000 });
+  }
+  async clickEmptyCatalogRetry() {
+    await this.page
+      .locator(`${this.l.emptyCatalog} [data-test$="-action"], ${this.l.emptyCatalog} button`)
+      .first()
+      .click();
+  }
+  async expectNoResults() { await expect(this.page.locator(this.l.noResults)).toBeVisible(); }
+
+  async expectRailCategoryVisible(id) {
+    await expect(this.page.locator(`[data-test="alert-library-rail-category-${id}"]`)).toBeVisible();
+  }
+  async expectRailCategoryAbsent(id) {
+    await expect(this.page.locator(`[data-test="alert-library-rail-category-${id}"]`)).toHaveCount(0);
+  }
+
+  async expectPageHeaderVisible() {
+    await expect(this.page.locator(this.l.page)).toBeVisible();
+    await expect(this.page.locator(this.l.title)).toBeVisible();
+    await expect(this.page.locator(this.l.refresh)).toBeVisible();
+    await expect(this.page.locator(this.l.contribute)).toBeVisible();
+  }
+
+  async expectInstallResultCount(status, count) {
+    await expect(
+      this.page.locator(`[data-test^="alert-library-install-result-"][data-status="${status}"]`),
+    ).toHaveCount(count);
+  }
+  async expectInstallErrorVisible() {
+    await expect(this.page.locator('[data-test^="alert-library-install-error-"]').first()).toBeVisible();
+  }
+  async expectRetryVisible() { await expect(this.page.locator(this.l.retry)).toBeVisible(); }
+
+  async expectDestinationsFailed() { await expect(this.page.locator(this.l.destinationsFailed)).toBeVisible(); }
+  async expectDestinationsRetryVisible() { await expect(this.page.locator(this.l.destinationsRetry)).toBeVisible(); }
+  async clickDestinationsRetry() { await this.page.locator(this.l.destinationsRetry).click(); }
+  async expectDestinationsEmpty() { await expect(this.page.locator(this.l.destinationsEmpty)).toBeVisible(); }
+  async expectOpenDestinationsVisible() { await expect(this.page.locator(this.l.openDestinations)).toBeVisible(); }
 
   // ── internals ─────────────────────────────────────────────────────────────
   async _fillField(rootSelector, value) {

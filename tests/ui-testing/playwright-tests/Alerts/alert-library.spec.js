@@ -14,9 +14,11 @@ const {
 
 // Combined-journey e2e for the Alert Library. The manifest + alert files are
 // mocked (deterministic readiness / bulk counts / states); install hits the
-// real alert API and is verified by reading the created alert back.
+// real alert API and is verified by reading the created alert back. Selectors
+// and element assertions live in alertLibraryPage — never inline here.
 test.describe('Alert Library', () => {
   let pm;
+  let lib;
   let readyStream;
   let missingStream;
   let templateName;
@@ -26,6 +28,7 @@ test.describe('Alert Library', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
     pm = new PageManager(page);
+    lib = pm.alertLibraryPage;
 
     const rand = pm.alertsPage.generateRandomString().toLowerCase();
     readyStream = `pw_lib_ready_${rand}`.toLowerCase();
@@ -44,8 +47,6 @@ test.describe('Alert Library', () => {
       destinationName, 'http://example.com/webhook', templateName,
     );
 
-    // Deterministic gallery: 1 ready card, 1 not-ready (missing) card, and a
-    // bulk pack of 51 ready cards (> LARGE_BATCH=50) for the large-batch guard.
     // All installable names share the pw_lib_ prefix so cleanup.spec.js sweeps
     // the alerts they create (see apiCleanup alertPrefixes).
     const ready = makeEntry(1, {
@@ -67,51 +68,50 @@ test.describe('Alert Library', () => {
     await routeLibrary(page, { manifest: buildManifest(entries), entries });
   });
 
-  test('browse, filter, preview and install a single curated alert', async ({ page }) => {
+  test('browse, filter, preview and install a single curated alert', async () => {
     const ready = entries[0];
     const missing = entries[1];
 
     // Gallery renders from the mocked manifest.
-    await pm.alertLibraryPage.openViaUrl();
-    await expect(page.locator('[data-test="alert-library-grid"]')).toBeVisible();
+    await lib.openViaUrl();
+    await lib.expectGalleryVisible();
 
     // Readiness: missing card shows the "not ingested" chip, ready card doesn't.
-    await expect(pm.alertLibraryPage.needsDataChip(missing.id)).toBeVisible();
-    await expect(pm.alertLibraryPage.needsDataChip(ready.id)).toHaveCount(0);
+    await lib.expectCardNeedsData(missing.id);
+    await lib.expectCardReady(ready.id);
 
     // Readiness filter (stat strip) narrows to not-ready, then back.
-    await pm.alertLibraryPage.filterNeedsData();
-    await expect(pm.alertLibraryPage.card(missing.id)).toBeVisible();
-    await expect(pm.alertLibraryPage.card(ready.id)).toHaveCount(0);
-    await pm.alertLibraryPage.filterAll();
+    await lib.filterNeedsData();
+    await lib.expectCardVisible(missing.id);
+    await lib.expectCardAbsent(ready.id);
+    await lib.filterAll();
 
     // Search narrows to the ready alert by title.
-    await pm.alertLibraryPage.search('PW Ready');
-    await expect(pm.alertLibraryPage.card(ready.id)).toBeVisible();
+    await lib.search('PW Ready');
+    await lib.expectCardVisible(ready.id);
 
     // Drawer: opens, lazy-loads the (mocked) file, shows preview + install.
-    await pm.alertLibraryPage.openCard(ready.id);
-    await expect(page.locator('[data-test="alert-library-drawer-preview"]')).toBeVisible();
+    await lib.openCard(ready.id);
+    await lib.expectDrawerPreviewVisible();
 
     // Install wizard: destination → alerts → folder(default) → tune → run.
-    await pm.alertLibraryPage.installFromDrawer();
-    // F2: cannot advance until a destination is chosen.
-    await expect(page.locator('[data-test="alert-library-install-next"]')).toBeDisabled();
-    await pm.alertLibraryPage.pickDestination(destinationName);
-    await expect(page.locator('[data-test="alert-library-install-next"]')).toBeEnabled();
-    await pm.alertLibraryPage.next(); // → alerts
-    await pm.alertLibraryPage.next(); // → folder
-    await pm.alertLibraryPage.next(); // → tune
-    await pm.alertLibraryPage.enableTune();
-    await pm.alertLibraryPage.setFrequency(15);
-    await pm.alertLibraryPage.setSilence(20);
-    await pm.alertLibraryPage.next(); // → review
-    await pm.alertLibraryPage.run();
-    await pm.alertLibraryPage.waitResult(ready.id, 'installed');
-    await pm.alertLibraryPage.done();
+    await lib.installFromDrawer();
+    await lib.expectNextDisabled(); // F2: cannot advance until a destination is chosen
+    await lib.pickDestination(destinationName);
+    await lib.expectNextEnabled();
+    await lib.next(); // → alerts
+    await lib.next(); // → folder
+    await lib.next(); // → tune
+    await lib.enableTune();
+    await lib.setFrequency(15);
+    await lib.setSilence(20);
+    await lib.next(); // → review
+    await lib.run();
+    await lib.waitResult(ready.id, 'installed');
+    await lib.done();
 
     // Verify via API the transformations the UI never shows.
-    const created = await pm.alertLibraryPage.getInstalledAlert(ready.name);
+    const created = await lib.getInstalledAlert(ready.name);
     expect(created, 'installed alert should be readable via API').toBeTruthy();
     // I2 destination overridden (author's o2_to_slack replaced)
     expect(created.destinations).toContain(destinationName);
@@ -121,68 +121,67 @@ test.describe('Alert Library', () => {
     expect(created.context_attributes?.library_hash).toBe(ready.content_hash);
     // I4 severity critical → priority 1 (integer on the wire)
     expect(created.priority).toBe(1);
-    // I5 owner is the installing user; I1 lands in the chosen (default) folder
+    // I5 owner is the installing user
     expect(typeof created.owner === 'string' && created.owner.length).toBeTruthy();
     // I7 tuning applied
     expect(created.trigger_condition?.frequency).toBe(15);
     expect(created.trigger_condition?.silence).toBe(20);
   });
 
-  test('bulk select via select-all-in-view triggers the >50 large-batch guard', async ({ page }) => {
-    await pm.alertLibraryPage.openViaUrl();
+  test('bulk select via select-all-in-view triggers the >50 large-batch guard', async () => {
+    await lib.openViaUrl();
 
     // Select every card in view (1 ready + 1 missing + 51 bulk = 53 > 50).
-    await pm.alertLibraryPage.selectAllInViewToggle();
-    expect(await pm.alertLibraryPage.selectedCountInBar()).toBeGreaterThan(50);
+    await lib.selectAllInViewToggle();
+    expect(await lib.selectedCountInBar()).toBeGreaterThan(50);
 
-    await pm.alertLibraryPage.addSelected();
-    await pm.alertLibraryPage.pickDestination(destinationName);
-    await pm.alertLibraryPage.next(); // alerts
-    await pm.alertLibraryPage.next(); // folder
-    await pm.alertLibraryPage.next(); // tune
-    await pm.alertLibraryPage.next(); // review
+    await lib.addSelected();
+    await lib.pickDestination(destinationName);
+    await lib.next(); // alerts
+    await lib.next(); // folder
+    await lib.next(); // tune
+    await lib.next(); // review
 
     // Guard: confirm checkbox present, Run disabled until it is ticked.
-    await expect(page.locator('[data-test="alert-library-install-confirm-large"]')).toBeVisible();
-    await expect(page.locator('[data-test="alert-library-install-run"]')).toBeDisabled();
-    await pm.alertLibraryPage.confirmLargeBatch();
-    await expect(page.locator('[data-test="alert-library-install-run"]')).toBeEnabled();
+    await lib.expectLargeConfirmVisible();
+    await lib.expectRunDisabled();
+    await lib.confirmLargeBatch();
+    await lib.expectRunEnabled();
 
     // H5: the confirmation auto-resets when the run's shape changes (here, the
     // alert selection), so it always describes the run about to happen.
-    await pm.alertLibraryPage.back(); // → tune
-    await pm.alertLibraryPage.back(); // → folder
-    await pm.alertLibraryPage.back(); // → alerts
-    await pm.alertLibraryPage.clearInDialog();
-    await pm.alertLibraryPage.selectAllInDialog();
-    await pm.alertLibraryPage.next(); // folder
-    await pm.alertLibraryPage.next(); // tune
-    await pm.alertLibraryPage.next(); // review
-    await expect(page.locator('[data-test="alert-library-install-run"]')).toBeDisabled();
+    await lib.back(); // → tune
+    await lib.back(); // → folder
+    await lib.back(); // → alerts
+    await lib.clearInDialog();
+    await lib.selectAllInDialog();
+    await lib.next(); // folder
+    await lib.next(); // tune
+    await lib.next(); // review
+    await lib.expectRunDisabled();
   });
 
-  test('readiness surfaces on the card and in the drawer (fresh vs missing)', async ({ page }) => {
+  test('readiness surfaces on the card and in the drawer (fresh vs missing)', async () => {
     const ready = entries[0];
     const missing = entries[1];
 
-    await pm.alertLibraryPage.openViaUrl();
+    await lib.openViaUrl();
 
     // Card: missing → "not ingested" chip; fresh → none.
-    await expect(pm.alertLibraryPage.needsDataChip(missing.id)).toBeVisible();
-    await expect(pm.alertLibraryPage.needsDataChip(ready.id)).toHaveCount(0);
+    await lib.expectCardNeedsData(missing.id);
+    await lib.expectCardReady(ready.id);
 
-    // Drawer: missing → availability warning banner; fresh → no banner.
-    await pm.alertLibraryPage.openCard(missing.id);
-    await expect(page.locator('[data-test="alert-library-drawer-needs-data"]')).toBeVisible();
-    await expect(page.locator('[data-test="alert-library-drawer-availability"]')).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(page.locator('[data-test="alert-library-drawer"]')).toBeHidden();
+    // Drawer: missing → availability warning banner; fresh → preview renders.
+    await lib.openCard(missing.id);
+    await lib.expectDrawerNeedsData();
+    await lib.expectDrawerAvailability();
+    await lib.closeDrawer();
 
     // The ready card's drawer renders the preview. (Its exact availability
     // sub-state — fresh vs stale — depends on stream-stats propagation timing,
     // which is covered deterministically by the useAlertLibrary unit tests.)
-    await pm.alertLibraryPage.openCard(ready.id);
-    await expect(page.locator('[data-test="alert-library-drawer-preview"]')).toBeVisible();
+    await lib.openCard(ready.id);
+    await lib.expectDrawerPreviewVisible();
   });
 
   test('a broken manifest shows a recovery state, not an empty gallery', async ({ page }) => {
@@ -198,10 +197,10 @@ test.describe('Alert Library', () => {
       await page.route(MANIFEST_GLOB, (route) =>
         route.fulfill({ status: m.status, contentType: 'application/json', body: m.body }),
       );
-      if (i === 0) await pm.alertLibraryPage.openViaUrl();
+      if (i === 0) await lib.openViaUrl();
       else await page.reload();
       // Distinct error surface with a retry, never a silent empty catalog.
-      await expect(page.locator('[data-test="alert-library-error"]'), m.label).toBeVisible({ timeout: 20000 });
+      await lib.expectErrorState(m.label);
     }
 
     // B3: a valid-but-empty manifest is its OWN state, not an error.
@@ -213,88 +212,87 @@ test.describe('Alert Library', () => {
       }),
     );
     await page.reload();
-    await expect(page.locator('[data-test="alert-library-empty-catalog"]')).toBeVisible({ timeout: 20000 });
+    await lib.expectEmptyCatalog();
 
     // B7: restoring a good manifest and hitting Retry recovers the gallery.
     await page.unroute(MANIFEST_GLOB);
     await page.route(MANIFEST_GLOB, (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildManifest(entries)) }),
     );
-    await page.locator('[data-test="alert-library-empty-catalog"] [data-test$="-action"], [data-test="alert-library-empty-catalog"] button').first().click();
-    await expect(page.locator('[data-test="alert-library-grid"]')).toBeVisible({ timeout: 20000 });
+    await lib.clickEmptyCatalogRetry();
+    await lib.expectGalleryVisible();
   });
 
   test('Customize opens the alert editor prefilled from the library file', async ({ page }) => {
     const ready = entries[0];
 
-    await pm.alertLibraryPage.openViaUrl();
-    await pm.alertLibraryPage.openCard(ready.id);
-    await pm.alertLibraryPage.customizeFromDrawer();
+    await lib.openViaUrl();
+    await lib.openCard(ready.id);
+    await lib.customizeFromDrawer();
 
     // Customize hands the alert to the full editor via the library prefill
     // (route "addAlert" with ?prefill=library) — not a customizeFailed toast.
     await expect(page).toHaveURL(/prefill=library/, { timeout: 15000 });
   });
 
-  test('the rail filters the gallery by severity and by category', async ({ page }) => {
+  test('the rail filters the gallery by severity and by category', async () => {
     const ready = entries[0]; // critical, category ready-signals
     const missing = entries[1]; // info, category absent-signals
     const bulk = entries[2]; // warning, category bulk-signals
 
-    await pm.alertLibraryPage.openViaUrl();
+    await lib.openViaUrl();
 
     // Severity is single-select: critical → only the critical card.
-    await pm.alertLibraryPage.selectSeverity('critical');
-    await expect(pm.alertLibraryPage.card(ready.id)).toBeVisible();
-    await expect(pm.alertLibraryPage.card(missing.id)).toHaveCount(0);
-    await pm.alertLibraryPage.selectSeverity('all'); // widen back
-    await expect(pm.alertLibraryPage.card(missing.id)).toBeVisible();
+    await lib.selectSeverity('critical');
+    await lib.expectCardVisible(ready.id);
+    await lib.expectCardAbsent(missing.id);
+    await lib.selectSeverity('all'); // widen back
+    await lib.expectCardVisible(missing.id);
 
     // Category search narrows the rail list (nothing selected yet).
-    await pm.alertLibraryPage.searchCategories('bulk');
-    await expect(page.locator('[data-test="alert-library-rail-category-bulk-signals"]')).toBeVisible();
-    await expect(page.locator('[data-test="alert-library-rail-category-absent-signals"]')).toHaveCount(0);
-    await pm.alertLibraryPage.searchCategories('');
+    await lib.searchCategories('bulk');
+    await lib.expectRailCategoryVisible('bulk-signals');
+    await lib.expectRailCategoryAbsent('absent-signals');
+    await lib.searchCategories('');
 
     // Category multi-select filters the gallery; clear resets it.
-    await pm.alertLibraryPage.toggleCategory('bulk-signals');
-    await expect(pm.alertLibraryPage.card(bulk.id)).toBeVisible();
-    await expect(pm.alertLibraryPage.card(ready.id)).toHaveCount(0);
-    await pm.alertLibraryPage.clearCategories();
-    await expect(pm.alertLibraryPage.card(ready.id)).toBeVisible();
+    await lib.toggleCategory('bulk-signals');
+    await lib.expectCardVisible(bulk.id);
+    await lib.expectCardAbsent(ready.id);
+    await lib.clearCategories();
+    await lib.expectCardVisible(ready.id);
 
     // C13: a search matching nothing shows the no-results state.
-    await pm.alertLibraryPage.search('zzz_no_such_alert_zzz');
-    await expect(page.locator('[data-test="alert-library-no-results"]')).toBeVisible();
+    await lib.search('zzz_no_such_alert_zzz');
+    await lib.expectNoResults();
   });
 
-  test('bulk install a small selection runs each alert and reports success', async ({ page }) => {
+  test('bulk install a small selection runs each alert and reports success', async () => {
     const picks = [entries[2], entries[3], entries[4]]; // three bulk cards on the ready stream
 
-    await pm.alertLibraryPage.openViaUrl();
-    for (const e of picks) await pm.alertLibraryPage.selectCard(e.id);
-    expect(await pm.alertLibraryPage.selectedCountInBar()).toBe(picks.length);
+    await lib.openViaUrl();
+    for (const e of picks) await lib.selectCard(e.id);
+    expect(await lib.selectedCountInBar()).toBe(picks.length);
 
-    await pm.alertLibraryPage.addSelected();
-    await pm.alertLibraryPage.pickDestination(destinationName);
-    await pm.alertLibraryPage.next(); // alerts
+    await lib.addSelected();
+    await lib.pickDestination(destinationName);
+    await lib.next(); // alerts
     // F5: clearing the selection blocks advancing until at least one is re-picked
     // (re-check the three specific rows — select-all would pull the whole gallery).
-    await pm.alertLibraryPage.clearInDialog();
-    await expect(page.locator('[data-test="alert-library-install-next"]')).toBeDisabled();
-    for (const e of picks) await pm.alertLibraryPage.toggleAlertInDialog(e.id);
-    await expect(page.locator('[data-test="alert-library-install-next"]')).toBeEnabled();
-    await pm.alertLibraryPage.next(); // folder
-    await pm.alertLibraryPage.next(); // tune
-    await pm.alertLibraryPage.next(); // review
-    // <= 50, so no large-batch confirm is required.
-    await expect(page.locator('[data-test="alert-library-install-confirm-large"]')).toHaveCount(0);
-    await pm.alertLibraryPage.run();
-    for (const e of picks) await pm.alertLibraryPage.waitResult(e.id, 'installed');
-    await pm.alertLibraryPage.done();
+    await lib.clearInDialog();
+    await lib.expectNextDisabled();
+    for (const e of picks) await lib.toggleAlertInDialog(e.id);
+    await lib.expectNextEnabled();
+    await lib.next(); // folder
+    await lib.next(); // tune
+    await lib.next(); // review
+    await lib.expectLargeConfirmAbsent(); // <= 50, so no confirm required
+    await lib.run();
+    for (const e of picks) await lib.waitResult(e.id, 'installed');
+    await lib.done();
 
     // Spot-check one installed alert via API.
-    const created = await pm.alertLibraryPage.getInstalledAlert(picks[0].name);
+    const created = await lib.getInstalledAlert(picks[0].name);
     expect(created, 'a bulk-installed alert should be readable via API').toBeTruthy();
     expect(created.destinations).toContain(destinationName);
     expect(created.context_attributes?.library_id).toBe(picks[0].id);
@@ -303,32 +301,28 @@ test.describe('Alert Library', () => {
   test('opens from the section tab and shows the header actions', async ({ page }) => {
     const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
     await page.goto(`${base}/web/alerts?org_identifier=${getOrgIdentifier()}`);
-    await pm.alertLibraryPage.openViaTab();
-
-    await expect(page.locator('[data-test="alert-library-page"]')).toBeVisible();
-    await expect(page.locator('[data-test="alert-library-title"]')).toBeVisible();
-    await expect(page.locator('[data-test="alert-library-refresh"]')).toBeVisible();
-    await expect(page.locator('[data-test="alert-library-contribute"]')).toBeVisible();
+    await lib.openViaTab();
+    await lib.expectPageHeaderVisible();
   });
 
-  test('selection persists across filters via group-select, off-screen count and clear', async ({ page }) => {
-    await pm.alertLibraryPage.openViaUrl();
+  test('selection persists across filters via group-select, off-screen count and clear', async () => {
+    await lib.openViaUrl();
 
     // G2: a group's select button selects that group's cards.
-    await pm.alertLibraryPage.firstSelectGroup();
-    expect(await pm.alertLibraryPage.selectedCountInBar()).toBeGreaterThan(0);
-    await pm.alertLibraryPage.clearSelection();
-    expect(await pm.alertLibraryPage.selectedCountInBar()).toBe(0);
+    await lib.firstSelectGroup();
+    expect(await lib.selectedCountInBar()).toBeGreaterThan(0);
+    await lib.clearSelection();
+    expect(await lib.selectedCountInBar()).toBe(0);
 
     // G4: a selected card that a filter pushes out of view is reported off-screen.
-    await pm.alertLibraryPage.selectCard(entries[2].id); // a warning bulk card
-    await pm.alertLibraryPage.selectSeverity('critical'); // hides warning cards
-    expect(await pm.alertLibraryPage.offscreenCountInBar()).toBeGreaterThan(0);
+    await lib.selectCard(entries[2].id); // a warning bulk card
+    await lib.selectSeverity('critical'); // hides warning cards
+    expect(await lib.offscreenCountInBar()).toBeGreaterThan(0);
 
     // G5: clear empties the selection.
-    await pm.alertLibraryPage.selectSeverity('all');
-    await pm.alertLibraryPage.clearSelection();
-    expect(await pm.alertLibraryPage.selectedCountInBar()).toBe(0);
+    await lib.selectSeverity('all');
+    await lib.clearSelection();
+    expect(await lib.selectedCountInBar()).toBe(0);
   });
 
   test('a per-alert install failure is shown per-row and can be retried', async ({ page }) => {
@@ -357,26 +351,26 @@ test.describe('Alert Library', () => {
       fileFor: (entry) => (entry.id === b.id ? brokenFile(entry) : buildAlertFile(entry)),
     });
 
-    await pm.alertLibraryPage.openViaUrl();
-    await pm.alertLibraryPage.selectCard(a.id);
-    await pm.alertLibraryPage.selectCard(b.id);
-    await pm.alertLibraryPage.addSelected();
-    await pm.alertLibraryPage.pickDestination(destinationName);
-    await pm.alertLibraryPage.next(); // alerts
-    await pm.alertLibraryPage.next(); // folder
-    await pm.alertLibraryPage.next(); // tune
-    await pm.alertLibraryPage.next(); // review
-    await pm.alertLibraryPage.run();
+    await lib.openViaUrl();
+    await lib.selectCard(a.id);
+    await lib.selectCard(b.id);
+    await lib.addSelected();
+    await lib.pickDestination(destinationName);
+    await lib.next(); // alerts
+    await lib.next(); // folder
+    await lib.next(); // tune
+    await lib.next(); // review
+    await lib.run();
 
     // H6: exactly one installed, one failed, with the server message shown.
-    await expect(page.locator('[data-test^="alert-library-install-result-"][data-status="installed"]')).toHaveCount(1);
-    await expect(page.locator('[data-test^="alert-library-install-result-"][data-status="failed"]')).toHaveCount(1);
-    await expect(page.locator('[data-test^="alert-library-install-error-"]').first()).toBeVisible();
+    await lib.expectInstallResultCount('installed', 1);
+    await lib.expectInstallResultCount('failed', 1);
+    await lib.expectInstallErrorVisible();
 
     // H7: the failed row can be retried (it collides again and stays failed).
-    await expect(page.locator('[data-test="alert-library-install-retry"]')).toBeVisible();
-    await pm.alertLibraryPage.retryFailed();
-    await expect(page.locator('[data-test^="alert-library-install-result-"][data-status="failed"]')).toHaveCount(1);
+    await lib.expectRetryVisible();
+    await lib.retryFailed();
+    await lib.expectInstallResultCount('failed', 1);
   });
 
   test('install blocks when the org has no usable destinations', async ({ page }) => {
@@ -386,19 +380,19 @@ test.describe('Alert Library', () => {
     await page.route('**/api/*/alerts/destinations**', (route) =>
       route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }),
     );
-    await pm.alertLibraryPage.openViaUrl();
-    await pm.alertLibraryPage.openCard(ready.id);
-    await pm.alertLibraryPage.installFromDrawer();
-    await expect(page.locator('[data-test="alert-library-install-destinations-failed"]')).toBeVisible();
-    await expect(page.locator('[data-test="alert-library-install-destinations-retry"]')).toBeVisible();
+    await lib.openViaUrl();
+    await lib.openCard(ready.id);
+    await lib.installFromDrawer();
+    await lib.expectDestinationsFailed();
+    await lib.expectDestinationsRetryVisible();
 
     // F3: retry against an empty list → the no-destinations banner + open-destinations.
     await page.unroute('**/api/*/alerts/destinations**');
     await page.route('**/api/*/alerts/destinations**', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
     );
-    await page.locator('[data-test="alert-library-install-destinations-retry"]').click();
-    await expect(page.locator('[data-test="alert-library-install-destinations-empty"]')).toBeVisible();
-    await expect(page.locator('[data-test="alert-library-install-open-destinations"]')).toBeVisible();
+    await lib.clickDestinationsRetry();
+    await lib.expectDestinationsEmpty();
+    await lib.expectOpenDestinationsVisible();
   });
 });
