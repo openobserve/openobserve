@@ -30,13 +30,13 @@ use config::meta::{
     folder::{DEFAULT_FOLDER, Folder, FolderType},
     synthetics::{
         ListSyntheticsParams, Synthetic, SyntheticAuth, SyntheticListItem, SyntheticListResponse,
-        for_each_string_at_path, take_strings_at_path,
+        SyntheticVariable, for_each_string_at_path, take_strings_at_path,
     },
     synthetics_variables::{
-        ResolvedVariableView, SplitTarget, SyntheticsEnvironmentRequest, SyntheticsEnvironmentView,
-        SyntheticsVariableKind, SyntheticsVariableRequest, SyntheticsVariableView,
-        normalize_variable_name, placeholder_names, validate_environment_request,
-        validate_variable_request,
+        ResolvedVariableView, ResolvedVariablesGrouped, SplitTarget, SyntheticsEnvironmentRequest,
+        SyntheticsEnvironmentView, SyntheticsVariableKind, SyntheticsVariableRequest,
+        SyntheticsVariableView, normalize_variable_name, placeholder_names,
+        validate_environment_request, validate_variable_request,
     },
 };
 // Re-exported so handlers can name what `get_environment` returns without

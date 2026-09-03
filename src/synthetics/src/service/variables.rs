@@ -582,7 +582,37 @@ pub async fn resolved_variables(
     else {
         return Ok(None);
     };
-    let env_id = check.environments.first().cloned();
+    let envs = synthetics_environments::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let shared = synthetics_variables::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    Ok(Some(resolved_rows(
+        &shared,
+        &envs,
+        &check.variables,
+        check.environments.first().map(String::as_str),
+    )))
+}
+
+/// Every environment's resolved set, keyed by environment name.
+///
+/// Same reads as [`resolved_variables`], the merge run once per environment, so
+/// the editor can switch environments without a request per flip. A stored
+/// environment id that no longer resolves is skipped — a deleted environment,
+/// not an error, matching the update path's reconcile behaviour.
+pub async fn resolved_variables_grouped(
+    org_id: &str,
+    check_id: &str,
+) -> anyhow::Result<Option<ResolvedVariablesGrouped>> {
+    let conn = get_orm_client_ro().await;
+    let Some(check) = synthetics_checks::get(conn, org_id, check_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+    else {
+        return Ok(None);
+    };
     let envs = synthetics_environments::list(conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
@@ -590,14 +620,44 @@ pub async fn resolved_variables(
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
+    let mut grouped = ResolvedVariablesGrouped::default();
+    if check.environments.is_empty() {
+        grouped.environments.push(String::new());
+        grouped.resolved.insert(
+            String::new(),
+            resolved_rows(&shared, &envs, &check.variables, None),
+        );
+    }
+    for id in &check.environments {
+        let Some(env) = envs.iter().find(|e| &e.id == id) else {
+            continue;
+        };
+        grouped.environments.push(env.name.clone());
+        grouped.resolved.insert(
+            env.name.clone(),
+            resolved_rows(&shared, &envs, &check.variables, Some(id)),
+        );
+    }
+    Ok(Some(grouped))
+}
+
+/// One environment's resolved rows, from already-loaded data.
+///
+/// Pure so the per-environment `overridden` semantics stay unit-testable: a
+/// check variable shadows a shared row only where that row applies.
+fn resolved_rows(
+    shared: &[SyntheticsVariableRecord],
+    envs: &[SyntheticsEnvironmentRecord],
+    check_vars: &[SyntheticVariable],
+    env_id: Option<&str>,
+) -> Vec<ResolvedVariableView> {
     // Names the check defines itself. Looked up as a set because the shared
     // rows below need to know which of them the check shadows.
-    let own: std::collections::HashSet<&str> =
-        check.variables.iter().map(|v| v.name.as_str()).collect();
+    let own: std::collections::HashSet<&str> = check_vars.iter().map(|v| v.name.as_str()).collect();
 
     let mut out: Vec<ResolvedVariableView> = shared
         .iter()
-        .filter(|v| applies_to(v, env_id.as_deref()))
+        .filter(|v| applies_to(v, env_id))
         .map(|v| ResolvedVariableView {
             scope: match &v.env {
                 None => "global".to_string(),
@@ -619,7 +679,7 @@ pub async fn resolved_variables(
         })
         .collect();
 
-    out.extend(check.variables.iter().map(|v| ResolvedVariableView {
+    out.extend(check_vars.iter().map(|v| ResolvedVariableView {
         name: v.name.clone(),
         // The check tier keeps the old `secure` flag, which is a display hint
         // rather than a storage property — so it is reported as plain here.
@@ -631,7 +691,7 @@ pub async fn resolved_variables(
         has_value: !v.value.is_empty(),
     }));
     out.sort_by(|a, b| a.name.cmp(&b.name).then(a.scope.cmp(&b.scope)));
-    Ok(Some(out))
+    out
 }
 
 /// One shared secret released to a browser for replay.
@@ -1164,5 +1224,140 @@ mod tests {
     fn kinds_map_to_the_strings_the_check_constraint_reads() {
         assert_eq!(kind_str(SyntheticsVariableKind::Secret), "secret");
         assert_eq!(kind_str(SyntheticsVariableKind::Plain), "plain");
+    }
+
+    fn named_var(id: &str, name: &str, env: Option<&str>) -> SyntheticsVariableRecord {
+        SyntheticsVariableRecord {
+            id: id.into(),
+            name: name.into(),
+            value: "x".into(),
+            ..var(env)
+        }
+    }
+
+    fn env_record(id: &str, name: &str) -> SyntheticsEnvironmentRecord {
+        SyntheticsEnvironmentRecord {
+            id: id.into(),
+            org_id: "acme".into(),
+            name: name.into(),
+            description: String::new(),
+            owner: None,
+            created_at: 0,
+            updated_at: 0,
+        }
+    }
+
+    fn check_var(name: &str) -> SyntheticVariable {
+        SyntheticVariable {
+            name: name.into(),
+            value: "y".into(),
+            secure: true,
+            example: String::new(),
+        }
+    }
+
+    #[test]
+    fn a_global_row_resolves_in_every_environment_a_scoped_row_only_in_its_own() {
+        let shared = vec![
+            named_var("g1", "ORG", None),
+            named_var("s1", "BASE_URL", Some("e-stg")),
+        ];
+        let envs = vec![env_record("e-stg", "staging"), env_record("e-qa", "qa")];
+
+        let staging = resolved_rows(&shared, &envs, &[], Some("e-stg"));
+        let qa = resolved_rows(&shared, &envs, &[], Some("e-qa"));
+
+        assert_eq!(
+            staging.iter().map(|v| v.name.as_str()).collect::<Vec<_>>(),
+            ["BASE_URL", "ORG"]
+        );
+        assert_eq!(
+            qa.iter().map(|v| v.name.as_str()).collect::<Vec<_>>(),
+            ["ORG"]
+        );
+    }
+
+    #[test]
+    fn scope_is_the_environment_name_global_or_check() {
+        let shared = vec![
+            named_var("g1", "ORG", None),
+            named_var("s1", "BASE_URL", Some("e-stg")),
+        ];
+        let envs = vec![env_record("e-stg", "staging")];
+
+        let rows = resolved_rows(&shared, &envs, &[check_var("RETRY_LIMIT")], Some("e-stg"));
+        let scope_of = |name: &str| rows.iter().find(|v| v.name == name).unwrap().scope.clone();
+
+        assert_eq!(scope_of("BASE_URL"), "staging");
+        assert_eq!(scope_of("ORG"), "global");
+        assert_eq!(scope_of("RETRY_LIMIT"), "check");
+    }
+
+    #[test]
+    fn overridden_varies_per_environment() {
+        // The check shadows staging's row where it applies; in qa the check
+        // variable is simply the only definition — nothing to mark.
+        let shared = vec![named_var("s1", "CHECKOUT_USER", Some("e-stg"))];
+        let envs = vec![env_record("e-stg", "staging"), env_record("e-qa", "qa")];
+        let own = [check_var("CHECKOUT_USER")];
+
+        let staging = resolved_rows(&shared, &envs, &own, Some("e-stg"));
+        let qa = resolved_rows(&shared, &envs, &own, Some("e-qa"));
+
+        let shadowed = staging
+            .iter()
+            .find(|v| v.scope == "staging")
+            .expect("staging row present");
+        assert!(shadowed.overridden);
+        assert_eq!(qa.len(), 1);
+        assert_eq!(qa[0].scope, "check");
+        assert!(!qa[0].overridden);
+    }
+
+    #[test]
+    fn an_unscoped_run_resolves_globals_and_check_variables_only() {
+        let shared = vec![
+            named_var("g1", "ORG", None),
+            named_var("s1", "BASE_URL", Some("e-stg")),
+        ];
+        let envs = vec![env_record("e-stg", "staging")];
+
+        let rows = resolved_rows(&shared, &envs, &[check_var("RETRY_LIMIT")], None);
+        assert_eq!(
+            rows.iter().map(|v| v.name.as_str()).collect::<Vec<_>>(),
+            ["ORG", "RETRY_LIMIT"]
+        );
+    }
+
+    #[test]
+    fn rows_sort_by_name_then_scope_in_every_group() {
+        let shared = vec![
+            named_var("s1", "B_NAME", Some("e-stg")),
+            named_var("g1", "A_NAME", None),
+        ];
+        let envs = vec![env_record("e-stg", "staging")];
+
+        let rows = resolved_rows(&shared, &envs, &[check_var("A_NAME")], Some("e-stg"));
+        let keys: Vec<(&str, &str)> = rows
+            .iter()
+            .map(|v| (v.name.as_str(), v.scope.as_str()))
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                ("A_NAME", "check"),
+                ("A_NAME", "global"),
+                ("B_NAME", "staging")
+            ]
+        );
+    }
+
+    #[test]
+    fn a_secure_check_variable_is_still_reported_plain() {
+        // `secure` is a display hint, not a storage property — reporting it as
+        // a secret would overclaim the write-only guarantee.
+        let rows = resolved_rows(&[], &[], &[check_var("TOKEN")], None);
+        assert_eq!(rows[0].kind, SyntheticsVariableKind::Plain);
+        assert!(rows[0].has_value);
     }
 }

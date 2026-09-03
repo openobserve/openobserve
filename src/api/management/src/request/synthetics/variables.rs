@@ -44,6 +44,13 @@ pub struct ForceQuery {
     pub force: bool,
 }
 
+/// Selects the resolved-variables response shape; only `all` is recognised.
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct ResolvedQuery {
+    #[serde(default)]
+    pub envs: Option<String>,
+}
+
 /// OpenFGA resource key for an environment. Its object id is the environment
 /// *name*, which is why names are validated as FGA-safe on write.
 #[cfg(feature = "enterprise")]
@@ -485,6 +492,7 @@ fn variables_error(operation: &str, error: anyhow::Error) -> Response {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Check ID"),
+        ("envs" = Option<String>, Query, description = "Pass `all` for every environment's resolved set, keyed by environment name; omit for the flat first-environment set"),
     ),
     responses(
         (status = 200, description = "Success",   content_type = "application/json", body = Object),
@@ -493,11 +501,26 @@ fn variables_error(operation: &str, error: anyhow::Error) -> Response {
 )]
 pub async fn get_synthetic_resolved_variables(
     Path((org_id, id)): Path<(String, String)>,
+    Query(q): Query<ResolvedQuery>,
 ) -> Response {
-    match openobserve_synthetics::service::resolved_variables(&org_id, &id).await {
-        Ok(Some(resolved)) => MetaHttpResponse::json(resolved),
-        Ok(None) => MetaHttpResponse::not_found("check not found"),
-        Err(e) => variables_error("resolved_variables", e),
+    match q.envs.as_deref() {
+        // The flat shape resolves the first environment only and predates the
+        // grouped one; kept byte-identical until every client passes `envs=all`.
+        None => match openobserve_synthetics::service::resolved_variables(&org_id, &id).await {
+            Ok(Some(resolved)) => MetaHttpResponse::json(resolved),
+            Ok(None) => MetaHttpResponse::not_found("check not found"),
+            Err(e) => variables_error("resolved_variables", e),
+        },
+        Some("all") => {
+            match openobserve_synthetics::service::resolved_variables_grouped(&org_id, &id).await {
+                Ok(Some(grouped)) => MetaHttpResponse::json(grouped),
+                Ok(None) => MetaHttpResponse::not_found("check not found"),
+                Err(e) => variables_error("resolved_variables_grouped", e),
+            }
+        }
+        Some(other) => {
+            MetaHttpResponse::bad_request(format!("envs: '{other}' is not supported; use 'all'"))
+        }
     }
 }
 
