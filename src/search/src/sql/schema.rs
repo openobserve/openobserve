@@ -18,7 +18,7 @@ use std::sync::Arc;
 use arrow_schema::FieldRef;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME, get_config,
-    meta::search::SearchEventType,
+    meta::{search::SearchEventType, sql::TableReferenceExt, stream::StreamType},
 };
 use datafusion::{arrow::datatypes::Schema, common::TableReference};
 use hashbrown::{HashMap, HashSet};
@@ -26,17 +26,19 @@ use infra::schema::{
     SchemaCache, get_stream_setting_defined_schema_fields, get_stream_setting_fts_fields,
     unwrap_stream_settings,
 };
+use schema::check_schema_for_defined_schema_fields;
 
 pub fn generate_select_star_schema(
     schemas: HashMap<TableReference, Arc<SchemaCache>>,
     columns: &HashMap<TableReference, HashSet<String>>,
     has_original_column: HashMap<TableReference, bool>,
     quick_mode: bool,
-    quick_mode_num_fields: usize,
+    stream_type: StreamType,
     search_event_type: &Option<SearchEventType>,
     need_fst_fields: bool,
 ) -> HashMap<TableReference, Arc<SchemaCache>> {
     let cfg = get_config();
+    let quick_mode_num_fields = cfg.limit.quick_mode_num_fields;
     let mut used_schemas = HashMap::new();
     for (name, schema) in schemas {
         let stream_settings = unwrap_stream_settings(schema.schema());
@@ -71,6 +73,7 @@ pub fn generate_select_star_schema(
                         &fts_fields,
                         skip_original_column,
                         need_fst_fields,
+                        name.get_stream_type(stream_type),
                     )
                 } else {
                     // skip selecting "_original" column if `SELECT * ...`
@@ -133,6 +136,7 @@ pub fn generate_quick_mode_fields(
     fts_fields: &[String],
     skip_original_column: bool,
     need_fst_fields: bool,
+    stream_type: StreamType,
 ) -> Vec<Arc<arrow_schema::Field>> {
     let cfg = get_config();
     let strategy = cfg.limit.quick_mode_strategy.to_lowercase();
@@ -221,6 +225,16 @@ pub fn generate_quick_mode_fields(
         {
             fields.push(Arc::new(field.clone()));
             fields_name.insert(field.to_string());
+        }
+    }
+
+    // truncation must not drop the columns a stream type is rendered from
+    for field in check_schema_for_defined_schema_fields(stream_type, schema, Vec::new()) {
+        if !fields_name.contains(&field)
+            && let Ok(field) = schema.field_with_name(&field)
+        {
+            fields.push(Arc::new(field.clone()));
+            fields_name.insert(field.name().to_string());
         }
     }
 
@@ -419,7 +433,7 @@ mod tests {
         let schema = Schema::new(fields);
 
         // Mock config - default strategy is "first"
-        let result = generate_quick_mode_fields(&schema, None, &[], false, false);
+        let result = generate_quick_mode_fields(&schema, None, &[], false, false, StreamType::Logs);
 
         // Should include timestamp and some fields (exact count depends on config)
         assert!(!result.is_empty());
@@ -439,7 +453,8 @@ mod tests {
         let mut columns = HashSet::new();
         columns.insert("selected_field".to_string());
 
-        let result = generate_quick_mode_fields(&schema, Some(columns), &[], false, false);
+        let result =
+            generate_quick_mode_fields(&schema, Some(columns), &[], false, false, StreamType::Logs);
 
         // Should include timestamp and selected field
         assert!(result.iter().any(|f| f.name() == TIMESTAMP_COL_NAME));
@@ -456,9 +471,38 @@ mod tests {
         fields.push(Arc::new(Field::new("service", DataType::Utf8, true)));
         let schema = Schema::new(fields);
 
-        let result = generate_quick_mode_fields(&schema, None, &[], false, false);
+        let result = generate_quick_mode_fields(&schema, None, &[], false, false, StreamType::Logs);
 
         assert!(result.iter().any(|f| f.name() == "service"));
+    }
+
+    #[test]
+    fn test_generate_quick_mode_fields_keeps_trace_fields() {
+        // Not in the built-in default list, so only the stream type guard can bring them back.
+        let trace_fields = [
+            "span_status",
+            "span_kind",
+            "events",
+            "reference_parent_span_id",
+        ];
+        let over_cutoff = get_config().limit.quick_mode_num_fields + 100;
+        let mut fields = (0..over_cutoff)
+            .map(|i| Arc::new(Field::new(format!("field{i}"), DataType::Utf8, true)))
+            .collect::<Vec<_>>();
+        for name in trace_fields {
+            fields.push(Arc::new(Field::new(name, DataType::Utf8, true)));
+        }
+        let schema = Schema::new(fields);
+
+        let result =
+            generate_quick_mode_fields(&schema, None, &[], false, false, StreamType::Traces);
+
+        for name in trace_fields {
+            assert!(result.iter().any(|f| f.name() == name), "missing {name}");
+        }
+
+        let logs = generate_quick_mode_fields(&schema, None, &[], false, false, StreamType::Logs);
+        assert!(!logs.iter().any(|f| f.name() == "span_status"));
     }
 
     #[test]
@@ -476,6 +520,7 @@ mod tests {
             &[],
             true, // skip_original_column = true
             false,
+            StreamType::Logs,
         );
 
         // Should not include original data column
@@ -501,6 +546,7 @@ mod tests {
             &fts_fields,
             false,
             true, // need_fst_fields = true
+            StreamType::Logs,
         );
 
         // Should include FTS fields
