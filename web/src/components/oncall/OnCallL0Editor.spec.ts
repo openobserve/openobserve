@@ -78,8 +78,10 @@ describe("OnCallL0Editor", () => {
     expect(wrapper.find('[data-test="oncall-l0-mode-p3"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-l0-mode-p1"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-l0-mode-p4"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="oncall-l0-p1"]').text()).toContain("Pages now");
-    expect(wrapper.find('[data-test="oncall-l0-p4"]').text()).toContain("nobody is paged");
+    expect(wrapper.find('[data-test="oncall-l0-p1"]').text()).toContain("Alert immediately");
+    expect(wrapper.find('[data-test="oncall-l0-p4"]').text()).toContain(
+      "no notifications are sent",
+    );
   });
 
   it("emits the whole block when a mode changes, P1/P4 untouched", async () => {
