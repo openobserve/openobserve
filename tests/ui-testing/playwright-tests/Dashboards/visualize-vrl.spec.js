@@ -287,6 +287,9 @@ test.describe("VRL visualization support testcases", () => {
     const tablePanel = pm.logsVisualise.getTablePanel();
     await expect(tablePanel).toBeVisible({ timeout: 15000 });
 
+    // Let the edit panel's initial chart settle before changing the time range, else the
+    // time change races the in-flight first render and the re-query can be dropped.
+    await pm.dashboardPanelActions.waitForChartToRender(page);
     await pm.dashboardTimeRefresh.setRelative("8", "h");
     // await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender(page);
@@ -543,11 +546,8 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.openVisualiseTabWithVrl();
 
     // IMPORTANT: Run query in visualization tab to populate vrlFunctionFieldList
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion({ expectTable: true });
     await pm.logsVisualise.verifyChartRenders(page);
-
-    // Wait for table to render with data
-    // await waitForTableData(page);
 
     // Verify table panel is displayed
     const tablePanel = pm.logsVisualise.getTablePanel();

@@ -986,8 +986,8 @@ describe("OTable", () => {
         },
       });
 
-      // The toolbar floats above the pointer, so it lives in <body> and exists only
-      // while a cell is hovered — never one overlay per cell.
+      // The toolbar floats clear of the hovered row, so it lives in <body> and exists
+      // only while a cell is hovered — never one overlay per cell.
       const toolbars = () =>
         document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]');
       expect(toolbars().length).toBe(0);
@@ -1047,6 +1047,99 @@ describe("OTable", () => {
       expect(document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(
         0,
       );
+    });
+
+    describe("placement", () => {
+      const realRect = Element.prototype.getBoundingClientRect;
+
+      // The td, the thead and the toolbar are the only rects the placement reads.
+      function stubRects(cellTop: number, cellBottom: number, headerBottom: number) {
+        Element.prototype.getBoundingClientRect = function () {
+          const el = this as HTMLElement;
+          if (el.tagName === "THEAD") {
+            return { top: 0, bottom: headerBottom, height: headerBottom } as DOMRect;
+          }
+          if (el.classList?.contains("o2-table-cell-hover-actions")) {
+            return { top: 0, bottom: 34, left: 0, right: 120, width: 120, height: 34 } as DOMRect;
+          }
+          if (el.tagName === "TD") {
+            return {
+              top: cellTop,
+              bottom: cellBottom,
+              left: 100,
+              right: 300,
+              width: 200,
+              height: cellBottom - cellTop,
+            } as DOMRect;
+          }
+          return { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 } as DOMRect;
+        } as any;
+      }
+
+      async function hoverCell(
+        cellTop: number,
+        cellBottom: number,
+        headerBottom: number,
+        clientX: number,
+      ) {
+        stubRects(cellTop, cellBottom, headerBottom);
+        wrapper = mount(OTable, {
+          props: { data: makeRows(3), columns: makeColumns() },
+          slots: { "cell-hover-actions": `<span class="hover-act">A</span>` },
+        });
+        await wrapper
+          .find('[data-test="o2-table-cell-id"]')
+          .trigger("mouseenter", { clientX, clientY: 999 });
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        return document.querySelector('[data-test^="o2-table-cell-hover-actions-"]') as HTMLElement;
+      }
+
+      const arrowOf = (bar: HTMLElement) =>
+        bar.querySelector('[data-test^="o2-table-cell-hover-arrow-"]') as HTMLElement;
+
+      beforeEach(() => {
+        Object.defineProperty(window, "innerWidth", { value: 800, configurable: true });
+      });
+
+      afterEach(() => {
+        Element.prototype.getBoundingClientRect = realRect;
+        document.querySelectorAll(".o2-table-cell-hover-actions").forEach((n) => n.remove());
+      });
+
+      it("anchors to the row's top edge, not the pointer, and points the arrow down", async () => {
+        const bar = await hoverCell(300, 324, 40, 200);
+        // clientY was 999 — a pointer-anchored toolbar would have landed there.
+        expect(bar.style.top).toBe("300px");
+        expect(bar.style.transform).toBe("translate(-50%, -100%)");
+        expect(arrowOf(bar).className).toContain("-bottom-1");
+      });
+
+      it("flips below the row when the toolbar would cover the sticky header", async () => {
+        const bar = await hoverCell(50, 74, 40, 200);
+        expect(bar.style.top).toBe("74px");
+        expect(bar.style.transform).toBe("translate(-50%, 0)");
+        expect(arrowOf(bar).className).toContain("-top-1");
+      });
+
+      it("clamps the toolbar to the window but keeps the arrow over the pointer", async () => {
+        const bar = await hoverCell(300, 324, 40, 795);
+        // Half-width is 60, so the centre can go no further than 800 - 60.
+        expect(bar.style.left).toBe("740px");
+        // Pointer 795 sits 115px into a 120px bar; the arrow stops 10px short of the corner.
+        expect(arrowOf(bar).style.left).toBe("110px");
+      });
+
+      it("centres the arrow and clips it to the half outside the bar", async () => {
+        const bar = await hoverCell(300, 324, 40, 400);
+        expect(bar.style.left).toBe("400px");
+        // `left` is the arrow's centre (`-ml-1`); unclipped, the rotated square's
+        // upper half notches any filled control in the bar (the AI chip).
+        expect(arrowOf(bar).style.left).toBe("60px");
+        expect(arrowOf(bar).className).toContain("-ml-1");
+        expect(arrowOf(bar).className).toContain("[clip-path:polygon(0_100%");
+      });
     });
   });
 
