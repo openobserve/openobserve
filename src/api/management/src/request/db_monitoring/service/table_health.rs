@@ -1038,14 +1038,13 @@ mod tests {
                 "`{supported}` ships a table-stats recipe"
             );
         }
-        for unsupported in ["oracle"] {
-            assert_eq!(
-                table_health_engine_support(unsupported),
-                "unsupported",
-                "`{unsupported}` has no table-stats recipe, and the UI must say \
-                 'not collected for this engine' rather than render an empty list"
-            );
-        }
+        let unsupported = "oracle";
+        assert_eq!(
+            table_health_engine_support(unsupported),
+            "unsupported",
+            "`{unsupported}` has no table-stats recipe, and the UI must say \
+             'not collected for this engine' rather than render an empty list"
+        );
         assert_eq!(
             table_health_engine_support(""),
             "unknown",
