@@ -151,6 +151,8 @@ describe("useWorkloadDetection", () => {
       await b.refresh();
       await flushPromises();
       expect(b.states.value.hosts).toBe("undetected");
+      // Module-level shared state would have flipped a's result alongside b's.
+      expect(a.states.value.hosts).toBe("detected");
     });
   });
 });

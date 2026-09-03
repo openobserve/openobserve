@@ -209,10 +209,14 @@ describe("useHostsList — join & window anchoring", () => {
     wrapper = h.wrapper;
     await h.list.refresh(refreshArgs);
     await flushPromises();
+    expect(metricsQueryMock).toHaveBeenCalledTimes(6);
     for (const call of metricsQueryMock.mock.calls) {
       const raw = (call[0] as any).query as string;
+      const decoded = decodeURIComponent(raw);
+      // Canonical round-trip: partial encoders (spaces-only, brace-only) fail this.
+      expect(raw).toBe(encodeURIComponent(decoded));
       expect(raw).not.toContain("{");
-      expect(decodeURIComponent(raw)).toContain("(");
+      if (decoded.includes("[")) expect(raw).not.toContain("[");
     }
   });
 

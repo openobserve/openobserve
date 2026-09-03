@@ -202,9 +202,11 @@ describe("HostDetailDrawer", () => {
       searchMock.mockResolvedValue({ data: { hits: [] } } as any);
       wrapper = await mountDrawer();
       await openTab("logs");
-      const text = wrapper.text();
-      expect(text).toContain("No logs found in stream");
-      expect(text).toContain("default");
+      const empty = wrapper.find('[data-test="host-drawer-logs-empty"]');
+      expect(empty.exists()).toBe(true);
+      expect(empty.text()).toContain("No logs found in stream");
+      // {stream} resolved to the LOGS_STREAM constant — scoped so "default" can't match elsewhere.
+      expect(empty.text()).toContain("default");
     });
 
     it("builds the Explore-in-Logs URL with all nine constructLogsUrl params", async () => {
