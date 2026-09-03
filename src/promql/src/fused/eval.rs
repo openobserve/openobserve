@@ -92,7 +92,8 @@ pub(crate) async fn fused_range_agg(
         eval_ctx: eval_ctx.clone(),
         timestamps: eval_ctx.timestamps(),
     });
-    let (matrix, sources) = matrix_sources(matrix, param, config::get_config().limit.cpu_num);
+
+    let sources = matrix_sources(matrix, param, config::get_config().limit.cpu_num);
     let folds = sources
         .into_iter()
         .map(|source| {
@@ -106,10 +107,6 @@ pub(crate) async fn fused_range_agg(
         &params.timestamps,
     );
 
-    if let Ok(matrix) = Arc::try_unwrap(matrix) {
-        // Free the per-series allocations on the rayon pool; dropping them single-threaded is slow.
-        matrix.into_par_iter().for_each(drop);
-    }
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) completed in {:?}, folded {input_series} series into {} series",
         op.name(),

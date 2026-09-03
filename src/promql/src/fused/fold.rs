@@ -25,6 +25,7 @@ use config::meta::promql::value::{
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::{HashMap, hash_map::Entry};
 use infra::errors::{Error, ErrorCodes};
+use tokio::task::JoinSet;
 
 use super::{accumulator::FusedAccumulator, op::FusedAggOp};
 use crate::{
@@ -76,6 +77,8 @@ pub(super) async fn fold_partition<S: SeriesSource>(
             &params.timestamps,
         );
         series_count += 1;
+        // the fold is pure CPU: give the runtime a chance to time out or abort it
+        tokio::task::consume_budget().await;
     }
     Ok((groups, series_count))
 }
@@ -117,37 +120,39 @@ fn fold_series(
     }
 }
 
-/// Aborts the partition folds when `timeout` elapses before they all finish.
+/// Runs the partition folds concurrently; the first failed partition or the
+/// `timeout` fails the whole fold, and dropping the set aborts the rest.
 pub(super) async fn run_folds<Fut>(folds: Vec<Fut>, timeout: u64) -> Result<Vec<(GroupAccs, usize)>>
 where
     Fut: Future<Output = Result<(GroupAccs, usize)>> + Send + 'static,
 {
-    let mut tasks = Vec::with_capacity(folds.len());
-    let mut abort_handles = Vec::with_capacity(folds.len());
-    for fold in folds {
-        let task = tokio::task::spawn(fold);
-        abort_handles.push(task.abort_handle());
-        tasks.push(task);
+    let mut results: Vec<Option<(GroupAccs, usize)>> = folds.iter().map(|_| None).collect();
+    let mut tasks = JoinSet::new();
+    for (index, fold) in folds.into_iter().enumerate() {
+        tasks.spawn(async move { (index, fold.await) });
     }
-    tokio::select! {
-        joined = futures::future::try_join_all(tasks) => {
-            joined
-                .map_err(|e| DataFusionError::Execution(e.to_string()))?
-                .into_iter()
-                .collect()
+    // folds finish in any order; the merge needs them in partition order
+    let join = async {
+        while let Some(joined) = tasks.join_next().await {
+            let (index, fold) = joined.map_err(|e| DataFusionError::Execution(e.to_string()))?;
+            results[index] = Some(fold?);
         }
-        _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
-            for handle in abort_handles {
-                handle.abort();
-            }
-            Err(DataFusionError::Plan(
+        Ok::<_, DataFusionError>(())
+    };
+    tokio::time::timeout(Duration::from_secs(timeout), join)
+        .await
+        .map_err(|_| {
+            DataFusionError::Plan(
                 Error::ErrorCode(ErrorCodes::SearchTimeout(
                     "[PromQL] fused agg timeout".to_string(),
                 ))
                 .to_string(),
-            ))
-        }
-    }
+            )
+        })??;
+    Ok(results
+        .into_iter()
+        .map(|fold| fold.expect("every partition joined"))
+        .collect())
 }
 
 /// Merges the partition-local groups in partition order and materializes the
@@ -187,5 +192,106 @@ pub(super) fn merge_folds(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
         Value::None
     } else {
         Value::Matrix(results)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+        time::Duration,
+    };
+
+    use config::meta::promql::value::{Labels, Sample};
+
+    use super::*;
+    use crate::functions;
+
+    /// Errors on its first series.
+    struct FailingSource;
+
+    impl SeriesSource for FailingSource {
+        async fn advance(&mut self) -> Result<Option<u64>> {
+            Err(DataFusionError::Execution("partition failed".into()))
+        }
+        fn labels(&self) -> Labels {
+            Labels::default()
+        }
+        async fn consume(&mut self) -> Result<&[Sample]> {
+            Ok(&[])
+        }
+    }
+
+    /// Yields series forever; `finished` records whether it ever returned.
+    struct EndlessSource {
+        samples: Vec<Sample>,
+        finished: Arc<AtomicBool>,
+    }
+
+    impl SeriesSource for EndlessSource {
+        async fn advance(&mut self) -> Result<Option<u64>> {
+            Ok(Some(1))
+        }
+        fn labels(&self) -> Labels {
+            Labels::default()
+        }
+        async fn consume(&mut self) -> Result<&[Sample]> {
+            Ok(&self.samples)
+        }
+    }
+
+    impl Drop for EndlessSource {
+        fn drop(&mut self) {
+            self.finished.store(true, Ordering::SeqCst);
+        }
+    }
+
+    fn params() -> Arc<FoldParams> {
+        let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func("rate").unwrap());
+        let eval_ctx = EvalContext::new(1_000_000, 2_000_000, 1_000_000, "test".into());
+        Arc::new(FoldParams {
+            op: FusedAggOp::Sum,
+            func: func.clone(),
+            counter_kind: func.counter_extrapolation(),
+            range: Duration::from_secs(60),
+            timestamps: eval_ctx.timestamps(),
+            eval_ctx,
+        })
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn test_run_folds_fails_fast_and_aborts_the_rest() {
+        let params = params();
+        let dropped = Arc::new(AtomicBool::new(false));
+        let endless = EndlessSource {
+            samples: vec![Sample::new(1_500_000, 1.0)],
+            finished: dropped.clone(),
+        };
+        let failing = FailingSource;
+        let folds = vec![
+            Box::pin(fold_partition(endless, params.clone()))
+                as std::pin::Pin<Box<dyn Future<Output = Result<(GroupAccs, usize)>> + Send>>,
+            Box::pin(fold_partition(failing, params)),
+        ];
+
+        let start = std::time::Instant::now();
+        let result = run_folds(folds, 30).await;
+        assert!(result.is_err(), "the failed partition must fail the fold");
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "must not wait for the endless partition"
+        );
+
+        // the aborted task drops its source at its next yield point
+        for _ in 0..100 {
+            if dropped.load(Ordering::SeqCst) {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        panic!("the endless partition was not aborted");
     }
 }

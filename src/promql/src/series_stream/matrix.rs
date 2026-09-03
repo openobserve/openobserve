@@ -17,8 +17,6 @@
 //! series-source contract, so layouts that cannot stream still share the
 //! streaming consumers.
 
-use std::sync::Arc;
-
 use config::meta::promql::value::{Labels, RangeValue, Sample};
 use datafusion::error::Result;
 use promql_parser::parser::LabelModifier;
@@ -29,68 +27,78 @@ use crate::aggregations::{group_series_by_labels, projected_labels};
 /// Series per partition; matches the fused fold's historical chunk size.
 pub(crate) const MATRIX_PARTITION_CHUNK: usize = 1024;
 
-/// One partition of a materialized matrix, iterated group-contiguously.
+/// One partition of a materialized matrix, owning its series in group order;
+/// each series is freed on the partition's own task once the next one starts.
 pub(crate) struct MatrixSource {
-    matrix: Arc<Vec<RangeValue>>,
+    series: std::vec::IntoIter<(u64, RangeValue)>,
+    current: Option<RangeValue>,
     modifier: Option<LabelModifier>,
-    /// `(group signature, matrix index)` of this partition's series.
-    order: Vec<(u64, u32)>,
-    pos: usize,
 }
 
 impl SeriesSource for MatrixSource {
     async fn advance(&mut self) -> Result<Option<u64>> {
-        Ok(self.order.get(self.pos).map(|&(sig, _)| sig))
+        let Some((sig, series)) = self.series.next() else {
+            self.current = None;
+            return Ok(None);
+        };
+        self.current = Some(series);
+        Ok(Some(sig))
     }
 
     fn labels(&self) -> Labels {
-        let (_, index) = self.order[self.pos];
-        projected_labels(&self.modifier, &self.matrix[index as usize].labels)
+        let series = self.current.as_ref().expect("advance yielded a series");
+        projected_labels(&self.modifier, &series.labels)
     }
 
     async fn consume(&mut self) -> Result<&[Sample]> {
-        let (_, index) = self.order[self.pos];
-        self.pos += 1;
-        Ok(&self.matrix[index as usize].samples)
+        let series = self.current.as_ref().expect("advance yielded a series");
+        Ok(&series.samples)
     }
 }
 
-/// Splits a matrix into group-contiguous partitions behind shared ownership;
+/// Splits a matrix into group-contiguous partitions that own their series;
 /// partition boundaries depend only on the series count, so folds merge
 /// deterministically.
 pub(crate) fn matrix_sources(
     matrix: Vec<RangeValue>,
     modifier: &Option<LabelModifier>,
     max_partitions: usize,
-) -> (Arc<Vec<RangeValue>>, Vec<MatrixSource>) {
+) -> Vec<MatrixSource> {
     let mut groups: Vec<(u64, Vec<usize>)> = group_series_by_labels(&matrix, modifier)
         .into_iter()
         .collect();
     groups.sort_unstable_by_key(|(sig, _)| *sig);
-    let order: Vec<(u64, u32)> = groups
-        .into_iter()
-        .flat_map(|(sig, indices)| indices.into_iter().map(move |index| (sig, index as u32)))
-        .collect();
 
+    let total: usize = groups.iter().map(|(_, indices)| indices.len()).sum();
     // small folds stay sequential, keeping them bit-identical to the generic path
-    let partitions = if order.len() < 2 * MATRIX_PARTITION_CHUNK {
+    let partitions = if total < 2 * MATRIX_PARTITION_CHUNK {
         1
     } else {
         max_partitions
             .max(1)
-            .min(order.len().div_ceil(MATRIX_PARTITION_CHUNK))
+            .min(total.div_ceil(MATRIX_PARTITION_CHUNK))
     };
-    let chunk = order.len().div_ceil(partitions).max(1);
+    let chunk = total.div_ceil(partitions).max(1);
 
-    let matrix = Arc::new(matrix);
-    let sources = order
-        .chunks(chunk)
-        .map(|chunk| MatrixSource {
-            matrix: matrix.clone(),
+    // every index appears exactly once, so each series moves straight into its partition
+    let mut slots: Vec<Option<RangeValue>> = matrix.into_iter().map(Some).collect();
+    let mut parts: Vec<Vec<(u64, RangeValue)>> =
+        (0..partitions).map(|_| Vec::with_capacity(chunk)).collect();
+    let mut position = 0;
+    for (sig, indices) in groups {
+        for index in indices {
+            let series = slots[index].take().expect("series moved once");
+            parts[position / chunk].push((sig, series));
+            position += 1;
+        }
+    }
+
+    parts
+        .into_iter()
+        .map(|part| MatrixSource {
+            series: part.into_iter(),
+            current: None,
             modifier: modifier.clone(),
-            order: chunk.to_vec(),
-            pos: 0,
         })
-        .collect();
-    (matrix, sources)
+        .collect()
 }
