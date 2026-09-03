@@ -50,8 +50,7 @@ import { computed, defineComponent, ref, watch, type Ref, type PropType } from "
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { useI18nTyped } from "@/types/i18n";
-import { getFoldersList, getPanelId } from "@/utils/commons";
-import { addPanel } from "@/utils/commons";
+import { getFoldersList, getPanelId, addPanel } from "@/utils/commons";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";

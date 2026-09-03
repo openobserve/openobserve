@@ -65,9 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="ai-toolsets-list-refresh-btn"
-              @click="getData"
+              @click="refreshData"
             >
               <OTooltip
                 side="bottom"
@@ -130,6 +130,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { aiToolsetsQuery } from "@/services/ai_toolsets.queries";
+import { aiToolsetKeys } from "@/services/ai_toolsets.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
 import { defineComponent, ref, computed, watch, onMounted, onUpdated, Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -145,9 +150,9 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
-import aiToolsetsService from "@/services/ai_toolsets";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import aiToolsetsService from "@/services/ai_toolsets";
 
 export default defineComponent({
   name: "PageAiToolsets",
@@ -167,9 +172,25 @@ export default defineComponent({
     const router = useRouter();
     const { t } = useI18nTyped();
 
-    const tabledata: any = ref([]);
+    const orgIdForList = useOrgId();
+    const toolsetsList = useQuery(() =>
+      Object.assign(aiToolsetsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+    );
+
+    // The list is the query, not a copy: only an observer applies `staleTime` and revalidates on mount.
+    const tabledata: any = computed(() =>
+      (toolsetsList.data.value ?? []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        kind: item.kind,
+        description: item.description || "",
+      })),
+    );
     const showAddDialog = ref(false);
-    const loading = ref(false);
+    const loading = toolsetsList.isPending;
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = toolsetsList.isFetching;
     const filterQuery = ref("");
 
     const columns: OTableColumnDef[] = [
@@ -243,44 +264,41 @@ export default defineComponent({
     // -----------------------------------------------------------------------
     // Data loading
     // -----------------------------------------------------------------------
-    const getData = () => {
-      loading.value = true;
-      const dismiss = toast({
-        variant: "loading",
-        message: t("common.loading"),
-        timeout: 0,
-      });
+    // Bound to refresh / "list changed" events: always hits the server.
+    const refreshData = () => getData(true);
 
-      aiToolsetsService
-        .list(store.state.selectedOrganization.identifier)
-        .then((res) => {
-          const items = res.data?.toolsets ?? [];
-          tabledata.value = items.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            kind: item.kind,
-            description: item.description || "",
-          }));
-          resultTotal.value = tabledata.value.length;
-        })
-        .catch((err) => {
-          if (err?.status !== 403) {
-            toast({
-              variant: "error",
-              message:
-                err?.response?.data?.message ||
-                t("aiToolset.loadFailed", { product: raw("AI Toolsets") }),
-              timeout: 5000,
-            });
-          }
-        })
-        .finally(() => {
-          loading.value = false;
-          dismiss();
-        });
+    const getData = async (force = false) => {
+      if (force) await toolsetsList.refetch();
     };
 
-    getData();
+    let dismissLoading: (() => void) | null = null;
+    watch(
+      loading,
+      (pending) => {
+        if (pending && !dismissLoading) {
+          dismissLoading = toast({
+            variant: "loading",
+            message: t("common.loading"),
+            timeout: 0,
+          });
+        } else if (!pending && dismissLoading) {
+          dismissLoading();
+          dismissLoading = null;
+        }
+      },
+      { immediate: true },
+    );
+
+    watch(toolsetsList.error, (err: any) => {
+      if (!err || err?.status === 403) return;
+      toast({
+        variant: "error",
+        message:
+          err?.response?.data?.message ||
+          t("aiToolset.loadFailed", { product: raw("AI Toolsets") }),
+        timeout: 5000,
+      });
+    });
 
     // -----------------------------------------------------------------------
     // Filter
@@ -308,7 +326,7 @@ export default defineComponent({
       {
         id: "aiToolsetsRefresh",
         handler: () => {
-          if (!isInputFocused()) getData();
+          if (!isInputFocused()) getData(true);
         },
       },
     ]);
@@ -337,7 +355,7 @@ export default defineComponent({
 
     const hideAddDialog = async () => {
       showAddDialog.value = false;
-      await getData();
+      await getData(true);
       router.push({
         name: "aiToolsets",
         query: { org_identifier: store.state.selectedOrganization.identifier },
@@ -369,7 +387,14 @@ export default defineComponent({
         .delete(store.state.selectedOrganization.identifier, row.id)
         .then(() => {
           toast({ variant: "success", message: t("aiToolset.deletedSuccessfully") });
-          getData();
+          // Drop the row from the cache first so it disappears now, not when
+          // the refetch lands; the forced reload re-persists the list.
+          queryClient.setQueriesData(
+            { queryKey: aiToolsetKeys.all(store.state.selectedOrganization.identifier) },
+            (list: any) =>
+              Array.isArray(list) ? list.filter((tool: any) => tool.id !== row.id) : list,
+          );
+          getData(true);
         })
         .catch((err) => {
           if (err?.status !== 403) {
@@ -388,9 +413,11 @@ export default defineComponent({
     };
 
     return {
+      refreshData,
       t,
       store,
       loading,
+      fetching,
       tabledata,
       columns,
       showAddDialog,

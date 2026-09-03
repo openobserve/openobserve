@@ -609,6 +609,8 @@ import { useRouter, useRoute } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import modelPricingService from "@/services/model_pricing";
+import { modelPricingKeys } from "@/services/model_pricing.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -1150,6 +1152,9 @@ async function save(value?: ModelPricingForm) {
     } else {
       await modelPricingService.create(orgIdentifier.value, m);
     }
+    // The list is a 5-minute persisted read, so without this the editor routes
+    // back to a pre-write copy and the new model only shows after a refresh.
+    queryClient.invalidateQueries({ queryKey: modelPricingKeys.all(orgIdentifier.value) });
     if (patternConflicts.length > 0) {
       const winner = patternConflicts[0].name;
       toast({

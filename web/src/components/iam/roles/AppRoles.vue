@@ -46,9 +46,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="iam-roles-refresh-btn"
-              @click="setupRoles"
+              @click="refreshRoles"
             >
               <OTooltip
                 side="bottom"
@@ -81,7 +81,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { onBeforeMount, ref } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { deleteRoleMutation, bulkDeleteRolesMutation } from "@/services/iam.queries";
+import { rolesQuery } from "@/services/iam.queries";
+import { allUserRolesQuery } from "@/services/users.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { onBeforeMount, ref, watch } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -89,8 +96,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";
-import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers } from "@/services/iam";
-import usersService from "@/services/users";
+import { getRoleUsers } from "@/services/iam";
 import config from "@/aws-exports";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
@@ -150,7 +156,7 @@ const addRole = () => {
 // through so EditRole can seed the starting permissions.
 const onRoleAdded = (payload: { role_name: string; startFrom?: string }) => {
   if (!payload?.role_name) {
-    setupRoles();
+    setupRoles(true);
     return;
   }
 
@@ -179,7 +185,17 @@ const editRole = (role: any) => {
   });
 };
 
-const loading = ref(false);
+const orgIdForList = useOrgId();
+const rolesList = useQuery(() =>
+  Object.assign(rolesQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+);
+
+// Bound to the query rather than hand-managed: `isPending` is the cold read,
+// `isFetching` is any request in flight.
+const loading = rolesList.isPending;
+// A request in flight while rows stay on screen — the refresh button's spinner.
+// `loading` is the skeleton, which only a cold read wants.
+const fetching = rolesList.isFetching;
 
 // `GET /roles` returns role NAMES only, so a role row has nothing to show beyond
 // its name. The one fact worth surfacing — is anyone actually in this role — comes
@@ -191,10 +207,12 @@ const roleUserCounts = ref<Record<string, number> | null>(null);
 const loadRoleUserCounts = async () => {
   if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
   try {
-    const res = await usersService.getAllUserRoles(store.state.selectedOrganization.identifier);
+    const res = await queryClient.fetchQuery(
+      allUserRolesQuery(store.state.selectedOrganization.identifier),
+    );
     const counts: Record<string, number> = {};
     // Response is a map of user email -> role list.
-    Object.values(res.data ?? {}).forEach((roles: any) => {
+    Object.values(res ?? {}).forEach((roles: any) => {
       (Array.isArray(roles) ? roles : []).forEach((role: any) => {
         const key = String(role ?? "").trim();
         if (!key) return;
@@ -219,36 +237,57 @@ const applyRoleUserCounts = () => {
   updateTable();
 };
 
-const setupRoles = async () => {
-  loading.value = true;
-  await getRoles(store.state.selectedOrganization.identifier)
-    .then((res) => {
-      rolesState.roles = res.data.map((role: string) => ({
-        role_name: role,
-        user_count: null,
-      }));
-      updateTable();
-      // Fire-and-forget: the roles list renders immediately and the member counts
-      // (a second request) fill in when they land. Awaiting here would hold the
-      // whole table hostage to a secondary, enterprise-only endpoint.
-      void loadRoleUserCounts().then(applyRoleUserCounts);
-    })
-    .catch((err) => {
-      console.log(err);
-    })
-    .finally(() => {
-      loading.value = false;
-    });
+// `force` for every reload that follows a write or an explicit refresh —
+// an "added" event means the server has something new to show.
+// Named handler: binding setupRoles straight to @click puts the MouseEvent
+// in `force`.
+const refreshRoles = () => setupRoles(true);
+
+const applyRoles = (res: any) => {
+  rolesState.roles = res.map((role: string) => ({
+    role_name: role,
+    user_count: null,
+  }));
+  updateTable();
+  // Fire-and-forget: the roles list renders immediately and the member counts
+  // (a second request) fill in when they land. Awaiting here would hold the
+  // whole table hostage to a secondary, enterprise-only endpoint.
+  void loadRoleUserCounts().then(applyRoleUserCounts);
 };
 
+// The list is the query now: anything that invalidates the scope repaints these
+// rows without this component asking.
+watch(
+  rolesList.data,
+  (rows: any) => {
+    if (rows) applyRoles(rows);
+  },
+  { immediate: true },
+);
+watch(rolesList.error, (err: any) => {
+  if (err) console.log(err);
+});
+
+// Only an explicit call reads: refresh, post-write reload, search. Mount and
+// invalidation-driven repaints come from the query itself.
+const setupRoles = async (force = false) => {
+  if (force) await rolesList.refetch();
+};
+
+const orgId = useOrgId();
+const deleteRoleOne = useMutation(() => deleteRoleMutation(orgId.value));
+const bulkDeleteRolesAll = useMutation(() => bulkDeleteRolesMutation(orgId.value));
+
 const deleteUserRole = (role: any) => {
-  deleteRole(role.role_name, store.state.selectedOrganization.identifier)
+  // Was: invalidate, then delete — the refetch raced the write.
+  deleteRoleOne
+    .mutateAsync(role.role_name)
     .then(() => {
       toast({
         message: t("iam.appRoles.roleDeletedSuccess"),
         variant: "success",
       });
-      setupRoles();
+      setupRoles(true);
     })
     .catch((error: any) => {
       if (error.response.status != 403) {
@@ -323,9 +362,7 @@ const bulkDeleteUserRoles = async () => {
   bulkDeleteLoading.value = true;
 
   try {
-    const response = await bulkDeleteRoles(store.state.selectedOrganization.identifier, {
-      ids: roleNames,
-    });
+    const response = await bulkDeleteRolesAll.mutateAsync(roleNames);
 
     const { successful = [], unsuccessful = [], err } = response.data || {};
 
@@ -353,7 +390,7 @@ const bulkDeleteUserRoles = async () => {
       });
     }
 
-    await setupRoles();
+    await setupRoles(true);
     selectedRoleNames.value = [];
     confirmBulkDelete.value = false;
   } catch (error: any) {
@@ -381,7 +418,7 @@ useShortcuts([
   {
     id: "iamRolesRefresh",
     handler: () => {
-      if (!isInputFocused()) setupRoles();
+      if (!isInputFocused()) setupRoles(true);
     },
   },
   {

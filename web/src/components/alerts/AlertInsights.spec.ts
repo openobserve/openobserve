@@ -24,18 +24,21 @@ vi.mock("vue-router", () => ({
   useRoute: () => ({ params: {}, query: {} }),
 }));
 
-vi.mock("@/services/alerts", () => ({
-  default: {
-    listByFolderId: vi.fn().mockResolvedValue({
-      data: {
-        list: [
-          { alert_id: "a1", name: "TestAlert", folder_id: "default" },
-          { alert_id: "a2", name: "OtherAlert", folder_id: "default" },
-        ],
-      },
-    }),
-  },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listByFolderId: vi.fn().mockResolvedValue({
+        data: {
+          list: [
+            { alert_id: "a1", name: "TestAlert", folder_id: "default" },
+            { alert_id: "a2", name: "OtherAlert", folder_id: "default" },
+          ],
+        },
+      }),
+    },
+  });
+});
 
 vi.mock("@/composables/useAlertInsights", async () => {
   const { ref } = await import("vue");

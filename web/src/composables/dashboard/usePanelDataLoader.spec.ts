@@ -25,29 +25,32 @@ let shouldSearchThrow = false;
 let shouldPartitionThrow = false;
 let shouldMetricsThrow = false;
 
-vi.mock("../../services/search", () => ({
-  default: {
-    partition: vi.fn().mockImplementation(() => {
-      if (shouldPartitionThrow) {
-        return Promise.reject(new Error("Partition service error"));
-      }
-      return Promise.resolve(mockPartitionResults);
-    }),
-    search: vi.fn().mockImplementation(() => {
-      if (shouldSearchThrow) {
-        return Promise.reject(new Error("Search service error"));
-      }
-      return Promise.resolve({ data: mockSearchResults });
-    }),
-    metrics_query_range: vi.fn().mockImplementation(() => {
-      if (shouldMetricsThrow) {
-        return Promise.reject(new Error("Metrics service error"));
-      }
-      return Promise.resolve(mockMetricsResults);
-    }),
-    delete_running_queries: vi.fn().mockResolvedValue({ status: "success" }),
-  },
-}));
+vi.mock("../../services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      partition: vi.fn().mockImplementation(() => {
+        if (shouldPartitionThrow) {
+          return Promise.reject(new Error("Partition service error"));
+        }
+        return Promise.resolve(mockPartitionResults);
+      }),
+      search: vi.fn().mockImplementation(() => {
+        if (shouldSearchThrow) {
+          return Promise.reject(new Error("Search service error"));
+        }
+        return Promise.resolve({ data: mockSearchResults });
+      }),
+      metrics_query_range: vi.fn().mockImplementation(() => {
+        if (shouldMetricsThrow) {
+          return Promise.reject(new Error("Metrics service error"));
+        }
+        return Promise.resolve(mockMetricsResults);
+      }),
+      delete_running_queries: vi.fn().mockResolvedValue({ status: "success" }),
+    },
+  });
+});
 
 vi.mock("vuex", () => ({
   useStore: () => ({

@@ -67,9 +67,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="pipeline-destination-list-refresh-btn"
-              @click="getDestinations"
+              @click="refreshDestinations"
             >
               <OTooltip
                 side="bottom"
@@ -171,13 +171,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts">
+import { bulkDeleteDestinationsMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue";
 import type { Ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import PipelineDestinationEditor from "../pipeline/PipelineDestinationEditor.vue";
 import destinationService from "@/services/alert_destination";
-import templateService from "@/services/alert_templates";
+import { templatesQuery } from "@/services/alert_templates.queries";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
@@ -334,28 +340,47 @@ export default defineComponent({
     });
 
     const loading = ref(false);
-    const getDestinations = () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.alerts.pleaseWaitWhileLoadingDestinations"),
-        timeout: 0,
-      });
-      loading.value = true;
-      destinationService
-        .list({
-          page_num: 1,
-          page_size: 100000,
-          sort_by: "name",
-          desc: false,
-          org_identifier: store.state.selectedOrganization.identifier,
-          module: "pipeline",
-        })
-        .then((res) => {
-          resultTotal.value = res.data.length;
-          destinations.value = res.data;
-          updateRoute();
-        })
-        .catch((err) => {
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = ref(false);
+    // Bound to refresh / post-write reloads: always reaches the server.
+    const refreshDestinations = () => getDestinations(true);
+
+    const getDestinations = (force = false) => {
+      const org = store.state.selectedOrganization.identifier;
+      // Only a cold read spins and toasts — the rows stay put on a refresh.
+      const warm = queryClient.getQueryData(destinationKeys.list(org, "pipeline")) !== undefined;
+      const dismiss = warm
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("toastMessages.alerts.pleaseWaitWhileLoadingDestinations"),
+            timeout: 0,
+          });
+
+      const options = destinationsQuery(org, "pipeline");
+      const applyRows = (list: any[]) => {
+        resultTotal.value = list.length;
+        destinations.value = list;
+        updateRoute();
+      };
+      const cached = queryClient.getQueryData<any[]>(options.queryKey);
+      if (cached !== undefined) applyRows(cached);
+      loading.value = cached === undefined;
+      fetching.value = true;
+
+      // TODO: fold into `useQuery` when this list drops its imperative refresh.
+      if (force) {
+        void queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
+      }
+      return queryClient
+        .fetchQuery(options)
+        .then((list: any[]) => applyRows(list))
+        .catch((err: any) => {
           if (err.response.status != 403) {
             toast({
               variant: "error",
@@ -367,14 +392,13 @@ export default defineComponent({
         .finally(() => {
           dismiss();
           loading.value = false;
+          fetching.value = false;
         });
     };
     const getTemplates = () => {
-      templateService
-        .list({
-          org_identifier: store.state.selectedOrganization.identifier,
-        })
-        .then((res) => (templates.value = res.data));
+      queryClient
+        .fetchQuery(templatesQuery(store.state.selectedOrganization.identifier))
+        .then((list: any) => (templates.value = list));
     };
     const updateRoute = () => {
       if (router.currentRoute.value.query.action === "add") editDestination(null);
@@ -430,7 +454,8 @@ export default defineComponent({
                 name: confirmDelete.value.data.name,
               }),
             });
-            getDestinations();
+            // Forced: nothing invalidates this scope, and an unforced read inside staleTime keeps the deleted row.
+            getDestinations(true);
           })
           .catch((err) => {
             if (err.response.data.code === 409) {
@@ -541,6 +566,9 @@ export default defineComponent({
       { immediate: true },
     );
 
+    const orgIdForWrites = useOrgId();
+    const bulkDeleteWrite = useMutation(() => bulkDeleteDestinationsMutation(orgIdForWrites.value));
+
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
@@ -567,10 +595,7 @@ export default defineComponent({
           ids: selectedDestinations.value.map((d: any) => d.name),
         };
 
-        const response = await destinationService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          payload,
-        );
+        const response = await bulkDeleteWrite.mutateAsync(payload.ids);
 
         dismiss();
 
@@ -611,7 +636,8 @@ export default defineComponent({
         }
 
         selectedDestinations.value = [];
-        getDestinations();
+        // Forced, same reason as the single delete above.
+        getDestinations(true);
       } catch (error: any) {
         dismiss();
         console.error("Error deleting destinations:", error);
@@ -637,7 +663,7 @@ export default defineComponent({
       {
         id: "pipelineDestinationsRefresh",
         handler: () => {
-          if (!isInputFocused()) getDestinations();
+          if (!isInputFocused()) refreshDestinations();
         },
       },
     ]);
@@ -651,6 +677,8 @@ export default defineComponent({
       getImageURL,
       conformDeleteDestination,
       loading,
+      fetching,
+      refreshDestinations,
       filterQuery,
       filterData,
       editingDestination,

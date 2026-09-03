@@ -21,12 +21,15 @@ import i18nInstance from "@/locales";
 const t = (i18nInstance.global as any).t;
 
 // Mock Stream Service
-vi.mock("@/services/stream", () => ({
-  default: {
-    nameList: vi.fn(),
-    schema: vi.fn(),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      nameList: vi.fn(),
+      schema: vi.fn(),
+    },
+  });
+});
 
 // Mock Toast
 const mockToastDismiss = vi.fn();

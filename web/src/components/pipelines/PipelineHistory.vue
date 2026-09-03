@@ -469,7 +469,8 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import pipelinesService from "@/services/pipelines";
-import http from "@/services/http";
+import { pipelineHistoryQuery } from "@/services/pipelines.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -697,7 +698,7 @@ const clearSearch = () => {
   fetchPipelineHistory();
 };
 
-const fetchPipelineHistory = async () => {
+const fetchPipelineHistory = async (force = false) => {
   loading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
@@ -724,13 +725,19 @@ const fetchPipelineHistory = async () => {
       params.sort_order = pagination.value.descending ? "desc" : "asc";
     }
 
-    const url = `/api/${org}/pipelines/history`;
-    const response = await http().get(url, { params });
+    // Cached read — a revisit inside the freshness window paints without a
+    // request; the Refresh button forces.
+    const options = pipelineHistoryQuery(org, params);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const historyData: any = await queryClient.fetchQuery(options);
 
-    if (response.data) {
-      // Handle the response data
-      const historyData = response.data;
-
+    if (historyData) {
       // Map the hits array or handle empty response
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
@@ -797,7 +804,7 @@ const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
 };
 
 const refreshData = () => {
-  fetchPipelineHistory();
+  fetchPipelineHistory(true);
 };
 
 const formatDate = (timestamp: number) => {

@@ -22,11 +22,14 @@ import i18n from "@/locales";
 // ── Module mocks (hoisted) ───────────────────────────────────────────────────
 
 const mockTest = vi.fn();
-vi.mock("@/services/model_pricing", () => ({
-  default: {
-    test: (...args: any[]) => mockTest(...args),
-  },
-}));
+vi.mock("@/services/model_pricing", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      test: (...args: any[]) => mockTest(...args),
+    },
+  });
+});
 
 // Component import must come after all vi.mock() declarations.
 import TestModelMatchDialog from "./TestModelMatchDialog.vue";

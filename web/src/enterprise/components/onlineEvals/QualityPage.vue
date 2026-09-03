@@ -178,6 +178,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
+  /** Re-read the score-configs list, which this page receives as a prop. */
+  (e: "reload-configs"): void;
   (e: "update:agentKey", value: string): void;
   // Fired once after mount so the parent can run the agents-first reload. The
   // parent owns every reload trigger (mount / refresh / date / agent) — this
@@ -274,6 +276,11 @@ const numericRange = computed(() => {
 });
 
 async function refreshAll() {
+  // The score-configs list arrives as a prop, so refreshing only the derived
+  // aggregates leaves it untouched — and each of those bails out early when the
+  // list is empty, which is why the button appeared to do nothing at all. Ask
+  // the parent to re-read the list first, then recompute from it.
+  emit("reload-configs");
   await Promise.all([refresh(), refreshConfigs(), refreshDetail(), refreshCharts(), refreshRuns()]);
 }
 

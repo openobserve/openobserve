@@ -25,25 +25,34 @@ import MemberInvitation from "@/components/iam/users/MemberInvitation.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    add_members: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      add_members: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/users", () => ({
-  default: {
-    getRoles: vi.fn(() =>
-      Promise.resolve({
-        data: [{ label: "Admin", value: "admin" }],
-      }),
-    ),
-  },
-}));
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getRoles: vi.fn(() =>
+        Promise.resolve({
+          data: [{ label: "Admin", value: "admin" }],
+        }),
+      ),
+    },
+  });
+});
 
-vi.mock("@/services/iam", () => ({
-  getRoles: vi.fn(),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    getRoles: vi.fn(),
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({
   default: { track: vi.fn() },

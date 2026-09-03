@@ -1,9 +1,10 @@
 // Copyright 2026 OpenObserve Inc.
 
+import { orgSummaryQuery } from "@/services/organizations.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import config from "../aws-exports";
 import { useStore } from "vuex";
 import userService from "@/services/users";
-import organizationService from "@/services/organizations";
 import { b64DecodeUnicode, b64EncodeStandard, b64DecodeStandard } from "@/utils/formatters";
 import { useLocalUserInfo } from "@/utils/storage";
 import { getUUID, getUUIDv7 } from "@/utils/uuid";
@@ -141,8 +142,10 @@ export const routeGuard = async (to: any, from: any, next: any) => {
         next();
         return;
       }
-      const response = await organizationService.get_organization_summary(orgIdentifier);
-      if (!response.data?.streams?.num_streams) {
+      // Shares the Usage tab's cached summary — this runs on every guarded
+      // navigation, so an uncached read here re-requested on each one.
+      const data: any = await queryClient.fetchQuery(orgSummaryQuery(orgIdentifier));
+      if (!data?.streams?.num_streams) {
         store.dispatch("setIsDataIngested", false);
         next({ path: "/ingestion" });
       } else {

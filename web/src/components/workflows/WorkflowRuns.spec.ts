@@ -19,7 +19,7 @@
 // inspect separate (Edit Workflow -> editor route; back -> list). The canvas /
 // panel / result drawer are stubbed.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 
 const { mockRouter, mockToast, mockHydrate, mockLoadRun, mockReset, workflowObj, listWorkflows } =
   vi.hoisted(() => {
@@ -49,9 +49,12 @@ vi.mock("vue-router", () => ({ useRouter: () => mockRouter }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...a: any[]) => mockToast(...a),
 }));
-vi.mock("@/services/workflows", () => ({
-  default: { listWorkflows: (...a: any[]) => listWorkflows(...a) },
-}));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { listWorkflows: (...a: any[]) => listWorkflows(...a) },
+  });
+});
 vi.mock("@/plugins/workflows/useWorkflowCanvas", () => ({
   default: () => ({ resetWorkflowData: mockReset }),
   workflowObj,
@@ -59,7 +62,6 @@ vi.mock("@/plugins/workflows/useWorkflowCanvas", () => ({
   loadWorkflowRun: (...a: any[]) => mockLoadRun(...a),
 }));
 
-import { describe, it, expect, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";

@@ -43,12 +43,15 @@ const mockDiffData = vi.hoisted(() => ({
   unchanged: [{ id: "unch-1", display: "Stable Group", fields: ["level"], normalize: false }],
 }));
 
-vi.mock("@/services/alerts", () => ({
-  default: {
-    previewSemanticGroupsDiff: vi.fn().mockResolvedValue({ data: mockDiffData }),
-    saveSemanticGroups: vi.fn().mockResolvedValue({ data: {} }),
-  },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      previewSemanticGroupsDiff: vi.fn().mockResolvedValue({ data: mockDiffData }),
+      saveSemanticGroups: vi.fn().mockResolvedValue({ data: {} }),
+    },
+  });
+});
 
 import ImportSemanticGroups from "@/components/alerts/ImportSemanticGroups.vue";
 import alertsService from "@/services/alerts";

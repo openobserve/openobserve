@@ -16,11 +16,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 
-vi.mock("@/services/alerts", () => ({
-  default: {
-    getHistory: vi.fn(),
-  },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getHistory: vi.fn(),
+    },
+  });
+});
 
 import AlertEvaluationHistory from "./AlertEvaluationHistory.vue";
 import i18n from "@/locales";

@@ -586,6 +586,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
+import { configFullQuery } from "@/services/config.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { orgSummaryQuery } from "@/services/organizations.queries";
+import { organizationKeys } from "@/services/organizations.querykeys";
 import {
   computed,
   defineComponent,
@@ -603,7 +607,6 @@ import organizations from "@/services/organizations";
 import usersService from "@/services/users";
 import settingsService from "@/services/settings";
 import config from "@/aws-exports";
-import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import { applyThemeColors, switchThemeMode } from "@/utils/theme";
@@ -855,11 +858,11 @@ export default defineComponent({
       if (!orgId || orgScope.value || orgScopeLoading.value) return;
       orgScopeLoading.value = true;
       try {
-        const res = await organizations.get_organization_summary(orgId);
+        const data: any = await queryClient.fetchQuery(orgSummaryQuery(orgId));
         orgScope.value = t("settings.deleteOrganizationScope", {
-          dashboards: res.data?.total_dashboards ?? 0,
-          streams: res.data?.streams?.num_streams ?? 0,
-          size: formatSizeFromMB(String(res.data?.streams?.total_storage_size ?? 0)),
+          dashboards: data?.total_dashboards ?? 0,
+          streams: data?.streams?.num_streams ?? 0,
+          size: formatSizeFromMB(String(data?.streams?.total_storage_size ?? 0)),
         });
       } catch {
         // Contextual only — the delete flow stays usable without the counts.
@@ -967,6 +970,11 @@ export default defineComponent({
           store.state?.organizationData?.organizationSettings,
         );
 
+        // MainLayout re-reads this scope on every org switch and would serve the pre-save payload back.
+        await queryClient.invalidateQueries({
+          queryKey: organizationKeys.settings(store.state?.selectedOrganization?.identifier),
+        });
+
         // Apply the current mode's theme
         const currentMode = isDark.value ? "dark" : "light";
         const color = currentMode === "light" ? customLightColor.value : customDarkColor.value;
@@ -1021,11 +1029,21 @@ export default defineComponent({
                 }),
               });
 
-              await configService
-                .get_config_full(store.state.selectedOrganization?.identifier || orgIdentifier)
-                .then((res: any) => {
-                  store.dispatch("setConfig", res.data);
-                });
+              // Forced: the logo just changed, so the cached config is the one
+              // thing that must not answer here.
+              await queryClient.invalidateQueries({
+                queryKey: configFullQuery(
+                  store.state.selectedOrganization?.identifier || orgIdentifier,
+                ).queryKey,
+                exact: true,
+                refetchType: "none",
+              });
+              store.dispatch(
+                "setConfig",
+                await queryClient.fetchQuery(
+                  configFullQuery(store.state.selectedOrganization?.identifier || orgIdentifier),
+                ),
+              );
 
               // Clear the appropriate file ref
               if (mode === "dark") {
@@ -1082,11 +1100,24 @@ export default defineComponent({
               }),
             });
 
-            await configService
-              .get_config_full(store.state.selectedOrganization?.identifier || orgIdentifier)
-              .then((res: any) => {
-                store.dispatch("setConfig", res.data);
-              });
+            // Forced: the logo just changed, so the cached config is the one
+            // thing that must not answer here.
+            store.dispatch(
+              "setConfig",
+              await queryClient
+                .invalidateQueries({
+                  queryKey: configFullQuery(
+                    store.state.selectedOrganization?.identifier || orgIdentifier,
+                  ).queryKey,
+                  exact: true,
+                  refetchType: "none",
+                })
+                .then(() =>
+                  queryClient.fetchQuery(
+                    configFullQuery(store.state.selectedOrganization?.identifier || orgIdentifier),
+                  ),
+                ),
+            );
           } else {
             toast({
               variant: "error",

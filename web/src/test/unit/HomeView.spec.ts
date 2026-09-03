@@ -29,13 +29,16 @@ vi.mock("../../aws-exports", () => ({
   },
 }));
 
-vi.mock("@/services/settings", () => ({
-  default: {
-    getSetting: vi.fn(),
-    setOrgSetting: vi.fn(),
-    deleteOrgSetting: vi.fn().mockResolvedValue({}),
-  },
-}));
+vi.mock("@/services/settings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getSetting: vi.fn(),
+      setOrgSetting: vi.fn(),
+      deleteOrgSetting: vi.fn().mockResolvedValue({}),
+    },
+  });
+});
 
 const toastSpy = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -461,7 +464,11 @@ describe("HomeView org home dashboard tab", () => {
     wrapper.vm.activeHomeTab = "dash:B:abc";
     await flushPromises();
     // load(org) re-reads the authoritative setting via getSetting(org, key).
-    expect(settingsService.getSetting).toHaveBeenCalledWith("test-org", "home_dashboard");
+    expect(settingsService.getSetting).toHaveBeenCalledWith(
+      "test-org",
+      "home_dashboard",
+      undefined,
+    );
   });
 
   it("does NOT toast when the pin is closed deliberately via the ×", async () => {

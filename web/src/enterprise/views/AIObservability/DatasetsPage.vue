@@ -61,9 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="icon-sm"
             icon-left="refresh"
-            :loading="loading"
+            :loading="fetching"
             data-test="ai-datasets-refresh-btn"
-            @click="refresh"
+            @click="refreshDatasets"
           >
             <OTooltip side="bottom" :content="t('common.refresh')" />
           </OButton>
@@ -228,6 +228,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useQuery } from "@tanstack/vue-query";
+import { llmDatasetsQuery } from "@/services/llm-datasets.service.queries";
 import { computed, onMounted, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -277,8 +279,16 @@ function openDetail(row: LlmDataset) {
   });
 }
 
-const datasets = ref<LlmDataset[]>([]);
-const loading = ref(false);
+const datasetsList = useQuery(() =>
+  Object.assign(llmDatasetsQuery(orgId.value), { enabled: !!orgId.value }),
+);
+
+// The list is the query, not a copy of it: a write that invalidates the scope
+// repaints these rows with no wiring here.
+const datasets = computed<LlmDataset[]>(() => (datasetsList.data.value ?? []) as LlmDataset[]);
+const loading = datasetsList.isPending;
+// Request in flight with rows still on screen — the refresh control's spinner.
+const fetching = datasetsList.isFetching;
 const search = ref("");
 
 const numberedRows = useNumberedRows(datasets);
@@ -366,15 +376,18 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
-async function refresh() {
+// Named handler: binding refresh straight to @click puts the MouseEvent in
+// `force`.
+const refreshDatasets = () => refresh(true);
+
+async function refresh(force = true) {
   if (!orgId.value) return;
-  loading.value = true;
   try {
-    datasets.value = await llmDatasetsService.list(orgId.value);
+    // `force` by default: every caller here is a post-write reload or the
+    // refresh control. A plain mount passes false and keeps the cached rows.
+    if (force) await datasetsList.refetch();
   } catch {
     toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
-  } finally {
-    loading.value = false;
   }
 }
 
@@ -451,5 +464,7 @@ async function removeDataset(row: LlmDataset) {
   }
 }
 
-onMounted(refresh);
+// Explicitly false: onMounted passes no argument, so `refresh` would fall back
+// to its force default and every visit would bypass the cache.
+onMounted(() => refresh(false));
 </script>

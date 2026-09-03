@@ -522,6 +522,7 @@ and each domain has its own reference below.
 
 | Decision | The rule | Detail |
 | --- | --- | --- |
+| Fetching data for a page | Never call a service from a component. Declare a `queryOptions()` in `services/<domain>.queries.ts` and `useQuery` it — never a bare `staleTime` at a call site. | [references/data-fetching.md](references/data-fetching.md) · [inventory](references/data-fetching-inventory.md) |
 | **Tabular data** | `OTable` + `OTableColumnDef[]`; client-side pagination unless the backend paginates a set too large to fetch whole | [core-controls-table](references/core-controls-table.md) |
 | **Charts / graphs** | **Every data chart renders through the shared dashboard engine — never mount a charting lib in a feature page.** Time-series, category, scatter, geo/map, gauge, pie → **`PanelSchemaRenderer`** (`web/src/components/dashboards/PanelSchemaRenderer.vue`) with a panel schema: it runs the query, applies the app's unit/theme/annotation formatting, and owns the loading/error ladder. **Banned in feature code:** `echarts.init` / a raw `<v-chart>` / ApexCharts / D3 / Chart.js / a hand-rolled `<canvas>` or `<svg>` plot. The low-level **`panels/ChartRenderer.vue`** (raw ECharts option) is the ONLY sanctioned escape hatch, and ONLY when you need chart-`@click` forwarding `PanelSchemaRenderer` doesn't re-emit — annotate the site with why, and convert once the schema renderer forwards clicks. **Not charts** (do NOT force these through the renderer): in-row trend lines are **`OSparkline`**, single-value share bars are **`OProgressBar`**, in-cell data bars are the table's **`ODataBarCell`**, and a decorative topology/diagram is bespoke SVG. | [core-display](references/core-display.md) |
 | **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`, the latter needing **`tabs-below`** to land in row 2 instead of inline), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
@@ -574,6 +575,13 @@ Run this in your head before writing template markup, and again before
 considering the UI done:
 
 - [ ] Page/module header is `OPageHeader` (not a hand-built header bar).
+- [ ] Any data the page reads is a `queryOptions()` in
+      `services/<domain>.queries.ts`, consumed with `useQuery` — not a service
+      call with a hand-rolled `loading` ref. Durations come from
+      `cachePolicy.ts`, never a bare number. Writes are `mutationOptions()`
+      declaring `meta.invalidates`; a component never calls `invalidateQueries`
+      itself. Anything carrying a token or key material omits the `persister`.
+      See [references/data-fetching.md](references/data-fetching.md).
 - [ ] Peer/section tabs pass **`tabs-below`** so the strip is the full-width
       row-2 band — the bare `#header-tabs`/`#tabs` slot renders them inline
       beside the title, where they shift as the title's width changes.

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { builtInRegexPatternsQuery } from "@/services/regex_pattern.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
@@ -20,22 +22,16 @@ import { createI18n } from "vue-i18n";
 import BuiltInPatternsTab from "./BuiltInPatternsTab.vue";
 
 // --- Mock services ---
-vi.mock("@/services/regex_pattern", () => ({
-  default: {
-    getBuiltInPatterns: vi.fn(),
-  },
-}));
-
-vi.mock("@/utils/regexPatternCache", () => ({
-  RegexPatternCache: {
-    get: vi.fn().mockReturnValue(null),
-    set: vi.fn(),
-    clear: vi.fn(),
-  },
-}));
+vi.mock("@/services/regex_pattern", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getBuiltInPatterns: vi.fn(),
+    },
+  });
+});
 
 import regexPatternsService from "@/services/regex_pattern";
-import { RegexPatternCache } from "@/utils/regexPatternCache";
 
 const mockPatterns = [
   {
@@ -170,7 +166,6 @@ describe("BuiltInPatternsTab", () => {
   let wrapper: VueWrapper;
 
   beforeEach(() => {
-    vi.mocked(RegexPatternCache.get).mockReturnValue(null);
     vi.mocked(regexPatternsService.getBuiltInPatterns).mockResolvedValue({
       data: { patterns: mockPatterns },
     } as any);
@@ -222,7 +217,10 @@ describe("BuiltInPatternsTab", () => {
     });
 
     it("should use cached patterns when cache hit", async () => {
-      vi.mocked(RegexPatternCache.get).mockReturnValue(mockPatterns);
+      // Warm the shared query, as a previous visit to this tab would.
+      await queryClient.fetchQuery(builtInRegexPatternsQuery("test-org"));
+      vi.mocked(regexPatternsService.getBuiltInPatterns).mockClear();
+
       wrapper = mountComponent();
       await flushPromises();
       expect(regexPatternsService.getBuiltInPatterns).not.toHaveBeenCalled();
@@ -323,7 +321,7 @@ describe("BuiltInPatternsTab", () => {
       wrapper.vm.refreshPatterns();
       await flushPromises();
 
-      expect(RegexPatternCache.clear).toHaveBeenCalledWith("test-org");
+      // The refresh button bypasses the cache and hits the server again.
       expect(regexPatternsService.getBuiltInPatterns).toHaveBeenCalledWith("test-org");
     });
   });

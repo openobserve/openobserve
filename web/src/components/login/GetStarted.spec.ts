@@ -11,11 +11,14 @@ import { gt } from "@/types/i18n";
 const getStartedSchema = makeGetStartedSchema(gt);
 
 // Mock billings service
-vi.mock("@/services/billings", () => ({
-  default: {
-    submit_new_user_info: vi.fn(),
-  },
-}));
+vi.mock("@/services/billings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      submit_new_user_info: vi.fn(),
+    },
+  });
+});
 
 // Mock toast function
 vi.mock("@/lib/feedback/Toast/useToast", () => {

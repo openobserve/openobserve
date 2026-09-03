@@ -180,6 +180,9 @@ const alerts = {
     );
   },
   get_by_alert_id: (org_identifier: string, alert_id: string, folder_id?: any) => {
+    // A teardown-time watcher can reach here with no id; that must not become
+    // a GET /alerts/undefined on the wire.
+    if (!alert_id) return Promise.reject(new Error("alert_id is required"));
     let url = `/api/v2/${org_identifier}/alerts/${alert_id}`;
     if (folder_id) {
       url += `?folder=${folder_id}`;
@@ -315,3 +318,16 @@ const alerts = {
 };
 
 export default alerts;
+
+export interface AlertHistoryQuery {
+  // string | number because the callers build these differently and the wrapper
+  // must not change what any of them sends.
+  start_time: string | number;
+  end_time: string | number;
+  from: string | number;
+  size: string | number;
+  alert_id?: string;
+  sort_by?: string;
+  sort_order?: string;
+  [extra: string]: unknown;
+}

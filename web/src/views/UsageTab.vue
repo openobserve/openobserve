@@ -552,12 +552,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- UsageTab: self-contained home usage dashboard showing streams, functions, dashboards, alerts, and pipelines summary with animated counters and charts. -->
 <script setup lang="ts">
+import { configFullQuery } from "@/services/config.queries";
+import { orgSummaryQuery } from "@/services/organizations.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import orgService from "@/services/organizations";
-import configService from "@/services/config";
 import config from "@/aws-exports";
 import { formatSizeFromMB } from "@/utils/zincutils";
 import { formatEventCount } from "@/utils/formatters";
@@ -637,9 +638,10 @@ const getSummary = (org_id: any) => {
     message: t("toastMessages.views.pleaseWaitWhileLoadingSummary"),
     timeout: 0,
   });
-  orgService
-    .get_organization_summary(org_id)
-    .then((res) => {
+  queryClient
+    .fetchQuery(orgSummaryQuery(org_id))
+    .then((data: any) => {
+      const res = { data };
       if (
         res.data.streams.num_streams == 0 &&
         res.data.alerts.num_realtime == 0 &&
@@ -960,8 +962,18 @@ onMounted(() => {
 const refreshConfig = async () => {
   try {
     if (!orgId.value) return;
-    const res: any = await configService.get_config_full(orgId.value);
-    store.dispatch("setConfig", res.data);
+    // Forced: the whole point of this call is a fresher last_usage_report_ts
+    // than the one the banner is already rendering.
+    store.dispatch(
+      "setConfig",
+      await queryClient
+        .invalidateQueries({
+          queryKey: configFullQuery(orgId.value).queryKey,
+          exact: true,
+          refetchType: "none",
+        })
+        .then(() => queryClient.fetchQuery(configFullQuery(orgId.value))),
+    );
   } catch (error) {
     console.log(error);
   }

@@ -18,14 +18,17 @@ import i18n from "@/locales";
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
-vi.mock("@/services/online-evals.service", () => ({
-  default: {
-    scoreConfigs: {
-      create: vi.fn(),
-      update: vi.fn(),
+vi.mock("@/services/online-evals.service", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      scoreConfigs: {
+        create: vi.fn(),
+        update: vi.fn(),
+      },
     },
-  },
-}));
+  });
+});
 
 const store = createStore({
   state: { theme: "light", selectedOrganization: { identifier: "test-org" } },

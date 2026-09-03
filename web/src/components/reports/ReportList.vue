@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model:active-tab="activeTab"
                       @update:active-tab="
                         () => {
-                          invalidateFolderCache(activeFolderId);
+                          invalidateFolderCache(activeFolderId, true);
                           loadReports(activeFolderId);
                         }
                       "
@@ -128,14 +128,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="icon-sm"
                   icon-left="refresh"
-                  :loading="isLoadingReports"
+                  :loading="isRefreshingReports"
                   data-test="report-list-refresh-btn"
-                  @click="
-                    () => {
-                      invalidateFolderCache(activeFolderId);
-                      loadReports(activeFolderId);
-                    }
-                  "
+                  @click="refreshReports"
                 >
                   <OTooltip
                     side="bottom"
@@ -315,7 +310,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent } from "vue";
+import { useOrgId } from "@/composables/query/useOrgId";
+import type { ReportListFilters } from "@/services/reports";
+import { useQuery } from "@tanstack/vue-query";
+import { reportsQuery } from "@/services/reports.queries";
+import { reportKeys } from "@/services/reports.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -328,7 +329,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import reports from "@/services/reports";
 import { debounce } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -369,7 +370,29 @@ const reportsTableRows: Ref<any[]> = ref([]);
 const staticReportsList: Ref<any[]> = ref([]);
 // Start in the loading state so the table shows the skeleton on first render
 // instead of briefly flashing the empty state before the fetch completes.
+// What the current read is aimed at. Held reactively so the query key forks on
+// a folder/tab/search change — which is also what makes the old "is this
+// response stale?" guard unnecessary: a late response lands under its own key
+// and can no longer render into the current view.
+const orgIdForReports = useOrgId();
+const readFilters = ref<ReportListFilters>({
+  folder: undefined,
+  isCache: false,
+  nameQuery: undefined,
+});
+const readNameQuery = ref<string | undefined>(undefined);
+
+const hasRequestedReports = ref(false);
+
+const reportsList = useQuery(() =>
+  Object.assign(reportsQuery(orgIdForReports.value, readFilters.value), {
+    enabled: hasRequestedReports.value && !!orgIdForReports.value,
+  }),
+);
+
 const isLoadingReports = ref(true);
+// Request in flight with rows still on screen — the refresh button's spinner.
+const isRefreshingReports = ref(false);
 const activeTab = ref("shared");
 const filterQuery = ref(""); // client-side filter within current folder
 const searchQuery = ref(""); // API search across all folders
@@ -483,80 +506,96 @@ const columns = computed<OTableColumnDef[]>(() => {
 });
 
 // ── Load reports ──────────────────────────────────────────────────────────────
-const loadReports = async (folderId: string, nameQuery?: string) => {
-  // Use Vuex cache for folder loads (no nameQuery = normal folder navigation)
-  if (!nameQuery && store.state.organizationData.allReportsListByFolderId?.[folderId]) {
-    const cached = store.state.organizationData.allReportsListByFolderId[folderId];
-    staticReportsList.value = cached;
-    cachedFolderReports.value = cached;
-    filterReports();
-    // Data is served synchronously from cache — clear the initial loading flag
-    // so the skeleton doesn't stay stuck on a cached (re)mount.
-    isLoadingReports.value = false;
-    return;
-  }
+const shapeReports = (rows: any[]) =>
+  rows.map((report: any) => ({
+    ...report,
+    last_triggered_at_raw: report.last_triggered_at || null,
+    last_triggered_at: report.last_triggered_at
+      ? convertUnixToDateFormat(report.last_triggered_at)
+      : "-",
+  }));
 
-  isLoadingReports.value = true;
-  const dismiss = toast({
-    variant: "loading",
-    message: t("toastMessages.reports.pleaseWaitWhileFetchingReports"),
-    timeout: 0,
-  });
+const renderReports = (rows: any[]) => {
+  const mapped = shapeReports(rows);
+  if (!readNameQuery.value) cachedFolderReports.value = mapped;
+  staticReportsList.value = mapped;
+  filterReports();
+};
+
+// The list is the query now: anything that invalidates the reports scope
+// repaints these rows without this component asking.
+watch(reportsList.data, (rows: any) => {
+  if (rows) renderReports(rows);
+});
+
+watch(reportsList.error, (err: any) => {
+  if (!err) return;
+  isLoadingReports.value = false;
+  isRefreshingReports.value = false;
+  if (err?.response?.status !== 403) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("reports.fetchReportsError"),
+    });
+  }
+});
+
+const loadReports = async (folderId: string, nameQuery?: string, force = false) => {
+  // The skeleton is for a cold read only — a refresh keeps its rows and spins
+  // the button instead.
+  const warm = staticReportsList.value.length > 0;
+  isLoadingReports.value = !warm;
+  isRefreshingReports.value = true;
+  const dismiss = warm
+    ? () => {}
+    : toast({
+        variant: "loading",
+        message: t("toastMessages.reports.pleaseWaitWhileFetchingReports"),
+        timeout: 0,
+      });
 
   try {
-    const folder = searchAcrossFolders.value ? undefined : folderId;
-    const isCache = activeTab.value === "cached";
-    const res = await reports.listByFolderId(
-      store.state.selectedOrganization.identifier,
-      folder,
-      undefined,
-      isCache,
-      nameQuery || undefined,
-    );
+    readNameQuery.value = nameQuery;
+    readFilters.value = {
+      folder: searchAcrossFolders.value ? undefined : folderId,
+      isCache: activeTab.value === "cached",
+      nameQuery,
+    };
+    // Let the key pick up the new parameters before asking for the data.
+    await nextTick();
 
-    const mapped = (res.data ?? []).map((report: any) => ({
-      ...report,
-      last_triggered_at_raw: report.last_triggered_at || null,
-      last_triggered_at: report.last_triggered_at
-        ? convertUnixToDateFormat(report.last_triggered_at)
-        : "-",
-    }));
-
-    // Always cache the result — even if stale, so navigating back hits the cache
-    if (!nameQuery) {
-      store.dispatch("setAllReportsListByFolderId", {
-        ...store.state.organizationData.allReportsListByFolderId,
-        [folderId]: mapped,
-      });
+    if (!hasRequestedReports.value) {
+      hasRequestedReports.value = true;
+      await nextTick();
+      await reportsList.suspense();
+    } else if (force) {
+      await reportsList.refetch();
+    } else {
+      await reportsList.suspense();
     }
-
-    // Race condition guard: don't update UI if user moved to another folder,
-    // but data is already cached above for future use (mirrors AlertList.vue:1574)
-    if (folderId !== activeFolderId.value && !nameQuery) {
-      dismiss();
-      return;
-    }
-
-    if (!nameQuery) cachedFolderReports.value = mapped;
-    staticReportsList.value = mapped;
-    filterReports();
-  } catch (err: any) {
-    if (err?.response?.status !== 403) {
-      toast({
-        variant: "error",
-        message: err?.data?.message || t("reports.fetchReportsError"),
-      });
-    }
+    await nextTick();
   } finally {
-    isLoadingReports.value = false;
     dismiss();
+    isLoadingReports.value = false;
+    isRefreshingReports.value = false;
   }
 };
 
-const invalidateFolderCache = (folderId: string) => {
-  const updated = { ...store.state.organizationData.allReportsListByFolderId };
-  delete updated[folderId];
-  store.dispatch("setAllReportsListByFolderId", updated);
+// Called after every write and by the refresh button. Prefix invalidation, so
+// the cached/scheduled tab and any active name search all refetch too.
+//
+// `siblingsOnly` when a `loadReports` follows. Invalidating the entry the table
+// is *observing* makes it refetch on the spot, and the load right after asks
+// for it a second time — two identical requests behind one click. Skipping the
+// observed entry leaves that one read to `loadReports`, while every inactive
+// sibling still goes stale.
+const invalidateFolderCache = (_folderId?: string, siblingsOnly = false) => {
+  queryClient.invalidateQueries({
+    queryKey: reportKeys.all(store.state.selectedOrganization.identifier),
+    ...(siblingsOnly
+      ? { refetchType: "none" as const, predicate: (q: any) => q.getObserversCount() === 0 }
+      : {}),
+  });
 };
 
 const filterReports = () => {
@@ -626,6 +665,14 @@ watch(searchAcrossFolders, (enabled) => {
     filterReports();
   }
 });
+
+// Named handler: a refresh keeps whatever the user is searching for. Passing
+// `undefined` here reset the name query, so the rows came back unfiltered while
+// the search box still showed the term.
+const refreshReports = () => {
+  invalidateFolderCache(activeFolderId.value, true);
+  return loadReports(activeFolderId.value, searchQuery.value || undefined, true);
+};
 
 const debouncedSearch = debounce(async (query: string) => {
   await loadReports(activeFolderId.value, query);
@@ -867,9 +914,11 @@ const onMoveUpdated = async (fromFolder: string, toFolder: string) => {
   selectedReports.value = [];
   reportIdsToMove.value = [];
   // Invalidate both source and destination folder caches
-  invalidateFolderCache(fromFolder || activeFolderId.value);
-  invalidateFolderCache(toFolder);
-  await loadReports(activeFolderId.value);
+  invalidateFolderCache(fromFolder || activeFolderId.value, true);
+  invalidateFolderCache(toFolder, true);
+  // Forced: this is a post-write reload, and `siblingsOnly` above deliberately
+  // left the folder on screen untouched so it is refetched exactly once here.
+  await loadReports(activeFolderId.value, undefined, true);
 };
 
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
@@ -884,9 +933,8 @@ useShortcuts([
     id: "reportsRefresh",
     handler: () => {
       if (!isInputFocused()) {
-        // Match the refresh button: drop the cache first so it actually reloads.
-        invalidateFolderCache(activeFolderId.value);
-        loadReports(activeFolderId.value);
+        // The same handler the button uses: forces, and keeps the active search.
+        refreshReports();
       }
     },
   },

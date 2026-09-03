@@ -926,15 +926,26 @@ import {
 } from "@/composables/traces/useSpanEvents";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
-import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
+import {
+  defineComponent,
+  onBeforeMount,
+  ref,
+  watch,
+  type Ref,
+  type PropType,
+  inject,
+  computed,
+  onMounted,
+  onUnmounted,
+  defineAsyncComponent,
+  nextTick,
+} from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { computed } from "vue";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
-import { onMounted, onUnmounted, defineAsyncComponent, nextTick } from "vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import JsonPreview from "@/components/JsonPreview.vue";
 import CorrelatedLogsTable from "@/plugins/correlation/CorrelatedLogsTable.vue";

@@ -22,11 +22,14 @@ import enMessages from "@/locales/languages/en-US.json";
 import { ref } from "vue";
 
 // ─── Service mocks ───────────────────────────────────────────────────────────
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    create: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+    },
+  });
+});
 
 vi.mock("axios", () => ({
   default: { get: vi.fn() },

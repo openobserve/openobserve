@@ -1,3 +1,10 @@
+import { evalJobsQuery } from "@/services/online-evals.service.queries";
+import { scoreConfigsQuery } from "@/services/online-evals.service.queries";
+import { scorersQuery } from "@/services/online-evals.service.queries";
+import { providersQuery } from "@/services/online-evals.service.queries";
+import { onlineEvalKeys } from "@/services/online-evals.service.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { fetchInto } from "@/composables/query/fetchInto";
 import { ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import onlineEvalsService, {
@@ -18,43 +25,45 @@ export function useOnlineEvalsData() {
   const providers = ref<Provider[]>([]);
   const isLoading = ref(false);
 
-  async function loadAll(orgId: string) {
+  const applyScoreConfigs = (rows: ScoreConfig[]) => {
+    scoreConfigs.value = rows;
+    scoreConfigVersions.value = Object.fromEntries(
+      rows.map((config) => [entityId(config), [config]]),
+    );
+  };
+
+  async function loadAll(orgId: string, force = false) {
     if (!orgId) return;
-    isLoading.value = true;
+    // `load`, not `get`: a stale entry still has rows, and `get` would block on
+    // the network with the skeleton up, throwing away what the user was reading.
+    // Only a genuinely cold page — nothing cached for any of the four — spins.
+    isLoading.value =
+      queryClient.getQueryData(onlineEvalKeys.providers(orgId)) === undefined &&
+      queryClient.getQueryData(onlineEvalKeys.scoreConfigs(orgId)) === undefined &&
+      queryClient.getQueryData(onlineEvalKeys.scorers(orgId)) === undefined &&
+      queryClient.getQueryData(onlineEvalKeys.jobs(orgId)) === undefined;
     try {
+      // The four requests still fan out in parallel, and each list settles on
+      // its own so one failing endpoint cannot blank the other three.
       const [providerResult, scoreConfigResult, scorerResult, jobResult] = await Promise.allSettled(
         [
-          onlineEvalsService.providers.list(orgId),
-          onlineEvalsService.scoreConfigs.list(orgId),
-          onlineEvalsService.scorers.list(orgId),
-          onlineEvalsService.jobs.list(orgId),
+          fetchInto(providersQuery(orgId), { apply: (rows) => (providers.value = rows), force }),
+          fetchInto(scoreConfigsQuery(orgId), { apply: applyScoreConfigs, force }),
+          fetchInto(scorersQuery(orgId), { apply: (rows) => (scorers.value = rows), force }),
+          fetchInto(evalJobsQuery(orgId), { apply: (rows) => (jobs.value = rows), force }),
         ],
       );
 
-      if (providerResult.status === "fulfilled") {
-        providers.value = providerResult.value;
-      } else {
+      if (providerResult.status === "rejected") {
         showError(providerResult.reason, t("onlineEvals.loadError"));
       }
-
-      if (scoreConfigResult.status === "fulfilled") {
-        scoreConfigs.value = scoreConfigResult.value;
-        scoreConfigVersions.value = Object.fromEntries(
-          scoreConfigResult.value.map((config) => [entityId(config), [config]]),
-        );
-      } else {
+      if (scoreConfigResult.status === "rejected") {
         showError(scoreConfigResult.reason, t("onlineEvals.loadError"));
       }
-
-      if (scorerResult.status === "fulfilled") {
-        scorers.value = scorerResult.value;
-      } else {
+      if (scorerResult.status === "rejected") {
         showError(scorerResult.reason, t("onlineEvals.loadError"));
       }
-
-      if (jobResult.status === "fulfilled") {
-        jobs.value = jobResult.value;
-      } else {
+      if (jobResult.status === "rejected") {
         showError(jobResult.reason, t("onlineEvals.loadError"));
       }
     } finally {
@@ -65,7 +74,13 @@ export function useOnlineEvalsData() {
   async function loadProviders(orgId: string) {
     if (!orgId) return;
     try {
-      providers.value = await onlineEvalsService.providers.list(orgId);
+      const options = providersQuery(orgId);
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+      providers.value = await queryClient.fetchQuery(options);
     } catch (err: any) {
       showError(err, t("onlineEvals.loadError"));
     }

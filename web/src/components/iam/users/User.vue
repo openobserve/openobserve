@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-sm"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               data-test="user-list-refresh-btn"
               @click="refreshUsers"
             >
@@ -280,7 +280,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
+import { orgUsersQuery, assignableRolesQuery, allUserRolesQuery } from "@/services/users.queries";
+import { rolesQuery } from "@/services/iam.queries";
+import { userKeys } from "@/services/users.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { defineComponent, ref, onActivated, onBeforeMount, watch, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -308,8 +312,6 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
-import { computed } from "vue";
-import { getRoles as getCustomRolesApi } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
@@ -693,15 +695,16 @@ export default defineComponent({
     let revokeInviteToken = "";
     const revokeInviteEmail = ref("");
 
+    // Resolves `true` either way, as it always has: callers only await it to
+    // sequence the mount, and a missing role list must not block the page.
     const getRoles = () => {
-      return new Promise((resolve) => {
-        usersService
-          .getRoles(store.state.selectedOrganization.identifier)
-          .then((res) => {
-            options.value = res.data;
-          })
-          .finally(() => resolve(true));
-      });
+      return queryClient
+        .fetchQuery(assignableRolesQuery(store.state.selectedOrganization.identifier))
+        .then((data: any) => {
+          options.value = data;
+          return true;
+        })
+        .catch(() => true);
     };
     const getCustomRoles = async (options: { silent?: boolean } = {}) => {
       if (
@@ -710,8 +713,11 @@ export default defineComponent({
       )
         return;
       try {
-        const res = await getCustomRolesApi(store.state.selectedOrganization.identifier);
-        customRoles.value = Array.isArray(res.data) ? res.data : [];
+        // Same endpoint as the IAM roles list — one cache entry, not one per page.
+        const data = await queryClient.fetchQuery(
+          rolesQuery(store.state.selectedOrganization.identifier),
+        );
+        customRoles.value = Array.isArray(data) ? data : [];
       } catch (err: any) {
         if (!options.silent && err?.response?.status !== 403) {
           toast({
@@ -749,84 +755,116 @@ export default defineComponent({
     };
 
     const loading = ref(false);
-    const getOrgMembers = () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: t("iam.user.pleaseWaitLoadingUsers"),
-        timeout: 0,
-      });
+    // A request in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = ref(false);
+    // The ?email= deep link opens the edit dialog, so it is latched — the
+    // cached paint and the fresh one must not open it twice.
+    let deepLinkOpened = false;
 
-      loading.value = true;
+    const applyUsers = (users: any[]) => {
+      currentUserRole.value = "";
+      usersState.users = users.map((data: any) => {
+        if (store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()) {
+          currentUserRole.value = data.role?.toLowerCase();
+          isCurrentUserInternal.value = !data.is_external;
+        }
+
+        if (
+          data.email?.toLowerCase() ==
+          router.currentRoute.value.query.email?.toString().toLowerCase()
+        ) {
+          if (!deepLinkOpened) {
+            deepLinkOpened = true;
+            addUser({ row: data }, true);
+          }
+        }
+
+        // Normalise roles to an array. Enterprise APIs surface roles in
+        // various shapes — pull from every plausible field and dedupe.
+        const rolesSet = new Set<string>();
+        if (data?.role) rolesSet.add(String(data.role));
+        if (Array.isArray(data?.roles)) {
+          data.roles.forEach((r: any) => r && rolesSet.add(String(r)));
+        }
+        if (Array.isArray(data?.custom_roles)) {
+          data.custom_roles.forEach((r: any) => r && rolesSet.add(String(r)));
+        }
+        if (Array.isArray(data?.assigned_roles)) {
+          data.assigned_roles.forEach((r: any) => r && rolesSet.add(String(r)));
+        }
+        const rolesArr: string[] = Array.from(rolesSet).filter(Boolean);
+
+        return {
+          email: maskText(data.email),
+          rawEmail: data.email,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          // Store the display-cased role (e.g. "Admin", "Admin (Invited)").
+          // The role options from getRoles use the lowercase value ("admin"),
+          // so this seeded "Admin" doesn't match an option — but OSelect renders
+          // the raw value as a fallback, so the field still displays "Admin"
+          // correctly. The only cosmetic quirk is that the open dropdown won't
+          // highlight the lowercase option as active.
+          role:
+            data?.status == "pending"
+              ? toCamelCase(data.role) + " (Invited)"
+              : toCamelCase(data.role),
+          roles: rolesArr,
+          auth_type: data?.auth_type ? data.auth_type : data?.is_external ? "SSO" : "Native",
+          is_external: !!data?.is_external,
+          enableEdit:
+            store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase() ? true : false,
+          enableChangeRole: false,
+          enableDelete: config.isCloud == "true" ? true : false,
+          status: data?.status,
+          token: data?.token || null,
+        };
+      });
+      rows.value = usersState.users;
+      tableKey.value++;
+    };
+
+    const getOrgMembers = (force = false) => {
+      const org = store.state.selectedOrganization.identifier;
+      // Stale-while-revalidate: paint the cached members at once. On cloud the
+      // invited-members merge only happens on the fresh pass, so the cached
+      // paint is org members alone — rows on screen beat an empty table.
+      // Not gated on `force`: a manual refresh keeps the rows on screen.
+      const cached = queryClient.getQueryData<any[]>(userKeys.users(org));
+      const warm = cached !== undefined;
+      if (cached) applyUsers([...cached]);
+
+      const dismiss = warm
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("iam.user.pleaseWaitLoadingUsers"),
+            timeout: 0,
+          });
+
+      loading.value = !warm;
+      fetching.value = true;
       return new Promise((resolve, reject) => {
-        usersService
-          .orgUsers(store.state.selectedOrganization.identifier)
-          .then(async (res) => {
-            let users = [...res.data.data];
+        (force
+          ? queryClient
+              .invalidateQueries({
+                queryKey: orgUsersQuery(org).queryKey,
+                exact: true,
+                refetchType: "none",
+              })
+              .then(() => queryClient.fetchQuery(orgUsersQuery(org)))
+          : queryClient.fetchQuery(orgUsersQuery(org))
+        )
+          .then(async (orgUsers: any[]) => {
+            let users = [...orgUsers];
 
             if (config.isCloud == "true") {
               const invitedMembers: any = await getInvitedMembers();
-              users = [...res.data.data, ...invitedMembers];
+              users = [...orgUsers, ...invitedMembers];
             }
 
-            currentUserRole.value = "";
-            usersState.users = users.map((data: any) => {
-              if (store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()) {
-                currentUserRole.value = data.role?.toLowerCase();
-                isCurrentUserInternal.value = !data.is_external;
-              }
-
-              if (
-                data.email?.toLowerCase() ==
-                router.currentRoute.value.query.email?.toString().toLowerCase()
-              ) {
-                addUser({ row: data }, true);
-              }
-
-              // Normalise roles to an array. Enterprise APIs surface roles in
-              // various shapes — pull from every plausible field and dedupe.
-              const rolesSet = new Set<string>();
-              if (data?.role) rolesSet.add(String(data.role));
-              if (Array.isArray(data?.roles)) {
-                data.roles.forEach((r: any) => r && rolesSet.add(String(r)));
-              }
-              if (Array.isArray(data?.custom_roles)) {
-                data.custom_roles.forEach((r: any) => r && rolesSet.add(String(r)));
-              }
-              if (Array.isArray(data?.assigned_roles)) {
-                data.assigned_roles.forEach((r: any) => r && rolesSet.add(String(r)));
-              }
-              const rolesArr: string[] = Array.from(rolesSet).filter(Boolean);
-
-              return {
-                email: maskText(data.email),
-                rawEmail: data.email,
-                first_name: data.first_name,
-                last_name: data.last_name,
-                // Store the display-cased role (e.g. "Admin", "Admin (Invited)").
-                // The role options from getRoles use the lowercase value ("admin"),
-                // so this seeded "Admin" doesn't match an option — but OSelect renders
-                // the raw value as a fallback, so the field still displays "Admin"
-                // correctly. The only cosmetic quirk is that the open dropdown won't
-                // highlight the lowercase option as active.
-                role:
-                  data?.status == "pending"
-                    ? toCamelCase(data.role) + " (Invited)"
-                    : toCamelCase(data.role),
-                roles: rolesArr,
-                auth_type: data?.auth_type ? data.auth_type : data?.is_external ? "SSO" : "Native",
-                is_external: !!data?.is_external,
-                enableEdit:
-                  store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()
-                    ? true
-                    : false,
-                enableChangeRole: false,
-                enableDelete: config.isCloud == "true" ? true : false,
-                status: data?.status,
-                token: data?.token || null,
-              };
-            });
-            rows.value = usersState.users;
-            tableKey.value++;
+            applyUsers(users);
             dismiss();
 
             // Resolve immediately so the caller (onBeforeMount) can run
@@ -844,11 +882,11 @@ export default defineComponent({
             if (isEnterpriseOrCloud && store.state.zoConfig.rbac_enabled) {
               const orgId = store.state.selectedOrganization.identifier;
               // Don't await — let the batched role fetch run in the background.
-              usersService
-                .getAllUserRoles(orgId)
+              queryClient
+                .fetchQuery(allUserRolesQuery(orgId))
                 .then((resp: any) => {
                   // Response is a map of user email -> role list.
-                  const roleMap: Record<string, any> = resp?.data || {};
+                  const roleMap: Record<string, any> = resp || {};
                   usersState.users.forEach((u: any) => {
                     if (u.status === "pending") return;
                     const fetched: string[] = Array.isArray(roleMap[u.rawEmail])
@@ -882,6 +920,7 @@ export default defineComponent({
           })
           .finally(() => {
             loading.value = false;
+            fetching.value = false;
           });
       });
     };
@@ -913,7 +952,7 @@ export default defineComponent({
     // mirrors the onBeforeMount sequence).
     const refreshUsers = async () => {
       try {
-        await getOrgMembers();
+        await getOrgMembers(true);
       } finally {
         updateUserActions();
       }
@@ -1099,7 +1138,7 @@ export default defineComponent({
     const updateMember = async (data: any) => {
       if (data.data != undefined) {
         try {
-          await getOrgMembers();
+          await getOrgMembers(true);
         } catch (error) {
           toast({
             message: t("iam.user.failedToRefreshUserList"),
@@ -1130,7 +1169,7 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
-        await getOrgMembers();
+        await getOrgMembers(true);
         updateUserActions();
         if (operationType == "created") {
           toast({
@@ -1199,7 +1238,7 @@ export default defineComponent({
               message: t("iam.user.userDeletedSuccess"),
               variant: "success",
             });
-            await getOrgMembers();
+            await getOrgMembers(true);
             updateUserActions();
           }
         })
@@ -1235,7 +1274,7 @@ export default defineComponent({
             message: t("iam.user.invitationRevokedSuccess"),
             variant: "success",
           });
-          await getOrgMembers();
+          await getOrgMembers(true);
           updateUserActions();
 
           segment.track("Button Click", {
@@ -1255,7 +1294,7 @@ export default defineComponent({
     };
 
     const handleInviteSent = async () => {
-      await getOrgMembers();
+      await getOrgMembers(true);
       updateUserActions();
     };
 
@@ -1295,7 +1334,7 @@ export default defineComponent({
 
         selectedUsers.value = [];
         confirmBulkDelete.value = false;
-        await getOrgMembers();
+        await getOrgMembers(true);
         updateUserActions();
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
@@ -1406,6 +1445,7 @@ export default defineComponent({
       usersState,
       columns,
       loading,
+      fetching,
       orgData,
       confirmDelete,
       deleteUser,

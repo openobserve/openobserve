@@ -229,10 +229,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-sm"
               class="w-8!"
               icon-left="refresh"
-              :loading="loading"
+              :loading="fetching"
               :title="t('common.refresh')"
               data-test="synthetic-monitoring-refresh-btn"
-              @click="loadMonitors()"
+              @click="loadMonitors(undefined, true)"
             />
           </template>
         </MonitorTable>
@@ -412,7 +412,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { syntheticsKeys } from "@/services/synthetics.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { useQuery } from "@tanstack/vue-query";
+import { syntheticsMonitorsQuery } from "@/services/synthetics.queries";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -561,11 +565,27 @@ type DisplayMonitor = ReturnType<typeof mapMonitor>;
 // ── Data loading ───────────────────────────────────────────────────────
 // Start in loading state so the table shows the skeleton on first render
 // instead of briefly flashing the empty state before the fetch completes.
-const loading = ref(true);
-
+// The folder a read is currently aimed at. `loadMonitors` may be handed a
+// folder the route refs have not caught up with, and "search across folders"
+// means *no* folder, so the key tracks this rather than `activeFolderId`.
 const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
 );
+
+const readFolder = ref<string | undefined>(undefined);
+// Distinct from readFolder being undefined, which is the "All folders" scope.
+const folderResolved = ref(false);
+
+const monitorsList = useQuery(() =>
+  Object.assign(syntheticsMonitorsQuery(orgIdentifier.value, readFolder.value), {
+    enabled: !!orgIdentifier.value && folderResolved.value,
+  }),
+);
+
+const loading = monitorsList.isPending;
+// Request in flight, with rows still on screen — the refresh button's
+// spinner. `loading` stays for the skeleton, which only a cold read wants.
+const fetching = monitorsList.isFetching;
 
 /** Resolves once orgIdentifier is populated — on browser back-navigation the
  *  store may not be hydrated synchronously yet. */
@@ -581,24 +601,19 @@ function waitForOrgIdentifier(): Promise<void> {
   });
 }
 
-async function loadMonitors(folderId?: string) {
+async function loadMonitors(folderId?: string, force = false) {
   if (!orgIdentifier.value) return;
-  loading.value = true;
-  try {
-    const targetFolder =
-      folderId !== undefined
-        ? folderId
-        : searchAcrossFolders.value
-          ? undefined
-          : activeFolderId.value;
-    const res = await syntheticsService.listByFolderId(orgIdentifier.value, targetFolder);
-    // The API field was renamed `monitors` -> `checks`. Both are read so a
-    // bundle and a server on opposite sides of that rename still render.
-    const rows = (res.data as any).checks ?? (res.data as any).monitors ?? [];
-    monitors.value = rows.map(mapMonitor);
-  } finally {
-    loading.value = false;
-  }
+  const targetFolder =
+    folderId !== undefined
+      ? folderId
+      : searchAcrossFolders.value
+        ? undefined
+        : activeFolderId.value;
+  readFolder.value = targetFolder;
+  folderResolved.value = true;
+  // Let the key pick up the new folder before asking for the data.
+  await nextTick();
+  if (force) await monitorsList.refetch();
 }
 
 async function initPage() {
@@ -755,7 +770,7 @@ const bulkDeleteMonitors = async () => {
     selectedMonitorIds.value = [];
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.bulkDeleteSuccess") });
-    await loadMonitors();
+    await loadMonitors(undefined, true);
   } catch (err: any) {
     dismiss();
     toast({
@@ -785,7 +800,7 @@ const moveSingleMonitor = (row: any) => {
 const onMoveUpdated = async () => {
   selectedMonitorIds.value = [];
   showMoveDialog.value = false;
-  await loadMonitors();
+  await loadMonitors(undefined, true);
 };
 
 // ── Row click → Monitor Results page ───────────────────────────────────
@@ -1029,7 +1044,9 @@ async function loadLocations() {
   }
 }
 
-const monitors = ref<DisplayMonitor[]>([]);
+// The list is the query, not a copy of it: a monitor write invalidates the
+// synthetics scope and these rows repaint with no wiring here.
+const monitors = computed<DisplayMonitor[]>(() => (monitorsList.data.value ?? []).map(mapMonitor));
 
 // Enrich monitors with folder names from Vuex store
 const enrichedMonitors = computed(() => {
@@ -1197,7 +1214,7 @@ async function bulkPauseMonitors() {
   }
   bulkActionLoading.value = false;
   selectedMonitorIds.value = [];
-  await loadMonitors();
+  await loadMonitors(undefined, true);
 }
 
 async function bulkEnableMonitors() {
@@ -1235,7 +1252,7 @@ async function bulkEnableMonitors() {
   }
   bulkActionLoading.value = false;
   selectedMonitorIds.value = [];
-  await loadMonitors();
+  await loadMonitors(undefined, true);
 }
 
 async function bulkTriggerMonitors() {
@@ -1435,7 +1452,7 @@ async function saveDuplicate() {
     if (!searchAcrossFolders.value && targetFolder !== activeFolderId.value) {
       activeFolderId.value = targetFolder;
     } else {
-      await loadMonitors();
+      await loadMonitors(undefined, true);
     }
   } catch (err: any) {
     dismiss();
@@ -1511,7 +1528,12 @@ async function deleteMonitor(m: any) {
   });
   try {
     await syntheticsService.delete(org, String(m.id), activeFolderId.value);
-    monitors.value = monitors.value.filter((mon) => String(mon.id) !== String(m.id));
+    // Drop it from the cached entry rather than waiting for the invalidation's
+    // refetch to repaint.
+    queryClient.setQueryData<any[]>(
+      syntheticsKeys.monitors(orgIdentifier.value, readFolder.value),
+      (old) => (old ?? []).filter((mon: any) => String(mon.id) !== String(m.id)),
+    );
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.deleteSuccessSingle") });
   } catch (err: any) {

@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { settingQuery } from "@/services/settings.queries";
+import { settingKeys } from "@/services/settings.querykeys";
+import { queryClient, setPersistedQueryData } from "@/composables/query/queryClient";
+import { fetchInto } from "@/composables/query/fetchInto";
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -34,13 +38,27 @@ const isLoading = ref(false);
 export function useHomeDashboard(t: TranslateFn) {
   const isHome = (dashboardId: string) => homeDashboard.value?.dashboardId === dashboardId;
 
-  const load = async (org: string) => {
+  /** Cached read — see useFavoriteDashboards.load for the same rationale. */
+  const load = async (org: string, force = false) => {
     if (!org) return;
-    isLoading.value = true;
-    try {
-      const res = await settings.getSetting(org, SETTING_KEY);
-      const val = res?.data?.setting_value;
+    const apply = (val: any) => {
       homeDashboard.value = val && val.dashboardId ? (val as HomeDashboard) : null;
+    };
+    try {
+      if (force) {
+        isLoading.value = true;
+        const options = settingQuery(org, SETTING_KEY);
+        await queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
+        apply(await queryClient.fetchQuery(options));
+        return;
+      }
+      // Stale-while-revalidate: the pinned dashboard stays put while the
+      // setting revalidates, so the home button never flickers back to empty.
+      await fetchInto(settingQuery(org, SETTING_KEY), { apply, loading: isLoading });
     } catch {
       // Missing setting / 404 → no home dashboard for this org.
       homeDashboard.value = null;
@@ -60,6 +78,7 @@ export function useHomeDashboard(t: TranslateFn) {
     homeDashboard.value = d; // optimistic
     try {
       await settings.setOrgSetting(org, SETTING_KEY, d, SETTING_CATEGORY);
+      setPersistedQueryData(settingKeys.one(org, SETTING_KEY), d);
     } catch (e: any) {
       homeDashboard.value = prev; // revert
       toast({
@@ -75,6 +94,7 @@ export function useHomeDashboard(t: TranslateFn) {
     homeDashboard.value = null; // optimistic
     try {
       await settings.deleteOrgSetting(org, SETTING_KEY);
+      setPersistedQueryData(settingKeys.one(org, SETTING_KEY), null);
     } catch (e: any) {
       // A 404 means the setting is already gone — this is the desired end state,
       // not a failure. The backend now clears home_dashboard itself when the

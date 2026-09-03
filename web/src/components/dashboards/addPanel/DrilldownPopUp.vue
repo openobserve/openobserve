@@ -237,17 +237,23 @@
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, inject, nextTick, reactive, ref } from "vue";
+import {
+  defineAsyncComponent,
+  inject,
+  nextTick,
+  reactive,
+  ref,
+  defineComponent,
+  watch,
+  computed,
+  onMounted,
+} from "vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { defineComponent } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import { watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
-import { computed } from "vue";
 import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "../../../utils/commons";
-import { onMounted } from "vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
