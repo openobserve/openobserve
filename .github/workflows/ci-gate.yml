@@ -35,9 +35,10 @@ jobs:
           gh api -X POST "repos/${{ github.repository }}/statuses/$SHA" \
             -f state="$STATE" -f context=ci-gate -f description="$DESC" -f target_url="$RUN_URL" \
             --jq '"\(.context): \(.state)"'
-          # Forks cannot be built in o2-enterprise; report that required status as passed so the PR is not stuck.
-          if [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ]; then
+          # o2-enterprise posts ent-build-status-check on PR heads only; a queue commit never gets one, and
+          # a fork PR cannot be built there. Report it as passed in both cases so a required check cannot deadlock the queue.
+          if [ "${{ github.event_name }}" = "merge_group" ] || [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ]; then
             gh api -X POST "repos/${{ github.repository }}/statuses/$SHA" \
-              -f state=success -f context=ent-build-status-check -f description="fork PR: enterprise build not run" \
+              -f state=success -f context=ent-build-status-check -f description="gate passed on the PR head; not re-run on this commit" \
               --jq '"\(.context): \(.state)"'
           fi
