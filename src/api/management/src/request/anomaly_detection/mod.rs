@@ -172,7 +172,7 @@ pub async fn create_config(
         Ok(config) => MetaHttpResponse::json(config),
         Err(e) => {
             tracing::error!("Failed to create anomaly config: {}", e);
-            let status = if e.to_string().contains("validation") {
+            let status = if e.to_string().contains("validation error") {
                 StatusCode::BAD_REQUEST
             } else {
                 StatusCode::INTERNAL_SERVER_ERROR
@@ -227,17 +227,17 @@ pub async fn update_config(
     });
     match anomaly_service::update_config(&org_id, &anomaly_id, req).await {
         Ok(config) => MetaHttpResponse::json(config),
+        // Before "not found": the rejected payload is caller-controlled and can contain it.
+        Err(e) if e.to_string().contains("validation error") => {
+            MetaHttpResponse::error(StatusCode::BAD_REQUEST.as_u16(), e.to_string()).into_response()
+        }
         Err(e) if e.to_string().contains("not found") => {
             MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), e.to_string()).into_response()
         }
         Err(e) => {
             tracing::error!("Failed to update anomaly config: {}", e);
-            let status = if e.to_string().contains("validation") {
-                StatusCode::BAD_REQUEST
-            } else {
-                StatusCode::INTERNAL_SERVER_ERROR
-            };
-            MetaHttpResponse::error(status.as_u16(), e.to_string()).into_response()
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                .into_response()
         }
     }
 }

@@ -2843,7 +2843,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           detection_function: parsedFn,
           detection_function_field: parsedField,
           threshold: data.threshold ?? data.percentile ?? 97,
-          filters: data.filters ?? [],
+          filters: Array.isArray(data.filters) ? data.filters : [],
           histogram_interval_value: histInterval.value,
           histogram_interval_unit: histInterval.unit,
           schedule_interval_value: sched.value,

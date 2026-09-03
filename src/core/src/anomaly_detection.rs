@@ -376,10 +376,10 @@ pub async fn get_config(org_id: &str, anomaly_id: &str) -> Result<Option<serde_j
 /// Create a new anomaly detection configuration
 pub async fn create_config(
     org_id: &str,
-    req: CreateAnomalyConfigRequest,
+    mut req: CreateAnomalyConfigRequest,
 ) -> Result<serde_json::Value> {
-    // Validate request
-    validate_config_request(&req)?;
+    req.filters = normalize_request_filters(req.filters).map_err(validation_error)?;
+    validate_config_request(&req).map_err(validation_error)?;
 
     // Feature 2 (PT-7): same normalization the alerts path uses, so a tag
     // means the same thing on both. Kept typed, not stringified, so the API
@@ -578,6 +578,10 @@ pub async fn update_config(
     // Remember the pre-update threshold so we can detect an actual change below and, if so,
     // recompute the trained model's cutoff in place without a retrain.
     let previous_threshold = existing.threshold;
+    let previous = existing.clone();
+    // Only a field that could plausibly fix a failure clears the backoff, so that a bulk
+    // folder move or tag edit cannot reset the counter on dozens of configs at once.
+    let mut retryable_change = false;
 
     let mut active_model = existing.into_active_model();
 
@@ -631,21 +635,29 @@ pub async fn update_config(
             }
             _ => {}
         }
+        retryable_change |= previous.query_mode != query_mode;
         active_model.query_mode = Set(query_mode);
     }
-    if let Some(filters) = req.filters {
+    if let Some(filters) = normalize_request_filters(req.filters).map_err(validation_error)? {
+        // Compared as rows so NULL, `{}` and `[]` all read as the same "no filters".
+        let rows = |v: Option<&serde_json::Value>| {
+            v.and_then(|v| v.as_array()).cloned().unwrap_or_default()
+        };
+        retryable_change |= rows(previous.filters.as_ref()) != rows(Some(&filters));
         active_model.filters = Set(Some(filters));
     }
     if let Some(custom_sql) = req.custom_sql {
+        retryable_change |= previous.custom_sql.as_deref() != Some(custom_sql.as_str());
         active_model.custom_sql = Set(Some(custom_sql));
     }
     if let Some(detection_function) = req.detection_function {
-        active_model.detection_function = Set(combine_detection_fn(
-            &detection_function,
-            req.detection_function_field.as_deref(),
-        ));
+        let combined =
+            combine_detection_fn(&detection_function, req.detection_function_field.as_deref());
+        retryable_change |= previous.detection_function != combined;
+        active_model.detection_function = Set(combined);
     }
     if let Some(histogram_interval) = req.histogram_interval {
+        retryable_change |= previous.histogram_interval != histogram_interval;
         active_model.histogram_interval = Set(histogram_interval);
     }
     if let Some(schedule_interval) = req.schedule_interval {
@@ -665,7 +677,9 @@ pub async fn update_config(
         }
     }
     if let Some(training_window_days) = req.training_window_days {
-        active_model.training_window_days = Set(training_window_days.max(1));
+        let clamped = training_window_days.max(1);
+        retryable_change |= previous.training_window_days != clamped;
+        active_model.training_window_days = Set(clamped);
     }
     if let Some(retrain_interval_days) = req.retrain_interval_days {
         active_model.retrain_interval_days = Set(retrain_interval_days);
@@ -704,6 +718,11 @@ pub async fn update_config(
         } else {
             Some(serde_json::json!(normalized))
         });
+    }
+
+    // A repaired config must not sit out the inherited backoff before it is retried.
+    if retryable_change {
+        active_model.retries = Set(0);
     }
 
     active_model.updated_at = Set(Utc::now().timestamp_micros());
@@ -1116,6 +1135,8 @@ pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
     let mut active = config.into_active_model();
     // Status 0 = Waiting — back to the queue so the user can re-trigger training.
     active.status = Set(0i32);
+    // The scheduler's queued fast-path needs retries == 0, so without this it never re-queues.
+    active.retries = Set(0);
     active.training_started_at = Set(None);
     active.last_error = Set(Some("Training cancelled by user.".to_string()));
     active.updated_at = Set(Utc::now().timestamp_micros());
@@ -1426,6 +1447,42 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
     Ok(())
 }
 
+/// Marks a rejected request with the prefix the API layer matches to answer 400, not 500.
+fn validation_error(e: anyhow::Error) -> anyhow::Error {
+    anyhow::anyhow!("validation error: {e}")
+}
+
+/// Collapses the `filters` shapes that mean "no filters" to `[]`; rejects any other non-array.
+fn normalize_request_filters(
+    filters: Option<serde_json::Value>,
+) -> Result<Option<serde_json::Value>> {
+    let Some(value) = filters else {
+        return Ok(None);
+    };
+    match value {
+        serde_json::Value::Array(_) => Ok(Some(value)),
+        serde_json::Value::Null => Ok(Some(serde_json::json!([]))),
+        serde_json::Value::Object(ref map) if map.is_empty() => Ok(Some(serde_json::json!([]))),
+        // The value itself is never echoed back: it is caller-controlled JSON.
+        other => anyhow::bail!(
+            "filters must be a JSON array, got a JSON {}",
+            json_type(&other)
+        ),
+    }
+}
+
+/// Names a JSON value's type for an error message, without disclosing the value.
+fn json_type(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "boolean",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
+    }
+}
+
 /// Combine a detection function name and optional field into the DB storage form.
 /// E.g. ("avg", Some("cpu_millicores")) → "avg(cpu_millicores)"
 ///      ("count", _) → "count(*)"
@@ -1462,12 +1519,9 @@ pub fn config_to_training_config(
 ) -> Result<o2_enterprise::enterprise::anomaly_detection::types::AnomalyConfig> {
     use o2_enterprise::enterprise::anomaly_detection::types::AnomalyConfig;
 
-    // Parse filters if present
-    let filters = if let Some(filters_json) = &config.filters {
-        serde_json::from_value(filters_json.clone())?
-    } else {
-        Vec::new()
-    };
+    let filters = o2_enterprise::enterprise::anomaly_detection::types::parse_filters(
+        config.filters.as_ref(),
+    )?;
 
     Ok(AnomalyConfig {
         anomaly_id: config.anomaly_id.clone(),
@@ -2106,6 +2160,69 @@ mod tests {
     #[test]
     fn test_validate_valid_filters_mode() {
         assert!(validate_config_request(&make_valid_filters_req()).is_ok());
+    }
+
+    /// The HTTP layer selects 400 by matching this marker, so both must move together.
+    #[test]
+    fn test_validation_error_is_recognisable_to_the_http_layer() {
+        let err = normalize_request_filters(Some(serde_json::json!({"action": "login"})))
+            .map_err(validation_error)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("validation error"), "unexpected error: {err}");
+        assert!(err.contains("must be a JSON array"), "detail lost: {err}");
+    }
+
+    /// A row already holding `{}` would otherwise 400 the moment anything re-saved it.
+    #[test]
+    fn test_normalize_request_filters_collapses_the_no_filter_shapes() {
+        let empty = serde_json::json!([]);
+        assert_eq!(
+            normalize_request_filters(Some(serde_json::json!({}))).unwrap(),
+            Some(empty.clone())
+        );
+        assert_eq!(
+            normalize_request_filters(Some(serde_json::Value::Null)).unwrap(),
+            Some(empty)
+        );
+        assert_eq!(normalize_request_filters(None).unwrap(), None);
+    }
+
+    #[test]
+    fn test_normalize_request_filters_passes_arrays_through_untouched() {
+        for value in [
+            serde_json::json!([]),
+            serde_json::json!([{"field": "action", "operator": "=", "value": "login"}]),
+        ] {
+            assert_eq!(
+                normalize_request_filters(Some(value.clone())).unwrap(),
+                Some(value)
+            );
+        }
+    }
+
+    /// Refused rather than dropped, and the caller-controlled value is never echoed back.
+    #[test]
+    fn test_normalize_request_filters_rejects_any_other_shape() {
+        let err = normalize_request_filters(Some(serde_json::json!({"action": "login"})))
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("a JSON object"), "unexpected error: {err}");
+        assert!(!err.contains("login"), "error echoed the value: {err}");
+
+        assert!(normalize_request_filters(Some(serde_json::json!("a = b"))).is_err());
+        assert!(normalize_request_filters(Some(serde_json::json!(7))).is_err());
+        assert!(normalize_request_filters(Some(serde_json::json!(true))).is_err());
+    }
+
+    #[test]
+    fn test_json_type_names_every_variant() {
+        assert_eq!(json_type(&serde_json::Value::Null), "null");
+        assert_eq!(json_type(&serde_json::json!(true)), "boolean");
+        assert_eq!(json_type(&serde_json::json!(1)), "number");
+        assert_eq!(json_type(&serde_json::json!("s")), "string");
+        assert_eq!(json_type(&serde_json::json!([])), "array");
+        assert_eq!(json_type(&serde_json::json!({})), "object");
     }
 
     #[test]

@@ -21,8 +21,8 @@
 //! `UPDATE … WHERE anomaly_id = ?` rather than silently updating 0 rows.
 
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
-    QueryOrder, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel,
+    JsonValue as Json, QueryFilter, QueryOrder, Set, TransactionTrait,
 };
 
 use crate::{
@@ -249,7 +249,7 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     active.name = Set(src.name);
     active.description = Set(src.description);
     active.query_mode = Set(src.query_mode);
-    active.filters = Set(src.filters);
+    active.filters = Set(normalize_filters(src.filters));
     active.custom_sql = Set(src.custom_sql);
     active.detection_function = Set(src.detection_function);
     active.histogram_interval = Set(src.histogram_interval);
@@ -279,8 +279,18 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     // created_at is NOT patched — it is set once at insert time and never changed.
 }
 
+/// Collapses the `filters` shapes that mean "no filters" to NULL, on every model-based write.
+fn normalize_filters(filters: Option<Json>) -> Option<Json> {
+    match filters {
+        Some(Json::Null) => None,
+        Some(Json::Object(ref map)) if map.is_empty() => None,
+        other => other,
+    }
+}
+
 /// Converts a `Model` into a fully-`Set` `ActiveModel` for inserts.
-fn into_active_model(m: Model) -> anomaly_detection_config::ActiveModel {
+fn into_active_model(mut m: Model) -> anomaly_detection_config::ActiveModel {
+    m.filters = normalize_filters(m.filters);
     // For inserts the PK must be Set (it is not auto-increment).
     // `into_active_model()` sets every field including PK as Set, which is
     // correct for INSERT — only UPDATE requires the PK to be Unchanged.
@@ -367,6 +377,54 @@ mod tests {
         patch_all_fields(&mut active, replacement);
         assert!(!active.enabled.unwrap());
         assert_eq!(active.status.unwrap(), 3);
+    }
+
+    #[test]
+    fn test_normalize_filters_collapses_the_no_filter_shapes() {
+        assert_eq!(normalize_filters(None), None);
+        assert_eq!(normalize_filters(Some(Json::Null)), None);
+        assert_eq!(normalize_filters(Some(serde_json::json!({}))), None);
+    }
+
+    #[test]
+    fn test_normalize_filters_leaves_every_other_value_alone() {
+        let empty_array = serde_json::json!([]);
+        assert_eq!(
+            normalize_filters(Some(empty_array.clone())),
+            Some(empty_array)
+        );
+        let rows = serde_json::json!([{"field": "a", "operator": "=", "value": "b"}]);
+        assert_eq!(normalize_filters(Some(rows.clone())), Some(rows));
+        // Not silently dropped: the read path must still reject it rather than widen the query.
+        let populated_object = serde_json::json!({"a": "b"});
+        assert_eq!(
+            normalize_filters(Some(populated_object.clone())),
+            Some(populated_object)
+        );
+    }
+
+    /// A legacy `{}` must not survive a clone or a super-cluster replication into a new row.
+    #[test]
+    fn test_into_active_model_normalizes_a_legacy_empty_object() {
+        let mut m = make_model("id", "org");
+        m.filters = Some(serde_json::json!({}));
+        let active = into_active_model(m);
+        assert_eq!(
+            active.filters.into_value(),
+            Some(sea_orm::Value::Json(None))
+        );
+    }
+
+    #[test]
+    fn test_patch_all_fields_normalizes_a_legacy_empty_object() {
+        let mut active = make_model("id", "org").into_active_model();
+        let mut src = make_model("id", "org");
+        src.filters = Some(serde_json::json!({}));
+        patch_all_fields(&mut active, src);
+        assert_eq!(
+            active.filters.into_value(),
+            Some(sea_orm::Value::Json(None))
+        );
     }
 
     #[test]
