@@ -87,7 +87,7 @@ BUILD_JOB_NAME="${BUILD_JOB_NAME-build_binary}"
 RUNTIME_READY_JOB_NAME="${RUNTIME_READY_JOB_NAME:-}"
 BUILD_DUR=null
 if [ -n "$BUILD_JOB_NAME" ]; then
-  BUILD_DUR=$(printf '%s' "$THIS_JOBS" | jq --arg job_name "$BUILD_JOB_NAME" "[.jobs[]|select(.name==\$job_name)]|.[0]|if . then ($JOBDUR) else null end" 2>/dev/null)
+  BUILD_DUR=$(printf '%s' "$THIS_JOBS" | jq --arg job_name "$BUILD_JOB_NAME" "[.jobs[]|select(.name==\$job_name and .conclusion==\"success\")]|.[0]|if . then ($JOBDUR) else null end" 2>/dev/null)
   [ -n "$BUILD_DUR" ] || BUILD_DUR=null
 fi
 RUNTIME_READY_DUR=null

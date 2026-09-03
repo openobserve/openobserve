@@ -93,82 +93,11 @@ jobs:
             echo "should_run=true" >> "$GITHUB_OUTPUT"
           fi
 
-  # Reuse an exact-SHA runtime produced by the regular Playwright workflow or
-  # an earlier regression attempt. A miss selects this run as the producer.
-  resolve_binary:
-    timeout-minutes: 5
-    name: resolve_binary
-    needs: [check_main_changed]
-    if: ${{ needs.check_main_changed.outputs.should_run == 'true' }}
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-    outputs:
-      reuse: ${{ steps.resolve.outputs.reuse }}
-      run_id: ${{ steps.resolve.outputs.run_id }}
-      binary_artifact_name: ${{ steps.resolve.outputs.binary_artifact_name }}
-      frontend_artifact_name: ${{ steps.resolve.outputs.frontend_artifact_name }}
-    steps:
-      - name: Find exact-SHA Playwright runtime
-        id: resolve
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SOURCE_SHA: ${{ github.sha }}
-          CURRENT_RUN_ID: ${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          binary_artifact="release-ci-binary-${SOURCE_SHA}"
-          frontend_artifact="frontend-dist-${SOURCE_SHA}"
-          selected_run_id="$CURRENT_RUN_ID"
-          reuse=false
-
-          for workflow in playwright.yml playwright_regression.yml; do
-            run_ids="$(
-              gh api --method GET \
-                "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs?head_sha=${SOURCE_SHA}&per_page=100" \
-                --jq '.workflow_runs | sort_by(.created_at) | reverse | .[].id' \
-                2>/dev/null || true
-            )"
-            while IFS= read -r run_id; do
-              [ -n "$run_id" ] || continue
-              artifact_names="$(
-                gh api --method GET \
-                  "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" \
-                  --jq '.artifacts[] | select(.expired == false) | .name' \
-                  2>/dev/null || true
-              )"
-              if grep -Fxq "$binary_artifact" <<< "$artifact_names" &&
-                 grep -Fxq "$frontend_artifact" <<< "$artifact_names"; then
-                selected_run_id="$run_id"
-                reuse=true
-                break 2
-              fi
-            done <<< "$run_ids"
-          done
-
-          {
-            echo "reuse=$reuse"
-            echo "run_id=$selected_run_id"
-            echo "binary_artifact_name=$binary_artifact"
-            echo "frontend_artifact_name=$frontend_artifact"
-          } >> "$GITHUB_OUTPUT"
-          if [ "$reuse" = "true" ]; then
-            echo "Reusing exact-SHA Playwright runtime from run $selected_run_id"
-          else
-            echo "No reusable exact-SHA runtime found; regression build_binary will run"
-          fi
-
   build_binary:
     timeout-minutes: 45
     name: build_binary
-    needs: [check_main_changed, resolve_binary]
-    if: >-
-      always() &&
-      needs.check_main_changed.result == 'success' &&
-      needs.check_main_changed.outputs.should_run == 'true' &&
-      needs.resolve_binary.result == 'success' &&
-      needs.resolve_binary.outputs.reuse != 'true'
+    needs: [check_main_changed]
+    if: ${{ needs.check_main_changed.outputs.should_run == 'true' }}
     runs-on:
       labels: ubicloud-standard-16
     permissions:
@@ -224,14 +153,14 @@ jobs:
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-ci-binary-${{ github.sha }}
+          name: release-ci-binary
           path: target/x86_64-unknown-linux-gnu/release-ci/openobserve
           retention-days: 1
 
       - name: Upload frontend artifact
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-dist-${{ github.sha }}
+          name: frontend-dist
           path: /tmp/dist
           retention-days: 1
           if-no-files-found: error
@@ -261,18 +190,11 @@ jobs:
   ui_integration_tests:
     timeout-minutes: 45
     name: e2e / ${{ matrix.testfolder }}
-    needs: [resolve_binary, build_binary, generate_matrix]
-    if: >-
-      always() &&
-      !cancelled() &&
-      needs.resolve_binary.result == 'success' &&
-      needs.generate_matrix.result == 'success' &&
-      (needs.resolve_binary.outputs.reuse == 'true' || needs.build_binary.result == 'success')
+    needs: [build_binary, generate_matrix]
     runs-on:
       labels: eks-openobserve-standard-8
     permissions:
       contents: read
-      actions: read
     strategy:
       fail-fast: false
       # Matrix from tests/ui-testing/ci-matrix/ci_matrix_regression.json (single source of
@@ -293,20 +215,14 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@v5
         with:
-          name: ${{ needs.resolve_binary.outputs.binary_artifact_name }}
+          name: release-ci-binary
           path: release-ci-binary
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: ${{ needs.resolve_binary.outputs.run_id }}
 
       - name: Download frontend artifact
         uses: actions/download-artifact@v5
         with:
-          name: ${{ needs.resolve_binary.outputs.frontend_artifact_name }}
+          name: frontend-dist
           path: /tmp/dist
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: ${{ needs.resolve_binary.outputs.run_id }}
 
       - name: Start OpenObserve
         run: chmod +x ./release-ci-binary/openobserve && ./release-ci-binary/openobserve > o2.log 2>&1 &
@@ -571,8 +487,8 @@ jobs:
   report_openobserve:
     timeout-minutes: 10
     name: Report to OpenObserve
-    needs: [resolve_binary, build_binary, ui_integration_tests, merge_reports]
-    if: ${{ always() && !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
+    needs: [build_binary, ui_integration_tests, merge_reports]
+    if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
       labels: eks-openobserve-standard-4
     permissions:
@@ -590,7 +506,7 @@ jobs:
           O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
           O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
-          BUILD_RESULT: ${{ needs.resolve_binary.outputs.reuse == 'true' && 'success' || needs.build_binary.result }}
+          BUILD_RESULT: ${{ needs.build_binary.result }}
           UI_RESULT: ${{ needs.ui_integration_tests.result }}
           MERGE_RESULT: ${{ needs.merge_reports.result }}
           MERGE_STATS: ${{ needs.merge_reports.outputs.stats }}
@@ -694,8 +610,7 @@ jobs:
                 finished_at: (\$done | map(.completed_at) | max),
                 duration_sec: ((\$done | map(.completed_at|fromdateiso8601) | max) - (\$done | map(.started_at|fromdateiso8601) | min)),
                 runner_seconds: ([ \$done[] | ($dur) ] | add),
-                build_duration_sec: ( [ \$j[] | select(.name==\"build_binary\" and .conclusion==\"success\") ] | .[0] | if . then ($dur) else null end ),
-                runtime_ready_duration_sec: ( [ \$j[] | select(.name==\"resolve_binary\") ] | .[0] | if . then ($dur) else null end ),
+                build_duration_sec: ( [ \$j[] | select(.name==\"build_binary\") ] | .[0] | if . then ($dur) else null end ),
                 shards_total: ([ \$j[] | select(.name|startswith(\"e2e /\")) ] | length),
                 shards_passed: ([ \$j[] | select((.name|startswith(\"e2e /\")) and .conclusion==\"success\") ] | length),
                 shards_failed: ([ \$j[] | select((.name|startswith(\"e2e /\")) and .conclusion==\"failure\") ] | length),
@@ -759,23 +674,17 @@ jobs:
     runs-on:
       labels: eks-openobserve-standard-4
     permissions: {}
-    needs: [check_main_changed, resolve_binary, build_binary, ui_integration_tests, merge_reports]
+    needs: [build_binary, ui_integration_tests, merge_reports]
     if: always()
     steps:
       - name: Check test results
         run: |
-          RUNTIME_OK=false
+          BUILD_OK=false
           UI_OK=false
           MERGE_OK=false
 
-          if [ "${{ needs.check_main_changed.outputs.should_run }}" != "true" ]; then
-            echo "main unchanged since the previous scheduled run — regression skipped"
-            exit 0
-          fi
-
-          if [ "${{ needs.resolve_binary.result }}" == "success" ] &&
-             { [ "${{ needs.resolve_binary.outputs.reuse }}" == "true" ] || [ "${{ needs.build_binary.result }}" == "success" ]; }; then
-            RUNTIME_OK=true
+          if [ "${{ needs.build_binary.result }}" == "success" ] || [ "${{ needs.build_binary.result }}" == "skipped" ]; then
+            BUILD_OK=true
           fi
 
           if [ "${{ needs.ui_integration_tests.result }}" == "success" ] || [ "${{ needs.ui_integration_tests.result }}" == "skipped" ]; then
@@ -788,12 +697,11 @@ jobs:
             MERGE_OK=true
           fi
 
-          if [ "$RUNTIME_OK" == "true" ] && [ "$UI_OK" == "true" ] && [ "$MERGE_OK" == "true" ]; then
+          if [ "$BUILD_OK" == "true" ] && [ "$UI_OK" == "true" ] && [ "$MERGE_OK" == "true" ]; then
             echo "All regression tests completed successfully"
             exit 0
           else
             echo "Regression tests failed:"
-            echo "  resolve_binary: ${{ needs.resolve_binary.result }} (reuse=${{ needs.resolve_binary.outputs.reuse }})"
             echo "  build_binary: ${{ needs.build_binary.result }}"
             echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
             echo "  merge_reports: ${{ needs.merge_reports.result }}"

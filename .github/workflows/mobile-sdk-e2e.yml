@@ -349,12 +349,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/github-auth
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: mobile-e2e-linux-oo-v2
-          # PR merge refs must not create multi-GB branch-scoped entries. Only
-          # trusted non-PR runs on main may refresh this fallback cache.
-          save-if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
       - name: Install Protoc
         run: bash ./.github/protoc.sh
       - uses: actions/setup-node@v4
@@ -403,10 +397,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/github-auth
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: mobile-e2e-macos-oo-v2
-          save-if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
       - name: Install Protoc (macOS)
         run: brew install protobuf || true
       - uses: actions/setup-node@v4
