@@ -22,9 +22,12 @@ use std::{hash::Hasher, sync::Arc};
 
 use config::{
     TIMESTAMP_COL_NAME,
-    meta::promql::{
-        HASH_LABEL, VALUE_LABEL,
-        value::{Label, Labels, Sample},
+    meta::{
+        plan::generate_plan_string,
+        promql::{
+            HASH_LABEL, VALUE_LABEL,
+            value::{Label, Labels, Sample},
+        },
     },
     utils::hash::gxhash,
 };
@@ -256,11 +259,16 @@ pub(crate) async fn build_shard_inputs(
             .sort(vec![col(HASH_LABEL).sort(true, false)])?;
         let task_ctx = Arc::new(shard_df.task_ctx());
         let plan = shard_df.create_physical_plan().await?;
+
+        // the shards only differ in their hash interval, so one plan speaks for all
+        if shard == 0 && config::get_config().common.print_key_sql {
+            log::info!("{}", generate_plan_string(trace_id, plan.as_ref()));
+        }
+
         let Some(streams) = shard_streams(plan.clone(), task_ctx)? else {
             log::info!(
                 "[trace_id: {trace_id}] [PromQL] streaming fused agg fallback: shard {shard} plan cannot stream in order:\n{}",
-                datafusion::physical_plan::display::DisplayableExecutionPlan::new(plan.as_ref())
-                    .indent(true)
+                generate_plan_string(trace_id, plan.as_ref())
             );
             return Ok(None);
         };
