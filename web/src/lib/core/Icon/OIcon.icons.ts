@@ -150,6 +150,7 @@ import Group from "~icons/material-symbols/group-outline";
 import HourglassEmpty from "~icons/material-symbols/hourglass-empty";
 import Label from "~icons/material-symbols/label-outline";
 import Layers from "~icons/material-symbols/layers-outline";
+import Public from "~icons/material-symbols/public";
 import Mail from "~icons/material-symbols/mail-outline";
 import ManageSearch from "~icons/material-symbols/manage-search";
 import Merge from "~icons/material-symbols/merge";
@@ -526,6 +527,7 @@ export const iconRegistry = {
   "hourglass-empty": HourglassEmpty,
   label: Label,
   layers: Layers,
+  public: Public,
   mail: Mail,
   "manage-search": ManageSearch,
   merge: Merge,
