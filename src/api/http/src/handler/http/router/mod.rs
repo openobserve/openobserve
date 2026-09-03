@@ -2104,12 +2104,59 @@ mod tests {
         let _ = service_routes();
     }
 
-    /// The lockout routes answer to the same rule as the policy: the state they expose is its
-    /// enforcement record, and the counters would tell the user they describe how to pace attempts
-    /// under the threshold. Both methods, because a read that leaks and a write that unlocks are
-    /// each worth refusing on their own.
+    /// A caller who administers neither the named org nor the instance gets nothing from either
+    /// method — a read that leaks the counters and a write that unlocks the account are each worth
+    /// refusing on their own. Which administrators *are* admitted, and over whom, is unit-tested
+    /// against `validate_lockout_admin` in the handler crate.
+    ///
+    /// The caller is seeded as a real member of both organizations, holding a role that is not an
+    /// administrator's. An unseeded caller would be refused for having no row to read a role from,
+    /// which would pass this test against a check that admitted every user it could find.
     #[tokio::test]
-    async fn lockout_routes_require_a_meta_admin() {
+    async fn lockout_routes_refuse_a_caller_who_administers_nothing() {
+        use common::infra::config::{ORG_USERS, USERS};
+        use config::meta::user::{UserRole, UserType};
+
+        let caller = "viewer@lockout-routes.test";
+        let target = "target@example.com";
+        USERS.insert(
+            caller.to_string(),
+            infra::table::users::UserRecord {
+                email: caller.to_string(),
+                first_name: "V".to_string(),
+                last_name: "R".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root: false,
+                password_ext: None,
+                user_type: UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        // The target is seeded as a member too, so the caller's role is the ONLY thing left that
+        // can refuse these requests. Without it a check that admitted the caller would
+        // still answer 403 — for the target not being a member — and this test could not
+        // tell the two apart.
+        for (org, email) in [("acme", caller), ("_meta", caller), ("acme", target)] {
+            ORG_USERS.insert(
+                format!("{org}/{email}"),
+                infra::table::org_users::OrgUserRecord {
+                    role: UserRole::Viewer,
+                    token: "token".to_string(),
+                    rum_token: None,
+                    org_id: org.to_string(),
+                    email: email.to_string(),
+                    created_at: 0,
+                    allow_static_token: true,
+                },
+            );
+        }
+
         let app = Router::new().route(
             "/{org_id}/settings/password_policy/lockouts/{email_id}",
             get(password_policy::lockout::get_lockout)
@@ -2120,12 +2167,12 @@ mod tests {
             (
                 Method::GET,
                 "/acme/settings/password_policy/lockouts/target@example.com",
-                "read outside the meta org",
+                "read on an org the caller does not administer",
             ),
             (
                 Method::DELETE,
                 "/acme/settings/password_policy/lockouts/target@example.com",
-                "unlock outside the meta org",
+                "unlock on an org the caller does not administer",
             ),
             (
                 Method::GET,
@@ -2144,18 +2191,22 @@ mod tests {
                     Request::builder()
                         .method(method)
                         .uri(uri)
-                        // Not present in ORG_USERS, so the role lookup finds nothing to admit.
-                        .header("user_id", "not-a-meta-admin@example.invalid")
+                        .header("user_id", caller)
                         .body(Body::empty())
                         .unwrap(),
                 )
                 .await
                 .unwrap();
 
-            // Returns before touching the database, which is what makes this assertable here.
+            // Answered from the caches above, so this never reaches the database.
             assert_eq!(refused.status(), StatusCode::FORBIDDEN, "{case}");
         }
-    } 
+
+        USERS.remove(caller);
+        for (org, email) in [("acme", caller), ("_meta", caller), ("acme", target)] {
+            ORG_USERS.remove(&format!("{org}/{email}"));
+        }
+    }
 
     #[tokio::test]
     async fn password_complexity_route_is_readable_by_any_org() {

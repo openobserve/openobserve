@@ -1424,8 +1424,8 @@ fn _extract_full_url(req: &Request) -> String {
 
 #[cfg(test)]
 mod tests {
-    use config::meta::password_policy::{LockoutPolicy, PasswordPolicy};
     use chrono::Utc;
+    use config::meta::password_policy::{LockoutPolicy, PasswordPolicy};
     use infra::{
         db as infra_db,
         db::{get_orm_client_ro, get_orm_client_rw},
