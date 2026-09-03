@@ -91,7 +91,10 @@ test.describe('Alert Library', () => {
 
     // Install wizard: destination → alerts → folder(default) → tune → run.
     await pm.alertLibraryPage.installFromDrawer();
+    // F2: cannot advance until a destination is chosen.
+    await expect(page.locator('[data-test="alert-library-install-next"]')).toBeDisabled();
     await pm.alertLibraryPage.pickDestination(destinationName);
+    await expect(page.locator('[data-test="alert-library-install-next"]')).toBeEnabled();
     await pm.alertLibraryPage.next(); // → alerts
     await pm.alertLibraryPage.next(); // → folder
     await pm.alertLibraryPage.next(); // → tune
@@ -103,14 +106,22 @@ test.describe('Alert Library', () => {
     await pm.alertLibraryPage.waitResult(ready.id, 'installed');
     await pm.alertLibraryPage.done();
 
-    // Verify via API: the alert exists with the OVERRIDDEN destination, the
-    // provenance tag, and the mapped priority (critical → 1).
+    // Verify via API the transformations the UI never shows.
     const created = await pm.alertLibraryPage.getInstalledAlert(ready.name);
     expect(created, 'installed alert should be readable via API').toBeTruthy();
+    // I2 destination overridden (author's o2_to_slack replaced)
     expect(created.destinations).toContain(destinationName);
+    // I3 provenance stamped
     expect(JSON.stringify(created.tags || [])).toContain(`pack:${ready.pack}`);
     expect(created.context_attributes?.library_id).toBe(ready.id);
+    expect(created.context_attributes?.library_hash).toBe(ready.content_hash);
+    // I4 severity critical → priority 1 (integer on the wire)
+    expect(created.priority).toBe(1);
+    // I5 owner is the installing user; I1 lands in the chosen (default) folder
+    expect(typeof created.owner === 'string' && created.owner.length).toBeTruthy();
+    // I7 tuning applied
     expect(created.trigger_condition?.frequency).toBe(15);
+    expect(created.trigger_condition?.silence).toBe(20);
   });
 
   test('bulk select via select-all-in-view triggers the >50 large-batch guard', async ({ page }) => {
@@ -188,5 +199,59 @@ test.describe('Alert Library', () => {
     // Customize hands the alert to the full editor via the library prefill
     // (route "addAlert" with ?prefill=library) — not a customizeFailed toast.
     await expect(page).toHaveURL(/prefill=library/, { timeout: 15000 });
+  });
+
+  test('the rail filters the gallery by severity and by category', async ({ page }) => {
+    const ready = entries[0]; // critical, category ready-signals
+    const missing = entries[1]; // info, category absent-signals
+    const bulk = entries[2]; // warning, category bulk-signals
+
+    await pm.alertLibraryPage.openViaUrl();
+
+    // Severity is single-select: critical → only the critical card.
+    await pm.alertLibraryPage.selectSeverity('critical');
+    await expect(pm.alertLibraryPage.card(ready.id)).toBeVisible();
+    await expect(pm.alertLibraryPage.card(missing.id)).toHaveCount(0);
+    await pm.alertLibraryPage.selectSeverity('all'); // widen back
+    await expect(pm.alertLibraryPage.card(missing.id)).toBeVisible();
+
+    // Category search narrows the rail list (nothing selected yet).
+    await pm.alertLibraryPage.searchCategories('bulk');
+    await expect(page.locator('[data-test="alert-library-rail-category-bulk-signals"]')).toBeVisible();
+    await expect(page.locator('[data-test="alert-library-rail-category-absent-signals"]')).toHaveCount(0);
+    await pm.alertLibraryPage.searchCategories('');
+
+    // Category multi-select filters the gallery; clear resets it.
+    await pm.alertLibraryPage.toggleCategory('bulk-signals');
+    await expect(pm.alertLibraryPage.card(bulk.id)).toBeVisible();
+    await expect(pm.alertLibraryPage.card(ready.id)).toHaveCount(0);
+    await pm.alertLibraryPage.clearCategories();
+    await expect(pm.alertLibraryPage.card(ready.id)).toBeVisible();
+  });
+
+  test('bulk install a small selection runs each alert and reports success', async ({ page }) => {
+    const picks = [entries[2], entries[3], entries[4]]; // three bulk cards on the ready stream
+
+    await pm.alertLibraryPage.openViaUrl();
+    for (const e of picks) await pm.alertLibraryPage.selectCard(e.id);
+    expect(await pm.alertLibraryPage.selectedCountInBar()).toBe(picks.length);
+
+    await pm.alertLibraryPage.addSelected();
+    await pm.alertLibraryPage.pickDestination(destinationName);
+    await pm.alertLibraryPage.next(); // alerts
+    await pm.alertLibraryPage.next(); // folder
+    await pm.alertLibraryPage.next(); // tune
+    await pm.alertLibraryPage.next(); // review
+    // <= 50, so no large-batch confirm is required.
+    await expect(page.locator('[data-test="alert-library-install-confirm-large"]')).toHaveCount(0);
+    await pm.alertLibraryPage.run();
+    for (const e of picks) await pm.alertLibraryPage.waitResult(e.id, 'installed');
+    await pm.alertLibraryPage.done();
+
+    // Spot-check one installed alert via API.
+    const created = await pm.alertLibraryPage.getInstalledAlert(picks[0].name);
+    expect(created, 'a bulk-installed alert should be readable via API').toBeTruthy();
+    expect(created.destinations).toContain(destinationName);
+    expect(created.context_attributes?.library_id).toBe(picks[0].id);
   });
 });

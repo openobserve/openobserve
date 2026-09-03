@@ -114,6 +114,19 @@ export class AlertLibraryPage {
     await this.page.locator(`[data-test="alert-library-rail-category-${id}"]`).click();
   }
 
+  async searchCategories(text) {
+    const root = this.page.locator(this.l.railSearchCategories);
+    await root.waitFor({ state: 'attached', timeout: 10000 });
+    const inner = root.locator('input');
+    const target = (await inner.count()) ? inner.first() : root;
+    await target.fill(text, { force: true });
+    await this.page.waitForTimeout(300);
+  }
+
+  async clearCategories() {
+    await this.page.locator(this.l.railClearCategories).click();
+  }
+
   async cardCount() {
     return this.page.locator('[data-test^="alert-library-card-"][data-selected]').count();
   }
