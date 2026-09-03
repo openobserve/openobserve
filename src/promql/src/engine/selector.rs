@@ -18,15 +18,8 @@
 
 use std::{sync::Arc, time::Duration};
 
-use config::meta::{
-    promql::{NAME_LABEL, value::*},
-    search::ScanStats,
-};
-use datafusion::{
-    arrow::datatypes::Schema,
-    error::{DataFusionError, Result},
-    prelude::SessionContext,
-};
+use config::meta::promql::{NAME_LABEL, value::*};
+use datafusion::error::{DataFusionError, Result};
 use futures::future::{pending, try_join_all};
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
@@ -43,9 +36,6 @@ use crate::{
     micros,
     promql::rewrite::remove_filter_all,
 };
-
-/// One context per selected schema with its scan stats and whether the matchers still apply.
-type SelectorContexts = Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>;
 
 impl Engine {
     /// Instant vector selector --- select a single sample at each evaluation
@@ -81,7 +71,7 @@ impl Engine {
                 .retain(|mat| mat.name != NAME_LABEL);
         }
 
-        let data = self.selector_load_data_owned(&selector, None, None).await?;
+        let data = self.selector_load_data_owned(&selector, None).await?;
 
         let metrics_cache = match data.get_range_values() {
             Some(v) => v,
@@ -160,12 +150,11 @@ impl Engine {
     /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
     ///
     /// MatrixSelector is a special case of VectorSelector that returns a matrix
-    /// of samples. `ctxs` reuses contexts already created for this selector.
+    /// of samples.
     pub(super) async fn eval_matrix_selector(
         &mut self,
         selector: &VectorSelector,
         range: Duration,
-        ctxs: Option<SelectorContexts>,
     ) -> Result<Vec<RangeValue>> {
         if self.result_type.is_none() {
             self.result_type = Some("matrix".to_string());
@@ -191,7 +180,7 @@ impl Engine {
         }
 
         let data = self
-            .selector_load_data_owned(&selector, Some(range), ctxs)
+            .selector_load_data_owned(&selector, Some(range))
             .await?;
 
         let values = match data.get_range_values() {
@@ -234,9 +223,8 @@ impl Engine {
         &mut self,
         selector: &VectorSelector,
         range: Option<Duration>,
-        ctxs: Option<SelectorContexts>,
     ) -> Result<Value> {
-        let mut metric_values = match self.selector_load_data_inner(selector, range, ctxs).await {
+        let mut metric_values = match self.selector_load_data_inner(selector, range).await {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -279,7 +267,6 @@ impl Engine {
         &self,
         selector: &VectorSelector,
         range: Option<Duration>,
-        ctxs: Option<SelectorContexts>,
     ) -> Result<Vec<RangeValue>> {
         let start_time = std::time::Instant::now();
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
@@ -335,22 +322,18 @@ impl Engine {
             drop(super_tx);
         }
 
-        let ctxs = match ctxs {
-            Some(ctxs) => ctxs,
-            None => {
-                self.ctx
-                    .table_provider
-                    .create_context(
-                        &self.ctx.query_ctx.org_id,
-                        table_name,
-                        (start, end),
-                        selector.matchers.clone(),
-                        self.label_selector.clone(),
-                        &mut filters,
-                    )
-                    .await?
-            }
-        };
+        let ctxs = self
+            .ctx
+            .table_provider
+            .create_context(
+                &self.ctx.query_ctx.org_id,
+                table_name,
+                (start, end),
+                selector.matchers.clone(),
+                self.label_selector.clone(),
+                &mut filters,
+            )
+            .await?;
 
         // check if we need to load data from local cluster
         #[cfg(feature = "enterprise")]
@@ -528,8 +511,7 @@ impl Engine {
     /// Attempts the streaming fused path: series arrive whole from
     /// `(__hash__, _timestamp)` ordered scans and fold straight into the
     /// aggregation, so the sample matrix is never materialized. `None` means
-    /// the query shape requires the materializing path; once a context exists
-    /// the materializing fold runs on it here instead of creating another.
+    /// the query shape or the storage layout requires the materializing path.
     pub(super) async fn try_streaming_fused_agg(
         &mut self,
         matrix_selector: &MatrixSelector,
@@ -577,7 +559,6 @@ impl Engine {
         let mut label_selector = self.label_selector.clone();
         label_selector.extend(self.ctx.label_selector.iter().cloned());
 
-        let timeout = query_ctx.timeout;
         let ctxs = self
             .ctx
             .table_provider
@@ -591,49 +572,35 @@ impl Engine {
             )
             .await?;
         // a second context would split series and evaluate rate windows on partial data
-        if let [(ctx, schema, scan_stats, keep_filters)] = ctxs.as_slice() {
-            let matchers = if *keep_filters {
-                selector.matchers.clone()
-            } else {
-                Matchers::empty()
-            };
-            let run = fused::stream::fused_agg(
-                ctx,
-                schema,
-                fused::stream::StreamingSelector {
-                    table_name: &table_name,
-                    matchers: &matchers,
-                    offset,
-                },
-                fused::stream::FusedShape {
-                    op,
-                    func: func.clone(),
-                    range,
-                },
-                modifier,
-                &self.eval_ctx,
-            );
-            if let Some(value) = self.run_cancellable(run, timeout).await? {
-                self.ctx.scan_stats.write().await.add(scan_stats);
-                if self.result_type.is_none() {
-                    self.result_type = Some("matrix".to_string());
-                }
-                return Ok(Some(value));
-            }
+        if ctxs.len() != 1 {
+            return Ok(None);
+        }
+        let (ctx, schema, scan_stats, keep_filters) = ctxs.into_iter().next().unwrap();
+        if !keep_filters {
+            selector.matchers = Matchers::empty();
         }
 
-        // the layout cannot stream: materialize on the contexts already created
-        let matrix = self
-            .eval_matrix_selector(&selector, range, Some(ctxs))
-            .await?;
-        let input = if matrix.is_empty() {
-            Value::None
-        } else {
-            Value::Matrix(matrix)
-        };
-        fused::matrix::fused_agg(modifier, input, func, op, &self.eval_ctx, timeout)
-            .await
-            .map(Some)
+        let run = fused::stream::fused_agg(
+            &ctx,
+            &schema,
+            fused::stream::StreamingSelector {
+                table_name: &table_name,
+                matchers: &selector.matchers,
+                offset,
+            },
+            fused::stream::FusedShape { op, func, range },
+            modifier,
+            &self.eval_ctx,
+        );
+        let value = self.run_cancellable(run, query_ctx.timeout).await?;
+        if value.is_some() {
+            let mut ctx_scan_stats = self.ctx.scan_stats.write().await;
+            ctx_scan_stats.add(&scan_stats);
+            if self.result_type.is_none() {
+                self.result_type = Some("matrix".to_string());
+            }
+        }
+        Ok(value)
     }
 
     /// Runs the streaming fold under the query timeout and the host's cancel signal; dropping
@@ -1001,7 +968,7 @@ mod tests {
         };
 
         let result = engine
-            .eval_matrix_selector(&selector, Duration::from_secs(300), None)
+            .eval_matrix_selector(&selector, Duration::from_secs(300))
             .await;
         assert!(result.is_ok());
         let values = result.unwrap();
@@ -1079,7 +1046,7 @@ mod tests {
         };
 
         let result = engine
-            .eval_matrix_selector(&selector, Duration::from_secs(300), None)
+            .eval_matrix_selector(&selector, Duration::from_secs(300))
             .await;
 
         assert!(result.is_err(), "expected an error, not a panic");
@@ -1123,7 +1090,7 @@ mod tests {
         };
 
         let result = engine
-            .eval_matrix_selector(&selector, Duration::from_secs(300), None)
+            .eval_matrix_selector(&selector, Duration::from_secs(300))
             .await;
         assert!(result.is_ok());
         let values = result.unwrap();
@@ -1148,19 +1115,20 @@ mod tests {
     }
 
     mod streaming_fused_agg {
-        use std::sync::atomic::{AtomicUsize, Ordering};
-
         use config::{
             TIMESTAMP_COL_NAME,
-            meta::promql::{HASH_LABEL, STREAMING_AGG_TABLE_SUFFIX, VALUE_LABEL},
+            meta::{
+                promql::{HASH_LABEL, STREAMING_AGG_TABLE_SUFFIX, VALUE_LABEL},
+                search::ScanStats,
+            },
         };
         use datafusion::{
             arrow::{
                 array::{Float64Array, Int64Array, RecordBatch, UInt64Array},
-                datatypes::{DataType, Field},
+                datatypes::{DataType, Field, Schema},
             },
             datasource::MemTable,
-            prelude::{SessionConfig, col},
+            prelude::{SessionConfig, SessionContext, col},
         };
         use hashbrown::HashSet;
         use tokio::sync::oneshot;
@@ -1170,18 +1138,16 @@ mod tests {
         const SECOND: i64 = 1_000_000;
         const BASE: i64 = 1_000 * SECOND;
 
-        /// Serves one prebuilt context, counts the requests, and can hand out an already-fired
-        /// cancel signal.
-        struct ContextProvider {
+        /// Serves one hash-sorted context and can hand out an already-fired cancel signal.
+        struct StreamingProvider {
             ctx: SessionContext,
-            calls: Arc<AtomicUsize>,
             canceled: bool,
             // a dropped sender reads as a cancel, so a live registration keeps it
             cancel: std::sync::Mutex<Option<oneshot::Sender<()>>>,
         }
 
         #[async_trait::async_trait]
-        impl crate::TableProvider for ContextProvider {
+        impl crate::TableProvider for StreamingProvider {
             async fn create_context(
                 &self,
                 _org_id: &str,
@@ -1190,8 +1156,7 @@ mod tests {
                 _matchers: Matchers,
                 _label_selector: HashSet<String>,
                 _filters: &mut [(String, Vec<String>)],
-            ) -> Result<SelectorContexts> {
-                self.calls.fetch_add(1, Ordering::SeqCst);
+            ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
                 Ok(vec![(
                     self.ctx.clone(),
                     metrics_schema(),
@@ -1222,8 +1187,8 @@ mod tests {
             ]))
         }
 
-        /// Two counters sampled every 20 s across the evaluation window.
-        fn metrics_table(sorted: bool) -> MemTable {
+        /// Two counters sampled every 20 s, registered as the hash-sorted table.
+        fn provider(canceled: bool) -> StreamingProvider {
             let rows: Vec<(i64, u64, f64)> = [7u64, u64::MAX / 2]
                 .into_iter()
                 .flat_map(|hash| {
@@ -1239,42 +1204,35 @@ mod tests {
                 ],
             )
             .unwrap();
-            let table = MemTable::try_new(metrics_schema(), vec![vec![batch]]).unwrap();
-            if sorted {
-                table.with_sort_order(vec![vec![
+            let table = MemTable::try_new(metrics_schema(), vec![vec![batch]])
+                .unwrap()
+                .with_sort_order(vec![vec![
                     col(HASH_LABEL).sort(true, false),
                     col(TIMESTAMP_COL_NAME).sort(true, false),
-                ]])
-            } else {
-                table
-            }
-        }
-
-        /// `m` always materializes; `m__hash_sorted` is registered only when `streams`.
-        fn provider(streams: bool, canceled: bool) -> (ContextProvider, Arc<AtomicUsize>) {
+                ]]);
             let mut config = SessionConfig::new().with_target_partitions(3);
             config.options_mut().optimizer.prefer_existing_sort = true;
             let ctx = SessionContext::new_with_config(config);
-            ctx.register_table("m", Arc::new(metrics_table(false)))
+            ctx.register_table(format!("m{STREAMING_AGG_TABLE_SUFFIX}"), Arc::new(table))
                 .unwrap();
-            if streams {
-                ctx.register_table(
-                    format!("m{STREAMING_AGG_TABLE_SUFFIX}"),
-                    Arc::new(metrics_table(true)),
-                )
-                .unwrap();
-            }
-            let calls = Arc::new(AtomicUsize::new(0));
-            let provider = ContextProvider {
+            StreamingProvider {
                 ctx,
-                calls: calls.clone(),
                 canceled,
                 cancel: Default::default(),
-            };
-            (provider, calls)
+            }
         }
 
-        async fn eval_sum_rate(provider: ContextProvider, timeout: u64) -> Result<Value> {
+        /// The flag defaults to off; flip it once for this process before the engine reads it.
+        fn enable_streaming() {
+            static ENABLE: std::sync::Once = std::sync::Once::new();
+            ENABLE.call_once(|| {
+                unsafe { std::env::set_var("ZO_FEATURE_METRICS_STREAMING_AGG_ENABLED", "true") };
+                config::refresh_config().expect("config refresh");
+            });
+        }
+
+        async fn eval_sum_rate(provider: StreamingProvider, timeout: u64) -> Result<Value> {
+            enable_streaming();
             let eval_ctx = EvalContext::new(
                 BASE + 60 * SECOND,
                 BASE + 180 * SECOND,
@@ -1294,36 +1252,20 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn test_fallback_reuses_the_streaming_context() {
-            let (provider, calls) = provider(false, false);
-
-            let value = eval_sum_rate(provider, 30).await.unwrap();
-            let Value::Matrix(matrix) = value else {
-                panic!("expected a matrix");
-            };
-            assert_eq!(matrix.len(), 1, "sum() folds both series into one");
-            assert_eq!(matrix[0].samples.len(), 3, "one sample per evaluation step");
-            assert_eq!(
-                calls.load(Ordering::SeqCst),
-                1,
-                "the materializing fallback must reuse the context the streaming attempt created"
-            );
-        }
-
-        #[tokio::test]
         async fn test_streaming_run_stops_on_cancel() {
-            let (provider, calls) = provider(true, true);
-
-            let err = eval_sum_rate(provider, 30).await.unwrap_err().to_string();
+            let err = eval_sum_rate(provider(true), 30)
+                .await
+                .unwrap_err()
+                .to_string();
             assert!(err.contains("canceled"), "unexpected error: {err}");
-            assert_eq!(calls.load(Ordering::SeqCst), 1);
         }
 
         #[tokio::test]
         async fn test_streaming_run_stops_on_timeout() {
-            let (provider, _) = provider(true, false);
-
-            let err = eval_sum_rate(provider, 0).await.unwrap_err().to_string();
+            let err = eval_sum_rate(provider(false), 0)
+                .await
+                .unwrap_err()
+                .to_string();
             assert!(err.contains("timeout"), "unexpected error: {err}");
         }
     }

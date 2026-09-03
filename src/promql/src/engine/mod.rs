@@ -236,7 +236,7 @@ impl Engine {
                         "MatrixSelector: @ modifier is not supported".into(),
                     ));
                 }
-                let data = self.eval_matrix_selector(&vs, *range, None).await?;
+                let data = self.eval_matrix_selector(&vs, *range).await?;
                 if data.is_empty() {
                     Value::None
                 } else {
