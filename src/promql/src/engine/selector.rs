@@ -160,13 +160,14 @@ impl Engine {
 
         let mut selector = selector.clone();
         if selector.name.is_none() {
-            let name = selector
-                .matchers
-                .find_matchers(NAME_LABEL)
-                .first()
-                .unwrap()
-                .value
-                .clone();
+            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
+                Some(mat) => mat.value.clone(),
+                None => {
+                    return Err(DataFusionError::Plan(
+                        "MatrixSelector: metric name is required".into(),
+                    ));
+                }
+            };
 
             selector.name = Some(name);
             // see eval_vector_selector: the matcher is consumed by stream selection
@@ -829,6 +830,90 @@ mod tests {
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
+    }
+
+    #[tokio::test]
+    async fn test_eval_vector_selector_without_a_metric_name_is_an_error() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
+        let mut engine = Engine::new(
+            trace_id,
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx(trace_id, org_id, 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+
+        // `{env="prod"}` -- no name and no __name__ matcher to fall back on.
+        let selector = VectorSelector {
+            name: None,
+            matchers: Matchers {
+                matchers: vec![promql_parser::label::Matcher {
+                    name: "env".to_string(),
+                    op: MatchOp::Equal,
+                    value: "prod".to_string(),
+                }],
+                or_matchers: vec![],
+            },
+            offset: None,
+            at: None,
+        };
+
+        let result = engine.eval_vector_selector(&selector).await;
+
+        assert!(result.is_err(), "expected an error, not a panic");
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("VectorSelector: metric name is required"),
+            "the error should name the vector selector"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_eval_matrix_selector_without_a_metric_name_is_an_error() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
+        let mut engine = Engine::new(
+            trace_id,
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx(trace_id, org_id, 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+
+        // `{env="prod"}[5m]` -- no name and no __name__ matcher to fall back on.
+        let selector = VectorSelector {
+            name: None,
+            matchers: Matchers {
+                matchers: vec![promql_parser::label::Matcher {
+                    name: "env".to_string(),
+                    op: MatchOp::Equal,
+                    value: "prod".to_string(),
+                }],
+                or_matchers: vec![],
+            },
+            offset: None,
+            at: None,
+        };
+
+        let result = engine
+            .eval_matrix_selector(&selector, Duration::from_secs(300))
+            .await;
+
+        assert!(result.is_err(), "expected an error, not a panic");
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("MatrixSelector: metric name is required"),
+            "the error should name the matrix selector"
+        );
     }
 
     #[tokio::test]
