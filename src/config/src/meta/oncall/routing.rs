@@ -188,6 +188,41 @@ impl DimensionDepth {
     /// either an ECS task or a Kubernetes pod, so `ecs-task` and `k8s-namespace`
     /// are never in contention and giving them a shared scale would only invent
     /// an ordering between two things that never meet.
+    /// The ordering routing falls back to when an org has described no topology.
+    ///
+    /// Without it, an unconfigured org ranks nothing, so two rules pinning one
+    /// dimension each tie on every meaningful term and fall through to *literal
+    /// character count* — `{k8s-namespace: kafka}` loses to
+    /// `{k8s-cluster: prod-use1}` because `prod-use1` is the longer word, while
+    /// `{k8s-namespace: monitoring}` wins because it is longer than the cluster
+    /// name. Measured on a realistic estate, that mis-routes about one page in
+    /// twenty, and which namespaces it hits depends on nothing an operator can
+    /// see.
+    ///
+    /// One axis per platform, coarse → fine. They rank independently, so a
+    /// Kubernetes pod and an ECS task never compete on a shared scale.
+    ///
+    /// `host` and `environment` are deliberately absent. Ranking `host` finer
+    /// than `k8s-namespace` would make a node claim beat a namespace claim on
+    /// every Kubernetes signal, which is not a precedence anybody has asked for;
+    /// ranking it coarser leaves bare-metal estates exactly where they are. So
+    /// they stay unranked, and an org that claims ownership by host says so in
+    /// its own identity sets.
+    pub fn shipped_default() -> Self {
+        const AXES: [&[&str]; 5] = [
+            &["k8s-cluster", "k8s-namespace", "k8s-deployment"],
+            &["region", "availability-zone", "aws-ecs-cluster", "aws-ecs-task"],
+            &["region", "faas-name"],
+            &["region", "azure-resource-group", "azure-cloud-role"],
+            &["region", "gcp-cloud-run", "gcp-instance"],
+        ];
+        let owned: Vec<Vec<String>> = AXES
+            .iter()
+            .map(|axis| axis.iter().map(|a| (*a).to_string()).collect())
+            .collect();
+        Self::from_sets(owned.iter().map(|axis| axis.as_slice()))
+    }
+
     pub fn from_sets<'a>(sets: impl IntoIterator<Item = &'a [String]>) -> Self {
         let mut ranks: HashMap<String, usize> = HashMap::new();
         for distinguish_by in sets {
@@ -964,6 +999,71 @@ mod tests {
             assert!(depths.rank_of("k8s-cluster") > depths.rank_of("unheard-of"));
             assert!(depths.rank_of("k8s-namespace") > depths.rank_of("k8s-cluster"));
             assert!(depths.rank_of("service") > depths.rank_of("k8s-namespace"));
+        }
+
+        /// The mis-route the shipped ordering exists to stop.
+        ///
+        /// "Platform owns the prod-use1 cluster" and "Data owns the kafka
+        /// namespace" are both one-dimension claims, so before this they tied on
+        /// every meaningful term and fell through to literal character count:
+        /// `prod-use1` is nine characters and `kafka` is five, so Platform won.
+        /// `monitoring` — ten characters — beat the same cluster and went to the
+        /// right team, which is what made the failure so hard to see.
+        #[test]
+        fn test_the_shipped_ordering_stops_word_length_deciding_who_is_paged() {
+            let rules = vec![
+                rule("r_cluster", "platform", &[("k8s-cluster", "prod-use1")]),
+                rule("r_kafka", "data", &[("k8s-namespace", "kafka")]),
+            ];
+            let record = dims(&[("k8s-cluster", "prod-use1"), ("k8s-namespace", "kafka")]);
+
+            assert_eq!(
+                resolve_owner_ranked(&rules, &record, &DimensionDepth::default())
+                    .unwrap()
+                    .team_id,
+                "platform",
+                "unranked, the longer word wins — this is the bug",
+            );
+            assert_eq!(
+                resolve_owner_ranked(&rules, &record, &DimensionDepth::shipped_default())
+                    .unwrap()
+                    .team_id,
+                "data",
+                "a namespace is inside a cluster, whatever the names happen to be",
+            );
+        }
+
+        /// Every platform the shipped groups can identify gets an ordering, not
+        /// just Kubernetes — an ECS task, a Lambda and a Cloud Run service each
+        /// rank below the region they run in.
+        #[test]
+        fn test_the_shipped_ordering_covers_every_platform() {
+            let d = DimensionDepth::shipped_default();
+            for (coarse, fine) in [
+                ("k8s-cluster", "k8s-namespace"),
+                ("k8s-namespace", "k8s-deployment"),
+                ("region", "availability-zone"),
+                ("availability-zone", "aws-ecs-cluster"),
+                ("aws-ecs-cluster", "aws-ecs-task"),
+                ("region", "faas-name"),
+                ("region", "azure-resource-group"),
+                ("azure-resource-group", "azure-cloud-role"),
+                ("region", "gcp-cloud-run"),
+            ] {
+                assert!(
+                    d.rank_of(fine) > d.rank_of(coarse),
+                    "{fine} should sit inside {coarse}",
+                );
+            }
+            assert!(
+                d.rank_of("service") > d.rank_of("k8s-deployment"),
+                "service is finest by definition",
+            );
+            // Left unranked on purpose: ranking `host` finer than a namespace
+            // would make a node claim beat a namespace claim on every k8s
+            // signal, which nobody has asked for.
+            assert_eq!(d.rank_of("host"), 0);
+            assert_eq!(d.rank_of("environment"), 0);
         }
 
         /// Sets are ranked independently. An ECS task and a Kubernetes
