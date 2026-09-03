@@ -208,8 +208,19 @@ pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-// Losing these silently degrades sourcemap translation, breadcrumbs and session replay.
-const _DEFAULT_QUICK_MODE_FIELDS: [&str; 4] = ["service", "version", "session_id", "view_url"];
+const _DEFAULT_QUICK_MODE_FIELDS: [&str; 9] = [
+    // Losing these silently degrades sourcemap translation, breadcrumbs and session replay.
+    "service",
+    "version",
+    "session_id",
+    "view_url",
+    // Losing these leaves the trace detail page without spans to build a waterfall from.
+    "service_name",
+    "operation_name",
+    "trace_id",
+    "span_id",
+    "duration",
+];
 pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
         _DEFAULT_QUICK_MODE_FIELDS.iter().map(|s| s.to_string()),
