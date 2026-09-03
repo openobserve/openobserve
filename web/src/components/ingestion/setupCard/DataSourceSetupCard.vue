@@ -71,13 +71,17 @@ const subs = computed<CardSubstitutions>(() => {
 
 const content = computed(() => getDataSourceCard(props.slug, subs.value, t));
 
-// ── Host Metrics auto-import (design 4.2) — host-agent slugs only, so the AWS
-// EC2 dialog's embedded Linux card gets the same behavior and no other card
-// changes at all.
+// Detection is forwarded so an embedding page (Hosts empty state) can react to it.
+const emit = defineEmits<{
+  (e: "detected", count: number): void;
+}>();
+
+// Host Metrics auto-import (design 4.2) — host-agent slugs only, so the AWS EC2 embed comes free.
 const isHostAgentSlug = computed(() => HOST_AGENT_SLUGS.has(props.slug));
 const importedDashboard = ref<{ id: string; folderId: string } | null>(null);
 
-const onDetected = async () => {
+const onDetected = async (count: number) => {
+  emit("detected", count);
   if (!isHostAgentSlug.value) return;
   // Captured at detect time — an org switch before the toast click must not retarget.
   const org = store.state.selectedOrganization?.identifier ?? "";

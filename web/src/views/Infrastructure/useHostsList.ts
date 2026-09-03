@@ -78,8 +78,7 @@ export function useHostsList() {
   const sortDesc = ref(true);
   const page = ref(1);
 
-  // metrics_query takes no AbortSignal, so a superseded response can only be
-  // ignored — every refresh bumps the generation and stale results are dropped.
+  // metrics_query takes no AbortSignal — superseded responses are generation-dropped, not cancelled.
   let generation = 0;
 
   const vectorToMap = (settled: PromiseSettledResult<any>): Map<string, number> | null => {
@@ -89,7 +88,10 @@ export function useHostsList() {
     for (const entry of result) {
       const host = entry?.metric?.host_name;
       if (!host) continue;
-      out.set(host, Number(entry.value?.[1]));
+      const value = Number(entry.value?.[1]);
+      // Prometheus emits "NaN" for 0/0 — a non-finite sample must blank the cell, not render "NaN%".
+      if (!Number.isFinite(value)) continue;
+      out.set(host, value);
     }
     return out;
   };

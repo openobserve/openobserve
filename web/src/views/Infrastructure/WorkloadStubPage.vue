@@ -59,15 +59,39 @@ const dashboards = ref<WorkloadDashboardRow[]>([]);
 const dashboardsLoading = ref(false);
 const showTemplateDrawer = ref(false);
 
+// Responses tagged with a superseded generation (org switched mid-flight) are dropped.
+let loadGeneration = 0;
+
+// The list API wants folder IDs; non-default entries are NAMES with server-generated ids (AWS tile).
+const resolveFolderIds = async (): Promise<string[]> => {
+  const entries = def.value.folders;
+  if (!entries.some((entry) => entry !== "default")) return [...entries];
+  let idByName = new Map<string, string>();
+  try {
+    const res = await dashboardsService.list_Folders(orgId.value);
+    idByName = new Map(
+      (res?.data?.list ?? []).map((f: { name: string; folderId: string }) => [f.name, f.folderId]),
+    );
+  } catch {
+    idByName = new Map();
+  }
+  return entries
+    .map((entry) => (entry === "default" ? "default" : (idByName.get(entry) ?? "")))
+    .filter((id) => id !== "");
+};
+
 const loadDashboards = async () => {
+  const gen = ++loadGeneration;
   dashboardsLoading.value = true;
   try {
     const keyword = def.value.dashboardKeyword.toLowerCase();
+    const folderIds = await resolveFolderIds();
     const results = await Promise.allSettled(
-      def.value.folders.map((folder) =>
+      folderIds.map((folder) =>
         dashboardsService.list(0, 1000, "name", false, "", orgId.value, folder, ""),
       ),
     );
+    if (gen !== loadGeneration) return;
     const rows: WorkloadDashboardRow[] = [];
     results.forEach((result, index) => {
       if (result.status !== "fulfilled") return;
@@ -80,14 +104,14 @@ const loadDashboards = async () => {
           rows.push({
             dashboardId: d.dashboardId,
             title: d.title,
-            folderId: def.value.folders[index],
+            folderId: folderIds[index],
           });
         }
       }
     });
     dashboards.value = rows;
   } finally {
-    dashboardsLoading.value = false;
+    if (gen === loadGeneration) dashboardsLoading.value = false;
   }
 };
 
@@ -115,10 +139,11 @@ watch(state, (next, prev) => {
 // The detected face of one org must never linger into the next (design 4.9).
 watch(
   () => store.state.selectedOrganization?.identifier,
-  (next, prev) => {
+  async (next, prev) => {
     if (!next || next === prev) return;
     dashboards.value = [];
-    detection.refresh();
+    // Awaited: the pre-refresh state is the PREVIOUS org's answer.
+    await detection.refresh();
     if (state.value === "detected") loadDashboards();
   },
 );
@@ -190,6 +215,10 @@ watch(
       </div>
     </div>
 
-    <AddDashboardFromGitHub v-model="showTemplateDrawer" :initial-search="def.gallerySearch" />
+    <AddDashboardFromGitHub
+      v-model="showTemplateDrawer"
+      :initial-search="def.gallerySearch"
+      @added="loadDashboards"
+    />
   </OPageLayout>
 </template>

@@ -57,8 +57,7 @@ const { t } = useI18nTyped();
 const detection = useWorkloadDetection();
 const gallery = useDashboardGallery();
 
-// Only the true "new org" moment — folder-scoped/filtered empty states keep
-// their existing presets untouched.
+// Only the true "new org" moment — folder-scoped/filtered empty states keep their presets.
 const visible = computed(() => props.activeFolderId === "default" && !props.filterQuery);
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
@@ -125,8 +124,7 @@ const onHostMetricsClick = async () => {
       emit("imported");
       goToDashboard(result.dashboardId);
     } else {
-      // The in-product upgrade path off the old buggy 13-panel import —
-      // replace only ever happens behind this explicit confirm.
+      // The upgrade path off the old buggy 13-panel import — replace only behind this explicit confirm.
       replaceTarget.value = { dashboardId: result.dashboardId };
     }
   } finally {

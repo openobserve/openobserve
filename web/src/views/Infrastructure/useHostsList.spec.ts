@@ -164,6 +164,21 @@ describe("useHostsList — join & window anchoring", () => {
     expect(web01.load).toBe(1.5);
   });
 
+  it("blanks a cell whose sample is Prometheus 'NaN' (0/0) instead of rendering NaN", async () => {
+    primeFleet({
+      cpu: vector([
+        { metric: { host_name: "web-01" }, value: NaN },
+        { metric: { host_name: "web-02" }, value: 42 },
+      ]),
+    });
+    const h = withHostsList();
+    wrapper = h.wrapper;
+    await h.list.refresh(refreshArgs);
+    await flushPromises();
+    expect(rowByName(h.list, "web-01").cpu).toBeNull();
+    expect(rowByName(h.list, "web-02").cpu).toBe(42);
+  });
+
   it("derives fleetCount from the joined rows (N total, M ACTIVE)", async () => {
     const h = withHostsList();
     wrapper = h.wrapper;

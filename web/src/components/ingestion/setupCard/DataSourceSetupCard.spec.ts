@@ -123,6 +123,17 @@ describe("DataSourceSetupCard — host metrics auto-import wiring", () => {
     expect(toastMock).not.toHaveBeenCalled();
   });
 
+  it.each(["linux", "sqlServer"])(
+    "forwards the renderer's detected emit for the %s slug (embedding pages react to it)",
+    async (slug) => {
+      wrapper = mountCard(slug);
+      renderer().vm.$emit("detected", 4);
+      await flushPromises();
+      // The Hosts empty state flips live off this emit — the card's state never reaches it otherwise.
+      expect(wrapper.emitted("detected")).toEqual([[4]]);
+    },
+  );
+
   it("toasts hostDashboardImported with the View Hosts action on created", async () => {
     wrapper = mountCard("linux");
     renderer().vm.$emit("detected", 4);

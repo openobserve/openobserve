@@ -28,7 +28,7 @@ export interface WorkloadDef {
   dashboardKeyword: string;
   /** Pre-seeds the template drawer's gallery search. */
   gallerySearch: string;
-  /** Folders whose dashboards are listed on the detected face. */
+  /** Detected-face dashboard folders: "default" is an ID, anything else a NAME resolved via the folders API. */
   folders: string[];
   /** Undetected face: an inline setup card, or a route to instructions. */
   setup: { kind: "card"; slug: string } | { kind: "route"; routeName: string };

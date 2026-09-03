@@ -392,10 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             : addDashboard()
                   "
                 />
-                <!-- Gated on the URL folder (correct on FIRST render, unlike the
-                     async activeFolderId); the dynamic conditions — filter text,
-                     favorites view — are the component's own internal gate via
-                     these props, so this node never toggles mid-session. -->
+                <!-- Gated on the URL folder — correct on FIRST render, unlike the async activeFolderId. -->
                 <TemplateSuggestionCards
                   v-if="($route.query.folder ?? 'default') === 'default'"
                   class="w-full max-w-3xl"

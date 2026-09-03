@@ -29,8 +29,7 @@ export const HOSTS_LAST_SEEN_SQL =
 export const HOSTS_CPU_QUERY =
   '100 * (1 - avg by (host_name)(irate(system_cpu_time{state="idle"}[5m])))';
 
-// Two byte queries, no ratio in PromQL — the % and the GB tooltip both derive
-// client-side from the same bytes.
+// Two byte queries, no PromQL ratio — the % and the GB tooltip both derive client-side from the same bytes.
 export const HOSTS_MEMORY_USED_QUERY = 'sum by (host_name)(system_memory_usage{state="used"})';
 
 export const HOSTS_MEMORY_TOTAL_QUERY = "sum by (host_name)(system_memory_usage)";

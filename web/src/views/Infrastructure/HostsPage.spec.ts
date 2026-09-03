@@ -108,14 +108,15 @@ const dateTimeStub = {
 
 const drawerStub = {
   name: "HostDetailDrawer",
-  props: ["hostName", "status", "range"],
+  props: ["hostName", "status", "osType", "range"],
   emits: ["close"],
-  template: "<div data-test='host-drawer-stub' :data-host='hostName' />",
+  template: "<div data-test='host-drawer-stub' :data-host='hostName' :data-os='osType' />",
 };
 
 const setupCardStub = {
   name: "DataSourceSetupCard",
   props: ["slug"],
+  emits: ["detected"],
   template: "<div data-test='setup-card-stub' :data-slug='slug' />",
 };
 
@@ -234,6 +235,16 @@ describe("HostsPage", () => {
       expect(wrapper.find('[data-test="setup-card-stub"]').attributes("data-slug")).toBe("macos");
     });
 
+    it("re-runs detection when the embedded setup card emits detected (empty→live wiring)", async () => {
+      workloadStates.value = { ...workloadStates.value, hosts: "undetected" };
+      wrapper = await mountPage();
+      detectionRefresh.mockClear();
+      // The card's own detection state never reaches this page's instance — the emit must.
+      wrapper.findComponent({ name: "DataSourceSetupCard" }).vm.$emit("detected", 4);
+      await flushPromises();
+      expect(detectionRefresh).toHaveBeenCalled();
+    });
+
     it("flips from the embedded setup card to the live table when detection connects", async () => {
       workloadStates.value = { ...workloadStates.value, hosts: "undetected" };
       wrapper = await mountPage();
@@ -250,6 +261,13 @@ describe("HostsPage", () => {
       hostsListState.filteredRows.value = [hostsListState.rows.value[0]];
       wrapper = await mountPage();
       expect(wrapper.text()).toMatch(/3 hosts.*2 active/);
+    });
+
+    it("pluralizes the fleet count — '1 host', never '1 hosts'", async () => {
+      hostsListState.fleetCount.value = { total: 1, active: 1 };
+      wrapper = await mountPage();
+      expect(wrapper.text()).toMatch(/1 host, 1 active/);
+      expect(wrapper.text()).not.toContain("1 hosts");
     });
 
     it("tints the % cells by threshold while always printing the value", async () => {
@@ -279,6 +297,8 @@ describe("HostsPage", () => {
       const drawer = wrapper.find('[data-test="host-drawer-stub"]');
       expect(drawer.exists()).toBe(true);
       expect(drawer.attributes("data-host")).toBe("web-01");
+      // The row's os_type rides along so the drawer header can chip it (design 4.8).
+      expect(drawer.attributes("data-os")).toBe("linux");
       wrapper.findComponent({ name: "HostDetailDrawer" }).vm.$emit("close");
       await flushPromises();
       expect(router.currentRoute.value.query.host).toBeUndefined();
@@ -302,6 +322,24 @@ describe("HostsPage", () => {
       expect(hostsListState.page.value).toBe(2);
       expect(hostsListState.sortBy.value).toBe("memoryPct");
       expect(hostsListState.sortDesc.value).toBe(false);
+    });
+
+    it("resets to page 1 (and clears ?page) when a filter changes", async () => {
+      wrapper = await mountPage();
+      hostsListState.page.value = 3;
+      await flushPromises();
+      expect(router.currentRoute.value.query.page).toBe("3");
+      // A narrowed result set on a stale ?page would render a false-empty table.
+      hostsListState.statusFilter.value = ["ACTIVE"];
+      await flushPromises();
+      await flushPromises();
+      expect(hostsListState.page.value).toBe(1);
+      expect(router.currentRoute.value.query.page).toBeUndefined();
+    });
+
+    it("keeps a URL-restored page across the same-tick filter restore (remount)", async () => {
+      wrapper = await mountPage({ name: "web", page: "3" });
+      expect(hostsListState.page.value).toBe(3);
     });
 
     it("writes filter and sort changes back into the URL", async () => {
@@ -355,6 +393,28 @@ describe("HostsPage", () => {
         .vm.$emit("on:date-change", { startTime: 111, endTime: 222 });
       await flushPromises();
       expect(hostsListState.refresh).toHaveBeenCalled();
+    });
+
+    it("does NOT fetch on the picker's mount replay (userChangedValue === false)", async () => {
+      wrapper = await mountPage();
+      hostsListState.refresh.mockClear();
+      // DateTime.vue contract: the mount emit is stamped programmatic — "do not fetch".
+      wrapper
+        .findComponent({ name: "DateTime" })
+        .vm.$emit("on:date-change", { startTime: 111, endTime: 222, userChangedValue: false });
+      await flushPromises();
+      expect(hostsListState.refresh).not.toHaveBeenCalled();
+    });
+
+    it("does NOT fan out on a date change while the org is undetected", async () => {
+      workloadStates.value = { ...workloadStates.value, hosts: "undetected" };
+      wrapper = await mountPage();
+      hostsListState.refresh.mockClear();
+      wrapper
+        .findComponent({ name: "DateTime" })
+        .vm.$emit("on:date-change", { startTime: 111, endTime: 222, userChangedValue: true });
+      await flushPromises();
+      expect(hostsListState.refresh).not.toHaveBeenCalled();
     });
 
     it("re-runs the fan-out from the manual Refresh trigger", async () => {

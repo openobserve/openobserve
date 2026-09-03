@@ -19,8 +19,7 @@
 
 import { HOSTS_DEVICE_EXCLUSION } from "./hostsQueries";
 
-// The o2 agent's log stream — not derivable from this repo (§7 risk 1); a
-// wrong value degrades to an empty-but-valid logs search, never an error.
+// Not derivable from this repo (§7 risk 1) — a wrong value degrades to an empty logs search, never an error.
 export const HOST_LOGS_STREAM = "default";
 
 export const LOGS_PREVIEW_LIMIT = 100;
@@ -86,8 +85,7 @@ function drawerPanel(def: DrawerPanelDef, index: number) {
   };
 }
 
-// Eight fixed panels pinned to one literal host — no variables block, a single
-// host needs no selectors (dead controls would just invite confusion).
+// Eight fixed panels pinned to one literal host — a single host needs no variable selectors.
 export function buildHostDashboard(host: string) {
   const h = `host_name="${promEscape(host)}"`;
   const excl = `device!~"${HOSTS_DEVICE_EXCLUSION}"`;

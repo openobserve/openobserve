@@ -48,6 +48,8 @@ import {
 const props = defineProps<{
   hostName: string;
   status?: string;
+  /** The row's os_type — renders as a header chip when present (design 4.8). */
+  osType?: string | null;
   /** Time range (microseconds) the Hosts page picker held when the row opened. */
   range: { from: number; to: number };
 }>();
@@ -63,8 +65,7 @@ const { t } = useI18nTyped();
 const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
 const activeTab = ref<string | number>("metrics");
-// Seeded from the page picker so the drawer opens on the window the row was
-// computed over, never a surprise default.
+// Seeded from the page picker — the drawer opens on the window the row was computed over.
 const drawerRange = ref({ ...props.range });
 
 const hostDashboard = computed(() => buildHostDashboard(props.hostName));
@@ -75,7 +76,9 @@ const currentTimeObj = computed(() => ({
   },
 }));
 
-const onDateChange = (date: { startTime: number; endTime: number }) => {
+const onDateChange = (date: { startTime: number; endTime: number; userChangedValue?: boolean }) => {
+  // DateTime replays on mount with userChangedValue:false — "do not fetch" (DateTime.vue contract).
+  if (date.userChangedValue === false) return;
   drawerRange.value = { from: date.startTime, to: date.endTime };
   if (logsLoaded.value) fetchLogs();
 };
@@ -117,6 +120,16 @@ watch(activeTab, (tab) => {
   if (tab === "logs" && !logsLoaded.value) fetchLogs();
 });
 
+// A ?host= edit while open reuses this instance — the previous host's logs must not linger.
+watch(
+  () => props.hostName,
+  () => {
+    logsHits.value = [];
+    logsLoaded.value = false;
+    if (activeTab.value === "logs") fetchLogs();
+  },
+);
+
 const logLine = (hit: any): string =>
   String(hit?.log ?? hit?.message ?? hit?.body ?? JSON.stringify(hit));
 
@@ -146,7 +159,8 @@ const exploreTracesHref = computed(
         org_identifier: org.value,
         from: String(drawerRange.value.from),
         to: String(drawerRange.value.to),
-        query: `host_name = '${sqlEscape(props.hostName)}'`,
+        // The traces page b64-decodes ?query= (plugins/traces/Index.vue restoreUrlQueryParams).
+        query: b64EncodeUnicode(`host_name = '${sqlEscape(props.hostName)}'`) ?? "",
       },
     }).href,
 );
@@ -213,7 +227,12 @@ const statusLabel = computed(() =>
   >
     <div class="flex h-full flex-col">
       <div class="flex items-center justify-between gap-2 pb-2">
-        <OTag :variant="statusVariant" size="sm">{{ statusLabel }}</OTag>
+        <div class="flex items-center gap-2">
+          <OTag :variant="statusVariant" size="sm">{{ statusLabel }}</OTag>
+          <OTag v-if="osType" variant="default-soft" size="sm" data-test="host-drawer-os-chip">{{
+            raw(osType)
+          }}</OTag>
+        </div>
         <DateTime
           auto-apply
           menu-align="end"
@@ -224,8 +243,7 @@ const statusLabel = computed(() =>
         />
       </div>
 
-      <!-- Reka activates on mousedown; the click fallback keeps keyboard/AT and
-           synthetic clicks (tests, automation) switching tabs too. -->
+      <!-- Reka activates on mousedown; the click fallback keeps keyboard/AT/synthetic clicks working. -->
       <OTabs v-model="activeTab" align="left" class="border-border-default border-b">
         <OTab
           name="metrics"

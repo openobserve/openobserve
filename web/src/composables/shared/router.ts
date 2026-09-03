@@ -489,9 +489,7 @@ const useRoutes = () => {
         query: to.query,
       }),
     },
-    // Always registered, no feature gate — workload detection changes each
-    // page's state, never the route's existence (design 4.7). Placed after the
-    // infra/databases block so the non-cloud reports splice(13) never shifts.
+    // Ungated by design (detection changes page state, not route existence) and placed past the splice(13) hazard.
     {
       path: "infra/hosts",
       name: "infraHosts",

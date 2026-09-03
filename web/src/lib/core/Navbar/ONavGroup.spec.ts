@@ -419,6 +419,25 @@ describe("ONavGroup", () => {
       expect(tileLink()).toBe("/somewhere-else");
     });
 
+    it("retargets a NON-infra tile to its first visible child when its anchor child is hidden", () => {
+      // The anchor-child rule applies to every group: hiding the child that resolves
+      // to parentLink (custom_hide_menus) retargets the tile — release-noted behavior change.
+      wrapper = mount(ONavGroup, {
+        props: {
+          groupKey: "data",
+          title: "Data",
+          icon: "database",
+          children,
+          parentItem: { link: "/streams", title: "Data", icon: "database", name: "logstreams" },
+        },
+        global: {
+          plugins: [infraRouter(), infraStore(true, "logstreams"), i18n],
+          stubs: { MenuLink: linkedTileStub, OIcon: oIconStub, teleport: true },
+        },
+      });
+      expect(tileLink()).toBe("/pipelines");
+    });
+
     it("leaves every other group's tile link byte-identical to its parentLink", () => {
       // The anchor child survives in every existing group, so they render bit-identically.
       wrapper = mount(ONavGroup, {
