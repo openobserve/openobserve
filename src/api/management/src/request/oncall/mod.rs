@@ -5483,6 +5483,7 @@ mod tests {
             snoozed_until: None,
             ladder_anchor: None,
             ladder_run: Some(1),
+            exhausted_at: None,
             responder_role: ResponderRole::Owner,
             origin_response_id: None,
             priority: 2,

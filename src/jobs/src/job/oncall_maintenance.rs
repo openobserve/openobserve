@@ -105,8 +105,8 @@ fn retention_batch(configured: u64) -> u64 {
 }
 
 pub fn run() {
-    if !LOCAL_NODE.is_alert_manager() {
-        log::debug!("[ONCALL_MAINTENANCE] not an alert_manager node, skipping");
+    if !LOCAL_NODE.is_scheduler() {
+        log::debug!("[ONCALL_MAINTENANCE] not a scheduler node, skipping");
         return;
     }
     if !o2_enterprise::enterprise::oncall::is_enabled() {
