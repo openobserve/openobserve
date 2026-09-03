@@ -17,7 +17,10 @@ import { gt } from "@/types/i18n";
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
 import { convertMultiSQLData } from "@/utils/dashboard/convertSQLData";
 import { convertTableData, convertMultiQueryTableData } from "@/utils/dashboard/convertTableData";
-import { convertPivotTableData } from "@/utils/dashboard/convertPivotTableData";
+import {
+  convertPivotTableData,
+  resolvePivotCustomQueryAggregations,
+} from "@/utils/dashboard/convertPivotTableData";
 import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertMapsData } from "@/utils/dashboard/convertMapsData";
 import { convertSankeyData } from "./convertSankeyData";
@@ -145,10 +148,12 @@ export const convertPanelData = async (
           (pivotQuery?.fields?.y?.length ?? 0) > 0;
 
         if (isPivot) {
-          // Pivot: single query only
+          // Pivot: single query only. Custom-SQL panels need their aggregation
+          // read out of the query text before cells can be combined.
+          const pivotAggregations = await resolvePivotCustomQueryAggregations(pivotQuery);
           return {
             chartType: panelSchema.type,
-            ...convertPivotTableData(panelSchema, [data[0]], store),
+            ...convertPivotTableData(panelSchema, [data[0]], store, pivotAggregations),
           };
         }
 

@@ -15,6 +15,7 @@
 
 import { gt } from "@/types/i18n";
 import { getDataValue } from "./aliasUtils";
+import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import {
   PIVOT_TABLE_MAX_COLUMNS,
   PIVOT_TABLE_SEPARATOR,
@@ -31,6 +32,44 @@ import {
   parseTimestampValue,
   detectTimestampFields,
 } from "./tableConfigUtils";
+
+// Parsed custom-SQL aggregations keyed by query text. A pivot re-converts on
+// every streaming chunk while the query text stays put, and astify() is not
+// cheap, so the parse is done once per distinct query.
+const customQueryAggregationCache = new Map<string, Record<string, string | null>>();
+const CUSTOM_QUERY_AGGREGATION_CACHE_LIMIT = 20;
+
+/**
+ * Maps each SELECT alias of a custom-SQL panel to the aggregation wrapping it,
+ * so duplicate pivot cells combine the way the query says rather than the way
+ * the field's placeholder `functionName` claims. Returns null for builder
+ * panels, whose fields carry a trustworthy aggregation of their own.
+ */
+export const resolvePivotCustomQueryAggregations = async (
+  query: any,
+): Promise<Record<string, string | null> | null> => {
+  const sql = query?.query;
+  if (!query?.customQuery || typeof sql !== "string" || !sql.trim()) return null;
+
+  const cached = customQueryAggregationCache.get(sql);
+  if (cached) return cached;
+
+  const byAlias: Record<string, string | null> = {};
+  try {
+    const { fields } = await getFieldsFromQuery(sql);
+    for (const field of fields ?? []) {
+      if (field?.alias) byAlias[field.alias] = field.aggregationFunction ?? null;
+    }
+  } catch {
+    // Unparseable SQL leaves the map empty, which reads as "unknown" below.
+  }
+
+  if (customQueryAggregationCache.size >= CUSTOM_QUERY_AGGREGATION_CACHE_LIMIT) {
+    customQueryAggregationCache.clear();
+  }
+  customQueryAggregationCache.set(sql, byAlias);
+  return byAlias;
+};
 
 /**
  * Builds N-level header metadata for the TableRenderer.
@@ -222,6 +261,9 @@ export const convertPivotTableData = (
   panelSchema: any,
   searchQueryData: any,
   store: any,
+  // Alias → aggregation for custom-SQL panels, from
+  // resolvePivotCustomQueryAggregations. Null for builder panels.
+  customQueryAggregations: Record<string, string | null> | null = null,
 ): {
   rows: any[];
   columns: any[];
@@ -343,12 +385,12 @@ export const convertPivotTableData = (
   // appears nowhere in the data and silently disagrees with the same query
   // shown anywhere else.
   //
-  // The aggregation is only knowable for builder panels. Custom-SQL panels
-  // carry a hardcoded `functionName: "count"` placeholder (usePanelFields
-  // stamps it on every y field; the real aggregation lives in the SQL text),
-  // so trusting it there would add up rows the user asked to max. Both field
-  // shapes are live — builder writes `functionName`, older saved panels write
-  // `aggregationFunction` (see utils/autoName.ts) — so read whichever exists.
+  // Custom-SQL panels carry a hardcoded `functionName: "count"` placeholder
+  // (usePanelFields stamps it on every y field; the real aggregation lives in
+  // the SQL text), so their aggregation comes from parsing the query instead —
+  // trusting the placeholder would add up rows the user asked to max. Builder
+  // panels declare it on the field, in either of two live shapes: `functionName`
+  // today, `aggregationFunction` on older saved panels (see utils/autoName.ts).
   type MergeKind = "add" | "min" | "max" | "first";
   const MERGE_FNS: Record<MergeKind, (a: number, b: number) => number> = {
     add: (a, b) => a + b,
@@ -360,8 +402,11 @@ export const convertPivotTableData = (
   };
 
   const resolveMergeKind = (yField: any): MergeKind => {
-    if (query.customQuery) return "first";
-    switch (String(yField?.functionName ?? yField?.aggregationFunction ?? "").toLowerCase()) {
+    const declared = query.customQuery
+      ? customQueryAggregations?.[yField?.alias]
+      : (yField?.functionName ?? yField?.aggregationFunction);
+
+    switch (String(declared ?? "").toLowerCase()) {
       case "count":
       case "sum":
         return "add";

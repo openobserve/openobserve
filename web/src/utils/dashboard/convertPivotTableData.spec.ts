@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
-import { convertPivotTableData } from "@/utils/dashboard/convertPivotTableData";
+import {
+  convertPivotTableData,
+  resolvePivotCustomQueryAggregations,
+} from "@/utils/dashboard/convertPivotTableData";
 import {
   PIVOT_TABLE_MAX_COLUMNS,
   PIVOT_TABLE_SEPARATOR,
@@ -335,7 +338,8 @@ describe("convertPivotTableData", () => {
     it("does not trust the functionName placeholder on custom-SQL panels", () => {
       // usePanelFields stamps functionName: "count" on every custom-query y
       // field; the real aggregation is in the SQL text, so adding the rows up
-      // would invent a number the query never returned.
+      // would invent a number the query never returned. With no parsed
+      // aggregation supplied, the merge keeps a real returned value.
       const result = convertPivotTableData(
         maxSchema({ functionName: "count" }, true),
         finerThanPivot,
@@ -346,6 +350,74 @@ describe("convertPivotTableData", () => {
       expect(row.svc1_val).toBe(801);
       expect(row.svc4_val).toBe(18);
       expect(row.svc1_val).not.toBe(6087);
+    });
+
+    describe("aggregation parsed from custom SQL", () => {
+      const customSql = (aggregation: string) =>
+        `SELECT country, service, endpoint, ${aggregation}(duration) as "val" ` +
+        `FROM "logs" GROUP BY country, service, endpoint`;
+
+      const runCustomSql = async (aggregation: string) => {
+        const panel = maxSchema({ functionName: "count" }, true);
+        panel.queries[0].query = customSql(aggregation);
+        const parsed = await resolvePivotCustomQueryAggregations(panel.queries[0]);
+        return convertPivotTableData(panel, finerThanPivot, store, parsed);
+      };
+
+      it("reads max out of the query text and reports the bound", async () => {
+        const row = (await runCustomSql("max")).rows[0];
+
+        expect(row.svc1_val).toBe(843);
+        expect(row.svc4_val).toBe(822);
+        expect(row[`${PIVOT_TABLE_TOTAL_LABEL}_val`]).toBe(843);
+      });
+
+      it("reads min out of the query text", async () => {
+        const row = (await runCustomSql("min")).rows[0];
+
+        expect(row.svc1_val).toBe(12);
+        expect(row[`${PIVOT_TABLE_TOTAL_LABEL}_val`]).toBe(6);
+      });
+
+      it("sums only when the query actually says sum", async () => {
+        const row = (await runCustomSql("sum")).rows[0];
+
+        expect(row.svc1_val).toBe(6087);
+        expect(row[`${PIVOT_TABLE_TOTAL_LABEL}_val`]).toBe(11511);
+      });
+
+      it("keeps a real value for avg, which cannot be reconstructed", async () => {
+        const row = (await runCustomSql("avg")).rows[0];
+
+        expect(row.svc1_val).toBe(801);
+        expect(row.svc1_val).not.toBe(6087);
+      });
+
+      it("maps every SELECT alias to its aggregation", async () => {
+        const parsed = await resolvePivotCustomQueryAggregations({
+          customQuery: true,
+          query: customSql("max"),
+        });
+        expect(parsed).toMatchObject({ val: "max", country: null, service: null });
+      });
+
+      it.each([
+        ["builder panels", { customQuery: false, query: "SELECT max(a) as val FROM t" }],
+        ["a blank query", { customQuery: true, query: "   " }],
+        ["a missing query", { customQuery: true }],
+      ])("returns null for %s", async (_name, query) => {
+        expect(await resolvePivotCustomQueryAggregations(query)).toBeNull();
+      });
+
+      it("never reports an aggregation for unparseable SQL", async () => {
+        const parsed = await resolvePivotCustomQueryAggregations({
+          customQuery: true,
+          query: "not sql at all",
+        });
+        // The parser's fallback aliases cannot collide with real y aliases, so
+        // the merge falls through to keeping a real value.
+        expect(parsed?.val).toBeUndefined();
+      });
     });
 
     it("leaves a min/max total null when the row has no values", () => {
