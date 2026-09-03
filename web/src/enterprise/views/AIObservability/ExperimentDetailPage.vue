@@ -300,6 +300,7 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { gt, raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -365,9 +366,14 @@ const rowDrawerOpen = ref(false);
 const retryingRow = ref(false);
 const selectedRowDetail = ref<ExperimentRowDetail | null>(null);
 
+// Real browser back when there's history to pop — returns to the Experiments
+// list with whatever filter (e.g. a dataset) the user actually arrived
+// through, not just the bare list. The fallback only fires with no history
+// to pop (direct link / reload).
+const { goBack: backToExperiments } = useSmartBack(() => aiExperimentsRoute(orgId.value));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.experiments"),
-  to: aiExperimentsRoute(orgId.value),
+  onClick: backToExperiments,
 }));
 const isMultiTrial = computed(() => (detail.value?.experiment.trialCount ?? 1) > 1);
 

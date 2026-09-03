@@ -24,9 +24,16 @@ const route = reactive({
   query: {} as Record<string, string>,
 });
 const replace = vi.fn();
+const push = vi.fn();
+const back = vi.fn();
 vi.mock("vue-router", () => ({
   useRoute: () => route,
-  useRouter: () => ({ push: vi.fn(), replace: (...a: any[]) => replace(...a), resolve: vi.fn() }),
+  useRouter: () => ({
+    push: (...a: any[]) => push(...a),
+    replace: (...a: any[]) => replace(...a),
+    back: (...a: any[]) => back(...a),
+    resolve: vi.fn(),
+  }),
 }));
 vi.mock("vuex", () => ({
   useStore: () => ({ state: { selectedOrganization: { identifier: "acme" } } }),
@@ -164,6 +171,23 @@ describe("ExperimentComparePage", () => {
     // The badge fills in only after the experiments load, so this guards the
     // OPageHeader slot-presence latch that made it invisible.
     expect(wrapper.get('[data-test="ai-experiment-compare-dataset"]').text()).toBe("RAG set");
+  });
+
+  it("uses real browser back when there's history to pop, instead of the bare Experiments list", async () => {
+    window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
+    const wrapper = mount(ExperimentComparePage, {
+      global: {
+        stubs: { ExperimentComparisonPanel: true, ExperimentComparisonRowDrawer: true },
+      },
+    });
+    await flushPromises();
+    push.mockClear();
+
+    await wrapper.get('[data-test="app-page-header-back"]').trigger("click");
+
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
+    window.history.replaceState(null, "");
   });
 
   it("clips a long dataset name in the header badge", async () => {

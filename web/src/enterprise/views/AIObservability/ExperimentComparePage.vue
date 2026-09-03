@@ -122,6 +122,7 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import useSmartBack from "@/composables/useSmartBack";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -162,9 +163,12 @@ const candidateRow = ref<ExperimentRowDetail | null>(null);
 const experiments = ref<LlmExperiment[]>([]);
 const optionsLoading = ref(false);
 
+// Real browser back when there's history to pop — returns to the Experiment
+// Detail page the compare was launched from, not just the bare list.
+const { goBack: backToExperiments } = useSmartBack(() => aiExperimentsRoute(orgId.value));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.experiments"),
-  to: aiExperimentsRoute(orgId.value),
+  onClick: backToExperiments,
 }));
 
 /** The dataset both sides are pinned to — the server refuses to compare across datasets. */

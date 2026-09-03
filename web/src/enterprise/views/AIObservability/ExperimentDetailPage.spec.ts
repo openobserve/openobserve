@@ -25,9 +25,10 @@ import {
 
 const route = reactive({ params: { id: "exp-1" }, query: {} }) as any;
 const push = vi.fn();
+const back = vi.fn();
 vi.mock("vue-router", () => ({
   useRoute: () => route,
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, back }),
 }));
 vi.mock("vuex", () => ({
   useStore: () => ({ state: { selectedOrganization: { identifier: "acme" } } }),
@@ -79,6 +80,21 @@ describe("ExperimentDetailPage", () => {
     expect(errors).toEqual([]);
     expect(get).toHaveBeenCalled();
     expect(wrapper.text()).toContain("run one");
+  });
+
+  it("uses real browser back when there's history to pop, instead of the bare Experiments list", async () => {
+    window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
+    const experiment = makeExperiment({ id: "exp-1", name: "run one", datasetId: "ds-1" });
+    get.mockResolvedValue(makeExperimentDetail(experiment, {}));
+    const wrapper = mount(ExperimentDetailPage);
+    await flushPromises();
+    push.mockClear();
+
+    await wrapper.get('[data-test="app-page-header-back"]').trigger("click");
+
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
+    window.history.replaceState(null, "");
   });
 
   // The meta line contains an "@", which vue-i18n parses as a linked message
