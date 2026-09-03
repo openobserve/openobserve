@@ -281,6 +281,21 @@ function childTo(child: SubnavChild) {
   return { name: child.name, query };
 }
 
+// Anchor-child rule (design 4.7): the tile keeps its declared parentLink while
+// the child that RESOLVES to that link survives gating (or while no declared
+// child resolves to it at all — every pre-existing group renders bit-identical).
+// Only when the anchor child gates out does the tile fall back to the first
+// visible child — otherwise a DBM-off org's Infra tile would bounce off the
+// /infra/databases guard onto Traces.
+const tileLink = computed(() => {
+  const parent = props.parentItem;
+  if (!parent) return "";
+  const anchor = props.children.find((c) => childPath(c.name) === parent.link);
+  if (!anchor || visibleChildren.value.includes(anchor)) return parent.link;
+  const first = visibleChildren.value[0];
+  return first ? (childPath(first.name) ?? parent.link) : parent.link;
+});
+
 function childDataTest(child: SubnavChild): string {
   return `nav-group-item-${child.name}${child.tab ? `-${child.tab}` : ""}`;
 }
@@ -485,7 +500,7 @@ function onChildMouseenter(event: MouseEvent) {
       submenu
       :title="title"
       :icon="icon"
-      :link="parentItem.link"
+      :link="tileLink"
       :active="isGroupActive"
       :expanded="isOpen"
       @click="onLinkClick"

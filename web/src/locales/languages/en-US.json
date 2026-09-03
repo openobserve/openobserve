@@ -1246,6 +1246,9 @@
     "ariaWithNotifications": "{label} ({count} notifications)",
     "infra": "Infra",
     "databases": "Databases",
+    "hosts": "Hosts",
+    "kubernetes": "Kubernetes",
+    "awsInfra": "AWS",
     "topQueries": "Top Queries"
   },
   "rum": {
@@ -3543,6 +3546,8 @@
       "telegraf": "Telegraf",
       "awsCloudwatchMetrics": "AWS CloudWatch Metrics"
     },
+    "hostMetricsReceiver": "Host metrics (hostmetrics receiver)",
+    "hostMetricsReceiverNote": "The resourcedetection processor stamps {attr} on every metric — without it your hosts show up nameless.",
     "otlpHttp": "OTLP HTTP",
     "otlpGrpc": "OTLP gRPC",
     "categrafDocLinkText": "to learn how to ingest metrics using Categraf",
@@ -3788,6 +3793,7 @@
       "checkingForLogs": "Checking for logs…",
       "checkingForMetrics": "Checking for metrics…",
       "checkingForSpans": "Checking for spans…",
+      "chipDashboard": "Dashboard",
       "chipEditor": "Editor",
       "chipInstall": "Install",
       "chipLogs": "Logs",
@@ -3809,6 +3815,8 @@
       "countLogs": "{count} log | {count} logs",
       "countMetricStreams": "{count} metric stream | {count} metric streams",
       "countSpans": "{count} span | {count} spans",
+      "dashboardReadyDesc": "After you verify above, we add the Host Metrics dashboard to your Default folder — open it below.",
+      "dashboardReadyTitle": "Get your dashboard",
       "downloadEnvTooltip": "Download .env",
       "downloadJmxJarDesc": "The JMX receiver runs this helper jar (requires Java on the collector host).",
       "downloadJmxJarTitle": "Download the JMX Metrics Jar",
@@ -3843,6 +3851,10 @@
       "genericLinuxVariant": "Generic Linux",
       "genericWindowsVariant": "Generic Windows",
       "hideToken": "Hide Token",
+      "hostDashboardExists": "Host metrics connected — your host is in Infra → Hosts. The Host Metrics dashboard is already in your Default folder.",
+      "hostDashboardImportFailed": "Couldn't add the Host Metrics dashboard — check your connection and try again, or import it from Dashboards → templates.",
+      "hostDashboardImportForbidden": "Couldn't add the dashboard — your role can't create dashboards. Ask an admin, or import it from Dashboards → templates.",
+      "hostDashboardImported": "Host metrics connected — your host is in Infra → Hosts. The Host Metrics dashboard was added to your Default folder.",
       "hotCommerceExampleLink": "HOT Commerce Example",
       "idempotentSuffix": "(idempotent):",
       "iFixedItTestAgain": "I Fixed It — Test Again",
@@ -4160,6 +4172,8 @@
       "verifyWindowsAgentDesc": "The agent starts on install. Give it a few seconds, then hit Test — host metrics arrive as `system_*` streams.",
       "verifyZookeeperMetricsDesc": "Hit Test below, or check Streams for the `zookeeper_*` metrics.",
       "viewLogs": "View Logs",
+      "viewHostDashboard": "View Host Metrics dashboard",
+      "viewHosts": "View Hosts",
       "viewStreams": "View Streams",
       "viewTraces": "View Traces",
       "whatTheInstallerDoes": "What The Installer Does",
@@ -5042,6 +5056,15 @@
       "tableModeOptionExpanded": "Expanded Time series",
       "tableModeOptionAggregate": "Aggregate"
     },
+    "templates": {
+      "heading": "Start from a template",
+      "browseAll": "Browse all templates →",
+      "detectedBadge": "Detected in your data",
+      "replaceTitle": "Replace 'Host Metrics'?",
+      "replaceMessage": "Replace 'Host Metrics' with the latest template? Your edits will be lost.",
+      "replaceConfirm": "Replace",
+      "replaceCancel": "Keep mine"
+    },
     "addDashboardFromGitHub": {
       "title": "Add Dashboard from Gallery",
       "cancel": "Cancel",
@@ -5079,7 +5102,11 @@
       "importSuccess": "Successfully imported {count} dashboard! | Successfully imported {count} dashboards!",
       "importPartial": "Imported {count} dashboard, but {failCount} failed. Check console for details. | Imported {count} dashboards, but {failCount} failed. Check console for details.",
       "importFailed": "Failed to import dashboards: {error}",
-      "addFailed": "Failed to add dashboards: {error}"
+      "addFailed": "Failed to add dashboards: {error}",
+      "replaceTitle": "Replace existing dashboard?",
+      "replaceMessage": "A dashboard named '{title}' already exists in this folder. Replacing it discards any edits made to it.",
+      "replaceConfirm": "Replace",
+      "replaceSkip": "Skip this one"
     },
     "addAnnotation": {
       "editAnnotation": "Edit Annotation",
@@ -16230,6 +16257,51 @@
     },
     "hover": {
       "deprecated": "**Deprecated** — prefer the canonical function."
+    }
+  },
+  "infra": {
+    "hosts": {
+      "emptyHeadline": "No host telemetry visible to you yet",
+      "emptyRbacHint": "If your team already collects host metrics, you may not have access to the system_* metric streams — ask your admin.",
+      "fleetCount": "{total} hosts, {active} active",
+      "livenessBanner": "Couldn't determine which hosts are currently reporting — status shown as Unknown.",
+      "lastSeenBanner": "Inactive hosts and last-seen are unavailable right now.",
+      "retry": "Retry",
+      "pageError": "Couldn't load the hosts list.",
+      "rangeNote": "Hosts with no samples in the selected time range are not listed — widen the range to see older hosts.",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "statusUnknown": "Unknown",
+      "statusFacet": "Status",
+      "osFacet": "OS",
+      "filterPlaceholder": "Filter by host name...",
+      "refresh": "Refresh",
+      "columnHost": "Host",
+      "columnOs": "OS",
+      "columnStatus": "Status",
+      "columnCpu": "CPU %",
+      "columnMemory": "Memory %",
+      "columnDisk": "Disk %",
+      "columnLoad": "Load 15m",
+      "columnLastSeen": "Last seen",
+      "memoryTooltip": "{used} GB / {total} GB",
+      "logsEmpty": "No logs found in stream '{stream}' for this host in the selected range. If your agent writes to a different stream, open Logs and pick it.",
+      "exploreInLogs": "Explore in Logs",
+      "exploreTraces": "Explore traces for this host",
+      "tracesScopeNote": "Traces open in the Traces explorer scoped to this host and time range.",
+      "openDashboard": "Open Host Metrics dashboard",
+      "windowsLivenessNote": "Windows hosts appear in this list only when the agent reports the load metric (system_cpu_load_average_15m) — if your Windows agents are running but missing here, enable the load scraper in the collector config or update the agent."
+    },
+    "workload": {
+      "kubernetesTitle": "Kubernetes",
+      "awsTitle": "AWS",
+      "setupHeadline": "Connect this workload to see it here",
+      "awsSetupCta": "Open AWS data sources",
+      "detectedChipKubernetes": "Detected: k8s_* metric streams",
+      "detectedChipAws": "Detected: aws_/cloudwatch streams",
+      "dashboardsHeading": "Dashboards for this workload",
+      "noDashboards": "No matching dashboards yet — import a template to get started.",
+      "importTemplates": "Import templates"
     }
   },
   "dbm": {

@@ -206,9 +206,9 @@ export const NAV_GROUPS: NavGroupDef[] = [
     key: "infra",
     titleKey: "menu.infra",
     icon: "dns",
-    // The tile lands on Database Monitoring — today its only destination, and
-    // the one that stays correct as the section grows, since a new Infra page
-    // would be added after it rather than in front of it.
+    // The tile still lands on Database Monitoring where DBM is enabled; when
+    // its gate filters that child out, ONavGroup's anchor-child fallback sends
+    // the tile to the first visible child instead (Hosts) — see tileLink there.
     parentLink: "/infra/databases",
     // Nothing to absorb: Infra is a NEW rail section, not a fold of existing
     // tiles. Database Monitoring only ever lived inside the Traces flyout, so
@@ -227,12 +227,14 @@ export const NAV_GROUPS: NavGroupDef[] = [
     // it immediately below the Reliability tile. Moving it back below Data here
     // would silently drop it one slot.
     placeAfter: "reliability",
+    // Hosts is declared FIRST so the flyout leads with it (pass-4 finding 4);
+    // the workload children are ungated on purpose — entries are always
+    // present under Infra, detection changes page state, never existence.
     children: [
+      { titleKey: "menu.hosts", icon: "dns", name: "infraHosts" },
       // Moved here from the Traces flyout. The routes are always registered
       // (the guard redirects when the feature is off), so the `gate` is what
-      // keeps the link out of the menu — and, because it is Infra's only child,
-      // what keeps the Infra TILE off the rail entirely (ONavGroup renders
-      // nothing when no child survives gating).
+      // keeps the link out of the menu.
       //
       // ONE entry, not two: Databases and Top queries are two views of the same
       // dataset over the same scope, so they are in-page tabs (DbmSectionTabs)
@@ -268,6 +270,8 @@ export const NAV_GROUPS: NavGroupDef[] = [
           "dbmTableHealth",
         ],
       },
+      { titleKey: "menu.kubernetes", icon: "hub", name: "infraKubernetes" },
+      { titleKey: "menu.awsInfra", icon: "cloud", name: "infraAws" },
     ],
   },
   {
