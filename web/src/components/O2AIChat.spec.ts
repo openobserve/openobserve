@@ -113,6 +113,7 @@ vi.mock("@/composables/contextProviders", () => ({
 
 // Component import must come after all vi.mock() declarations.
 import O2AIChat from "./O2AIChat.vue";
+import config from "@/aws-exports";
 
 // ── Stub definitions ─────────────────────────────────────────────────────────
 
@@ -238,6 +239,38 @@ describe("O2AIChat", () => {
       await flushPromises();
       const welcomeSection = wrapper.find(".welcome-section");
       expect(welcomeSection.exists()).toBe(true);
+    });
+  });
+
+  describe("toggleExpand — enterprise gate", () => {
+    afterEach(() => {
+      config.isEnterprise = "true";
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false });
+      store.commit("setIsAiChatEnabled", false);
+    });
+
+    it("should NOT open the chat on OSS builds (isEnterprise false) even with ai_enabled true", async () => {
+      config.isEnterprise = "false";
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+      store.commit("setIsAiChatEnabled", false);
+
+      wrapper = mountO2AIChat({ isOpen: false });
+      (wrapper.vm as any).toggleExpand();
+      await nextTick();
+
+      expect(store.state.isAiChatEnabled).toBe(false);
+    });
+
+    it("should open the chat when isEnterprise and ai_enabled are both true", async () => {
+      config.isEnterprise = "true";
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+      store.commit("setIsAiChatEnabled", false);
+
+      wrapper = mountO2AIChat({ isOpen: false });
+      (wrapper.vm as any).toggleExpand();
+      await nextTick();
+
+      expect(store.state.isAiChatEnabled).toBe(true);
     });
   });
 

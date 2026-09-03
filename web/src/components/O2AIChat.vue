@@ -1390,6 +1390,7 @@ import { marked } from "marked";
 import { MarkedOptions } from "marked";
 import DOMPurify from "dompurify";
 import { useStore } from "vuex";
+import config from "@/aws-exports";
 import { useTheme } from "@/composables/useTheme";
 import useAiChat from "@/composables/useAiChat";
 import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
@@ -1581,6 +1582,11 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
     const chatUpdated = computed(() => store.state.chatUpdated);
+
+    // O2 AI is enterprise-only; OSS/AI-off must never open the chat (e.g. via the Ctrl+B shortcut).
+    const aiFeatureEnabled = computed(
+      () => config.isEnterprise == "true" && store.state.zoConfig.ai_enabled,
+    );
 
     // Typewriter placeholder — only animates on the home tab (centeredStart) when no chat is open.
     // On the sidepanel the placeholder stays static ("Write your prompt").
@@ -3508,7 +3514,8 @@ export default defineComponent({
 
     const toggleExpand = () => {
       if (!store.state.isAiChatEnabled) {
-        // Closed → Open inline sidebar
+        // Closed → Open inline sidebar (blocked on OSS/AI-off so the shortcut can't surface AI)
+        if (!aiFeatureEnabled.value) return;
         store.dispatch("setIsAiChatEnabled", true);
         store.dispatch("setIsAiChatExpanded", false);
       } else if (!store.state.isAiChatExpanded) {
