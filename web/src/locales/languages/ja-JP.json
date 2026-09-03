@@ -11200,7 +11200,7 @@
             "item": "アイテム",
             "versions": "バージョン"
           },
-          "versionPill": "v{version} · {count} バージョン | v{version} · {count} バージョン",
+          "versionPill": "{count} バージョン | {count} バージョン",
           "sourceSection": "ソース",
           "sourceTrace": "トレース",
           "sourceSpan": "スパン",
@@ -11723,6 +11723,8 @@
       "schemaToggle": "出力をJSONスキーマに制約する",
       "schemaHelp": "スキーマが設定されている場合、出力はJSON形式で表示されます。",
       "schemaInvalidJson": "スキーマは有効なJSONである必要があります。",
+      "schemaIgnored": "スキーマ · このプロバイダーでは無視されます",
+      "schemaUnsupported": "このプロバイダーには構造化出力のフィールドがありません。スキーマはこの列に保持されますが送信されず、モデルはプレーンテキストで応答します。",
       "outputPlaceholder": "ここに出力が表示されます — 実行を押してください。",
       "outputNotRun": "未実行",
       "retry": "再試行",

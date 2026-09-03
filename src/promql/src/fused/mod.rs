@@ -19,6 +19,7 @@
 
 mod accumulator;
 mod eval;
+mod fold;
 mod op;
 
 pub(crate) use eval::fused_range_agg;

@@ -88,3 +88,35 @@ describe("PlaygroundVariableBar — tools dropdown", () => {
     expect(wrapper.emitted("set-tools")?.[0]).toEqual([[{ name: "fetch" }]]);
   });
 });
+
+describe("PlaygroundVariableBar — sample flash", () => {
+  // A sample lands via PlaygroundPage, which only holds a ref on the bar —
+  // this seam is what lets it reach the Variables button without knowing the
+  // menu inside the bar exists.
+  it("forwards flash() to the Variables menu inside it", () => {
+    const flashSpy = vi.fn();
+    const wrapper = mount(PlaygroundVariableBar, {
+      props: {
+        varNames: [],
+        vars: {},
+        usedVarNames: [],
+        tools: [],
+        provenance: null,
+        sample: null,
+      },
+      global: {
+        stubs: {
+          ...stubs,
+          PlaygroundVariablesMenu: {
+            template: "<div />",
+            methods: { flash: flashSpy },
+          },
+        },
+      },
+    });
+
+    (wrapper.vm as unknown as { flash: () => void }).flash();
+
+    expect(flashSpy).toHaveBeenCalledOnce();
+  });
+});

@@ -574,6 +574,20 @@ export class MetricsBuilderPage {
         return false;
     }
 
+    /** Select the first available label value, gating on the async values fetch; returns the value or ''. */
+    async selectFirstLabelValue() {
+        if (await this.isValueSelectDisabled()) return '';
+        await this.valueSelectLast.click();
+        await this.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
+        // Values load async after the popover opens; wait for the first option to attach before reading, else a one-shot count races the fetch and selects nothing (→ metric{label=""} matches nothing).
+        await this.valueOptions.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        if (await this.valueOptions.count() === 0) return '';
+        const value = (await this.valueOptions.first().textContent()).trim();
+        await this.valueOptions.first().click();
+        await this.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        return value;
+    }
+
     /**
      * Remove a label filter at the given index
      * @param {number} index - 0-based index
@@ -1369,20 +1383,16 @@ export class MetricsBuilderPage {
         const visible = await this.dashboardPanelTable.isVisible({ timeout: 5000 }).catch(() => false);
         if (!visible) return { visible: false, rowCount: 0, headers: [] };
 
-        // Wait for the table to settle (rows hydrated, or loading complete) BEFORE counting.
-        // Loading attribute `data-test-loading="false"` on `o2-table` signals query completion.
-        await this.page.locator('[data-test="o2-table"][data-test-loading="false"]')
-            .first()
-            .waitFor({ state: 'attached', timeout: 15000 })
-            .catch(() => {});
-
-        // `data-test-loading="false"` is not enough on its own: switching the chart
-        // type re-mounts the panel, so a table left over from the previous render is
-        // already attached and "not loading" while the new one has yet to hydrate its
-        // rows — we would measure that stale, empty table. Wait for the first row to
-        // actually exist. Times out quietly when the query legitimately has no data,
-        // leaving the caller's rowCount assertion to fail on the real state.
-        await this.tableRows.first().waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+        // Switching chart type + re-running leaves a stale table (loading=false but empty)
+        // attached while the new one hydrates, and under CI load the query response can land
+        // late — so wait for a table that is BOTH done-loading AND has rows, not either alone.
+        // Times out quietly when the query legitimately has no data, leaving the caller's
+        // rowCount assertion to fail on the real state.
+        await this.page.waitForFunction(() => {
+            const doneLoading = document.querySelector('[data-test="o2-table"][data-test-loading="false"]');
+            const hasRows = document.querySelectorAll('[data-test^="o2-table-row-"]').length > 0;
+            return !!doneLoading && hasRows;
+        }, undefined, { timeout: 25000 }).catch(() => {});
 
         // Get header texts via the data-test header cells
         const headers = [];

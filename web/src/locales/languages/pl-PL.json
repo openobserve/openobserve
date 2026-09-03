@@ -11200,7 +11200,7 @@
             "item": "Element",
             "versions": "Wersje"
           },
-          "versionPill": "v{version} · {count} wersja | v{version} · {count} wersje",
+          "versionPill": "{count} wersja | {count} wersje",
           "sourceSection": "Źródło",
           "sourceTrace": "Ślad",
           "sourceSpan": "Span",
@@ -11723,6 +11723,8 @@
       "schemaToggle": "Ogranicz wyjście do schematu JSON",
       "schemaHelp": "Wyjście jest formatowane jako JSON, gdy ustawiony jest schemat.",
       "schemaInvalidJson": "Schemat musi być poprawnym JSON.",
+      "schemaIgnored": "Schemat · Ignorowany przez tego dostawcę",
+      "schemaUnsupported": "Ten dostawca nie ma pola danych strukturalnych. Schemat pozostaje w tej kolumnie, ale nie jest wysyłany, a model odpowiada zwykłym tekstem.",
       "outputPlaceholder": "Wyjście pojawi się tutaj — naciśnij Uruchom.",
       "outputNotRun": "Nie uruchomiono",
       "retry": "Ponów",

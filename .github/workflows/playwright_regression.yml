@@ -2,9 +2,8 @@ name: Playwright Regression Tests
 
 on:
   schedule:
-    # Daytime IST only (9 AM, 1 PM, 5 PM, 9 PM IST) — the 1 AM and 5 AM IST slots were
-    # dropped: main rarely moves overnight, so those runs mostly re-tested unchanged code.
-    - cron: '30 3,7,11,15 * * *'  # 9 AM, 1 PM, 5 PM, 9 PM IST (3:30, 7:30, 11:30, 15:30 UTC)
+    # Once a day, after the previous day's merges and before either team starts (08:00 Beijing, 05:30 IST).
+    - cron: '0 0 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -117,6 +116,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -181,8 +181,11 @@ jobs:
       - uses: actions/checkout@v5
       - id: gen
         run: |
-          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix_regression.json)
-          if [ -z "$MATRIX" ]; then echo "::error::matrix generation failed (build-ci-matrix produced no output)"; exit 1; fi
+          # The queue no longer runs Playwright, so this daily run covers the full CI matrix plus the RegressionSet.
+          CI=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json)
+          RG=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix_regression.json)
+          if [ -z "$CI" ] || [ -z "$RG" ]; then echo "::error::matrix generation failed (build-ci-matrix produced no output)"; exit 1; fi
+          MATRIX=$(node -e 'const [a,b]=process.argv.slice(1).map(JSON.parse); console.log(JSON.stringify({include:[...a.include,...b.include]}))' "$CI" "$RG")
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
           echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log('generated',m.include.length,'shards:', m.include.map(s=>s.testfolder).join(', '))"
 
@@ -317,8 +320,13 @@ jobs:
               FILE_PATHS="$FILE_PATHS $FILE_PATH"
             done
 
-            echo "DEBUG: Final command: npx playwright test $FILE_PATHS"
-            npx playwright test $FILE_PATHS
+            # Per-shard worker pin from the matrix, same contract as playwright.yml.
+            WORKERS_ARG=""
+            if [ -n "${{ matrix.workers }}" ]; then
+              WORKERS_ARG="--workers=${{ matrix.workers }}"
+            fi
+            echo "DEBUG: Final command: npx playwright test $FILE_PATHS $WORKERS_ARG"
+            npx playwright test $FILE_PATHS $WORKERS_ARG
           else
             echo "No files specified to run for ${{ matrix.testfolder }} folder"
           fi
@@ -702,4 +710,47 @@ jobs:
             echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
             echo "  merge_reports: ${{ needs.merge_reports.result }}"
             exit 1
+          fi
+
+  # GitHub emails assignees and @-mentioned users, so a tracking issue is the notification:
+  # one open issue per breakage, a comment per further failing day, closed by the next green run.
+  report_result:
+    name: Report result
+    needs: [ui_integration_tests, playwright_summary]
+    if: ${{ always() && needs.ui_integration_tests.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      LABEL: ci-regression-failure
+      NOTIFY: hengfeiyang,oasisk,Shrinath-O2
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      RESULT: ${{ needs.playwright_summary.result }}
+    steps:
+      - name: Open or update the failure issue, or close it on green
+        run: |
+          OPEN=$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number // ""')
+          if [ "$RESULT" = "success" ]; then
+            if [ -n "$OPEN" ]; then
+              gh issue close "$OPEN" --comment "Regression is green again on main (${{ github.sha }}): $RUN_URL"
+            fi
+            exit 0
+          fi
+          FAILED=$(gh api --paginate "repos/$GH_REPO/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.name | startswith("e2e /")) | select(.conclusion == "failure" or .conclusion == "timed_out") | .name] | join(", ")')
+          MENTIONS=$(echo "$NOTIFY" | sed 's/[^,]*/@&/g; s/,/ /g')
+          BODY="Playwright regression failed on main at ${{ github.sha }}.
+          Failed shards: ${FAILED:-none listed (build or report merge failed)}
+          Run: $RUN_URL
+
+          $MENTIONS"
+          if [ -n "$OPEN" ]; then
+            gh issue comment "$OPEN" --body "$BODY"
+          else
+            gh label create "$LABEL" --color B60205 --description "Daily Playwright regression on main is failing" 2>/dev/null || true
+            gh issue create --title "Playwright regression failing on main" --label "$LABEL" --assignee "$NOTIFY" --body "$BODY"
           fi

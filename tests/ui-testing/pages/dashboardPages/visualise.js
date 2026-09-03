@@ -77,6 +77,8 @@ export default class LogsVisualise {
     if (isTableSelected !== "true") {
       await tableChartItem.click();
     }
+    // The chart-type switch is reactive and lags the click; gate on it actually applying so downstream steps don't run against the wrong chart type.
+    await expect(tableChartItem).toHaveAttribute("data-selected", "true", { timeout: 10000 });
   }
 
   //Apply: Logs
@@ -675,15 +677,20 @@ export default class LogsVisualise {
 
   // Open query inspector from a panel dropdown
   async openPanelQueryInspector(panelName) {
-    // Wait for the dashboard view to fully load after panel save
-    await this.page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+    // The Query Inspector item is v-if-gated on the panel's metaData, populated only after its query executes, so wait for the panel to render before opening the menu.
+    await this.verifyChartRenders(this.page);
 
     const dropdown = this.getPanelDropdown(panelName);
     await dropdown.waitFor({ state: "visible", timeout: 20000 });
-    await dropdown.click();
 
     const inspectorBtn = this.page.locator('[data-test="dashboard-query-inspector-panel"]');
-    await inspectorBtn.waitFor({ state: "visible", timeout: 10000 });
+    // Opening the menu before the item mounts leaves it absent for that open, so re-open until it appears.
+    await expect(async () => {
+      if (await inspectorBtn.isVisible().catch(() => false)) return;
+      await dropdown.click();
+      await expect(inspectorBtn).toBeVisible({ timeout: 2000 });
+    }).toPass({ timeout: 20000, intervals: [300, 700, 1500] });
+
     await inspectorBtn.click();
     await this.waitForQueryInspector(this.page);
   }

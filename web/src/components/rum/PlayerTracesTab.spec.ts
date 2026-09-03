@@ -59,10 +59,10 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 
 // Stream discovery: default resolves nothing so every row falls back to the
 // default stream and the pre-discovery tests keep their single-call shape;
-// individual tests override with per-id streams.
-const mockResolveTracesStreamsBulk = vi.fn().mockResolvedValue({});
+// individual tests override with per-id locations.
+const mockResolveTraceLocationsBulk = vi.fn().mockResolvedValue({});
 vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
-  default: () => ({ resolveTracesStreamsBulk: mockResolveTracesStreamsBulk }),
+  default: () => ({ resolveTraceLocationsBulk: mockResolveTraceLocationsBulk }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -308,9 +308,9 @@ describe("PlayerTracesTab", () => {
     it("gives each row its own stream and fetches metadata per distinct stream", async () => {
       const P1 = "01a034c1aabc72f78880daf6c9755cff"; // → payments_traces
       const C1 = "01a038ddccc770b9bba3b2df20c12415"; // → checkout_traces
-      mockResolveTracesStreamsBulk.mockResolvedValueOnce({
-        [P1]: "payments_traces",
-        [C1]: "checkout_traces",
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({
+        [P1]: { stream: "payments_traces" },
+        [C1]: { stream: "checkout_traces" },
       });
 
       // RUM hits for both ids; metadata mock answers per queried stream.
@@ -364,6 +364,69 @@ describe("PlayerTracesTab", () => {
       expect(traceDetails.exists()).toBe(true);
       expect(traceDetails.props("streamNameProp")).toBe("checkout_traces");
       expect(traceDetails.props("traceIdProp")).toBe(C1);
+    });
+
+    it("bounds the metadata query by the indexed ranges instead of the session window", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff";
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({
+        [P1]: {
+          stream: "default",
+          range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_090_000_000 },
+        },
+      });
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: P1 })],
+        [createTraceMetadata({ trace_id: P1 })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      expect(queryReq.start_time).toBe(1_700_000_000_000_000 - 60_000_000);
+      expect(queryReq.end_time).toBe(1_700_000_090_000_000 + 60_000_000);
+    });
+
+    it("keeps the session window when a trace has no indexed range", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff";
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({ [P1]: { stream: "default" } });
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: P1 })],
+        [createTraceMetadata({ trace_id: P1 })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      // the component's default props: startTime 1000 ms, endTime 2000 ms
+      expect(queryReq.start_time).toBe(1000 * 1000);
+      expect(queryReq.end_time).toBe(2000 * 1000);
+    });
+
+    it("opens a row over its indexed range when the metadata carries no timings", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff";
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({
+        [P1]: {
+          stream: "default",
+          range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_090_000_000 },
+        },
+      });
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: P1 })],
+        [createTraceMetadata({ trace_id: P1, start_time: undefined, end_time: undefined })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const rows = wrapper.findAll('[data-test^="table-row-"]');
+      await rows[0].trigger("click");
+      await flushPromises();
+
+      const traceDetails = wrapper.findComponent({ name: "TraceDetails" });
+      expect(traceDetails.props("startTimeProp")).toBe(1_700_000_000_000_000 - 60_000_000);
+      expect(traceDetails.props("endTimeProp")).toBe(1_700_000_090_000_000 + 60_000_000);
     });
 
     it("joins legacy zero-stripped RUM ids with padded traces-stream metadata", async () => {
