@@ -311,7 +311,7 @@ export default class LogsVisualise {
     await this.queryEditor.fill(vrl);
   }
 
-  async runQueryAndWaitForCompletion() {
+  async runQueryAndWaitForCompletion({ expectTable = false } = {}) {
     const runBtn = this.page.locator(
       '[data-test="logs-search-bar-visualize-refresh-btn"]'
     );
@@ -323,6 +323,11 @@ export default class LogsVisualise {
     // Wait for query to start (cancel btn appears) then complete (cancel btn disappears)
     await cancelBtn.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
     await cancelBtn.waitFor({ state: "hidden", timeout: 30000 }).catch(() => {});
+    // The cancel button is enterprise-gated (SearchBar.vue config.isEnterprise), so on OSS the waits above are no-ops that don't gate completion — wait for the result to actually render (the table specifically when the caller expects one, so a transient chart-renderer can't satisfy the gate early).
+    const resultSelector = expectTable
+      ? '[data-test="dashboard-panel-table"]'
+      : '[data-test="chart-renderer"], [data-test="dashboard-panel-table"]';
+    await this.page.locator(resultSelector).first().waitFor({ state: "visible", timeout: 30000 }).catch(() => {});
   }
 
   // Helper function to check for dashboard errors
