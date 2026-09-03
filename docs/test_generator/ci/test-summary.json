@@ -1,0 +1,6 @@
+[
+  { "title": "OSS Logs: floating AI toggle icon must not render", "action": "new", "verifies": "the floating AI toggle icon is absent from the Logs main query editor on OSS (aiFeatureEnabled false)" },
+  { "title": "OSS Logs: AI input bar must not render", "action": "new", "verifies": "the AI input bar and its input field are absent from the Logs main query editor on OSS" },
+  { "title": "OSS Logs: VRL editor AI toggle + bar must not render", "action": "new", "verifies": "the VRL function editor's AI toggle and input bar are absent on OSS (default query-editor prefix)" },
+  { "title": "Enterprise + ai_enabled: AI bar IS shown (positive gate) — not runnable in OSS checkout", "action": "new", "verifies": "the positive gate (toggle visible, click opens AI bar) is parked as fixme because it requires an enterprise build" }
+]

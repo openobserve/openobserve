@@ -184,6 +184,12 @@ export class LogsPage {
 
         // Additional locators
         this.fnEditor = '[data-test="logs-vrl-function-editor"]';
+        // AI bar/toggle selectors (QueryEditor.vue `${dataTestPrefix}-ai-*`); the VRL editor keeps the default `query-editor` prefix while the main editor is `logs-search-bar`.
+        this.aiToggleBtn = '[data-test="logs-search-bar-ai-toggle-btn"]';
+        this.aiInputBar = '[data-test="logs-search-bar-ai-input-bar"]';
+        this.aiInputField = '[data-test="logs-search-bar-ai-input-field"]';
+        this.vrlAiToggleBtn = '[data-test="query-editor-ai-toggle-btn"]';
+        this.vrlAiInputBar = '[data-test="query-editor-ai-input-bar"]';
         this.searchListFirstTextLeft = '.search-list > :nth-child(1) > .text-left';
         // SearchResult.vue exposes the result title via data-test — replacement for the
         // legacy class-based searchListFirstTextLeft selector in expectSearchListVisible.
@@ -4456,6 +4462,30 @@ export class LogsPage {
 
         testLogger.info('Results view is visible - query editor toggled off successfully');
         return true;
+    }
+
+    async expectFnEditorVisible() {
+        return await expect(this.page.locator(this.fnEditor).first()).toBeVisible();
+    }
+
+    async expectAiToggleAbsent() {
+        return await expect(this.page.locator(this.aiToggleBtn)).toHaveCount(0);
+    }
+
+    async expectAiInputBarAbsent() {
+        return await expect(this.page.locator(this.aiInputBar)).toHaveCount(0);
+    }
+
+    async expectAiInputFieldAbsent() {
+        return await expect(this.page.locator(this.aiInputField)).toHaveCount(0);
+    }
+
+    async expectVrlAiToggleAbsent() {
+        return await expect(this.page.locator(this.vrlAiToggleBtn)).toHaveCount(0);
+    }
+
+    async expectVrlAiInputBarAbsent() {
+        return await expect(this.page.locator(this.vrlAiInputBar)).toHaveCount(0);
     }
 
     async isVrlEditorInputVisible() {
