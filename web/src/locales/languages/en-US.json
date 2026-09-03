@@ -16290,7 +16290,17 @@
       "exploreTraces": "Explore traces for this host",
       "tracesScopeNote": "Traces open in the Traces explorer scoped to this host and time range.",
       "openDashboard": "Open Host Metrics dashboard",
-      "windowsLivenessNote": "Windows hosts appear in this list only when the agent reports the load metric (system_cpu_load_average_15m) — if your Windows agents are running but missing here, enable the load scraper in the collector config or update the agent."
+      "windowsLivenessNote": "Windows hosts appear in this list only when the agent reports the load metric (system_cpu_load_average_15m) — if your Windows agents are running but missing here, enable the load scraper in the collector config or update the agent.",
+      "panel": {
+        "cpuBusy": "CPU busy",
+        "cpuByState": "CPU by state",
+        "memoryByState": "Memory by state",
+        "load": "Load 1m / 5m / 15m",
+        "diskRead": "Disk read",
+        "diskWrite": "Disk write",
+        "filesystemUsedPct": "Filesystem used %",
+        "networkByDirection": "Network I/O by direction"
+      }
     },
     "workload": {
       "kubernetesTitle": "Kubernetes",

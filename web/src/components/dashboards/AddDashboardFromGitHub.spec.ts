@@ -1066,7 +1066,7 @@ describe("AddDashboardFromGitHub Component", () => {
 
     it("shows a confirm dialog listing the conflicting title instead of deleting silently", async () => {
       vi.mocked(dashboardsService.list).mockResolvedValue({
-        data: { dashboards: [{ dashboardId: "d1", title: "Host Metrics" }] },
+        data: { dashboards: [{ dashboard_id: "d1", title: "Host Metrics" }] },
       } as any);
       await seedSelection(["hm.json"], { "hm.json": { title: "Host Metrics", version: 8 } });
 
@@ -1087,7 +1087,7 @@ describe("AddDashboardFromGitHub Component", () => {
     it("confirming runs delete → 500ms settle → create", async () => {
       vi.useFakeTimers();
       vi.mocked(dashboardsService.list).mockResolvedValue({
-        data: { dashboards: [{ dashboardId: "d1", title: "Host Metrics" }] },
+        data: { dashboards: [{ dashboard_id: "d1", title: "Host Metrics" }] },
       } as any);
       vi.mocked(dashboardsService.delete).mockResolvedValue({} as any);
       vi.mocked(dashboardsService.create).mockResolvedValue({ data: {} } as any);
@@ -1109,7 +1109,7 @@ describe("AddDashboardFromGitHub Component", () => {
 
     it("declining skips the conflicting file while the rest of the batch proceeds", async () => {
       vi.mocked(dashboardsService.list).mockResolvedValue({
-        data: { dashboards: [{ dashboardId: "d1", title: "Host Metrics" }] },
+        data: { dashboards: [{ dashboard_id: "d1", title: "Host Metrics" }] },
       } as any);
       vi.mocked(dashboardsService.create).mockResolvedValue({ data: {} } as any);
       await seedSelection(["hm.json", "other.json"], {
@@ -1129,6 +1129,29 @@ describe("AddDashboardFromGitHub Component", () => {
       expect(vi.mocked(dashboardsService.create).mock.calls[0][1]).toEqual(
         expect.objectContaining({ title: "Fresh Title" }),
       );
+    });
+
+    it("closing the drawer mid-batch stops further imports and parks no new confirm", async () => {
+      vi.mocked(dashboardsService.list).mockResolvedValue({
+        data: { dashboards: [{ dashboard_id: "d1", title: "Host Metrics" }] },
+      } as any);
+      vi.mocked(dashboardsService.create).mockResolvedValue({ data: {} } as any);
+      // Both files conflict — without the cancel flag the second would park a NEW confirm.
+      await seedSelection(["hm.json", "hm2.json"], {
+        "hm.json": { title: "Host Metrics", version: 8 },
+        "hm2.json": { title: "Host Metrics", version: 8 },
+      });
+
+      const pending = wrapper.vm.confirmAdd();
+      await flushPromises();
+      expect(replaceDialog().props("open")).toBe(true);
+      await wrapper.setProps({ modelValue: false });
+      await flushPromises();
+      await pending;
+
+      expect(wrapper.vm.replaceConfirm).toBeNull();
+      expect(dashboardsService.delete).not.toHaveBeenCalled();
+      expect(dashboardsService.create).not.toHaveBeenCalled();
     });
   });
 });

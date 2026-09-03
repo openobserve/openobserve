@@ -102,7 +102,8 @@ const loadDashboards = async () => {
             .includes(keyword)
         ) {
           rows.push({
-            dashboardId: d.dashboardId,
+            // LIST rows are snake_case on the wire (dashboard_id) — camelCase never arrives.
+            dashboardId: d.dashboard_id ?? d.dashboardId ?? d.id,
             title: d.title,
             folderId: folderIds[index],
           });
@@ -162,7 +163,11 @@ watch(
       data-test="workload-setup-state"
     >
       <OText tag="h2" class="text-xl font-semibold">{{ t("infra.workload.setupHeadline") }}</OText>
-      <DataSourceSetupCard v-if="def.setup.kind === 'card'" :slug="def.setup.slug" />
+      <DataSourceSetupCard
+        v-if="def.setup.kind === 'card'"
+        :slug="def.setup.slug"
+        @detected="detection.refresh({ force: true })"
+      />
       <div v-else>
         <OButton
           variant="primary"

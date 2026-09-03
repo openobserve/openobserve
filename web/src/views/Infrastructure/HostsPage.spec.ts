@@ -242,7 +242,8 @@ describe("HostsPage", () => {
       // The card's own detection state never reaches this page's instance — the emit must.
       wrapper.findComponent({ name: "DataSourceSetupCard" }).vm.$emit("detected", 4);
       await flushPromises();
-      expect(detectionRefresh).toHaveBeenCalled();
+      // force:true — the stream cache may hold a stale empty list from this page's own mount.
+      expect(detectionRefresh).toHaveBeenCalledWith({ force: true });
     });
 
     it("flips from the embedded setup card to the live table when detection connects", async () => {

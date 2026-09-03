@@ -17,6 +17,7 @@
 // dashboard and the logs preview SQL. Host names are escaped, never excluded —
 // excluding would silently drop a real host.
 
+import { gt } from "@/types/i18n";
 import { HOSTS_DEVICE_EXCLUSION } from "./hostsQueries";
 
 // Not derivable from this repo (§7 risk 1) — a wrong value degrades to an empty logs search, never an error.
@@ -93,28 +94,28 @@ export function buildHostDashboard(host: string) {
     {
       id: "hd_cpu_busy",
       type: "line",
-      title: "CPU busy",
+      title: gt("infra.hosts.panel.cpuBusy"),
       unit: "percent",
       queries: [[`100 * (1 - avg(irate(system_cpu_time{state="idle",${h}}[5m])))`, "busy"]],
     },
     {
       id: "hd_cpu_by_state",
       type: "line",
-      title: "CPU by state",
+      title: gt("infra.hosts.panel.cpuByState"),
       unit: "percent-1",
       queries: [[`avg by (state)(irate(system_cpu_time{${h},state!="idle"}[5m]))`, "{state}"]],
     },
     {
       id: "hd_memory_by_state",
       type: "area-stacked",
-      title: "Memory by state",
+      title: gt("infra.hosts.panel.memoryByState"),
       unit: "bytes",
       queries: [[`sum by (state)(system_memory_usage{${h}})`, "{state}"]],
     },
     {
       id: "hd_load",
       type: "line",
-      title: "Load 1m / 5m / 15m",
+      title: gt("infra.hosts.panel.load"),
       unit: "numbers",
       queries: [
         [`avg(system_cpu_load_average_1m{${h}})`, "1m"],
@@ -125,7 +126,7 @@ export function buildHostDashboard(host: string) {
     {
       id: "hd_disk_read",
       type: "line",
-      title: "Disk read",
+      title: gt("infra.hosts.panel.diskRead"),
       unit: "bps",
       queries: [
         [
@@ -137,7 +138,7 @@ export function buildHostDashboard(host: string) {
     {
       id: "hd_disk_write",
       type: "line",
-      title: "Disk write",
+      title: gt("infra.hosts.panel.diskWrite"),
       unit: "bps",
       queries: [
         [
@@ -149,7 +150,7 @@ export function buildHostDashboard(host: string) {
     {
       id: "hd_fs_used_pct",
       type: "line",
-      title: "Filesystem used %",
+      title: gt("infra.hosts.panel.filesystemUsedPct"),
       unit: "percent",
       queries: [
         [
@@ -161,7 +162,7 @@ export function buildHostDashboard(host: string) {
     {
       id: "hd_network_by_direction",
       type: "line",
-      title: "Network I/O by direction",
+      title: gt("infra.hosts.panel.networkByDirection"),
       unit: "bps",
       queries: [[`sum by (direction)(irate(system_network_io{${h}}[5m]))`, "{direction}"]],
     },

@@ -125,16 +125,42 @@ describe("useWorkloadDetection", () => {
   });
 
   describe("stream-list access", () => {
-    it("pulls metrics and logs with schema=false and notify=false, never force", async () => {
+    it("pulls metrics and logs with schema=false and notify=false; mount-style refresh() never forces", async () => {
       const { refresh } = useWorkloadDetection();
       await refresh();
       await flushPromises();
       // notify=false must be the explicit third arg or every empty-state render toasts (pass-2 finding 4).
-      expect(getStreams).toHaveBeenCalledWith("metrics", false, false);
-      expect(getStreams).toHaveBeenCalledWith("logs", false, false);
+      expect(getStreams).toHaveBeenCalledWith("metrics", false, false, false);
+      expect(getStreams).toHaveBeenCalledWith("logs", false, false, false);
       for (const call of getStreams.mock.calls) {
-        expect(call[3] ?? false).toBe(false);
+        expect(call[3]).toBe(false);
       }
+    });
+
+    it("forces the stream fetch on detect-driven refresh({force:true}), never on plain refresh()", async () => {
+      const { refresh } = useWorkloadDetection();
+      await refresh({ force: true });
+      await flushPromises();
+      expect(getStreams).toHaveBeenCalledWith("metrics", false, false, true);
+      expect(getStreams).toHaveBeenCalledWith("logs", false, false, true);
+    });
+
+    it("flips empty→live past a stale cached empty list when forced (cold-review finding 2)", async () => {
+      // getStreams caches an EMPTY list forever with force=false — only force:true re-fetches.
+      getStreams.mockImplementation((streamType: string, _schema, _notify, force) => {
+        if (streamType !== "metrics") return Promise.resolve(streams([]));
+        return Promise.resolve(
+          force ? streams(["system_cpu_time", "system_memory_usage"]) : streams([]),
+        );
+      });
+      const { states, refresh } = useWorkloadDetection();
+      await refresh();
+      await flushPromises();
+      expect(states.value.hosts).toBe("undetected");
+      // The agent connected; the @detected handler refreshes with force — the state must flip.
+      await refresh({ force: true });
+      await flushPromises();
+      expect(states.value.hosts).toBe("detected");
     });
 
     it("refresh() re-evaluates against the current stream list (org switch, no stale leak)", async () => {

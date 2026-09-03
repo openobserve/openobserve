@@ -71,7 +71,7 @@ describe("importHostMetricsDashboard", () => {
 
   it("still confirms the exact title on returned rows (server filter may be substring)", async () => {
     listMock.mockResolvedValue(
-      listResponse([{ dashboardId: "near-miss", title: "Host Metrics Extended" }]),
+      listResponse([{ dashboard_id: "near-miss", title: "Host Metrics Extended" }]),
     );
     const result = await importHostMetricsDashboard("org-a");
     expect(result.status).toBe("created");
@@ -79,7 +79,8 @@ describe("importHostMetricsDashboard", () => {
   });
 
   it("returns exists without deleting or re-creating when the dashboard is found", async () => {
-    listMock.mockResolvedValue(listResponse([{ dashboardId: "dash-old", title: "Host Metrics" }]));
+    // LIST rows are snake_case on the wire — ListDashboardsResponseBodyItem carries `dashboard_id`.
+    listMock.mockResolvedValue(listResponse([{ dashboard_id: "dash-old", title: "Host Metrics" }]));
     const result = await importHostMetricsDashboard("org-a");
     // An automatic trigger must never destroy user edits silently (4.2).
     expect(result).toEqual({ status: "exists", dashboardId: "dash-old", folderId: "default" });

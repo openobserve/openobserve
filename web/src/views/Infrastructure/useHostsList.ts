@@ -122,6 +122,7 @@ export function useHostsList() {
               start_time: start,
               end_time: end,
               from: 0,
+              // Silent ceiling: hosts beyond 10k rows drop from last-seen with no error surfaced.
               size: 10000,
             },
           },
@@ -270,6 +271,12 @@ export function useHostsList() {
   const pagedRows = computed(() =>
     filteredRows.value.slice((page.value - 1) * PAGE_SIZE, page.value * PAGE_SIZE),
   );
+
+  // A refresh/filter that shrinks the list must never strand the pager on an empty page.
+  watch(filteredRows, (current) => {
+    const lastPage = Math.max(1, Math.ceil(current.length / PAGE_SIZE));
+    if (page.value > lastPage) page.value = lastPage;
+  });
 
   return {
     rows,

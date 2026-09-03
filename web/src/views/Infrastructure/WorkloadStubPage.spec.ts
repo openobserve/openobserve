@@ -118,6 +118,14 @@ describe("WorkloadStubPage", () => {
     expect(listMock).not.toHaveBeenCalled();
   });
 
+  it("force-refreshes detection when the embedded card emits detected (stale-cache flip)", async () => {
+    wrapper = await mountPage("kubernetes");
+    detectionRefresh.mockClear();
+    wrapper.findComponent({ name: "DataSourceSetupCard" }).vm.$emit("detected", 2);
+    await flushPromises();
+    expect(detectionRefresh).toHaveBeenCalledWith({ force: true });
+  });
+
   it("routes the undetected AWS page to the Data Sources AWS surface (no registered card)", async () => {
     wrapper = await mountPage("aws");
     expect(wrapper.find('[data-test="setup-card-stub"]').exists()).toBe(false);
@@ -133,8 +141,8 @@ describe("WorkloadStubPage", () => {
       listMock.mockResolvedValue({
         data: {
           dashboards: [
-            { dashboardId: "k1", title: "Kubernetes Overview" },
-            { dashboardId: "x1", title: "Nginx Ingress-Free" },
+            { dashboard_id: "k1", title: "Kubernetes Overview" },
+            { dashboard_id: "x1", title: "Nginx Ingress-Free" },
           ],
         },
       } as any);
@@ -155,8 +163,8 @@ describe("WorkloadStubPage", () => {
           data: {
             dashboards:
               folder === "xyz"
-                ? [{ dashboardId: "a2", title: "AWS CloudWatch" }]
-                : [{ dashboardId: "a1", title: "AWS EC2" }],
+                ? [{ dashboard_id: "a2", title: "AWS CloudWatch" }]
+                : [{ dashboard_id: "a1", title: "AWS EC2" }],
           },
         } as any);
       });
@@ -195,14 +203,14 @@ describe("WorkloadStubPage", () => {
           }) as any,
       );
       listMock.mockResolvedValue({
-        data: { dashboards: [{ dashboardId: "new1", title: "Kubernetes New" }] },
+        data: { dashboards: [{ dashboard_id: "new1", title: "Kubernetes New" }] },
       } as any);
       wrapper = await mountPage("kubernetes");
       // Org switch issues a fresh load while the first is still in flight.
       store.state.selectedOrganization = { identifier: "other-org" };
       await flushPromises();
       resolveStale({
-        data: { dashboards: [{ dashboardId: "stale1", title: "Kubernetes Stale" }] },
+        data: { dashboards: [{ dashboard_id: "stale1", title: "Kubernetes Stale" }] },
       });
       await flushPromises();
       expect(wrapper.find('[data-test="workload-dashboard-row-stale1"]').exists()).toBe(false);
@@ -241,7 +249,7 @@ describe("WorkloadStubPage", () => {
   it("re-runs detection and resets the dashboards list on org switch", async () => {
     workloadStates.value = { ...workloadStates.value, kubernetes: "detected" };
     listMock.mockResolvedValue({
-      data: { dashboards: [{ dashboardId: "k1", title: "Kubernetes Overview" }] },
+      data: { dashboards: [{ dashboard_id: "k1", title: "Kubernetes Overview" }] },
     } as any);
     wrapper = await mountPage("kubernetes");
     detectionRefresh.mockClear();

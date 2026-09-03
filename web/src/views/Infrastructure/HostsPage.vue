@@ -37,6 +37,7 @@ import DateTime from "@/components/DateTime.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import HostDetailDrawer from "./HostDetailDrawer.vue";
 import { useHostsList, utilizationTint, type HostRow } from "./useHostsList";
+import { HOSTS_DEFAULT_RELATIVE_PERIOD, HOSTS_DEFAULT_WINDOW_US } from "./hostsQueries";
 import { useWorkloadDetection } from "@/composables/useWorkloadDetection";
 
 const store = useStore();
@@ -64,10 +65,8 @@ const {
 const hostsState = computed(() => detection.states.value.hosts);
 const loading = ref(false);
 
-// Default window: last 3h, matching the bundled dashboard's default duration.
-const THREE_HOURS_US = 3 * 60 * 60 * 1000 * 1000;
 const nowUs = () => Date.now() * 1000;
-const range = ref({ start: nowUs() - THREE_HOURS_US, end: nowUs() });
+const range = ref({ start: nowUs() - HOSTS_DEFAULT_WINDOW_US, end: nowUs() });
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "");
 
@@ -320,7 +319,7 @@ const osToggleLabel = (slug: string) =>
           auto-apply
           menu-align="end"
           default-type="relative"
-          default-relative-time="3h"
+          :default-relative-time="HOSTS_DEFAULT_RELATIVE_PERIOD"
           data-test-name="hosts-date-time"
           @on:date-change="onDateChange"
         />
@@ -363,7 +362,7 @@ const osToggleLabel = (slug: string) =>
         </OButton>
       </div>
       <!-- Detection connecting inside the embedded card must flip this page live (design 4.8). -->
-      <DataSourceSetupCard :slug="osSlug" @detected="detection.refresh()" />
+      <DataSourceSetupCard :slug="osSlug" @detected="detection.refresh({ force: true })" />
     </div>
 
     <!-- Total failure: ONE page-level surface, never stacked column warnings. -->

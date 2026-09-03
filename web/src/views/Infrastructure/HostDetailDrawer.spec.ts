@@ -261,6 +261,28 @@ describe("HostDetailDrawer", () => {
       expect(args.query.query.sql).toContain("host_name = 'web-02'");
     });
 
+    it("drops a stale logs response that resolves after the host switched (out-of-order)", async () => {
+      let resolveStale!: (v: any) => void;
+      searchMock.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveStale = resolve;
+          }) as any,
+      );
+      searchMock.mockResolvedValue({
+        data: { hits: [{ _timestamp: 2, log: "NEW-HOST-LINE" }] },
+      } as any);
+      wrapper = await mountDrawer();
+      await openTab("logs");
+      // Host switches while web-01's fetch is still in flight; web-02's resolves first.
+      await wrapper.setProps({ hostName: "web-02" });
+      await flushPromises();
+      resolveStale({ data: { hits: [{ _timestamp: 1, log: "OLD-HOST-LINE" }] } });
+      await flushPromises();
+      expect(wrapper.text()).toContain("NEW-HOST-LINE");
+      expect(wrapper.text()).not.toContain("OLD-HOST-LINE");
+    });
+
     it("clears the loaded flag when the host changes off the logs tab", async () => {
       wrapper = await mountDrawer();
       await openTab("logs");
