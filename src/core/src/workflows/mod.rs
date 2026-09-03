@@ -259,7 +259,23 @@ pub async fn get_error_input_data(errors: &WorkflowRunErrors) -> Result<String, 
     ))
 }
 
+// Re-serializing Unsupported rewrites a newer build's node data, so every save path must bounce it.
+fn reject_unsupported_nodes(workflow: &Workflow) -> Result<(), anyhow::Error> {
+    match workflow
+        .nodes
+        .iter()
+        .find(|n| matches!(n.data, NodeData::Unsupported))
+    {
+        Some(node) => Err(anyhow::anyhow!(
+            "node {} has an unsupported node type: this version of OpenObserve does not recognize it",
+            node.id
+        )),
+        None => Ok(()),
+    }
+}
+
 async fn validate_workflow(workflow: &Workflow, is_draft: bool) -> Result<(), anyhow::Error> {
+    reject_unsupported_nodes(workflow)?;
     for node in &workflow.nodes {
         if !node.position.is_valid() {
             return Err(anyhow::anyhow!("node {} position is not valid", node.id));
@@ -328,6 +344,7 @@ pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
 }
 
 pub async fn save_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
+    reject_unsupported_nodes(&workflow)?;
     db::workflows::save_draft_record(workflow.clone()).await?;
     set_ownership(&workflow.org_id, "workflows", Authz::new(&workflow.id)).await;
     db::workflows::notify_draft_upsert(&workflow).await?;
@@ -342,6 +359,7 @@ pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
 }
 
 pub async fn update_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
+    reject_unsupported_nodes(&workflow)?;
     db::workflows::update_draft_record(workflow.clone()).await?;
     db::workflows::notify_draft_upsert(&workflow).await?;
     Ok(())
@@ -576,9 +594,21 @@ async fn persist_run_errors(
     }
 }
 
-/// `workflow_id` is the REAL saved id, not the synthetic `test-<uuid>` the executable runs
-/// under: the history API matches on `key LIKE '{workflow_id}/%'`, so a synthetic id there
-/// would make every Test row unreadable.
+// A body-supplied id keys history only once proven to name a workflow or draft in this org.
+async fn verified_history_id<'a>(org_id: &str, claimed_id: &'a str) -> Option<&'a str> {
+    if claimed_id.is_empty() {
+        return None;
+    }
+    let known = matches!(get_workflow_by_id(org_id, claimed_id).await, Ok(Some(_)))
+        || matches!(get_draft_by_id(org_id, claimed_id).await, Ok(Some(_)));
+    history_id_if_known(claimed_id, known)
+}
+
+fn history_id_if_known(claimed_id: &str, known_in_org: bool) -> Option<&str> {
+    (known_in_org && !claimed_id.is_empty()).then_some(claimed_id)
+}
+
+/// `workflow_id` is the sender-claimed saved id; history is recorded only when it verifies.
 pub async fn test_workflow(
     org_id: &str,
     workflow_id: &str,
@@ -597,7 +627,7 @@ pub async fn test_workflow(
     let run_id = config::ider::uuid();
     let start_time = chrono::Utc::now().timestamp_micros();
     let res = executable
-        .process_workflow_with_options(
+        .process_workflow(
             org_id,
             inputs,
             from_node,
@@ -606,27 +636,28 @@ pub async fn test_workflow(
             },
         )
         .await;
-    record_workflow_run(
-        org_id,
-        workflow_id,
-        WorkflowTriggerType::Test,
-        user_id,
-        &run_id,
-        start_time,
-        run_error_from_result(&res),
-    );
-    // a test run is listed in history like any other, so its per-node data has to be
-    // stored too or re-opening it later shows every node as never having run
-    if let Ok(result) = &res {
-        let errors = run_errors_from_parts(
+    if let Some(history_id) = verified_history_id(org_id, workflow_id).await {
+        record_workflow_run(
             org_id,
-            workflow_id,
+            history_id,
+            WorkflowTriggerType::Test,
+            user_id,
             &run_id,
-            &result.errors,
-            result.inputs.clone(),
-            result.outputs.clone(),
+            start_time,
+            run_error_from_result(&res),
         );
-        persist_run_errors(org_id, workflow_id, &run_id, errors).await;
+        // per-node data must persist too or re-opening the run shows nodes as never having run
+        if let Ok(result) = &res {
+            let errors = run_errors_from_parts(
+                org_id,
+                history_id,
+                &run_id,
+                &result.errors,
+                result.inputs.clone(),
+                result.outputs.clone(),
+            );
+            persist_run_errors(org_id, history_id, &run_id, errors).await;
+        }
     }
     res
 }
@@ -689,7 +720,9 @@ async fn execute_workflow(
 
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
 
-    let res = executable.process_workflow(org_id, inputs, None).await?;
+    let res = executable
+        .process_workflow(org_id, inputs, None, Default::default())
+        .await?;
 
     let WorkflowResult {
         errors: node_errors,
@@ -781,7 +814,9 @@ pub async fn retry_run(
     ))?;
 
     let start_time = chrono::Utc::now().timestamp_micros();
-    let res = executable.process_workflow(org_id, inputs, from_node).await;
+    let res = executable
+        .process_workflow(org_id, inputs, from_node, Default::default())
+        .await;
     // the retry is its own run; the failed run's id stays as source_id for provenance
     let retry_run_id = config::ider::uuid();
     record_workflow_run(
@@ -1057,12 +1092,8 @@ mod tests {
         assert_eq!(parts[1], "AlertFired");
         assert_eq!(parts[3], "run");
     }
-    #[tokio::test]
-    async fn an_unsupported_node_is_rejected_before_it_can_be_saved() {
-        // Unsupported is what a node type from a NEWER build decodes to. Re-serializing it
-        // rewrites that node as {"node_type":"unsupported"}, so saving one destroys data.
-        // The allowlist check runs before any DB lookup, so this needs no fixtures.
-        let workflow = Workflow {
+    fn workflow_with_unsupported_node() -> Workflow {
+        Workflow {
             id: "w1".to_string(),
             org_id: "org1".to_string(),
             name: "w".to_string(),
@@ -1079,10 +1110,35 @@ mod tests {
                 "default".to_string(),
             )],
             edges: vec![],
-        };
+        }
+    }
 
-        assert!(validate_workflow(&workflow, false).await.is_err());
-        assert!(validate_workflow(&workflow, true).await.is_err());
+    #[tokio::test]
+    async fn an_unsupported_node_is_rejected_before_it_can_be_saved() {
+        // re-serializing Unsupported rewrites a newer build's node, so no save path may pass it
+        let workflow = workflow_with_unsupported_node();
+        for is_draft in [false, true] {
+            let err = validate_workflow(&workflow, is_draft).await.unwrap_err();
+            assert!(err.to_string().contains("unsupported node type"), "{err}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_draft_save_rejects_an_unsupported_node_before_any_db_write() {
+        // save_draft/update_draft skip validate_workflow, so they need their own guard
+        let workflow = workflow_with_unsupported_node();
+        let err = save_draft(workflow.clone()).await.unwrap_err();
+        assert!(err.to_string().contains("unsupported node type"), "{err}");
+        let err = update_draft(workflow).await.unwrap_err();
+        assert!(err.to_string().contains("unsupported node type"), "{err}");
+    }
+
+    #[test]
+    fn a_sender_claimed_workflow_id_keys_history_only_when_known_in_the_org() {
+        // the id arrives in the request body, so an unverified one must never key history
+        assert_eq!(history_id_if_known("wf1", true), Some("wf1"));
+        assert_eq!(history_id_if_known("wf1", false), None);
+        assert_eq!(history_id_if_known("", true), None);
     }
 
     fn node_errors_with(msg: &str) -> config::meta::self_reporting::error::NodeErrors {

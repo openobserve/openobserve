@@ -269,8 +269,7 @@ pub enum NodeData {
     WorkflowTrigger,
     Destination(WorkflowDestination),
     Branch(BranchParams),
-    // A node type written by a newer node. Without this the whole workflow fails to
-    // deserialize, and the list path's `try_into()?` then fails every other row too.
+    // A newer build's node type; without this one such row fails the whole list via `try_into()?`
     #[serde(other)]
     Unsupported,
 }
@@ -1402,8 +1401,7 @@ mod tests {
         let node: NodeData = json::from_value(data).unwrap();
 
         assert!(matches!(node, NodeData::Unsupported));
-        // Re-serializing Unsupported REWRITES the newer node's data, so it must never
-        // reach a save path — every allowlist has to reject it.
+        // re-serializing Unsupported rewrites the newer node's data; every allowlist must reject it
         assert!(!node.is_workflow_node());
         assert!(!node.is_pipeline_node());
     }

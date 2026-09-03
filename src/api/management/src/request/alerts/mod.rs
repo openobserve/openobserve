@@ -3456,12 +3456,14 @@ pub async fn generate_sql(
         Err(e) => return e.into(),
     };
     if let Some(sql) = user_sql {
+        // Unparseable user SQL cannot prove a GROUP BY, so report false instead of failing.
+        let has_group_by = config::utils::sql::is_group_by_query(&sql).unwrap_or(false);
         return MetaHttpResponse::json(GenerateSqlResponseBody {
             sql,
             metadata: Some(GenerateSqlMetadata {
                 has_aggregation: query_condition.aggregation.is_some(),
                 has_conditions: conditions.len().await > 0,
-                has_group_by: false,
+                has_group_by,
             }),
         });
     }

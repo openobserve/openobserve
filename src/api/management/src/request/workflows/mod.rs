@@ -597,7 +597,7 @@ pub async fn test_workflow(
 ) -> Response {
     let mut workflow = inputs.workflow;
     workflow.org_id = org_id.clone();
-    // the run executes under a synthetic id, but history must be keyed on the real one
+    // the run executes under a synthetic id; core keys history on this id only if it verifies
     let workflow_id = workflow.id.clone();
     workflow.id = format!("test-{}", config::ider::uuid());
 

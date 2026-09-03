@@ -1912,17 +1912,16 @@ pub async fn enable_by_name(
 /// The synthetic row a manual trigger notifies with. Manual triggers evaluate
 /// nothing, so without it `alert_count` is 0 and templates render no data.
 pub fn manual_trigger_row(alert: &Alert) -> Map<String, Value> {
-    let row = config::utils::json::json!({
-        "stream_name": alert.stream_name,
-        "stream_type": alert.stream_type.to_string(),
-        "alert_name": alert.name,
-        "trigger_type": "manual"
-    });
-    row.as_object().unwrap().clone()
-}
-
-pub fn manual_trigger_rows(alert: &Alert) -> Vec<Map<String, Value>> {
-    vec![manual_trigger_row(alert)]
+    let mut row = Map::new();
+    row.insert("stream_name".into(), alert.stream_name.clone().into());
+    row.insert("stream_type".into(), alert.stream_type.to_string().into());
+    row.insert("alert_name".into(), alert.name.clone().into());
+    row.insert("trigger_type".into(), "manual".into());
+    // Incident correlation labels rows by alert_id; a row without it groups wrong.
+    if let Some(id) = alert.id {
+        row.insert("alert_id".into(), id.to_string().into());
+    }
+    row
 }
 
 /// Triggers an alert.
@@ -1959,8 +1958,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
             .incidents
             .enabled
     {
-        let mut synthetic_row = manual_trigger_row(&alert);
-        synthetic_row.insert("alert_id".to_string(), alert_id.to_string().into());
+        let synthetic_row = manual_trigger_row(&alert);
         let notify = std::slice::from_ref(&synthetic_row);
 
         match crate::alerts::incidents::correlate_alert_to_incident(
@@ -2013,7 +2011,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     } else {
         &[]
     };
-    let rows = manual_trigger_rows(&alert);
+    let rows = vec![manual_trigger_row(&alert)];
     let outcome = alert
         .send_notification(
             &trace_id,
@@ -2107,7 +2105,7 @@ pub async fn trigger_by_name(
     } else {
         &[]
     };
-    let rows = manual_trigger_rows(&alert);
+    let rows = vec![manual_trigger_row(&alert)];
     let outcome = alert
         .send_notification(
             &trace_id,
@@ -7032,11 +7030,27 @@ mod tests {
     }
 
     #[test]
+    fn manual_trigger_row_carries_alert_id_so_incident_correlation_can_label_it() {
+        let mut alert = manual_alert("my_alert", vec![]);
+        let id = <Ksuid as svix_ksuid::KsuidLike>::new(None, None);
+        alert.id = Some(id);
+        let row = manual_trigger_row(&alert);
+        assert_eq!(row.get("alert_id").unwrap(), &id.to_string());
+    }
+
+    #[test]
+    fn manual_trigger_row_omits_alert_id_for_an_unsaved_alert() {
+        let alert = manual_alert("my_alert", vec![]);
+        let row = manual_trigger_row(&alert);
+        assert!(!row.contains_key("alert_id"));
+    }
+
+    #[test]
     fn manual_trigger_row_is_non_empty_so_alert_count_is_not_zero() {
         // send_notification is called with an empty row slice today, so metadata
         // alert_count is 0 and `data` is empty for every manual run.
         let alert = manual_alert("my_alert", vec!["wf1".to_string()]);
-        let rows = manual_trigger_rows(&alert);
+        let rows = [manual_trigger_row(&alert)];
         assert_eq!(rows.len(), 1);
         assert!(!rows[0].is_empty());
     }

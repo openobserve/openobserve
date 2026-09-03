@@ -605,7 +605,13 @@ impl ExecutablePipeline {
                 inputs_sender: None,  // not applicable for pipelines
                 outputs_sender: None, // not applicable for pipelines
             };
-            let task = tokio::spawn(process_node(metadata, node, function_runtime, channels));
+            let task = tokio::spawn(process_node(
+                metadata,
+                node,
+                function_runtime,
+                channels,
+                Vec::new(),
+            ));
             node_tasks.push(task);
         }
         // Measure node task duration from when they were spawned (they start running
@@ -789,16 +795,6 @@ impl ExecutablePipeline {
         org_id: &str,
         records: Vec<Value>,
         from_node: Option<String>,
-    ) -> Result<WorkflowResult> {
-        self.process_workflow_with_options(org_id, records, from_node, Default::default())
-            .await
-    }
-
-    pub async fn process_workflow_with_options(
-        &self,
-        org_id: &str,
-        records: Vec<Value>,
-        from_node: Option<String>,
         options: WorkflowRunOptions,
     ) -> Result<WorkflowResult> {
         let batch_size = records.len();
@@ -915,7 +911,7 @@ impl ExecutablePipeline {
                         .collect()
                 })
                 .unwrap_or_default();
-            let task = tokio::spawn(process_node_with_routes(
+            let task = tokio::spawn(process_node(
                 metadata,
                 node,
                 function_runtime,
@@ -1312,15 +1308,6 @@ async fn process_node(
     metadata: ProcessMetadata,
     node: ExecutableNode,
     function_runtime: Option<CompiledFunctionRuntime>,
-    channels: ProcessChannels,
-) -> Result<()> {
-    process_node_with_routes(metadata, node, function_runtime, channels, Vec::new()).await
-}
-
-async fn process_node_with_routes(
-    metadata: ProcessMetadata,
-    node: ExecutableNode,
-    function_runtime: Option<CompiledFunctionRuntime>,
     mut channels: ProcessChannels,
     handle_routes: Vec<(String, Vec<Sender<PipelineItem>>)>,
 ) -> Result<()> {
@@ -1485,8 +1472,7 @@ async fn process_node_with_routes(
             .routed
         }
 
-        // Reached only when a newer node wrote a node type this build cannot run. Report
-        // it per record rather than skipping, so the run surfaces as errored not succeeded.
+        // a newer node type this build cannot run: one counted error so the run surfaces as errored
         NodeData::Unsupported => {
             log::warn!(
                 "[Pipeline] {} [inv={inv_id}]: node {node_idx} has a node type this version does not support",
@@ -1495,24 +1481,25 @@ async fn process_node_with_routes(
             let mut errored_count = 0usize;
             while let Some(item) = channels.receiver.recv().await {
                 channels.send_input(&metadata, &node.id, &item.record).await;
-                if let Err(send_err) = channels
-                    .error_sender
-                    .send((
-                        node.id.to_string(),
-                        node.node_type(),
-                        "node type not supported by this version".to_string(),
-                        None,
-                        None,
-                    ))
-                    .await
-                {
-                    log::error!(
-                        "[Pipeline] {} [inv={inv_id}]: UnsupportedNode failed sending errors for collection caused by: {send_err}",
-                        metadata.pipeline_name
-                    );
-                    break;
-                }
                 errored_count += 1;
+            }
+            if let Err(send_err) = channels
+                .error_sender
+                .send((
+                    node.id.to_string(),
+                    node.node_type(),
+                    format!(
+                        "node type not supported by this version, {errored_count} records not processed"
+                    ),
+                    None,
+                    None,
+                ))
+                .await
+            {
+                log::error!(
+                    "[Pipeline] {} [inv={inv_id}]: UnsupportedNode failed sending errors for collection caused by: {send_err}",
+                    metadata.pipeline_name
+                );
             }
             log::info!(
                 "[Pipeline] {} [inv={inv_id}]: unsupported node {node_idx} errored {errored_count} records",
@@ -1746,8 +1733,8 @@ async fn process_remote_stream_node(
             None
         };
 
-        // handle timestamp before sending to remote_write service
-        if metadata.flatten_records && !flattened && !record.is_null() && record.is_object() {
+        // pipeline-only node: never gated on flatten_records, ingest always flattens
+        if !flattened && !record.is_null() && record.is_object() {
             record = match flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level) {
                 Ok(flattened) => flattened,
                 Err(e) => {
@@ -2570,7 +2557,8 @@ async fn process_stream_node(
                 None
             };
 
-            if metadata.flatten_records && !flattened && !record.is_null() && record.is_object() {
+            // pipeline-only node: never gated on flatten_records, ingest always flattens
+            if !flattened && !record.is_null() && record.is_object() {
                 let flatten_timer = Instant::now();
                 let flatten_res =
                     flatten::flatten_with_level(record, cfg.limit.ingest_flatten_level);
@@ -2774,14 +2762,21 @@ async fn process_destination_node(
     destination: &WorkflowDestination,
 ) -> Result<usize, anyhow::Error> {
     if destination.destination_id.is_empty() {
-        return drain_destination_node_with_error(
-            &metadata,
-            &mut channels,
-            node,
-            "This destination node has no destination selected. Pick a destination for it."
-                .to_string(),
-        )
-        .await;
+        // drafts leave destinations unset on purpose; input-with-no-error renders as skipped
+        let mut count = 0usize;
+        while let Some(pipeline_item) = channels.receiver.recv().await {
+            channels
+                .send_input(&metadata, &node.id, &pipeline_item.record)
+                .await;
+            count += 1;
+        }
+        log::info!(
+            "[Workflow] {} [inv={}]: destination node {} has no destination set, {count} records not dispatched",
+            metadata.pipeline_name,
+            metadata.inv_id,
+            node.id,
+        );
+        return Ok(count);
     }
 
     // Validation only: a suppressed run drops this and returns before any dispatch code.
@@ -3978,7 +3973,7 @@ mod tests {
         send_records(&input_tx, vec![record.clone()]).await;
         drop(input_tx);
 
-        let result = process_node(dummy_metadata(1), node, None, channels).await;
+        let result = process_node(dummy_metadata(1), node, None, channels, Vec::new()).await;
 
         assert!(result.is_ok());
 
@@ -4015,7 +4010,7 @@ mod tests {
         send_records(&input_tx, records).await;
         drop(input_tx);
 
-        let result = process_node(dummy_metadata(1), node, None, channels).await;
+        let result = process_node(dummy_metadata(1), node, None, channels, Vec::new()).await;
 
         assert!(result.is_ok());
     }
@@ -4039,7 +4034,7 @@ mod tests {
         send_records(&input_tx, vec![record.clone()]).await;
         drop(input_tx);
 
-        let result = process_node(dummy_metadata(0), node, None, channels).await;
+        let result = process_node(dummy_metadata(0), node, None, channels, Vec::new()).await;
 
         assert!(result.is_ok());
 
@@ -4053,6 +4048,55 @@ mod tests {
             .expect("disabled WorkflowTrigger must still run its normal branch and record input");
         assert_eq!(recorded_id, "trigger-1");
         assert_eq!(recorded_value, record);
+    }
+
+    #[tokio::test]
+    async fn test_unsupported_node_sends_single_error_with_record_count() {
+        let node = ExecutableNode {
+            id: "mystery-1".to_string(),
+            node_data: NodeData::Unsupported,
+            children: vec![],
+            is_disabled: false,
+        };
+
+        let (input_tx, input_rx) = channel(8);
+        let (error_tx, mut error_rx) = channel(8);
+        let (inputs_tx, mut inputs_rx) = channel(8);
+        let channels = ProcessChannels {
+            receiver: input_rx,
+            child_senders: vec![],
+            result_sender: None,
+            error_sender: error_tx,
+            inputs_sender: Some(inputs_tx),
+            outputs_sender: None,
+        };
+
+        let records: Vec<Value> = (0..3).map(|i| json::json!({"i": i})).collect();
+        send_records(&input_tx, records).await;
+        drop(input_tx);
+
+        let result = process_node(dummy_metadata(1), node, None, channels, Vec::new()).await;
+        assert!(result.is_ok());
+
+        // the inputs channel is the run history, so every record must still land there
+        for _ in 0..3 {
+            assert!(
+                inputs_rx.try_recv().is_ok(),
+                "each record must be recorded as node input"
+            );
+        }
+        assert!(inputs_rx.try_recv().is_err());
+
+        let (node_id, _, message, ..) = error_rx.try_recv().expect("one error entry expected");
+        assert_eq!(node_id, "mystery-1");
+        assert!(
+            message.contains('3'),
+            "error must carry the record count, got: {message}"
+        );
+        assert!(
+            error_rx.try_recv().is_err(),
+            "exactly one error entry, not one per record"
+        );
     }
 
     // --- new_from_workflow trigger-node selection ---
@@ -4740,7 +4784,12 @@ mod tests {
             .expect("branch workflow must build");
 
         let result = executable
-            .process_workflow("org-1", vec![json::json!({"severity": "high"})], None)
+            .process_workflow(
+                "org-1",
+                vec![json::json!({"severity": "high"})],
+                None,
+                Default::default(),
+            )
             .await
             .expect("workflow run must not fail");
 
@@ -4766,7 +4815,7 @@ mod tests {
             .expect("workflow must build");
 
         let result = executable
-            .process_workflow_with_options(
+            .process_workflow(
                 "org-1",
                 vec![json::json!({"severity": "high"})],
                 None,
@@ -4851,7 +4900,7 @@ mod tests {
             .expect("workflow must build");
 
         let result = executable
-            .process_workflow_with_options(
+            .process_workflow(
                 "org-1",
                 vec![json::json!({"severity": "high"})],
                 None,
@@ -4879,14 +4928,14 @@ mod tests {
 
     #[cfg(feature = "enterprise")]
     #[tokio::test]
-    async fn test_empty_destination_id_reports_node_error() {
+    async fn test_empty_destination_id_is_a_draft_no_op_not_an_error() {
         let workflow = destination_workflow("");
         let executable = ExecutablePipeline::new_from_workflow(&workflow)
             .await
             .expect("workflow must build");
 
         let result = executable
-            .process_workflow_with_options(
+            .process_workflow(
                 "org-1",
                 vec![json::json!({"severity": "high"})],
                 None,
@@ -4897,14 +4946,19 @@ mod tests {
             .await
             .expect("run must complete");
 
-        let node_error = result
-            .errors
-            .get("d1")
-            .expect("an empty destination id must surface as a node error, not a silent no-op");
-        let messages: Vec<String> = node_error.errors.iter().map(|(m, _)| m.clone()).collect();
+        // draft nodes legitimately have no destination yet; an error here is a false signal
         assert!(
-            messages.iter().any(|m| m.contains("no destination")),
-            "the error must state that no destination is selected, got {messages:?}"
+            !result.errors.contains_key("d1"),
+            "an unset destination is an intentional draft state, not an error, got {:?}",
+            result.errors.get("d1")
+        );
+        assert!(
+            result.inputs.get("d1").is_some_and(|v| !v.is_empty()),
+            "records reaching the node must still be recorded as inputs"
+        );
+        assert!(
+            !result.outputs.contains_key("d1"),
+            "an unset destination must not report a dispatch output"
         );
     }
 
@@ -4917,7 +4971,7 @@ mod tests {
             .expect("workflow must build");
 
         let result = executable
-            .process_workflow_with_options(
+            .process_workflow(
                 "org-1",
                 vec![json::json!({"severity": "high"})],
                 None,
@@ -5006,7 +5060,12 @@ mod tests {
             .expect("condition workflow must build");
 
         let result = executable
-            .process_workflow("org-1", vec![nested_alert_payload()], None)
+            .process_workflow(
+                "org-1",
+                vec![nested_alert_payload()],
+                None,
+                Default::default(),
+            )
             .await
             .expect("workflow run must not fail");
 
@@ -5073,7 +5132,12 @@ mod tests {
             .expect("branch workflow must build");
 
         let result = executable
-            .process_workflow("org-1", vec![nested_alert_payload()], None)
+            .process_workflow(
+                "org-1",
+                vec![nested_alert_payload()],
+                None,
+                Default::default(),
+            )
             .await
             .expect("workflow run must not fail");
 
