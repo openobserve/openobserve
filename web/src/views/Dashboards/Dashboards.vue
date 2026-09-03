@@ -365,28 +365,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </template>
             <template #empty>
-              <OEmptyState
-                size="hero"
-                :preset="activeFolderId !== 'default' ? 'no-dashboards-in-folder' : 'no-dashboards'"
-                :title="
-                  showFavoritesOnly && !filterQuery ? t('dashboard.noFavoritesTitle') : undefined
-                "
-                :description="
-                  showFavoritesOnly && !filterQuery ? t('dashboard.noFavoritesMessage') : undefined
-                "
-                :hide-action="showFavoritesOnly && !filterQuery"
-                :filtered="!!filterQuery"
-                @action="
-                  (id) =>
-                    id === 'clear-filters'
-                      ? (filterQuery = '')
-                      : id === 'import'
-                        ? importDashboard()
-                        : id === 'templates'
-                          ? (showAddDashboardFromGitHub = true)
-                          : addDashboard()
-                "
-              />
+              <div class="flex w-full flex-col items-center gap-2">
+                <OEmptyState
+                  size="hero"
+                  :preset="
+                    activeFolderId !== 'default' ? 'no-dashboards-in-folder' : 'no-dashboards'
+                  "
+                  :title="
+                    showFavoritesOnly && !filterQuery ? t('dashboard.noFavoritesTitle') : undefined
+                  "
+                  :description="
+                    showFavoritesOnly && !filterQuery
+                      ? t('dashboard.noFavoritesMessage')
+                      : undefined
+                  "
+                  :hide-action="showFavoritesOnly && !filterQuery"
+                  :filtered="!!filterQuery"
+                  @action="
+                    (id) =>
+                      id === 'clear-filters'
+                        ? (filterQuery = '')
+                        : id === 'import'
+                          ? importDashboard()
+                          : id === 'templates'
+                            ? (showAddDashboardFromGitHub = true)
+                            : addDashboard()
+                  "
+                />
+                <!-- Gated on the URL folder (correct on FIRST render, unlike the
+                     async activeFolderId); the dynamic conditions — filter text,
+                     favorites view — are the component's own internal gate via
+                     these props, so this node never toggles mid-session. -->
+                <TemplateSuggestionCards
+                  v-if="($route.query.folder ?? 'default') === 'default'"
+                  class="w-full max-w-3xl"
+                  :active-folder-id="
+                    showFavoritesOnly ? '__favorites__' : (activeFolderId ?? 'default')
+                  "
+                  :filter-query="filterQuery"
+                  @open-drawer="showAddDashboardFromGitHub = true"
+                  @imported="getDashboards"
+                />
+              </div>
             </template>
             <template #bottom>
               <div class="flex w-full items-center justify-between gap-4 py-1">
@@ -563,6 +583,7 @@ import {
   getFoldersList,
 } from "../../utils/commons";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
+import TemplateSuggestionCards from "@/components/dashboards/TemplateSuggestionCards.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import useNotifications from "@/composables/useNotifications";
 import { debounce } from "lodash-es";
@@ -636,6 +657,7 @@ export default defineComponent({
     AddDashboard,
     OTooltip,
     AddDashboardFromGitHub,
+    TemplateSuggestionCards,
     OTable,
     ConfirmDialog,
     AddFolder,

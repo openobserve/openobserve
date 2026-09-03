@@ -9,9 +9,31 @@ const viteConfigObj = typeof viteConfig === 'function'
   ? (viteConfig as (options: ConfigEnv) => UserConfig)({ command: 'serve', mode: 'development' })
   : viteConfig
 
+// Specs that read sibling SOURCE files resolve them with
+// `new URL("<relative>", import.meta.url)`. Vite's asset-import rewrite plus
+// Vitest's normalize-url plugin turn that into an http://localhost URL in the
+// jsdom (client) transform, which breaks fileURLToPath/readFileSync. Wrapping
+// the base as `String(import.meta.url)` defeats both plugins' static pattern
+// match while being a runtime no-op — spec files only, app code is untouched.
+const specNativeFileUrls = () => ({
+  name: 'vitest:spec-native-file-urls',
+  enforce: 'pre' as const,
+  transform(code: string, id: string) {
+    if (!/\.spec\.(ts|js)$/.test(id) || !code.includes('import.meta.url')) return
+    const re = /(new\s+URL\s*\(\s*['"][^'"]+['"]\s*,\s*)import\.meta\.url(\s*\))/g
+    if (!re.test(code)) return
+    re.lastIndex = 0
+    return {
+      code: code.replace(re, '$1String(import.meta.url)$2'),
+      map: null,
+    }
+  },
+})
+
 export default mergeConfig(
   viteConfigObj,
   defineConfig({
+    plugins: [specNativeFileUrls()],
     logLevel: 'error', // Suppress Vite warnings (e.g., Monaco editor source map issues)
     customLogger: {
       info: (msg) => console.info(msg),

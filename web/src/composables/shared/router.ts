@@ -489,6 +489,32 @@ const useRoutes = () => {
         query: to.query,
       }),
     },
+    // Always registered, no feature gate — workload detection changes each
+    // page's state, never the route's existence (design 4.7). Placed after the
+    // infra/databases block so the non-cloud reports splice(13) never shifts.
+    {
+      path: "infra/hosts",
+      name: "infraHosts",
+      component: () => import("@/views/Infrastructure/HostsPage.vue"),
+      meta: { titleKey: "menu.hosts" },
+      beforeEnter: routeGuard,
+    },
+    {
+      path: "infra/kubernetes",
+      name: "infraKubernetes",
+      component: () => import("@/views/Infrastructure/WorkloadStubPage.vue"),
+      props: { workload: "kubernetes" },
+      meta: { titleKey: "menu.kubernetes" },
+      beforeEnter: routeGuard,
+    },
+    {
+      path: "infra/aws",
+      name: "infraAws",
+      component: () => import("@/views/Infrastructure/WorkloadStubPage.vue"),
+      props: { workload: "aws" },
+      meta: { titleKey: "menu.awsInfra" },
+      beforeEnter: routeGuard,
+    },
     {
       path: "traces/trace-details",
       name: "traceDetails",
