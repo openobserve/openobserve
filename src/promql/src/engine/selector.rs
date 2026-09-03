@@ -50,26 +50,7 @@ impl Engine {
             self.result_type = Some("vector".to_string());
         }
 
-        let mut selector = selector.clone();
-        if selector.name.is_none() {
-            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
-                Some(mat) => mat.value.clone(),
-                None => {
-                    return Err(DataFusionError::Plan(
-                        "VectorSelector: metric name is required".into(),
-                    ));
-                }
-            };
-            selector.name = Some(name);
-            // the matcher is fully consumed by stream selection; leaving it in
-            // would filter on the stored `__name__` column (which may keep the
-            // pre-`format_stream_name` case), leak into partition pruning, and
-            // make the selector's PromQL text unparseable on super-cluster peers
-            selector
-                .matchers
-                .matchers
-                .retain(|mat| mat.name != NAME_LABEL);
-        }
+        let selector = named_selector(selector.clone(), "VectorSelector")?;
 
         let data = self.selector_load_data_owned(&selector, None).await?;
 
@@ -160,24 +141,7 @@ impl Engine {
             self.result_type = Some("matrix".to_string());
         }
 
-        let mut selector = selector.clone();
-        if selector.name.is_none() {
-            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
-                Some(mat) => mat.value.clone(),
-                None => {
-                    return Err(DataFusionError::Plan(
-                        "MatrixSelector: metric name is required".into(),
-                    ));
-                }
-            };
-
-            selector.name = Some(name);
-            // see eval_vector_selector: the matcher is consumed by stream selection
-            selector
-                .matchers
-                .matchers
-                .retain(|mat| mat.name != NAME_LABEL);
-        }
+        let selector = named_selector(selector.clone(), "MatrixSelector")?;
 
         let data = self
             .selector_load_data_owned(&selector, Some(range))
@@ -602,6 +566,47 @@ impl Engine {
         }
         Ok(value)
     }
+}
+
+/// Strips placeholder matchers and rejects the selector forms no loader supports.
+pub(super) fn plain_selector(selector: &VectorSelector, kind: &str) -> Result<VectorSelector> {
+    let mut selector = selector.clone();
+    remove_filter_all(&mut selector);
+    if !selector.matchers.or_matchers.is_empty() {
+        return Err(DataFusionError::Plan(format!(
+            "{kind}: or_matchers is not supported"
+        )));
+    }
+    if selector.at.is_some() {
+        return Err(DataFusionError::NotImplemented(format!(
+            "{kind}: @ modifier is not supported"
+        )));
+    }
+    Ok(selector)
+}
+
+/// Lifts the `__name__` matcher into the selector name; kept as a matcher it would filter the
+/// stored column, which may hold the pre-`format_stream_name` case.
+fn named_selector(mut selector: VectorSelector, kind: &str) -> Result<VectorSelector> {
+    if selector.name.is_some() {
+        return Ok(selector);
+    }
+    let Some(name) = selector
+        .matchers
+        .find_matchers(NAME_LABEL)
+        .first()
+        .map(|mat| mat.value.clone())
+    else {
+        return Err(DataFusionError::Plan(format!(
+            "{kind}: metric name is required"
+        )));
+    };
+    selector.name = Some(name);
+    selector
+        .matchers
+        .matchers
+        .retain(|mat| mat.name != NAME_LABEL);
+    Ok(selector)
 }
 
 /// Discard the already-partitioned series hashes without rebuilding a global

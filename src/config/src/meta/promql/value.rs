@@ -231,11 +231,6 @@ impl Sample {
     pub fn new(timestamp: i64, value: f64) -> Self {
         Self { timestamp, value }
     }
-
-    #[allow(dead_code)]
-    pub fn is_nan(&self) -> bool {
-        self.value.is_nan()
-    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -871,14 +866,6 @@ impl Value {
     pub fn get_range_values(self) -> Option<Vec<RangeValue>> {
         match self {
             Value::Matrix(values) => Some(values),
-            _ => None,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn get_vector(&self) -> Option<&Vec<InstantValue>> {
-        match self {
-            Value::Vector(values) => Some(values),
             _ => None,
         }
     }
@@ -1571,12 +1558,10 @@ mod tests {
         let matrix = vec![range_value.clone()];
 
         let value_vector = Value::Vector(vector.clone());
-        assert!(value_vector.get_vector().is_some());
         assert!(value_vector.get_ref_matrix_values().is_none());
 
         let value_matrix = Value::Matrix(matrix.clone());
         assert!(value_matrix.get_ref_matrix_values().is_some());
-        assert!(value_matrix.get_vector().is_none());
 
         let value_string = Value::String("test".to_string());
         assert_eq!(value_string.get_string(), Some("test".to_string()));
@@ -1792,18 +1777,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sample_is_nan() {
-        let normal = Sample::new(1000, 42.0);
-        assert!(!normal.is_nan());
-
-        let nan_sample = Sample::new(1000, f64::NAN);
-        assert!(nan_sample.is_nan());
-
-        let inf_sample = Sample::new(1000, f64::INFINITY);
-        assert!(!inf_sample.is_nan());
-    }
-
-    #[test]
     fn test_range_value_new() {
         let labels: Labels = vec![
             Arc::new(Label::new("__name__", "cpu")),
@@ -1837,19 +1810,6 @@ mod tests {
         assert_eq!(result.unwrap().len(), 1);
 
         assert!(Value::Float(1.0).get_range_values().is_none());
-    }
-
-    #[test]
-    fn test_value_get_vector() {
-        let iv = InstantValue {
-            labels: vec![],
-            sample: Sample::new(1000, 5.0),
-        };
-        let val = Value::Vector(vec![iv]);
-        assert!(val.get_vector().is_some());
-        assert_eq!(val.get_vector().unwrap().len(), 1);
-
-        assert!(Value::Float(1.0).get_vector().is_none());
     }
 
     #[test]
