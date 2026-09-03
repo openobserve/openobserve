@@ -87,26 +87,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      # One shared classification for every suite (see .github/actions/classify-changes); a change to
+      # this workflow file re-tests itself on top of it.
+      - uses: ./.github/actions/classify-changes
+        id: classify
       - id: check
         env:
-          BASE_REF: ${{ github.base_ref }}
+          HAS_CHANGES: ${{ steps.classify.outputs.run_playwright }}
+          CHANGED_WORKFLOWS: ${{ steps.classify.outputs.changed_workflows }}
         run: |
-          # Skip when a PR touches only docs, images, or unrelated workflow files (e.g. a
-          # dependabot bump to another workflow) — none can affect the app. Source, web/, and
-          # this workflow (playwright.yml) still run the suite.
-          # Two-dot on purpose: base-branch drift over-reports has_changes, which keeps the
-          # merge_group full run firing whenever the merged tree differs from what PRs tested.
-          IGNORE_RE='(\.md$|^docs/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'
-          CHANGED=$(git diff --name-only "origin/${BASE_REF:-main}" ${{ github.sha }})
-          # Files not matching IGNORE_RE. Captured (not `grep -qv`) so the check doesn't depend
-          # on grep -qv exit semantics, which differ across grep builds; the `|| true` keeps
-          # `set -e` from aborting when grep matches nothing (exit 1). The `grep -qE` below is a
-          # loop-safe `if`-condition term (`set -e` doesn't fire there), so it needs no `|| true`.
-          RELEVANT=$(printf '%s' "$CHANGED" | grep -vE "$IGNORE_RE" || true)
-          if [ -z "$CHANGED" ] || [ -n "$RELEVANT" ] || printf '%s' "$CHANGED" | grep -qE '^\.github/workflows/playwright\.yml$'; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
+          if [ "$HAS_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' playwright.yml '; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
           fi
 
   build_binary:
