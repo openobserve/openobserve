@@ -123,10 +123,12 @@ export class IngestionTokensPage {
     // ----- toggle -----
 
     async toggleToken(name) {
-        // Table client-paginates at 20/page; filter to the unique name so the target row is on page 1 before we click.
-        await this.searchInput.fill(name);
         const toggle = this.tokenToggleByName(name);
-        await toggle.waitFor({ state: 'visible', timeout: 10000 });
+        // Token list loads async after reload and is client-paginated (20/page); re-apply the name filter until the row surfaces so a slow list load or search re-mount can't leave the toggle off-page.
+        await expect.poll(async () => {
+            await this.searchInput.fill(name);
+            return await toggle.isVisible().catch(() => false);
+        }, { timeout: 20000, intervals: [500, 1000, 1500, 2000, 3000] }).toBe(true);
         await toggle.click();
     }
 

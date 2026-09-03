@@ -77,6 +77,8 @@ export default class LogsVisualise {
     if (isTableSelected !== "true") {
       await tableChartItem.click();
     }
+    // The chart-type switch is reactive and lags the click; gate on it actually applying so downstream steps don't run against the wrong chart type.
+    await expect(tableChartItem).toHaveAttribute("data-selected", "true", { timeout: 10000 });
   }
 
   //Apply: Logs
