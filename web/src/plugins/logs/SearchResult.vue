@@ -540,26 +540,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Per-cell hover actions: AI button on the timestamp cell; copy /
                  add-search-term on closable field cells. -->
-                  <template #cell-hover-actions="{ row, column, active }">
+                  <template #cell-hover-actions="{ row, column, value, active }">
                     <O2AIContextAddBtn
                       v-if="active && !contextMenuOpen && column.id === logsTimestampCol"
-                      class="size-6!"
-                      :imageHeight="'14'"
-                      :imageWidth="'14'"
                       data-test="logs-search-result-ai-btn"
                       @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
                     />
                     <CellActions
-                      v-else-if="
-                        active &&
-                        !contextMenuOpen &&
-                        column.meta?.closable &&
-                        row[column.id] != null
-                      "
+                      v-else-if="active && !contextMenuOpen && showLogCellActions(column, row)"
                       :column="column"
                       :row="row"
+                      :value="value"
                       :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
                       :hide-search-term-actions="false"
+                      :hide-ai="column.id === 'source'"
                       @copy="copyLogToClipboard"
                       @add-search-term="addSearchTerm"
                       @send-to-ai-chat="sendToAiChat"
@@ -2186,6 +2180,10 @@ export default defineComponent({
 
     const logsTimestampCol = computed(() => store.state.zoConfig.timestamp_column || "_timestamp");
 
+    // `source` (whole-row JSON) is not closable but still gets copy; AI stays on the timestamp cell.
+    const showLogCellActions = (column: any, row: any) =>
+      column.meta?.closable ? row[column.id] != null : column.id === "source";
+
     // ── Right-click cell actions ──────────────────────────────────────────────
     // The cell the user last right-clicked, held as plain values (not the
     // TanStack cell) so the menu keeps rendering correctly even if the
@@ -2363,6 +2361,7 @@ export default defineComponent({
       addSearchTerm,
       removeSearchTerm,
       logsTimestampCol,
+      showLogCellActions,
       logsCellHtml,
       logsRowIndex,
       logsRowKey,
