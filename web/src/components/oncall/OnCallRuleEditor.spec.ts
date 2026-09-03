@@ -216,9 +216,10 @@ describe("OnCallRuleEditor", () => {
   it("refuses a duplicate condition name", async () => {
     const wrapper = render();
     await flushPromises();
+    // The row stays open after a commit, ready for the next condition — no
+    // second click on "Add condition" needed to write a second one.
     await addCondition(wrapper, "k8s-cluster", "prod");
 
-    await wrapper.find('[data-test="oncall-rule-editor-add-condition"]').trigger("click");
     await wrapper
       .findComponent('[data-test="oncall-rule-editor-dimension-name"]')
       .vm.$emit("update:modelValue", "k8s-cluster");
@@ -233,6 +234,28 @@ describe("OnCallRuleEditor", () => {
     // the reader to compare the row against the list above it.
     expect(wrapper.find('[data-test="oncall-rule-editor-dimension-problem"]').text()).toContain(
       "k8s-cluster",
+    );
+  });
+
+  /// Closing the row on every commit turned a multi-condition rule into a
+  /// click-Add-condition-again per condition. The row stays put so entering
+  /// several is Dimension, Value, Add, Dimension, Value, Add.
+  it("keeps the adder open after a commit so a second condition needs no reopening", async () => {
+    const wrapper = render();
+    await flushPromises();
+    await addCondition(wrapper, "k8s-cluster", "prod");
+
+    expect(wrapper.find('[data-test="oncall-rule-editor-dimension-name"]').exists()).toBe(true);
+    expect(
+      wrapper.findComponent('[data-test="oncall-rule-editor-dimension-name"]').props("modelValue"),
+    ).toBe("");
+
+    await addCondition(wrapper, "k8s-namespace", "risk");
+    expect(wrapper.find('[data-test="oncall-rule-editor-condition-k8s-cluster"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.find('[data-test="oncall-rule-editor-condition-k8s-namespace"]').exists()).toBe(
+      true,
     );
   });
 

@@ -58,8 +58,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Conditions are ANDed and matched exactly. Neither is visible in a
                list of chips, and both change what the rule means. -->
           <span class="flex flex-wrap items-baseline gap-x-2">
-            <OText variant="label">{{ t("oncall.ruleEditorConditions") }}</OText>
-            <OText variant="meta">{{ t("oncall.ruleEditorConditionsHint") }}</OText>
+            <span class="flex items-center gap-1">
+              <OText variant="label">{{ t("oncall.ruleEditorConditions") }}</OText>
+              <OIcon name="info-outline" size="sm" class="cursor-help">
+                <OTooltip side="right" :content="t('oncall.ruleEditorConditionsHint')" />
+              </OIcon>
+            </span>
 
             <!-- The queue is where most rules come from, so its rows are one
                  click away rather than a section the reader has to close this
@@ -158,47 +162,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                ends up pinned to a field nothing ever emits, which reads as
                "never matched". The value stays open — it is data — but the
                values already seen on this dimension are offered first. -->
-          <div v-if="!scoped && adding" class="flex flex-wrap items-end gap-2">
+          <div v-if="!scoped && adding" class="flex flex-wrap items-center gap-1">
             <OSelect
               v-model="draftName"
-              :label="t('oncall.ruleEditorDimensionLabel')"
               :options="dimensionOptions"
               :placeholder="t('oncall.ruleEditorFieldPlaceholder')"
               size="sm"
               width="sm"
               searchable
               data-test="oncall-rule-editor-dimension-name"
-            >
-              <!-- The list is short because it is what this org emits, not what
-                   the product understands. Said on demand: a reader who does
-                   not wonder should not have to read it. -->
-              <template #tooltip>
-                <OTooltip
-                  side="right"
-                  :content="
-                    vocabularyIsUnfiltered
-                      ? t('oncall.ruleEditorVocabularyUnfiltered')
-                      : t('oncall.ruleEditorDimensionsFromTelemetry')
-                  "
-                />
-              </template>
-            </OSelect>
+            />
             <!-- Enter commits the pair: the hands are already on the value
                  field, and reaching for Add to add a second condition is the
                  slow half of writing a two-condition rule. -->
             <span class="w-48 min-w-0" @keyup.enter="addPair">
               <OCombobox
                 v-model="draftValue"
-                :label="t('oncall.ruleEditorValueLabel')"
                 :items="valueOptions"
                 :placeholder="t('oncall.ruleEditorValuePlaceholder')"
                 size="sm"
                 data-test="oncall-rule-editor-dimension-value"
-              >
-                <template #tooltip>
-                  <OTooltip side="right" :content="t('oncall.ruleEditorValueHelp')" />
-                </template>
-              </OCombobox>
+              />
             </span>
             <OButton
               variant="outline"
@@ -387,14 +371,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }}
         </OText>
       </div>
+    </div>
 
-      <!-- Two rules can both match, and which one wins is the single thing a
-           reader cannot infer from the sentence above. -->
-      <span class="flex items-start gap-1.5" data-test="oncall-rule-editor-precedence">
+    <!-- Two rules can both match, and which one wins is the single thing a
+         reader cannot infer from the sentence above. Lives in the footer,
+         left of Cancel/Save, since it qualifies the whole rule rather than
+         any one field in the form above. -->
+    <template #footer-left>
+      <span class="flex items-center gap-1.5" data-test="oncall-rule-editor-precedence">
         <OIcon name="info-outline" size="sm" class="text-text-secondary shrink-0" />
         <OText variant="meta">{{ t("oncall.ruleEditorPrecedence") }}</OText>
       </span>
-    </div>
+    </template>
   </ODialog>
 </template>
 
@@ -507,6 +495,27 @@ const title = computed<I18nText>(() =>
   props.rule ? t("oncall.editOwnershipRule") : t("oncall.newRule"),
 );
 
+/// Whether there is an estate to pick levels from at all.
+///
+/// A deployment that has discovered nothing has no clusters, no namespaces and
+/// no services, so the scope picker would be a row of empty selects. The field
+/// builder still works there — it always did — so that is where such a
+/// deployment starts.
+const scopeAvailable = computed(
+  () =>
+    props.services.length > 0 ||
+    props.sets.some((set) =>
+      set.distinguish_by.some(
+        (dimension) => Object.keys(props.catalogue.values[dimension] ?? {}).length > 0,
+      ),
+    ),
+);
+
+/// Which of the two builders is on screen. Scope by default, because it is what
+/// almost every rule needs; Advanced is reachable in one click and holds
+/// everything scope deliberately cannot say.
+const scoped = ref(true);
+
 /// Opening is what resets the form — one instance serves add, edit and claim,
 /// and a stale draft from the last open would silently be saved as this one.
 watch(
@@ -563,27 +572,6 @@ const dimensionOptions = computed(() => {
   return [...present, ...onDraft].map((id) => ({ label: label(id), value: id }));
 });
 
-/// Whether there is an estate to pick levels from at all.
-///
-/// A deployment that has discovered nothing has no clusters, no namespaces and
-/// no services, so the scope picker would be a row of empty selects. The field
-/// builder still works there — it always did — so that is where such a
-/// deployment starts.
-const scopeAvailable = computed(
-  () =>
-    props.services.length > 0 ||
-    props.sets.some((set) =>
-      set.distinguish_by.some(
-        (dimension) => Object.keys(props.catalogue.values[dimension] ?? {}).length > 0,
-      ),
-    ),
-);
-
-/// Which of the two builders is on screen. Scope by default, because it is what
-/// almost every rule needs; Advanced is reachable in one click and holds
-/// everything scope deliberately cannot say.
-const scoped = ref(true);
-
 /// Whether the levels can state this claim exactly.
 ///
 /// One level, or one level narrowed by a coarser one. Anything else — a
@@ -626,13 +614,6 @@ function applyScope(dimensions: Record<string, string>) {
     value: String(value),
   }));
 }
-
-/// Whether the picker is showing the whole vocabulary because the registry is
-/// empty. The form says so rather than letting somebody pick a dimension this
-/// deployment has never seen and wait for a page that never comes.
-const vocabularyIsUnfiltered = computed(
-  () => !props.catalogue.present.length && props.aliases.length > 0,
-);
 
 const teamOptions = computed(() =>
   props.teams.map((option) => ({ label: raw(option.name), value: option.id })),
@@ -850,6 +831,9 @@ function cancelPair() {
   adding.value = false;
 }
 
+/// The row stays open after a commit — Add is how a multi-condition rule gets
+/// written, and closing it every time would turn "and" into a second click
+/// per condition instead of one.
 function addPair() {
   if (!canAddPair.value) return;
   pairs.value.push({
@@ -858,7 +842,6 @@ function addPair() {
   });
   draftName.value = "";
   draftValue.value = "";
-  adding.value = false;
 }
 
 function save() {
