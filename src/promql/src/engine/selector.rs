@@ -1098,7 +1098,7 @@ mod tests {
         use config::{
             TIMESTAMP_COL_NAME,
             meta::{
-                promql::{HASH_LABEL, STREAMING_AGG_TABLE_SUFFIX, VALUE_LABEL},
+                promql::{HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, VALUE_LABEL},
                 search::ScanStats,
             },
         };
@@ -1193,7 +1193,7 @@ mod tests {
             let mut config = SessionConfig::new().with_target_partitions(3);
             config.options_mut().optimizer.prefer_existing_sort = true;
             let ctx = SessionContext::new_with_config(config);
-            ctx.register_table(format!("m{STREAMING_AGG_TABLE_SUFFIX}"), Arc::new(table))
+            ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
                 .unwrap();
             StreamingProvider {
                 ctx,
