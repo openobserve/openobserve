@@ -1,6 +1,9 @@
 name: Security audit
 on:
+  # main only: a PR branch push is covered by the PR's own gated checks, and this ran on every branch push.
   push:
+    branches:
+      - "main"
     paths-ignore:
       - "**.md"
       - "**.yml"
