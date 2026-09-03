@@ -423,10 +423,8 @@ const osToggleLabel = (slug: string) =>
         </div>
 
         <div class="min-h-0 flex-1">
-          <!-- :rows mirrors :data for the co-located spec's presentational stub. -->
           <OTable
             :data="pagedRows"
-            :rows="pagedRows"
             :columns="columns"
             :loading="loading"
             row-key="host_name"
