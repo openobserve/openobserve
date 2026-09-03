@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The Hosts-list data plane (design 4.8/§6): 6 PromQL instant queries + 1 SQL
-// last-seen, joined client-side on host_name with tri-state status.
+// The Hosts-list data plane (design 4.8/§6): 6 instant queries + 1 SQL last-seen joined on host_name.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { defineComponent } from "vue";
@@ -61,8 +60,7 @@ type FleetResponses = Partial<{
   lastSeen: any;
 }>;
 
-// Route each of the 7 fan-out calls to its response by inspecting the DECODED
-// query — order-independent, so the composable may fire them however it likes.
+// Routes each fan-out call by its DECODED query, so response wiring is order-independent.
 function primeFleet(overrides: FleetResponses = {}) {
   const r: Required<FleetResponses> = {
     liveness: vector([
@@ -164,6 +162,15 @@ describe("useHostsList — join & window anchoring", () => {
     expect(web01.cpu).toBe(95);
     expect(web01.disk).toBe(91);
     expect(web01.load).toBe(1.5);
+  });
+
+  it("derives fleetCount from the joined rows (N total, M ACTIVE)", async () => {
+    const h = withHostsList();
+    wrapper = h.wrapper;
+    await h.list.refresh(refreshArgs);
+    await flushPromises();
+    // web-01/web-02 are ACTIVE from liveness; db-01 is SQL-only ⇒ INACTIVE.
+    expect(h.list.fleetCount.value).toEqual({ total: 3, active: 2 });
   });
 
   it("anchors the SQL window to the picker [start, end] and liveness to the picker end", async () => {
@@ -412,7 +419,33 @@ describe("useHostsList — sort, tint, staleness, facets, filter, paging", () =>
     primeFleet({ liveness: new Error("down") as any });
     await h.list.refresh(refreshArgs);
     await flushPromises();
-    expect(h.list.facets.value.status.map((f: any) => f.value)).toContain("UNKNOWN");
+    // Fixed order with zero-count rows kept in place — UNKNOWN appended last (4.8).
+    expect(h.list.facets.value.status.map((f: any) => f.value)).toEqual([
+      "ACTIVE",
+      "INACTIVE",
+      "UNKNOWN",
+    ]);
+    expect(h.list.facets.value.status.map((f: any) => f.count)).toEqual([0, 0, 3]);
+  });
+
+  it("derives the OS facet from distinct os_type values with counts", async () => {
+    primeFleet({
+      liveness: vector([
+        { metric: { host_name: "web-01", os_type: "linux" }, value: 1 },
+        { metric: { host_name: "web-02", os_type: "windows" }, value: 1 },
+        { metric: { host_name: "web-03", os_type: "linux" }, value: 1 },
+        { metric: { host_name: "web-04" }, value: 1 },
+      ]),
+    });
+    const h = withHostsList();
+    wrapper = h.wrapper;
+    await h.list.refresh(refreshArgs);
+    await flushPromises();
+    const os = h.list.facets.value.os;
+    // Distinct os_type only (4.8) — a host without the label gets no bucket.
+    expect(os.map((f: any) => f.value).sort()).toEqual(["linux", "windows"]);
+    expect(os.find((f: any) => f.value === "linux").count).toBe(2);
+    expect(os.find((f: any) => f.value === "windows").count).toBe(1);
   });
 
   it("debounces the name filter by 300ms", async () => {

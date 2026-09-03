@@ -13,17 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Content invariants for the bundled Host Metrics dashboard (design 4.1/§6).
-// This is the fast in-web mirror; the authoritative parse oracle is the Rust
-// serde pair in src/config/.../v8/mod.rs and src/api/management/.../dashboards.rs.
+// Bundled Host Metrics dashboard invariants (4.1/§6) — fast mirror of the Rust serde parse oracle.
 
 import { describe, it, expect } from "vitest";
 import { gt } from "@/types/i18n";
 import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
 import dashboard from "./host_metrics.dashboard.json";
 
-// The 4.1 device-exclusion constant — ONE matcher, no spaces (the shipped
-// `"tmpfs | nsfs"` bug matched literally nothing).
+// The 4.1 device-exclusion constant — ONE matcher, no spaces (the shipped bug matched nothing).
 const DEVICE_EXCLUSION = "/dev/loop.*|tmpfs|nsfs|squashfs|overlay";
 // The disk I/O panels carry their own loop-device exclusion (4.1 Disk tab).
 const DISK_IO_EXCLUSION = "loop.*";
@@ -201,8 +198,7 @@ describe("host_metrics.dashboard.json — variables", () => {
 });
 
 describe("host_metrics.dashboard.json — v8 serde-required keys", () => {
-  // The v8 structs carry no serde defaults: one missing key rejects the whole
-  // POST and kills auto-import (4.1) — mirror of the Rust parse oracle.
+  // v8 structs have no serde defaults: one missing key rejects the whole POST (4.1).
   it("every tab carries tabId and name", () => {
     for (const t of tabs) {
       expect(typeof t.tabId).toBe("string");

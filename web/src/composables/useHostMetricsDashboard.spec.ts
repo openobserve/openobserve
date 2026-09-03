@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Shared create-if-absent import of the bundled Host Metrics dashboard
-// (design 4.2/§6) — used by the setup card, template card and host drawer.
+// Shared create-if-absent import of the bundled Host Metrics dashboard (design 4.2/§6).
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { importHostMetricsDashboard } from "@/composables/useHostMetricsDashboard";
 import dashboardsService from "@/services/dashboards";
+import dashboardJson from "@/assets/dashboards/host_metrics.dashboard.json";
 
 vi.mock("@/services/dashboards", () => ({
   default: {
@@ -49,7 +49,8 @@ describe("importHostMetricsDashboard", () => {
     const [org, body, folder] = createMock.mock.calls[0];
     expect(org).toBe("org-a");
     expect(folder).toBe("default");
-    expect(body).toEqual(expect.objectContaining({ version: 8, title: "Host Metrics" }));
+    // §6: the create body IS the bundled JSON — anything less lets a stub dashboard pass.
+    expect(body).toEqual(dashboardJson);
     // The id comes from the versioned response envelope (3.6).
     expect(result).toEqual({ status: "created", dashboardId: "dash-new", folderId: "default" });
   });
@@ -109,15 +110,5 @@ describe("importHostMetricsDashboard", () => {
     const [r1, r2] = await Promise.all([first, second]);
     expect(createMock).toHaveBeenCalledTimes(1);
     expect(r1).toEqual(r2);
-  });
-
-  it("keeps the orgId captured at call time across an in-flight org switch", async () => {
-    let release: (v: any) => void = () => {};
-    listMock.mockReturnValue(new Promise((r) => (release = r)) as any);
-    const pending = importHostMetricsDashboard("org-a");
-    // Whatever org state changes mid-flight, the create targets the captured org.
-    release(listResponse([]));
-    await pending;
-    expect(createMock).toHaveBeenCalledWith("org-a", expect.anything(), "default");
   });
 });

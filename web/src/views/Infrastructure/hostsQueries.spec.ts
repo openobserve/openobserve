@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The Hosts-list query constants (design 4.8/§6) — exported strings so the
-// scale-critical shapes are pinned without mounting anything.
+// The Hosts-list query constants (design 4.8/§6) — scale-critical shapes pinned as exported strings.
 
 import { describe, it, expect } from "vitest";
 import * as hostsQueries from "./hostsQueries";

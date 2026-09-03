@@ -1664,8 +1664,7 @@ describe("useRoutes (router.ts)", () => {
   // =========================================================================
   // 18b. homeChildRoutes — Infrastructure routes (Hosts / Kubernetes / AWS)
   // =========================================================================
-  // Always registered, no feature gate — detection changes page STATE, never
-  // route existence (design 4.7/§6).
+  // Always registered, no feature gate — detection changes page state, never route existence (4.7/§6).
   describe("homeChildRoutes — infra workload routes", () => {
     it.each([
       ["infraHosts", "infra/hosts"],

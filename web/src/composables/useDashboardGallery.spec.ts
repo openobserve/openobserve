@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// S3 gallery fetch/cache extracted out of AddDashboardFromGitHub.vue (design
-// 4.3/§6) — the drawer and the empty-state cards must share ONE implementation.
+// S3 gallery fetch/cache extraction (design 4.3/§6) — drawer and empty state share ONE implementation.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { defineComponent } from "vue";

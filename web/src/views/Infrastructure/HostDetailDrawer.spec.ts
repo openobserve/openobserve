@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Host detail drawer (design 4.8/§6). Stub strategy: RenderDashboardCharts is
-// a defineComponent stub capturing dashboardData — every assertion runs on the
-// built dashboard object, never on ECharts internals.
+// Host detail drawer (design 4.8/§6) — assertions run on the captured dashboard object, never ECharts.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
@@ -53,8 +51,7 @@ const renderChartsStub = defineComponent({
   template: "<div class='render-stub' />",
 });
 
-// Records whatever the drawer hands the picker, so the init-from-page-range
-// assertion doesn't have to hardcode the DateTime prop name.
+// Captures all picker attrs so the init-from-page-range pin needn't hardcode the prop name.
 const dateTimeCapture: Record<string, any> = {};
 const dateTimeStub = defineComponent({
   name: "DateTime",
@@ -161,6 +158,16 @@ describe("HostDetailDrawer", () => {
         expect(q).toContain('host_name="he\\"llo"');
       }
     });
+
+    it("backslash-escapes a backslash in the host name in PromQL string values", async () => {
+      // 4.8: escape " AND \ — an unescaped \ silently corrupts the matcher.
+      wrapper = await mountDrawer({ hostName: "corp\\web-01" });
+      const queries = allDashboardQueries();
+      expect(queries.length).toBeGreaterThan(0);
+      for (const q of queries) {
+        expect(q).toContain('host_name="corp\\\\web-01"');
+      }
+    });
   });
 
   // The Logs/Traces panes may render lazily — open the tab before asserting.
@@ -233,6 +240,8 @@ describe("HostDetailDrawer", () => {
       expect(href).toContain("from=");
       expect(href).toContain("to=");
       expect(href).toContain("host_name");
+      // The filter must carry the actual host value, not just the label name.
+      expect(href).toContain("web-01");
     });
   });
 

@@ -976,8 +976,7 @@ mod tests {
 
     #[test]
     fn test_bundled_host_metrics_dashboard_parses_as_v8() {
-        // The real structs are the parse oracle for the bundled asset: one
-        // missing serde-required key rejects the whole POST and kills auto-import.
+        // Parse oracle for the bundled asset: one missing serde-required key kills auto-import.
         let json = include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../web/src/assets/dashboards/host_metrics.dashboard.json"

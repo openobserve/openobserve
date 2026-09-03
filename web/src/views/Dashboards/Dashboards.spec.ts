@@ -447,8 +447,7 @@ describe("Dashboards.vue", () => {
     });
   });
 
-  // T1.3 (design 4.3/§6): template cards live in the #empty slot, but ONLY on
-  // the true "new org" moment — default folder, no filter, no favorites view.
+  // T1.3 (design 4.3/§6): template cards render only on the true "new org" empty state.
   describe("Empty-state template suggestion cards", () => {
     const findCards = () => wrapper.findComponent({ name: "TemplateSuggestionCards" });
 

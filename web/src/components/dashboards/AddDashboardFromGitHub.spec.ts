@@ -1006,8 +1006,7 @@ describe("AddDashboardFromGitHub Component", () => {
     });
   });
 
-  // INF.4 (design 4.9/§6): workload pages open the drawer pre-seeded so the
-  // gallery search starts at their templates.
+  // INF.4 (design 4.9/§6): workload pages open the drawer pre-seeded at their templates.
   describe("initialSearch prop", () => {
     it("seeds the search box when the drawer opens", async () => {
       wrapper = createWrapper({ modelValue: true, initialSearch: "kubernetes" });
@@ -1018,8 +1017,7 @@ describe("AddDashboardFromGitHub Component", () => {
     });
   });
 
-  // T1.3 (design 4.3/§6): the gallery import path silently deleted an existing
-  // same-title dashboard — the replace now requires an explicit user confirm.
+  // T1.3 (design 4.3/§6): the gallery replace path now requires an explicit user confirm.
   describe("confirmed replace on import", () => {
     const seedSelection = async (jsonFiles: string[], jsonByFile: Record<string, any>) => {
       (store.state as any).githubDashboardGallery = {
