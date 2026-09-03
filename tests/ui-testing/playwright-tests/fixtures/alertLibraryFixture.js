@@ -5,8 +5,8 @@
  * For CI-stable e2e we intercept the manifest (and the per-alert files) with a
  * fixture we fully control, so readiness states, the >50 large-batch boundary
  * and error states are all reachable on demand. Install still hits the real
- * alert API — the served file body is a real, backend-valid alert (pass one
- * captured at setup via `fileTemplate`).
+ * alert API — the served file body is a backend-valid SQL alert, so it installs
+ * as-is; pass `fileTemplate` only when a test needs an exact captured body.
  */
 
 const MANIFEST_GLOB = '**/alerts/manifest.json';
@@ -68,9 +68,9 @@ function buildManifest(entries, o = {}) {
 /**
  * A minimal, backend-valid scheduled SQL alert file for one entry.
  *
- * Prefer passing a `fileTemplate` captured from a real alert at setup — this
- * fallback is only for specs that never install (browse / filter / readiness),
- * where the body only has to render in the drawer.
+ * This is what the install tests actually POST — it is a complete, installable
+ * alert body, not a placeholder. Pass `o.fileTemplate` only when a test needs
+ * an exact captured body instead of this default.
  */
 function buildAlertFile(entry, o = {}) {
   if (o.fileTemplate) {
