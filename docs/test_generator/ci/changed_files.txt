@@ -1,0 +1,16 @@
+web/src/components/rum/EventDetailDrawerContent.spec.ts
+web/src/components/rum/EventDetailDrawerContent.vue
+web/src/components/rum/PlayerTracesTab.spec.ts
+web/src/components/rum/PlayerTracesTab.vue
+web/src/composables/rum/useCorrelatedTracesStream.spec.ts
+web/src/composables/rum/useCorrelatedTracesStream.ts
+web/src/composables/rum/useTraceCorrelation.spec.ts
+web/src/composables/rum/useTraceCorrelation.ts
+web/src/services/search.spec.ts
+web/src/services/search.ts
+web/src/stores/index.spec.ts
+web/src/stores/index.ts
+web/src/test/unit/helpers/store.ts
+web/src/ts/interfaces/traces/traceTimeRange.types.ts
+web/src/utils/rum/traceWindow.spec.ts
+web/src/utils/rum/traceWindow.ts

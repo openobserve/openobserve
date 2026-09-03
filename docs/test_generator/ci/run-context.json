@@ -1,0 +1,22 @@
+{
+  "feature_slug": "rum-trace-time-range",
+  "feature_title": "RUM Trace Time Range (Indexed Trace Window)",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "rumTraceTimeRange.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/rumTraceTimeRange.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/components/rum/EventDetailDrawerContent.vue",
+    "web/src/components/rum/PlayerTracesTab.vue",
+    "web/src/composables/rum/useCorrelatedTracesStream.ts",
+    "web/src/composables/rum/useTraceCorrelation.ts",
+    "web/src/utils/rum/traceWindow.ts",
+    "web/src/services/search.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

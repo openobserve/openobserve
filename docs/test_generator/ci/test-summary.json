@@ -1,0 +1,7 @@
+[
+  { "title": "Traces tab lists the correlated trace and opens embedded TraceDetails over the indexed window", "action": "new", "verifies": "a session whose events carry a trace id lists exactly one correlated trace in the Traces tab (count badge '1' + one row) and clicking it opens the embedded TraceDetails" },
+  { "title": "Event drawer 'View Trace' navigates to standalone trace details over the indexed window", "action": "new", "verifies": "a related resource with a trace id shows the View Trace button, and clicking it opens /traces/trace-details in a new tab with the canonical padded trace id and an indexed window wider than the ±10s guess" },
+  { "title": "Traces tab shows the empty state when the session has no trace ids", "action": "new", "verifies": "a session whose events carry no trace id renders the 'no correlated traces' empty state and no table" },
+  { "title": "Legacy zero-stripped trace id is normalized and still correlates", "action": "new", "verifies": "a trace id stored zero-stripped in _rumdata is padded to 32 hex and still resolves to the matching backend trace" },
+  { "title": "Trace id present but no backend trace is filtered out of the list", "action": "new", "verifies": "a trace id with no matching backend trace is filtered out of the Traces tab, leaving the empty state" }
+]

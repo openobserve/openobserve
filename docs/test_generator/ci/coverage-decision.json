@@ -1,0 +1,13 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/rumTraceTimeRange.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/tracesSearch.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js",
+    "tests/ui-testing/playwright-tests/RUM/rum-page-dataflow.spec.js",
+    "tests/ui-testing/playwright-tests/RegressionSet/Traces/traces-regression.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_target": "tests/ui-testing/ci-matrix/ci_matrix.json",
+  "rationale": "No existing spec covers the RUM→distributed-trace correlation path (PlayerTracesTab in the session viewer, EventDetailDrawerContent 'View Trace', or the backend traces/time_range index). tracesSearch/traceDetails test the standalone Traces product only; rum-page-dataflow proves a session is listed/opened but never correlates to a backend trace. This feature is a distinct area (RUM trace time-range/indexed window) and needs its own spec under Traces/. Registration: append rumTraceTimeRange.spec.js to the 'Traces' shard run_files in ci_matrix.json."
+}

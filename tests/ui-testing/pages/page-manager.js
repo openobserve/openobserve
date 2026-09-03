@@ -60,6 +60,7 @@ import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
 import { DatabaseMonitoringPage } from "./dbmPages/databaseMonitoringPage.js";
 import { RumPage } from "./rumPages/rumPage.js";
 import { RumSessionsPage } from "./rumPages/rumSessionsPage.js";
+import { RumTraceCorrelationPage } from "./rumPages/rumTraceCorrelationPage.js";
 import { RumPerformancePage } from "./rumPages/rumPerformancePage.js";
 import { RumIngestionPage } from "./rumPages/rumIngestionPage.js";
 import { RumSourcemapsPage } from "./rumPages/rumSourcemapsPage.js";
@@ -255,6 +256,7 @@ class PageManager {
     // ===== RUM PAGE OBJECTS =====
     this.rumFormValidation = new RumFormValidationPage(page);
     this.rumSessionsPage = new RumSessionsPage(page);
+    this.rumTraceCorrelationPage = new RumTraceCorrelationPage(page);
     this.rumPerformancePage = new RumPerformancePage(page);
     this.rumIngestionPage = new RumIngestionPage(page);
     this.rumSourcemapsPage = new RumSourcemapsPage(page);

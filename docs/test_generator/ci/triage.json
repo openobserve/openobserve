@@ -1,0 +1,30 @@
+{
+  "feature_slug": "rum-trace-time-range",
+  "feature_title": "RUM Trace Time Range (Indexed Trace Window)",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "rumTraceTimeRange.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/rumTraceTimeRange.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/components/rum/EventDetailDrawerContent.vue",
+    "web/src/components/rum/PlayerTracesTab.vue",
+    "web/src/composables/rum/useCorrelatedTracesStream.ts",
+    "web/src/composables/rum/useTraceCorrelation.ts",
+    "web/src/utils/rum/traceWindow.ts",
+    "web/src/services/search.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 16 changed paths live under web/src/** (the OSS frontend tree — RUM components, composables, services, stores and utils). None are under enterprise-owned directories (enterprise/, o2_enterprise/, src/enterprise/) and there are no enterprise keywords (cipher/SSO/SAML/RBAC/SDR). This is a pure open-source frontend change.",
+    "skip": "Not skipped. The feature_hint.txt and trigger_comment.txt inputs are both empty (no explicit opt-out), and the diff is not docs-only or CI-only — it changes user-facing RUM behavior in EventDetailDrawerContent.vue and PlayerTracesTab.vue (how the View Trace button and the Traces tab choose the time window they open/query traces over).",
+    "e2e": "E2E is warranted: the change alters a user-facing UI flow in web/src. The RUM event-detail 'View Trace' button and the session player's Traces tab now resolve a trace's indexed time range (padded ±1 min via traceQueryWindow) instead of the previous ±10s guess around the RUM event, so slow/outliving traces open uncut. That is a visible, testable behavior change.",
+    "area": "Traces. The bulk of the change lives in web/src/components/rum/ (RUM session player, which is the Real User Monitoring view under the Traces product area), and the existing sibling E2E specs (traceDetails.spec.js, tracesSearch.spec.js, service-graph.spec.js) sit in tests/ui-testing/playwright-tests/Traces/.",
+    "group": "Traces. The ci-matrix manifests map testfolder 'Traces' to actual_folder 'Traces' (run_files: tracesSearch.spec.js, traceDetails.spec.js, traceQueryEditor.spec.js, etc.), so a RUM trace-correlation spec belongs in that shard.",
+    "existing_tests": "No E2E specs in the diff. The changed *.spec.ts files (EventDetailDrawerContent.spec.ts, PlayerTracesTab.spec.ts, useCorrelatedTracesStream.spec.ts, useTraceCorrelation.spec.ts, search.spec.ts, stores/index.spec.ts, traceWindow.spec.ts) are all Vitest unit tests under web/src/**, not Playwright specs under tests/ui-testing/playwright-tests/** — so they are not existing E2E coverage and existing_tests_in_diff is false."
+  }
+}
