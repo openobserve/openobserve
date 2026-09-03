@@ -661,6 +661,54 @@ describe("TraceDetailsSidebar", async () => {
 
       expect(w.vm.parsedSystemInstructions).toBe("Always be concise.");
     });
+
+    it("still renders a plain text part (regression check)", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "text", content: "Always be concise." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Always be concise.");
+    });
+
+    it("joins multiple parts with a newline", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "text", content: "Be concise." },
+            { type: "text", content: "Never make up facts." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Be concise.\nNever make up facts.");
+    });
+
+    it("renders a `thinking`-typed part (a real-world alias for reasoning)", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "thinking", content: "Always be concise." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Always be concise.");
+    });
+
+    it("returns null when there are no system instructions", () => {
+      const w = mountSidebar({
+        span: { ...mockSpan, gen_ai_system_instructions: undefined },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe(null);
+    });
   });
 
   describe("Service information in Attributes tab", () => {

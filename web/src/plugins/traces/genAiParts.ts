@@ -57,12 +57,12 @@ export function extractGenAiPartText(part: unknown): string | null {
   const type = typeof part.type === "string" ? part.type : "";
   if (!type) return null;
 
+  // A real-world SDK behind issue #14127 spells the spec's "reasoning" part
+  // as "thinking" instead — verified against its own source.
   switch (type) {
     case "text":
     case "reasoning":
     case "compaction":
-    // pydantic-ai (the SDK from issue #14127) spells the spec's "reasoning"
-    // part as "thinking" — verified against its own _otel_messages.py.
     case "thinking":
       if (typeof part.content === "string") return part.content;
       if (typeof part.text === "string") return part.text;
@@ -72,7 +72,7 @@ export function extractGenAiPartText(part: unknown): string | null {
       return `Called ${name}(${safeStringify(part.arguments ?? {})})`;
     }
     case "tool_call_response":
-      // pydantic-ai emits `result`, not the spec's `response` field.
+      // That same SDK emits `result`, not the spec's `response` field.
       return safeStringify(part.response ?? part.result);
     case "server_tool_call": {
       const name = typeof part.name === "string" ? part.name : "tool";

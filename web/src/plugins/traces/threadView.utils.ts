@@ -202,8 +202,8 @@ export function normalizeRole(raw: unknown): Role {
  *   - generic `{text}` / `{content}` objects
  *
  * OTel GenAI v5 `reasoning`/`tool_call`/`tool_call_response`/`server_tool_call*`
- * parts render as text, including SDK vendor spellings (pydantic-ai's
- * `thinking`/`result`) that don't match the spec's own field names — kept in
+ * parts render as text, including real-world SDK field-name aliases
+ * (`thinking`/`result`) that don't match the spec's own names — kept in
  * sync with LLMContentRenderer.vue via genAiParts.ts. `blob`/`file`/`uri`
  * stay suppressed (first-class rendering elsewhere), and any other
  * unrecognised type falls back to a `[type]` marker instead of vanishing.

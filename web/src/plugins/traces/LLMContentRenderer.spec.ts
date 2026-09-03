@@ -459,6 +459,72 @@ describe("LLMContentRenderer", () => {
       expect(messages[0].content).toContain("I should check the weather.");
       expect(messages[0].content).toContain("get_weather");
     });
+
+    // Some SDKs don't use the spec's own field/type names literally, even
+    // when the shape (a typed `parts` array) is otherwise correct.
+    it("renders a `thinking`-typed part (a real-world alias for reasoning)", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            { role: "assistant", parts: [{ type: "thinking", content: "let me check" }] },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      expect(wrapper.vm.parsedMessages[0].content).toBe("let me check");
+    });
+
+    it("renders a tool_call_response part that uses a `result` field instead of `response`", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            {
+              role: "tool",
+              parts: [{ type: "tool_call_response", id: "call_1", result: "rainy, 57F" }],
+            },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      expect(wrapper.vm.parsedMessages[0].content).toBe("rainy, 57F");
+    });
+
+    it("renders a v5 single message object (not an array) that only has `parts`", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify({
+            role: "assistant",
+            parts: [{ type: "text", content: "Single v5 response" }],
+          }),
+          viewMode: "formatted",
+        },
+      });
+
+      const messages = wrapper.vm.parsedMessages;
+      expect(messages).toHaveLength(1);
+      expect(messages[0].content).toBe("Single v5 response");
+    });
+
+    // Preview is a full-fidelity view: unlike the Thread tab, it still shows
+    // *something* for a part type with no text representation (blob/file/uri)
+    // instead of leaving the message blank.
+    it("still shows something for a blob part instead of leaving the message blank", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            {
+              role: "assistant",
+              parts: [{ type: "blob", modality: "image", content: "aGVsbG8=" }],
+            },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      expect(wrapper.vm.parsedMessages[0].content).toBeTruthy();
+    });
   });
 
   describe("Content Truncation", () => {
@@ -845,6 +911,26 @@ describe("LLMContentRenderer", () => {
       expect(result).toContain("get_weather");
       expect(result).toContain("Boston");
       expect(result).not.toContain('"type"');
+    });
+
+    it("formats a `thinking`-typed part the same as a reasoning part", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "dummy", viewMode: "formatted" },
+      });
+
+      const result = wrapper.vm.formatContent([{ type: "thinking", content: "let me check" }]);
+      expect(result).toBe("let me check");
+    });
+
+    it("formats a tool_call_response part that only has a `result` field", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "dummy", viewMode: "formatted" },
+      });
+
+      const result = wrapper.vm.formatContent([
+        { type: "tool_call_response", id: "call_1", result: "rainy, 57F" },
+      ]);
+      expect(result).toBe("rainy, 57F");
     });
   });
 

@@ -53,22 +53,28 @@ describe("extractGenAiPartText", () => {
     );
   });
 
-  // pydantic-ai (the SDK from issue #14127) does not follow the OTel spec's
-  // field names literally — verified against its own _otel_messages.py /
-  // messages.py source, not the spec doc. It emits `type: "thinking"`
-  // (spec calls it "reasoning") and a tool_call_response `result` field
-  // (spec calls it "response"). Both must render, or the fix doesn't
-  // actually work against the SDK that triggered the issue.
-  it("reads a pydantic-ai `thinking` part (vendor spelling of reasoning)", () => {
+  // A real-world SDK behind issue #14127 does not follow the OTel spec's
+  // field names literally (verified against its own source, not the spec
+  // doc): it emits `type: "thinking"` (spec calls it "reasoning") and a
+  // tool_call_response `result` field (spec calls it "response"). Both must
+  // render, or the fix doesn't actually work against the SDK that triggered
+  // the issue.
+  it("reads a `thinking`-typed part (a real-world alias for reasoning)", () => {
     expect(extractGenAiPartText({ type: "thinking", content: "let me check" })).toBe(
       "let me check",
     );
   });
 
-  it("reads a pydantic-ai tool_call_response `result` field", () => {
+  it("reads a tool_call_response part via its `result` field", () => {
     expect(extractGenAiPartText({ type: "tool_call_response", result: "rainy, 57F" })).toBe(
       "rainy, 57F",
     );
+  });
+
+  it("prefers the spec's `response` field over the `result` alias when both are present", () => {
+    expect(
+      extractGenAiPartText({ type: "tool_call_response", response: "spec-says-this", result: "vendor-says-this" }),
+    ).toBe("spec-says-this");
   });
 
   it("formats an object tool_call_response part as JSON", () => {
@@ -94,6 +100,27 @@ describe("extractGenAiPartText", () => {
       server_tool_call_response: { result: "ok" },
     });
     expect(result).toContain("ok");
+  });
+
+  it("defaults tool_call's name to \"tool\" when missing", () => {
+    expect(extractGenAiPartText({ type: "tool_call", arguments: { x: 1 } })).toContain("tool(");
+  });
+
+  it("defaults server_tool_call's name to \"tool\" when missing", () => {
+    expect(extractGenAiPartText({ type: "server_tool_call", server_tool_call: {} })).toContain(
+      "tool(",
+    );
+  });
+
+  it("returns an empty string (not the literal 'undefined') for tool_call_response with neither `response` nor `result`", () => {
+    expect(extractGenAiPartText({ type: "tool_call_response" })).toBe("");
+  });
+
+  it("returns null for text/reasoning/compaction/thinking parts with no content or text field", () => {
+    expect(extractGenAiPartText({ type: "text" })).toBe(null);
+    expect(extractGenAiPartText({ type: "reasoning" })).toBe(null);
+    expect(extractGenAiPartText({ type: "compaction" })).toBe(null);
+    expect(extractGenAiPartText({ type: "thinking" })).toBe(null);
   });
 
   it("returns null for blob/file/uri parts (no text representation)", () => {
