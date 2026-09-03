@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :sub-title="t('oncall.ruleEditorSubtitle')"
     :primary-button-label="t('oncall.saveRule')"
     :secondary-button-label="t('oncall.cancel')"
-    :primary-button-disabled="!pairs.length || !team"
+    :primary-button-disabled="!!saveProblem"
     :primary-button-loading="saving"
     :neutral-button-label="rule ? t('oncall.removeRule') : undefined"
     neutral-button-variant="ghost-destructive"
@@ -373,12 +373,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Two rules can both match, and which one wins is the single thing a
-         reader cannot infer from the sentence above. Lives in the footer,
-         left of Cancel/Save, since it qualifies the whole rule rather than
-         any one field in the form above. -->
+    <!-- Left of Cancel/Save, since both messages qualify the whole rule
+         rather than any one field in the form above. While Save is disabled,
+         the reason it's refused takes priority over the precedence note —
+         a reader staring at a disabled button needs to know what's missing
+         before they need to know how ties are broken. -->
     <template #footer-left>
-      <span class="flex items-center gap-1.5" data-test="oncall-rule-editor-precedence">
+      <span
+        v-if="saveProblem"
+        class="flex items-center gap-1.5"
+        data-test="oncall-rule-editor-save-problem"
+      >
+        <OIcon name="info-outline" size="sm" class="text-text-secondary shrink-0" />
+        <OText variant="meta">{{ saveProblem }}</OText>
+      </span>
+      <span v-else class="flex items-center gap-1.5" data-test="oncall-rule-editor-precedence">
         <OIcon name="info-outline" size="sm" class="text-text-secondary shrink-0" />
         <OText variant="meta">{{ t("oncall.ruleEditorPrecedence") }}</OText>
       </span>
@@ -844,8 +853,17 @@ function addPair() {
   draftValue.value = "";
 }
 
+/// Why Save is refused, in the reader's terms — the same defense-in-depth
+/// pairing as `addPairProblem`: it drives the disabled state, is rendered
+/// next to the button, and guards the handler below.
+const saveProblem = computed<I18nText | "">(() => {
+  if (!pairs.value.length) return t("oncall.ruleNeedsCondition");
+  if (!team.value) return t("oncall.ruleNeedsTeam");
+  return "";
+});
+
 function save() {
-  if (!pairs.value.length || !team.value) return;
+  if (saveProblem.value) return;
   emit("save", { dimensions: dimensionsOf(), team_id: team.value });
 }
 </script>
