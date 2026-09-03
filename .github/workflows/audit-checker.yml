@@ -1,16 +1,9 @@
 name: Security audit
 on:
-  # Advisories only matter when the dependency set changes, so PRs and main runs are path-filtered
-  # to the Cargo manifests; the weekly run catches advisories published against unchanged deps.
+  # Advisories only matter when the dependency set changes, so PR runs are path-filtered to the
+  # Cargo manifests; the weekly run catches advisories published against unchanged deps.
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
-    paths:
-      - "**/Cargo.toml"
-      - "**/Cargo.lock"
-      - ".github/workflows/audit-checker.yml"
-  push:
-    branches:
-      - "main"
     paths:
       - "**/Cargo.toml"
       - "**/Cargo.lock"
