@@ -277,6 +277,7 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     active.last_updated = Set(src.last_updated);
     active.updated_at = Set(src.updated_at);
     // created_at is NOT patched — it is set once at insert time and never changed.
+    // last_failed_at is NOT patched: a replicated anchor can only corrupt the local backoff.
 }
 
 /// Collapses the `filters` shapes that mean "no filters" to NULL, on every model-based write.
@@ -291,6 +292,8 @@ fn normalize_filters(filters: Option<Json>) -> Option<Json> {
 /// Converts a `Model` into a fully-`Set` `ActiveModel` for inserts.
 fn into_active_model(mut m: Model) -> anomaly_detection_config::ActiveModel {
     m.filters = normalize_filters(m.filters);
+    // Held local like patch_all_fields does: a new row inherits no peer's anchor.
+    m.last_failed_at = None;
     // For inserts the PK must be Set (it is not auto-increment).
     // `into_active_model()` sets every field including PK as Set, which is
     // correct for INSERT — only UPDATE requires the PK to be Unchanged.
@@ -340,6 +343,7 @@ mod tests {
             tags: None,
             status: 0,
             retries: 0,
+            last_failed_at: None,
             last_updated: 0,
             created_at: 1_000_000,
             updated_at: 1_000_000,
@@ -468,6 +472,32 @@ mod tests {
         assert_eq!(active.stream_type.unwrap(), "metrics");
         assert_eq!(active.seasonality.unwrap(), "daily");
         assert_eq!(active.detection_function.unwrap(), "zscore");
+    }
+
+    /// A peer's ConfigUpdate must not move this region's retry anchor: it never trained.
+    #[test]
+    fn test_patch_all_fields_leaves_last_failed_at_alone() {
+        let mut original = make_model("anom-1", "org");
+        original.last_failed_at = Some(1_700_000_000_000_000);
+        let mut active = original.into_active_model();
+
+        let mut replicated = make_model("anom-1", "org");
+        replicated.last_failed_at = None;
+        replicated.retries = 4;
+        patch_all_fields(&mut active, replicated);
+
+        assert_eq!(active.last_failed_at.unwrap(), Some(1_700_000_000_000_000));
+        // retries still replicates; only the anchor is held local.
+        assert_eq!(active.retries.unwrap(), 4);
+    }
+
+    /// `put()` may insert a ConfigUpdate for an unknown row, so it holds the anchor local.
+    #[test]
+    fn test_into_active_model_drops_a_replicated_last_failed_at() {
+        let mut m = make_model("anom-1", "org");
+        m.last_failed_at = Some(1_700_000_000_000_000);
+        let active = into_active_model(m);
+        assert_eq!(active.last_failed_at.unwrap(), None);
     }
 
     #[test]

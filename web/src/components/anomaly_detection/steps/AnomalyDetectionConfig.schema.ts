@@ -167,5 +167,5 @@ export const anomalyDetectionConfigDefaults = (
   detection_window_unit: cfg?.detection_window_unit ?? "h",
   training_window_days: cfg?.training_window_days ?? 14,
   retrain_interval_days: cfg?.retrain_interval_days ?? 7,
-  threshold: cfg?.threshold == null || cfg.threshold === "" ? 97 : Number(cfg.threshold),
+  threshold: cfg?.threshold == null || cfg.threshold === "" ? 95 : Number(cfg.threshold),
 });
