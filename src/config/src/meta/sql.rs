@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use sqlparser::{
     ast::{
         BinaryOperator, Expr, ObjectName, ObjectNamePart, Select, SelectItem, SetExpr, Statement,
-        TableFactor, TableWithJoins, Visit, VisitMut, Visitor, VisitorMut,
+        TableFactor, TableWithJoins, Value, Visit, VisitMut, Visitor, VisitorMut,
     },
     dialect::PostgreSqlDialect,
     keywords::ALL_KEYWORDS,
@@ -182,6 +182,106 @@ pub fn extract_where(sql: &str) -> WhereInfo {
         }
     }
     info
+}
+
+/// The equality conditions that hold in **every** case where this SQL matches.
+///
+/// An aggregating alert — `SELECT count(*) … WHERE …` — returns a row with no
+/// identity columns in it, so the only remaining evidence of *where* it was
+/// looking is the alert's own text. On-call routing reads that evidence to
+/// decide who gets woken, which makes "which of these equalities are actually
+/// guaranteed" a question a pager depends on.
+///
+/// The honest answer is: only the ones reachable through `AND` from the top of
+/// the WHERE.
+///
+/// ```text
+/// a = '1' AND b = '2'                → a, b
+/// a = '1' OR  b = '2'                → nothing; the firing could be either
+/// a = '1' AND (b = '2' OR c = '3')   → a only
+/// a = '1' AND NOT b = '2'            → a only; a NOT subtree is not a conjunct
+/// a = '1' AND a = '2'                → nothing; no row satisfies both
+/// ```
+///
+/// Values are string literals only. A dimension is a name, and admitting numbers
+/// would let `http_status = 500` present itself as an identity.
+///
+/// Returns pairs sorted by column, so two callers on one alert cannot disagree.
+pub fn guaranteed_equalities(sql: &str) -> Vec<(String, String)> {
+    if sql.len() > MAX_WHERE_SQL_BYTES {
+        return Vec::new();
+    }
+    let Ok(statements) = Parser::parse_sql(&PostgreSqlDialect {}, sql) else {
+        return Vec::new();
+    };
+    // `None` marks a column two conjuncts disagree about.
+    let mut found: HashMap<String, Option<String>> = HashMap::new();
+    for statement in statements {
+        let Statement::Query(query) = statement else {
+            continue;
+        };
+        // The OUTER select, so a CTE's or a subquery's WHERE cannot be mistaken
+        // for the one that decides which rows the alert saw.
+        let Some(selection) = outer_select(query.body.as_ref()).and_then(|s| s.selection.as_ref())
+        else {
+            break;
+        };
+        for conjunct in split_and(selection) {
+            let Some((column, value)) = equality_of(conjunct) else {
+                continue;
+            };
+            match found.get(&column) {
+                Some(Some(seen)) if *seen != value => {
+                    found.insert(column, None);
+                }
+                Some(None) => {}
+                _ => {
+                    found.insert(column, Some(value));
+                }
+            }
+        }
+        break;
+    }
+    let mut out: Vec<(String, String)> = found
+        .into_iter()
+        .filter_map(|(column, value)| value.map(|v| (column, v)))
+        .collect();
+    out.sort();
+    out
+}
+
+/// One conjunct, if it is `column = 'literal'`. Either operand order.
+fn equality_of(expr: &Expr) -> Option<(String, String)> {
+    let Expr::BinaryOp {
+        left,
+        op: BinaryOperator::Eq,
+        right,
+    } = expr
+    else {
+        return None;
+    };
+    let column = column_name(left).or_else(|| column_name(right))?;
+    let value = string_literal(right).or_else(|| string_literal(left))?;
+    Some((column, value))
+}
+
+/// The bare column name, with any table qualifier dropped.
+fn column_name(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Identifier(id) => Some(id.value.clone()),
+        Expr::CompoundIdentifier(ids) => ids.last().map(|id| id.value.clone()),
+        _ => None,
+    }
+}
+
+fn string_literal(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Value(v) => match &v.value {
+            Value::SingleQuotedString(s) | Value::DoubleQuotedString(s) => Some(s.clone()),
+            _ => None,
+        },
+        _ => None,
+    }
 }
 
 /// WHERE of a query body, unwrapping parenthesized SELECT; None for UNION/set-ops.
@@ -551,5 +651,99 @@ mod tests {
         assert_eq!(names.len(), 2);
         assert!(names.contains(&"events".to_string()));
         assert!(names.contains(&"alerts".to_string()));
+    }
+
+    /// The truth table `guaranteed_equalities` exists to satisfy.
+    ///
+    /// Every row here is a routing decision: what comes out of this function is
+    /// the identity an aggregating alert is routed on, so a value that is not
+    /// actually guaranteed pages the wrong team with total confidence.
+    #[test]
+    fn test_guaranteed_equalities_only_admits_what_must_be_true() {
+        let cases: &[(&str, &[(&str, &str)])] = &[
+            // Plain conjunction: everything holds.
+            ("SELECT count(*) FROM t WHERE a = '1'", &[("a", "1")]),
+            (
+                "SELECT count(*) FROM t WHERE a = '1' AND b = '2'",
+                &[("a", "1"), ("b", "2")],
+            ),
+            // An OR means the firing could have been either side, so neither is
+            // evidence of anything.
+            ("SELECT count(*) FROM t WHERE a = '1' OR b = '2'", &[]),
+            (
+                "SELECT count(*) FROM t WHERE a = '1' AND (b = '2' OR c = '3')",
+                &[("a", "1")],
+            ),
+            // Nested ANDs are still ANDs, however deep.
+            (
+                "SELECT count(*) FROM t WHERE a = '1' AND (b = '2' AND c = '3')",
+                &[("a", "1"), ("b", "2"), ("c", "3")],
+            ),
+            // A negated subtree is not a conjunct.
+            ("SELECT count(*) FROM t WHERE NOT a = '1'", &[]),
+            (
+                "SELECT count(*) FROM t WHERE a = '1' AND NOT b = '2'",
+                &[("a", "1")],
+            ),
+            // Not equalities at all.
+            ("SELECT count(*) FROM t WHERE a != '1'", &[]),
+            ("SELECT count(*) FROM t WHERE a LIKE 'x%'", &[]),
+            ("SELECT count(*) FROM t WHERE a > '1'", &[]),
+            // Two values for one column: an OR cannot make both true, and an AND
+            // means no row matches at all. Either way there is nothing to say
+            // about `a` — and emphatically not "whichever came last".
+            ("SELECT count(*) FROM t WHERE a = '1' OR a = '2'", &[]),
+            ("SELECT count(*) FROM t WHERE a = '1' AND a = '2'", &[]),
+            // The same value twice is not a conflict.
+            (
+                "SELECT count(*) FROM t WHERE a = '1' AND a = '1'",
+                &[("a", "1")],
+            ),
+            // Literal on the left reads the same as literal on the right.
+            ("SELECT count(*) FROM t WHERE '1' = a", &[("a", "1")]),
+            // A table qualifier is not part of the dimension name.
+            ("SELECT count(*) FROM t WHERE t.a = '1'", &[("a", "1")]),
+            // Numbers are not identities. `http_status = 500` is a threshold.
+            ("SELECT count(*) FROM t WHERE a = 500", &[]),
+            // No WHERE, and unparseable input, are both "nothing known".
+            ("SELECT count(*) FROM t", &[]),
+            ("this is not sql", &[]),
+        ];
+        for (sql, want) in cases {
+            let got = guaranteed_equalities(sql);
+            let want: Vec<(String, String)> = want
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+            assert_eq!(got, want, "for: {sql}");
+        }
+    }
+
+    /// The bug this replaced: `sql.find("where")` matched the first `where` in
+    /// the string, which in a CTE is the inner one. Routing then identified the
+    /// alert by a filter that never selected the rows it fired on.
+    #[test]
+    fn test_guaranteed_equalities_reads_the_outer_where_not_a_ctes() {
+        let sql = "WITH x AS (SELECT * FROM a WHERE k8s_cluster = 'dev') \
+                   SELECT count(*) FROM x WHERE k8s_cluster = 'prod'";
+        assert_eq!(
+            guaranteed_equalities(sql),
+            vec![("k8s_cluster".to_string(), "prod".to_string())],
+            "the outer WHERE is the one that decided which rows fired"
+        );
+    }
+
+    /// A column whose name merely contains the word is not a WHERE clause, and a
+    /// string literal containing it is not one either.
+    #[test]
+    fn test_guaranteed_equalities_is_not_fooled_by_the_word_where() {
+        assert_eq!(
+            guaranteed_equalities("SELECT count(*) FROM nowhere_logs WHERE service = 'api'"),
+            vec![("service".to_string(), "api".to_string())]
+        );
+        assert_eq!(
+            guaranteed_equalities("SELECT count(*) FROM t WHERE msg = 'somewhere else'"),
+            vec![("msg".to_string(), "somewhere else".to_string())]
+        );
     }
 }
