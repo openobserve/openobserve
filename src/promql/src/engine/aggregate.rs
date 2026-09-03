@@ -19,20 +19,16 @@ use std::sync::Arc;
 
 use config::meta::promql::value::*;
 use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::{Call, Expr as PromExpr, LabelModifier, MatrixSelector, token};
+use promql_parser::parser::{Call, Expr as PromExpr, LabelModifier, token};
 
 use super::Engine;
 use crate::{aggregations, functions, fused};
 
-/// A recognized `agg(range_func(...))` expression, the shape the fused and
-/// streaming evaluators accept.
+/// A recognized `agg(range_func(...))` expression, the shape the fused evaluators accept.
 struct FusedAggShape<'a> {
     op: fused::FusedAggOp,
     func: Arc<dyn functions::RangeFunc>,
     range_arg: &'a PromExpr,
-    /// Set when the range argument is a plain matrix selector, the only
-    /// argument shape the streaming evaluator can plan.
-    matrix_selector: Option<&'a MatrixSelector>,
 }
 
 impl Engine {
@@ -45,7 +41,8 @@ impl Engine {
     ) -> Result<Value> {
         // fused shapes fold the range function into the aggregation; others stay generic
         if let Some(shape) = fused_agg_shape(op, expr) {
-            if let Some(matrix_selector) = shape.matrix_selector
+            // only a plain matrix selector can be planned as ordered shard streams
+            if let PromExpr::MatrixSelector(matrix_selector) = shape.range_arg
                 && let Some(value) = self
                     .try_streaming_fused_agg(
                         matrix_selector,
@@ -154,22 +151,13 @@ fn fused_agg_shape<'a>(op: &token::TokenType, expr: &'a PromExpr) -> Option<Fuse
     let PromExpr::Call(Call { func, args }) = expr else {
         return None;
     };
-    if args.len() != 1 {
+    let [range_arg] = args.args.as_slice() else {
         return None;
-    }
-    let range_func = functions::fusable_range_func(func.name)?;
-    let range_arg: &PromExpr = args
-        .args
-        .last()
-        .expect("promql-parser validated the function argument");
-    let matrix_selector = match range_arg {
-        PromExpr::MatrixSelector(matrix_selector) => Some(matrix_selector),
-        _ => None,
     };
+    let range_func = functions::fusable_range_func(func.name)?;
     Some(FusedAggShape {
         op: agg_op,
         func: Arc::from(range_func),
         range_arg,
-        matrix_selector,
     })
 }

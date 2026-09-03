@@ -13,10 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The hash-sorted producer: hash-space shard plans over hash-sorted scans, and the
-//! per-shard series source that merges a shard's ordered chains one series at a
-//! time (one round of cursor checks per series instead of one heap operation
-//! per row).
+//! The hash-sorted producer: shard plans over hash-sorted scans, and the per-shard source that
+//! merges a shard's ordered chains one series at a time.
 
 use std::{hash::Hasher, sync::Arc};
 
@@ -50,8 +48,8 @@ use futures::TryStreamExt;
 use super::SeriesSource;
 use crate::load_series::{LabelColumn, batch_run_len};
 
-/// One shard's series source: every chain is hash-ordered and holds one run
-/// per series, so the minimum head hash across chains is the next series.
+/// One shard's series source; every chain holds one run per series, so the minimum head hash is the
+/// next series.
 pub(crate) struct StreamSource {
     cursors: Vec<ChainCursor>,
     group_cols: Arc<Vec<String>>,
@@ -153,8 +151,7 @@ impl SeriesSource for StreamSource {
     }
 }
 
-/// One hash-ordered input of a shard's merge (a chain of non-overlapping
-/// files). All samples of one series sit in a single run per chain.
+/// One hash-ordered chain of non-overlapping files; a series is a single run per chain.
 struct ChainCursor {
     stream: SendableRecordBatchStream,
     batch: Option<RecordBatch>,
@@ -224,21 +221,8 @@ impl ChainCursor {
     }
 }
 
-/// Uniform partition of the u64 hash space into `count` inclusive ranges.
-fn hash_shards(count: usize) -> Vec<(u64, u64)> {
-    let count = count.max(1) as u128;
-    let span = (u64::MAX as u128) + 1;
-    (0..count)
-        .map(|shard| {
-            let lo = (span * shard / count) as u64;
-            let hi = (span * (shard + 1) / count - 1) as u64;
-            (lo, hi)
-        })
-        .collect()
-}
-
-/// Builds every shard's ordered input streams; `None` (with the offending shard
-/// logged) means some shard's plan cannot stream in order.
+/// Every shard's ordered input streams; `None` (logged) means a shard's plan cannot stream in
+/// order.
 pub(crate) async fn build_shard_inputs(
     df: &DataFrame,
     columns: &[&str],
@@ -277,8 +261,20 @@ pub(crate) async fn build_shard_inputs(
     Ok(Some(shard_inputs))
 }
 
-/// The hash-ordered inputs a shard folds from: the merge's own child
-/// partitions, so the row-level merge node itself is never executed.
+/// Uniform partition of the u64 hash space into `count` inclusive ranges.
+fn hash_shards(count: usize) -> Vec<(u64, u64)> {
+    let count = count.max(1) as u128;
+    let span = (u64::MAX as u128) + 1;
+    (0..count)
+        .map(|shard| {
+            let lo = (span * shard / count) as u64;
+            let hi = (span * (shard + 1) / count - 1) as u64;
+            (lo, hi)
+        })
+        .collect()
+}
+
+/// The merge node's own child partitions, so the row-level merge itself is never executed.
 fn shard_streams(
     plan: Arc<dyn ExecutionPlan>,
     task_ctx: Arc<TaskContext>,

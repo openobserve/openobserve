@@ -109,51 +109,11 @@ mod tests {
 
     use config::meta::promql::value::{Label, RangeValue, Sample, TimeWindow};
 
-    use super::*;
+    use super::{super::test_support::*, *};
     use crate::{aggregations, functions, series_source::matrix::MATRIX_PARTITION_CHUNK};
 
-    type CanonicalSeries = (Vec<(String, String)>, Vec<(i64, u64)>);
     type GenericAgg = fn(&Option<LabelModifier>, Value, &EvalContext) -> Result<Value>;
     type GenericRange = fn(Value, &EvalContext) -> Result<Value>;
-
-    const SECOND: i64 = 1_000_000;
-    const BASE: i64 = 1_000 * SECOND;
-
-    fn canonical_matrix(value: Value) -> Vec<CanonicalSeries> {
-        let matrix = match value {
-            Value::Matrix(matrix) => matrix,
-            Value::None => return vec![],
-            value => panic!("expected matrix or none, got {}", value.get_type()),
-        };
-        let mut canonical = matrix
-            .into_iter()
-            .map(|series| {
-                let mut labels = series
-                    .labels
-                    .iter()
-                    .map(|label| (label.name.clone(), label.value.clone()))
-                    .collect::<Vec<_>>();
-                labels.sort();
-                let samples = series
-                    .samples
-                    .iter()
-                    .map(|sample| (sample.timestamp, sample.value.to_bits()))
-                    .collect::<Vec<_>>();
-                (labels, samples)
-            })
-            .collect::<Vec<_>>();
-        canonical.sort_by(|a, b| a.0.cmp(&b.0));
-        canonical
-    }
-
-    fn eval_ctx() -> EvalContext {
-        EvalContext::new(
-            BASE + 60 * SECOND,
-            BASE + 180 * SECOND,
-            60 * SECOND,
-            "test".into(),
-        )
-    }
 
     fn make_series(name: &str, instance: &str, path: &str, points: &[(i64, f64)]) -> RangeValue {
         RangeValue {
@@ -200,18 +160,6 @@ mod tests {
             // All samples precede every window: generic drops this series and its `/zzz` group.
             make_series("stale_total", "z", "/zzz", &[(-100, 1.0), (-50, 2.0)]),
         ]
-    }
-
-    fn by(labels: &[&str]) -> Option<LabelModifier> {
-        Some(LabelModifier::Include(promql_parser::label::Labels {
-            labels: labels.iter().map(|label| label.to_string()).collect(),
-        }))
-    }
-
-    fn without(labels: &[&str]) -> Option<LabelModifier> {
-        Some(LabelModifier::Exclude(promql_parser::label::Labels {
-            labels: labels.iter().map(|label| label.to_string()).collect(),
-        }))
     }
 
     async fn run_fused(

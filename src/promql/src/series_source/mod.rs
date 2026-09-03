@@ -24,10 +24,8 @@ pub(crate) mod stream;
 use config::meta::promql::value::{Labels, Sample};
 use datafusion::error::Result;
 
-/// One partition's series, delivered whole and grouped under a signature.
-///
-/// Protocol per series: `advance` yields the group signature, `labels` may be
-/// read while the series is current, `consume` takes its samples and moves on.
+/// One partition's series delivered whole: `advance` yields the group signature, then
+/// `labels`/`consume` read the current one.
 pub(crate) trait SeriesSource: Send {
     fn advance(&mut self) -> impl Future<Output = Result<Option<u64>>> + Send;
     /// Group labels of the current series; valid only before `consume`.

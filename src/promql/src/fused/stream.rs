@@ -39,19 +39,15 @@ use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
     fused::FusedAggOp,
     load_series::apply_time_window,
+    micros,
     series_source::stream::{StreamSource, build_shard_inputs},
     utils::apply_matchers,
 };
 
-/// Load-window and matcher parameters of one selector scan, with the window
-/// already shifted for any `offset` modifier.
+/// The selector being scanned; `offset` is the `offset` modifier in microseconds.
 pub(crate) struct StreamingSelector<'a> {
     pub table_name: &'a str,
     pub matchers: &'a Matchers,
-    pub start: i64,
-    pub end: i64,
-    pub step: i64,
-    pub lookback: i64,
     pub offset: i64,
 }
 
@@ -62,10 +58,7 @@ pub(crate) struct FusedShape {
     pub range: Duration,
 }
 
-/// Runs the fused aggregation as parallel per-hash-shard ordered streams.
-/// Returns `None` when the layout or query shape rules the streaming plan out
-/// (no ordered table, non-UInt64 hashes, `without` grouping, a plan that would
-/// need an actual sort); the caller then falls back to the materializing path.
+/// Folds from per-shard ordered streams; `None` when the layout or shape cannot stream.
 pub(crate) async fn fused_agg(
     ctx: &SessionContext,
     schema: &Schema,
@@ -94,10 +87,10 @@ pub(crate) async fn fused_agg(
 
     let df = apply_time_window(
         df,
-        selector.start,
-        selector.end,
-        selector.step,
-        selector.lookback,
+        eval_ctx.start - selector.offset,
+        eval_ctx.end - selector.offset,
+        eval_ctx.step,
+        micros(shape.range),
     )?;
     let df = apply_matchers(df, selector.matchers)?;
 
@@ -123,7 +116,7 @@ pub(crate) async fn fused_agg(
     let (value, series_count) = fold_sources(sources, params, timeout).await?;
 
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) completed in {:?}, folded {series_count} series into {} series",
+        "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) execution took: {:?}, folded {series_count} series into {} series",
         shape.op.name(),
         shape.func.name(),
         start_time.elapsed(),
@@ -135,8 +128,7 @@ pub(crate) async fn fused_agg(
     Ok(Some(value))
 }
 
-/// Columns the aggregation groups by, sorted for a stable label order.
-/// `None` when the grouping cannot be resolved to a column set (`without`).
+/// The `by()` columns in a stable order; `None` for `without()`, which needs the full label set.
 fn group_label_columns(
     modifier: &Option<LabelModifier>,
     schema: &Schema,
@@ -179,22 +171,11 @@ mod tests {
     use itertools::Itertools;
     use promql_parser::label::Labels as ModifierLabels;
 
-    use super::{super::matrix, *};
+    use super::{
+        super::{matrix, test_support::*},
+        *,
+    };
     use crate::functions;
-
-    type CanonicalSeries = (Vec<(String, String)>, Vec<(i64, u64)>);
-
-    const SECOND: i64 = 1_000_000;
-    const BASE: i64 = 1_000 * SECOND;
-
-    fn eval_ctx() -> EvalContext {
-        EvalContext::new(
-            BASE + 60 * SECOND,
-            BASE + 180 * SECOND,
-            60 * SECOND,
-            "test".into(),
-        )
-    }
 
     fn arrow_schema() -> Arc<Schema> {
         use datafusion::arrow::datatypes::Field;
@@ -329,72 +310,6 @@ mod tests {
         matrix
     }
 
-    fn canonical_matrix(value: Value) -> Vec<CanonicalSeries> {
-        let matrix = match value {
-            Value::Matrix(matrix) => matrix,
-            Value::None => return vec![],
-            value => panic!("expected matrix or none, got {}", value.get_type()),
-        };
-        let mut canonical = matrix
-            .into_iter()
-            .map(|series| {
-                let mut labels = series
-                    .labels
-                    .iter()
-                    .map(|label| (label.name.clone(), label.value.clone()))
-                    .collect::<Vec<_>>();
-                labels.sort();
-                let samples = series
-                    .samples
-                    .iter()
-                    .map(|sample| (sample.timestamp, sample.value.to_bits()))
-                    .collect::<Vec<_>>();
-                (labels, samples)
-            })
-            .collect::<Vec<_>>();
-        canonical.sort_by(|a, b| a.0.cmp(&b.0));
-        canonical
-    }
-
-    /// Labels and timestamps must match exactly; values may drift in the last
-    /// bits because streaming folds series in hash order, not matrix order.
-    fn assert_matrix_close(
-        expected: Vec<CanonicalSeries>,
-        actual: Vec<CanonicalSeries>,
-        context: &str,
-    ) {
-        assert_eq!(expected.len(), actual.len(), "{context}: series count");
-        for (expected, actual) in expected.iter().zip(&actual) {
-            assert_eq!(expected.0, actual.0, "{context}: labels");
-            assert_eq!(expected.1.len(), actual.1.len(), "{context}: sample count");
-            for (&(expected_ts, expected_bits), &(actual_ts, actual_bits)) in
-                expected.1.iter().zip(&actual.1)
-            {
-                assert_eq!(expected_ts, actual_ts, "{context}: timestamps");
-                if expected_bits == actual_bits {
-                    continue;
-                }
-                let expected_value = f64::from_bits(expected_bits);
-                let actual_value = f64::from_bits(actual_bits);
-                assert!(
-                    expected_value.is_finite() && actual_value.is_finite(),
-                    "{context}: non-finite values must match exactly"
-                );
-                let tolerance = expected_value.abs().max(actual_value.abs()) * 1e-12;
-                assert!(
-                    (expected_value - actual_value).abs() <= tolerance,
-                    "{context}: {expected_value} vs {actual_value}"
-                );
-            }
-        }
-    }
-
-    fn by(labels: &[&str]) -> Option<LabelModifier> {
-        Some(LabelModifier::Include(ModifierLabels {
-            labels: labels.iter().map(|label| label.to_string()).collect(),
-        }))
-    }
-
     async fn run_streaming(
         ctx: &SessionContext,
         modifier: &Option<LabelModifier>,
@@ -410,10 +325,6 @@ mod tests {
             StreamingSelector {
                 table_name: "m",
                 matchers: &Matchers::empty(),
-                start: eval_ctx.start,
-                end: eval_ctx.end,
-                step: eval_ctx.step,
-                lookback: crate::micros(range),
                 offset: 0,
             },
             FusedShape { op, func, range },

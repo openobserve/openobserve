@@ -68,9 +68,8 @@ impl FoldParams {
     }
 }
 
-/// Folds every source partition concurrently and merges the groups; returns
-/// the aggregated value and the number of series folded. Each partition's
-/// source is built inside its own task, so streaming sources open lazily.
+/// Folds all partitions concurrently and merges their groups; each source opens inside its own
+/// task.
 pub(super) async fn fold_sources<F, S>(
     sources: Vec<F>,
     params: Arc<FoldParams>,
@@ -96,8 +95,7 @@ where
     Ok((value, series_count))
 }
 
-/// Folds one partition's series into its group accumulators, dropping each
-/// series as soon as it is folded.
+/// Folds one partition's series into its group accumulators, dropping each as it goes.
 async fn fold_partition<S: SeriesSource>(
     mut source: S,
     params: Arc<FoldParams>,
@@ -129,8 +127,7 @@ async fn fold_partition<S: SeriesSource>(
     Ok((groups, series_count))
 }
 
-/// Evaluates `func` over one series' time-ordered samples and pushes each
-/// produced value into `acc` at its evaluation slot.
+/// Evaluates `func` over one series and pushes each value into `acc` at its evaluation slot.
 fn fold_series(
     acc: &mut FusedAccumulator,
     samples: &[Sample],
@@ -166,8 +163,7 @@ fn fold_series(
     }
 }
 
-/// Runs the partition folds concurrently; the first failed partition or the
-/// `timeout` fails the whole fold, and dropping the set aborts the rest.
+/// The first failed partition or the `timeout` fails the fold; dropping the set aborts the rest.
 async fn run_folds<Fut>(folds: Vec<Fut>, timeout: u64) -> Result<Vec<(GroupAccs, usize)>>
 where
     Fut: Future<Output = Result<(GroupAccs, usize)>> + Send + 'static,
@@ -201,9 +197,8 @@ where
         .collect())
 }
 
-/// Merges the partition-local groups in partition order and materializes the
-/// result; groups whose accumulator produced no samples are dropped like the
-/// generic path drops no-output series.
+/// Merges the partition groups in partition order; groups without output are dropped like the
+/// generic path.
 fn merge_folds(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
     let mut folds = folds.into_iter();
     let Some(mut merged) = folds.next() else {
@@ -298,14 +293,7 @@ mod tests {
     fn params() -> Arc<FoldParams> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func("rate").unwrap());
         let eval_ctx = EvalContext::new(1_000_000, 2_000_000, 1_000_000, "test".into());
-        Arc::new(FoldParams {
-            op: FusedAggOp::Sum,
-            func: func.clone(),
-            counter_kind: func.counter_extrapolation(),
-            range: Duration::from_secs(60),
-            timestamps: eval_ctx.timestamps(),
-            eval_ctx,
-        })
+        FoldParams::new(FusedAggOp::Sum, func, Duration::from_secs(60), &eval_ctx)
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

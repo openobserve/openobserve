@@ -27,8 +27,7 @@ use crate::aggregations::{group_series_by_labels, projected_labels};
 /// Series per partition; matches the fused fold's historical chunk size.
 pub(crate) const MATRIX_PARTITION_CHUNK: usize = 1024;
 
-/// One partition of a materialized matrix, owning its series in group order;
-/// each series is freed on the partition's own task once the next one starts.
+/// One partition of a materialized matrix, owning its series in group order.
 pub(crate) struct MatrixSource {
     series: std::vec::IntoIter<(u64, RangeValue)>,
     current: Option<RangeValue>,
@@ -56,9 +55,7 @@ impl SeriesSource for MatrixSource {
     }
 }
 
-/// Splits a matrix into group-contiguous partitions that own their series;
-/// partition boundaries depend only on the series count, so folds merge
-/// deterministically.
+/// Splits a matrix into group-contiguous partitions; boundaries depend only on the series count.
 pub(crate) fn matrix_sources(
     matrix: Vec<RangeValue>,
     modifier: &Option<LabelModifier>,
