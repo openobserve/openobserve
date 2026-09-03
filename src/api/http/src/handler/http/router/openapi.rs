@@ -571,6 +571,9 @@ pub struct ApiDoc;
     openobserve_api_management::request::remote_tasks::end_remote_task_signing_grace,
     openobserve_api_management::request::remote_tasks::revoke_remote_task_signing_secret,
 ))]
+#[openapi(components(schemas(
+    openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
+)))]
 struct EnterpriseExperimentApiDoc;
 
 pub struct SecurityAddon;

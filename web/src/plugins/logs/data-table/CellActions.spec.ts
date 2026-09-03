@@ -248,6 +248,35 @@ describe("CellActions", () => {
   });
 
   // ── Props defaults ────────────────────────────────────────────────────────────
+  describe("value prop", () => {
+    // Logs' `source` column is JSON.stringify(row): nothing sits under
+    // row["source"], so the caller hands the rendered value in.
+    it("acts on the passed value when the row has nothing under column.id", async () => {
+      const wrapper = mountComponent({
+        column: { id: "source" },
+        row: { status: "200", message: "OK" },
+        value: '{"status":"200"}',
+        selectedStreamFields: [],
+      });
+
+      await wrapper.find("button").trigger("click");
+
+      expect(wrapper.emitted("copy")?.[0]).toEqual(['{"status":"200"}']);
+      // The title/data-test follow the same value, so they never read "undefined".
+      expect(wrapper.find(".table-cell-actions").attributes("data-test")).toBe(
+        'log-add-data-from-column-{"status":"200"}',
+      );
+    });
+
+    it("falls back to row[column.id] when no value is passed", async () => {
+      const wrapper = mountComponent();
+
+      await wrapper.find("button").trigger("click");
+
+      expect(wrapper.emitted("copy")?.[0]).toEqual(["200"]);
+    });
+  });
+
   describe("Props defaults", () => {
     it("defaults hideSearchTermActions to false", () => {
       const wrapper = mountComponent();

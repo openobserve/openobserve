@@ -446,11 +446,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { rumField, normalizeTraceId } from "@/utils/rum/fields";
 import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
+import { traceQueryWindow } from "@/utils/rum/traceWindow";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -502,7 +503,9 @@ const emit = defineEmits(["update:open", "resource-selected"]);
 const store = useStore();
 const router = useRouter();
 const { t } = useI18nTyped();
-const { resolveTracesStream } = useCorrelatedTracesStream(t);
+const { resolveTraceLocation, cancel: cancelCorrelatedTracesStream } = useCorrelatedTracesStream(t);
+
+onUnmounted(() => cancelCorrelatedTracesStream());
 const relatedResources = ref<any[]>([]);
 const isLoadingRelatedResources = ref(false);
 const selectedResourceWithTrace = ref<any>(null);
@@ -640,14 +643,17 @@ const navigateToSpecificTrace = async (traceId: string) => {
   const win = window.open("", "_blank");
   isResolvingTraceNav.value = true;
   try {
-    const stream = await resolveTracesStream(canonicalTraceId, startTime, endTime);
+    const location = await resolveTraceLocation(canonicalTraceId, startTime, endTime);
+    // The ±10s guess above only frames the lookup; the indexed range is what
+    // the trace actually spans, so a slow call is no longer cut off.
+    const traceWindow = traceQueryWindow(location.range, startTime, endTime);
     const route = router.resolve({
       name: "traceDetails",
       query: {
-        stream,
+        stream: location.stream,
         trace_id: canonicalTraceId,
-        from: startTime,
-        to: endTime,
+        from: traceWindow.startTime,
+        to: traceWindow.endTime,
         org_identifier: store.state.selectedOrganization.identifier,
       },
     });

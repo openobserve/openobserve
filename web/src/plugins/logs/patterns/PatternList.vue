@@ -220,7 +220,7 @@ import {
   compactCount,
   type PatternSeverityKey,
 } from "./patternUtils";
-import { computed, watch } from "vue";
+import { computed, watch, onUnmounted } from "vue";
 import { DateTime } from "luxon";
 
 const SKELETON_WIDTHS = [
@@ -294,7 +294,9 @@ const openDetails = (pattern: any, index: number) => {
   emit("open-details", pattern, index, filteredPatterns.value);
 };
 
-const { hoveredToken, onPopoverEnter, onPopoverLeave } = useWildcardHover();
+const { hoveredToken, onPopoverEnter, onPopoverLeave, cleanup } = useWildcardHover();
+
+onUnmounted(() => cleanup());
 
 // The severity filter is shared through usePatternActions rather than kept
 // local: "create an alert from the visible patterns" has to know which patterns

@@ -1538,8 +1538,8 @@ pub struct Search {
     pub feature_metrics_fused_agg_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_METRICS_STREAMING_AGG_ENABLED",
-        default = false,
-        help = "Register the hash-sorted metrics table for streaming PromQL aggregation over hash-sorted metrics files; off by default until the streaming evaluator lands"
+        default = true,
+        help = "Evaluate fused PromQL agg(range_func(...)) queries as a stream over hash-sorted metrics files, series by series, instead of materializing all samples; falls back to the fused evaluator when the file layout or query shape does not allow it"
     )]
     pub feature_metrics_streaming_agg_enabled: bool,
     #[env_config(

@@ -52,6 +52,9 @@ pub struct WorkflowTestInput {
     workflow: Workflow,
     #[serde(default)]
     from_node: Option<String>,
+    /// Defaults to true so a client that omits the field cannot page on-call by testing.
+    #[serde(default = "default_suppress_destinations")]
+    suppress_destinations: bool,
 }
 
 #[derive(Serialize)]
@@ -117,6 +120,27 @@ pub struct WorkflowListItem {
 pub struct WorkflowCreatePayload {
     trigger_type: WorkflowTriggerType,
     workflow: Workflow,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum WorkflowDeleteOutcome {
+    DeletePublished,
+    DraftOnly,
+    NotFound,
+}
+
+fn default_suppress_destinations() -> bool {
+    true
+}
+
+/// An unqualified delete must not report success for an id it never removed, so a draft-only
+/// id is named as such rather than silently matching zero published rows.
+fn workflow_delete_outcome(published_exists: bool, draft_exists: bool) -> WorkflowDeleteOutcome {
+    match (published_exists, draft_exists) {
+        (true, _) => WorkflowDeleteOutcome::DeletePublished,
+        (false, true) => WorkflowDeleteOutcome::DraftOnly,
+        (false, false) => WorkflowDeleteOutcome::NotFound,
+    }
 }
 
 /// CreateWorkflow
@@ -332,6 +356,35 @@ pub async fn delete_workflows(
     let is_draft: bool = is_draft.parse().unwrap_or(false);
 
     if !is_draft {
+        let published_exists = match workflows::get_workflow_by_id(&org_id, &id).await {
+            Ok(v) => v.is_some(),
+            Err(e) => {
+                log::error!("error getting workflow {org_id}/{id} before delete : {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+        };
+        let draft_exists = match workflows::get_draft_by_id(&org_id, &id).await {
+            Ok(v) => v.is_some(),
+            Err(e) => {
+                log::error!("error getting draft {org_id}/{id} before delete : {e}");
+                return MetaHttpResponse::internal_error(e);
+            }
+        };
+
+        match workflow_delete_outcome(published_exists, draft_exists) {
+            WorkflowDeleteOutcome::NotFound => {
+                return MetaHttpResponse::not_found(format!(
+                    "workflow with id {id} does not exist"
+                ));
+            }
+            WorkflowDeleteOutcome::DraftOnly => {
+                return MetaHttpResponse::not_found(format!(
+                    "no published workflow with id {id}; it is a draft, delete it with ?draft=true"
+                ));
+            }
+            WorkflowDeleteOutcome::DeletePublished => {}
+        }
+
         let associations = match db::workflows::get_workflow_associations(&org_id, &id).await {
             Ok(v) => v,
             Err(e) => {
@@ -537,12 +590,15 @@ pub async fn update_workflows(
     )
 )]
 pub async fn test_workflow(
+    Headers(user_email): Headers<UserEmail>,
     Path(org_id): Path<String>,
     Query(query): Query<HashMap<String, String>>,
     Json(inputs): Json<WorkflowTestInput>,
 ) -> Response {
     let mut workflow = inputs.workflow;
     workflow.org_id = org_id.clone();
+    // the run executes under a synthetic id; core keys history on this id only if it verifies
+    let workflow_id = workflow.id.clone();
     workflow.id = format!("test-{}", config::ider::uuid());
 
     let is_draft = match query.get("draft") {
@@ -552,8 +608,19 @@ pub async fn test_workflow(
 
     let is_draft: bool = is_draft.parse().unwrap_or(false);
 
-    match workflows::test_workflow(&org_id, workflow, inputs.inputs, inputs.from_node, is_draft)
-        .await
+    match workflows::test_workflow(
+        &org_id,
+        &workflow_id,
+        workflow,
+        inputs.inputs,
+        inputs.from_node,
+        workflows::TestWorkflowOptions {
+            is_draft,
+            suppress_destinations: inputs.suppress_destinations,
+        },
+        &user_email.user_id,
+    )
+    .await
     {
         Ok(v) => MetaHttpResponse::json(WorkflowTestResult {
             errors: v.errors,
@@ -880,19 +947,17 @@ pub async fn get_workflow_history(
     let ret: Vec<_> = parsed_results
         .into_iter()
         .map(|mut v| {
-            let key_splits: Vec<_> = v.key.split("/").collect();
-
-            if key_splits.len() < 4 {
+            let Some((event_type, source_id, run_id)) = parse_workflow_history_key(&v.key) else {
                 log::warn!(
                     "unexpected key for workflow history of {org_id}/{workflow_id} : {}",
                     v.key
                 );
                 return v;
-            }
+            };
 
-            v.run_id = key_splits[3].to_string();
-            v.source_id = key_splits[2].to_string();
-            v.event_type = WorkflowTriggerType::from(key_splits[1]);
+            v.run_id = run_id;
+            v.source_id = source_id;
+            v.event_type = event_type;
             v
         })
         .collect();
@@ -971,4 +1036,106 @@ pub async fn promote_draft(
     };
 
     MetaHttpResponse::created("converted to workflow successfully")
+}
+
+/// Splits the 4-part run-history key. `rsplit_once` on the tail, not a
+/// left-to-right split: a source_id may itself contain '/' (a user email or an
+/// org/name pair), which would otherwise shift run_id into a source fragment.
+fn parse_workflow_history_key(key: &str) -> Option<(WorkflowTriggerType, String, String)> {
+    let mut parts = key.splitn(3, '/');
+    let workflow_id = parts.next()?;
+    let trigger_type = parts.next()?;
+    let rest = parts.next()?;
+    let (source_id, run_id) = rest.rsplit_once('/')?;
+    if workflow_id.is_empty()
+        || trigger_type.is_empty()
+        || source_id.is_empty()
+        || run_id.is_empty()
+    {
+        return None;
+    }
+    Some((
+        WorkflowTriggerType::from(trigger_type),
+        source_id.to_string(),
+        run_id.to_string(),
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn history_key_parses_into_trigger_type_source_id_and_run_id() {
+        let (trigger_type, source_id, run_id) =
+            parse_workflow_history_key("wf123/AlertFired/alert456/run789").unwrap();
+        assert_eq!(trigger_type, WorkflowTriggerType::AlertFired);
+        assert_eq!(source_id, "alert456");
+        assert_eq!(run_id, "run789");
+    }
+
+    #[test]
+    fn history_key_survives_a_source_id_containing_slashes() {
+        // A manual run's source_id is a user email or an org/name pair, both of which can
+        // contain '/', so a left-to-right split shifts run_id into a source_id fragment.
+        let (trigger_type, source_id, run_id) =
+            parse_workflow_history_key("wf123/AlertFired/myorg/my_alert/run789").unwrap();
+        assert_eq!(trigger_type, WorkflowTriggerType::AlertFired);
+        assert_eq!(source_id, "myorg/my_alert");
+        assert_eq!(run_id, "run789");
+    }
+
+    #[test]
+    fn history_key_for_a_manual_run_reports_manual_and_the_firing_user() {
+        let (trigger_type, source_id, run_id) =
+            parse_workflow_history_key("wf123/Manual/user@example.com/run789").unwrap();
+        assert_eq!(trigger_type, WorkflowTriggerType::Manual);
+        assert_eq!(source_id, "user@example.com");
+        assert_eq!(run_id, "run789");
+    }
+
+    #[test]
+    fn history_key_with_too_few_parts_is_rejected() {
+        assert!(parse_workflow_history_key("wf123/AlertFired/alert456").is_none());
+        assert!(parse_workflow_history_key("wf123/AlertFired").is_none());
+        assert!(parse_workflow_history_key("").is_none());
+    }
+
+    #[test]
+    fn history_key_round_trips_a_source_id_with_a_slash() {
+        let source_id = "myorg/my alert";
+        let key = format!("wf123/{}/{source_id}/run789", WorkflowTriggerType::Retry);
+        let (trigger_type, parsed_source, run_id) = parse_workflow_history_key(&key).unwrap();
+        assert_eq!(trigger_type, WorkflowTriggerType::Retry);
+        assert_eq!(parsed_source, source_id);
+        assert_eq!(run_id, "run789");
+    }
+
+    #[test]
+    fn unqualified_delete_of_a_missing_workflow_is_not_reported_as_deleted() {
+        assert_eq!(
+            workflow_delete_outcome(false, false),
+            WorkflowDeleteOutcome::NotFound
+        );
+    }
+
+    #[test]
+    fn unqualified_delete_of_an_id_that_names_only_a_draft_reports_draft_only() {
+        assert_eq!(
+            workflow_delete_outcome(false, true),
+            WorkflowDeleteOutcome::DraftOnly
+        );
+    }
+
+    #[test]
+    fn unqualified_delete_of_a_published_workflow_deletes_it() {
+        assert_eq!(
+            workflow_delete_outcome(true, false),
+            WorkflowDeleteOutcome::DeletePublished
+        );
+        assert_eq!(
+            workflow_delete_outcome(true, true),
+            WorkflowDeleteOutcome::DeletePublished
+        );
+    }
 }

@@ -30,7 +30,7 @@ name: Playwright E2E Crosscheck
 on:
   pull_request:
     # Fires once per PR when "Merge when ready" is clicked, then for pushes/labels while auto-merge stays on.
-    types: [auto_merge_enabled, synchronize, labeled, unlabeled]
+    types: [auto_merge_enabled, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   # A required check must also report on merge-queue commits; the gate already passed on the PR head.
   merge_group:
 
@@ -46,7 +46,7 @@ permissions:
 jobs:
   playwright-e2e-crosscheck:
     # A pre-merge gate: runs once auto-merge is enabled on a labelled PR, not on every push.
-    if: ${{ github.event_name == 'merge_group' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.auto_merge != null) }}
+    if: ${{ github.event_name == 'merge_group' || ((contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) && github.event.pull_request.auto_merge != null) }}
     name: Playwright E2E Crosscheck
     runs-on: ubuntu-latest
     # ~5 min to find the ENT run + up to ~75 min to poll. Generous on purpose: normal is ~20 min,
