@@ -170,6 +170,16 @@ export class AlertLibraryPage {
     return Number((await bar.getAttribute('data-selected')) || 0);
   }
 
+  async offscreenCountInBar() {
+    const bar = this.page.locator(this.l.selectionBar);
+    if (!(await bar.isVisible().catch(() => false))) return 0;
+    return Number((await bar.getAttribute('data-offscreen')) || 0);
+  }
+
+  async firstSelectGroup() {
+    await this.page.locator('[data-test^="alert-library-select-group-"]').first().click();
+  }
+
   // ── drawer ────────────────────────────────────────────────────────────────
   async openCard(id) {
     await this.cardTitle(id).click();
@@ -234,6 +244,12 @@ export class AlertLibraryPage {
   isLargeConfirmVisible() { return this.page.locator(this.l.confirmLarge).isVisible(); }
 
   async run() { await this.page.locator(this.l.run).click(); }
+  async retryFailed() { await this.page.locator(this.l.retry).click(); }
+  async clearInDialog() { await this.page.locator(this.l.installClear).click(); }
+  async selectAllInDialog() { await this.page.locator(this.l.installSelectAll).click(); }
+  async toggleAlertInDialog(id) {
+    await this.page.locator(`[data-test="alert-library-install-alert-${id}"]`).click();
+  }
 
   async waitResult(id, status = 'installed', timeout = 30000) {
     await expect(this.page.locator(`[data-test="alert-library-install-result-${id}"]`))

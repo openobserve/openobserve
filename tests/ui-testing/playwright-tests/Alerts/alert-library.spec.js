@@ -4,9 +4,11 @@ const testLogger = require('../utils/test-logger.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 const {
   MANIFEST_GLOB,
+  FILE_GLOB,
   makeEntry,
   makeEntries,
   buildManifest,
+  buildAlertFile,
   routeLibrary,
 } = require('../fixtures/alertLibraryFixture.js');
 
@@ -143,6 +145,18 @@ test.describe('Alert Library', () => {
     await expect(page.locator('[data-test="alert-library-install-run"]')).toBeDisabled();
     await pm.alertLibraryPage.confirmLargeBatch();
     await expect(page.locator('[data-test="alert-library-install-run"]')).toBeEnabled();
+
+    // H5: the confirmation auto-resets when the run's shape changes (here, the
+    // alert selection), so it always describes the run about to happen.
+    await pm.alertLibraryPage.back(); // → tune
+    await pm.alertLibraryPage.back(); // → folder
+    await pm.alertLibraryPage.back(); // → alerts
+    await pm.alertLibraryPage.clearInDialog();
+    await pm.alertLibraryPage.selectAllInDialog();
+    await pm.alertLibraryPage.next(); // folder
+    await pm.alertLibraryPage.next(); // tune
+    await pm.alertLibraryPage.next(); // review
+    await expect(page.locator('[data-test="alert-library-install-run"]')).toBeDisabled();
   });
 
   test('readiness surfaces on the card and in the drawer (fresh vs missing)', async ({ page }) => {
@@ -187,6 +201,25 @@ test.describe('Alert Library', () => {
       // Distinct error surface with a retry, never a silent empty catalog.
       await expect(page.locator('[data-test="alert-library-error"]'), m.label).toBeVisible({ timeout: 20000 });
     }
+
+    // B3: a valid-but-empty manifest is its OWN state, not an error.
+    await page.unroute(MANIFEST_GLOB);
+    await page.route(MANIFEST_GLOB, (route) =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ format_version: '1.0', alert_count: 0, packs: [], alerts: [] }),
+      }),
+    );
+    await page.reload();
+    await expect(page.locator('[data-test="alert-library-empty-catalog"]')).toBeVisible({ timeout: 20000 });
+
+    // B7: restoring a good manifest and hitting Retry recovers the gallery.
+    await page.unroute(MANIFEST_GLOB);
+    await page.route(MANIFEST_GLOB, (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(buildManifest(entries)) }),
+    );
+    await page.locator('[data-test="alert-library-empty-catalog"] [data-test$="-action"], [data-test="alert-library-empty-catalog"] button').first().click();
+    await expect(page.locator('[data-test="alert-library-grid"]')).toBeVisible({ timeout: 20000 });
   });
 
   test('Customize opens the alert editor prefilled from the library file', async ({ page }) => {
@@ -227,6 +260,10 @@ test.describe('Alert Library', () => {
     await expect(pm.alertLibraryPage.card(ready.id)).toHaveCount(0);
     await pm.alertLibraryPage.clearCategories();
     await expect(pm.alertLibraryPage.card(ready.id)).toBeVisible();
+
+    // C13: a search matching nothing shows the no-results state.
+    await pm.alertLibraryPage.search('zzz_no_such_alert_zzz');
+    await expect(page.locator('[data-test="alert-library-no-results"]')).toBeVisible();
   });
 
   test('bulk install a small selection runs each alert and reports success', async ({ page }) => {
@@ -239,6 +276,12 @@ test.describe('Alert Library', () => {
     await pm.alertLibraryPage.addSelected();
     await pm.alertLibraryPage.pickDestination(destinationName);
     await pm.alertLibraryPage.next(); // alerts
+    // F5: clearing the selection blocks advancing until at least one is re-picked
+    // (re-check the three specific rows — select-all would pull the whole gallery).
+    await pm.alertLibraryPage.clearInDialog();
+    await expect(page.locator('[data-test="alert-library-install-next"]')).toBeDisabled();
+    for (const e of picks) await pm.alertLibraryPage.toggleAlertInDialog(e.id);
+    await expect(page.locator('[data-test="alert-library-install-next"]')).toBeEnabled();
     await pm.alertLibraryPage.next(); // folder
     await pm.alertLibraryPage.next(); // tune
     await pm.alertLibraryPage.next(); // review
@@ -253,5 +296,107 @@ test.describe('Alert Library', () => {
     expect(created, 'a bulk-installed alert should be readable via API').toBeTruthy();
     expect(created.destinations).toContain(destinationName);
     expect(created.context_attributes?.library_id).toBe(picks[0].id);
+  });
+
+  test('opens from the section tab and shows the header actions', async ({ page }) => {
+    const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
+    await page.goto(`${base}/web/alerts?org_identifier=${getOrgIdentifier()}`);
+    await pm.alertLibraryPage.openViaTab();
+
+    await expect(page.locator('[data-test="alert-library-page"]')).toBeVisible();
+    await expect(page.locator('[data-test="alert-library-title"]')).toBeVisible();
+    await expect(page.locator('[data-test="alert-library-refresh"]')).toBeVisible();
+    await expect(page.locator('[data-test="alert-library-contribute"]')).toBeVisible();
+  });
+
+  test('selection persists across filters via group-select, off-screen count and clear', async ({ page }) => {
+    await pm.alertLibraryPage.openViaUrl();
+
+    // G2: a group's select button selects that group's cards.
+    await pm.alertLibraryPage.firstSelectGroup();
+    expect(await pm.alertLibraryPage.selectedCountInBar()).toBeGreaterThan(0);
+    await pm.alertLibraryPage.clearSelection();
+    expect(await pm.alertLibraryPage.selectedCountInBar()).toBe(0);
+
+    // G4: a selected card that a filter pushes out of view is reported off-screen.
+    await pm.alertLibraryPage.selectCard(entries[2].id); // a warning bulk card
+    await pm.alertLibraryPage.selectSeverity('critical'); // hides warning cards
+    expect(await pm.alertLibraryPage.offscreenCountInBar()).toBeGreaterThan(0);
+
+    // G5: clear empties the selection.
+    await pm.alertLibraryPage.selectSeverity('all');
+    await pm.alertLibraryPage.clearSelection();
+    expect(await pm.alertLibraryPage.selectedCountInBar()).toBe(0);
+  });
+
+  test('a per-alert install failure is shown per-row and can be retried', async ({ page }) => {
+    // Entry `a` is a valid alert; entry `b` ships an unreadable conditions shape
+    // ({and: <non-array>}), so buildInstallPayload rejects it client-side — a
+    // deterministic per-row failure without depending on backend validation.
+    const a = makeEntry(1, { pack: 'observability', category: 'dup',
+      stream: readyStream, required_streams: [readyStream] });
+    const b = makeEntry(2, { pack: 'infrastructure', category: 'dup',
+      stream: readyStream, required_streams: [readyStream] });
+    const brokenFile = (entry) => ({
+      name: entry.name,
+      stream_type: entry.stream_type,
+      stream_name: entry.stream,
+      is_real_time: false,
+      query_condition: { type: 'custom', conditions: { and: 'not-an-array' },
+        sql: '', promql: null, promql_condition: null, aggregation: null },
+      trigger_condition: { period: 10, operator: '>=', threshold: 3, frequency: 10, silence: 10, timezone: 'UTC' },
+      destinations: ['x'], context_attributes: {}, tags: [],
+    });
+    await page.unroute(MANIFEST_GLOB);
+    await page.unroute(FILE_GLOB);
+    await routeLibrary(page, {
+      manifest: buildManifest([a, b]),
+      entries: [a, b],
+      fileFor: (entry) => (entry.id === b.id ? brokenFile(entry) : buildAlertFile(entry)),
+    });
+
+    await pm.alertLibraryPage.openViaUrl();
+    await pm.alertLibraryPage.selectCard(a.id);
+    await pm.alertLibraryPage.selectCard(b.id);
+    await pm.alertLibraryPage.addSelected();
+    await pm.alertLibraryPage.pickDestination(destinationName);
+    await pm.alertLibraryPage.next(); // alerts
+    await pm.alertLibraryPage.next(); // folder
+    await pm.alertLibraryPage.next(); // tune
+    await pm.alertLibraryPage.next(); // review
+    await pm.alertLibraryPage.run();
+
+    // H6: exactly one installed, one failed, with the server message shown.
+    await expect(page.locator('[data-test^="alert-library-install-result-"][data-status="installed"]')).toHaveCount(1);
+    await expect(page.locator('[data-test^="alert-library-install-result-"][data-status="failed"]')).toHaveCount(1);
+    await expect(page.locator('[data-test^="alert-library-install-error-"]').first()).toBeVisible();
+
+    // H7: the failed row can be retried (it collides again and stays failed).
+    await expect(page.locator('[data-test="alert-library-install-retry"]')).toBeVisible();
+    await pm.alertLibraryPage.retryFailed();
+    await expect(page.locator('[data-test^="alert-library-install-result-"][data-status="failed"]')).toHaveCount(1);
+  });
+
+  test('install blocks when the org has no usable destinations', async ({ page }) => {
+    const ready = entries[0];
+
+    // F4: destinations fail to load → failed banner + retry.
+    await page.route('**/api/*/alerts/destinations**', (route) =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: '{}' }),
+    );
+    await pm.alertLibraryPage.openViaUrl();
+    await pm.alertLibraryPage.openCard(ready.id);
+    await pm.alertLibraryPage.installFromDrawer();
+    await expect(page.locator('[data-test="alert-library-install-destinations-failed"]')).toBeVisible();
+    await expect(page.locator('[data-test="alert-library-install-destinations-retry"]')).toBeVisible();
+
+    // F3: retry against an empty list → the no-destinations banner + open-destinations.
+    await page.unroute('**/api/*/alerts/destinations**');
+    await page.route('**/api/*/alerts/destinations**', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }),
+    );
+    await page.locator('[data-test="alert-library-install-destinations-retry"]').click();
+    await expect(page.locator('[data-test="alert-library-install-destinations-empty"]')).toBeVisible();
+    await expect(page.locator('[data-test="alert-library-install-open-destinations"]')).toBeVisible();
   });
 });
