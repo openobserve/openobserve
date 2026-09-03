@@ -54,6 +54,25 @@ describe("llm-experiments compare()", () => {
 });
 
 describe("get() slot status", () => {
+  it.each([
+    { total_cost: 0.1182, task_cost: 0.0406, scoring_cost: 0.0776, cost_incomplete: true },
+    { totalCost: 0.1182, taskCost: 0.0406, scoringCost: 0.0776, costIncomplete: true },
+  ])("preserves the run cost breakdown: %o", async (aggregate) => {
+    mockClient.get.mockResolvedValue({
+      data: {
+        experiment: { id: "exp-1" },
+        results: { aggregate_summary: aggregate },
+      },
+    });
+    const detail = await llmExperimentsService.get("acme", "exp-1");
+    expect(detail.results.aggregateSummary).toMatchObject({
+      totalCost: 0.1182,
+      taskCost: 0.0406,
+      scoringCost: 0.0776,
+      costIncomplete: true,
+    });
+  });
+
   it("keeps the server rollup and derives one when the field is absent", async () => {
     const slot = (extra: Record<string, unknown>) => ({
       row_id: "r1",

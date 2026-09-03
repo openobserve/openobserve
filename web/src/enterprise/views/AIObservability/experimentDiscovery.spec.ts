@@ -23,7 +23,7 @@ import {
   readExperimentBaselines,
   writeExperimentBaselines,
 } from "./experimentDiscovery";
-import { makeExperiment } from "./experimentTestFixtures";
+import { makeExperiment, makeExperimentDetail } from "./experimentTestFixtures";
 
 const experiment = (id: string, datasetId: string, createdAt: number) =>
   makeExperiment({ id, name: id, datasetId, createdAt });
@@ -31,6 +31,28 @@ const experiment = (id: string, datasetId: string, createdAt: number) =>
 beforeEach(() => localStorage.clear());
 
 describe("experiment discovery", () => {
+  it("uses the full-run cost when executions contain only the first page", () => {
+    const detail = makeExperimentDetail(makeExperiment(), {
+      results: {
+        executions: [{ cost: 0.032112106 } as any],
+        scores: [],
+        pagination: { page: 1, pageSize: 50, totalSlots: 56, hasMore: true },
+        aggregateSummary: {
+          p50LatencyMs: 4511,
+          totalCost: 0.118156603,
+          taskCost: 0.040630363,
+          scoringCost: 0.07752624,
+          costIncomplete: false,
+          incomplete: false,
+          incompleteTaskSlots: 0,
+          incompleteScoreDimensions: 0,
+          errorTaskSlots: 0,
+        },
+      },
+    });
+    expect(experimentEvidence(detail).cost).toBe(detail.results.aggregateSummary?.totalCost);
+  });
+
   it("groups by dataset, keeps filters independent, and pins the baseline first", () => {
     const rows = [
       experiment("old", "dataset-a", 1),
@@ -127,7 +149,7 @@ describe("experiment discovery", () => {
     expect(experimentEvidence(detail)).toEqual({
       completedSlots: 1,
       totalSlots: 2,
-      cost: 0.30000000000000004,
+      cost: null,
       scores: [
         { name: "quality", kind: "numeric", value: 0.75, sampleCount: 2 },
         { name: "mixed", kind: "numeric", value: 0.25, sampleCount: 1 },

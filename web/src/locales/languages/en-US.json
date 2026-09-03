@@ -10987,8 +10987,10 @@
       "addToDataset": "Add",
       "detail": {
         "by": "by {user}",
-        "p50Latency": "P50 Latency",
+        "p50Latency": "P50 Task Latency",
         "totalCost": "Total Cost",
+        "costBreakdown": "Task {task} · Scoring {scoring}",
+        "partialCostBreakdown": "Task {task} · Scoring {scoring} · Partial",
         "highDispersion": "High-Dispersion Cases",
         "highDispersionHint": "Rows where trials disagree",
         "scoredRows": "{scored}/{total} rows scored",

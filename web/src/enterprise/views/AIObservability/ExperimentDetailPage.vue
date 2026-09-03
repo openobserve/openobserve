@@ -583,6 +583,15 @@ const metricCards = computed<MetricCard[]>(() => {
     key: "cost",
     label: t("aiObservability.experiments.detail.totalCost"),
     value: aggregate?.totalCost == null ? "—" : `$${aggregate.totalCost.toFixed(4)}`,
+    footer: t(
+      aggregate?.costIncomplete
+        ? "aiObservability.experiments.detail.partialCostBreakdown"
+        : "aiObservability.experiments.detail.costBreakdown",
+      {
+        task: formatCost(aggregate?.taskCost ?? aggregate?.totalCost),
+        scoring: formatCost(aggregate?.scoringCost),
+      },
+    ),
     icon: "payments" as IconName,
     dataTest: "ai-experiment-detail-cost",
   });
@@ -618,6 +627,10 @@ const metricCards = computed<MetricCard[]>(() => {
   }
   return cards;
 });
+
+function formatCost(cost: number | null | undefined): string {
+  return cost == null ? "—" : `$${cost.toFixed(4)}`;
+}
 
 function isMetricCardActionable(card: MetricCard) {
   return card.key === "dispersion" && isMultiTrial.value;
