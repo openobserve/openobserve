@@ -52,6 +52,8 @@ class MonacoEditorHelper {
      */
     async focus(container) {
         const inputArea = this.getInputArea(container);
+        // The textarea lags the container when the editor is revealed via v-if; wait for it to attach so a one-shot count() can't miss it and skip focusing (→ typed text lands nowhere).
+        await inputArea.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
         if (await inputArea.count() > 0) {
             await inputArea.focus();
         } else {

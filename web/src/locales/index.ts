@@ -52,7 +52,7 @@ export const getLocale = () => {
   const language = navigator.language.toLowerCase();
   const locales = Object.keys(localeFileMap);
   for (const locale of locales) {
-    if (language.indexOf(locale) > -1) {
+    if (language === locale || language.startsWith(`${locale}-`)) {
       return locale;
     }
   }

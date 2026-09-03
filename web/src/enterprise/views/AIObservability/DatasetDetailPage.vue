@@ -476,7 +476,7 @@ const columns = computed(() => [
     accessorKey: "version",
     hideable: true,
     sortable: false,
-    size: 90,
+    size: 140,
     meta: { align: "left" },
   },
   {

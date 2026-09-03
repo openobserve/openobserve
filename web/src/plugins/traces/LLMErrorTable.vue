@@ -113,7 +113,7 @@ const displayTitle = computed(() => t(props.panel.titleKey));
 const displaySubtitle = computed(() => (props.panel.subtitleKey ? t(props.panel.subtitleKey) : ""));
 
 const store = useStore();
-const { executeQuery } = useLLMStreamQuery();
+const { executeQuery, cancelAll } = useLLMStreamQuery();
 
 const timezone = computed(() => store.state.timezone || "UTC");
 
@@ -239,6 +239,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  cancelAll();
   observer?.disconnect();
   observer = null;
 });

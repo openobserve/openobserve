@@ -22,8 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   Everything is resolved from the trigger registry (triggers.ts) by kind:
   - Alert Fired → a single { meta, data[] } sample.
-  - Incident Event (kinds with `commonMetaKeys`) → a split view: a stable common
-    block + an event_type picker revealing each event's extra fields.
+  - Incident Event (kinds with `commonMetaKeys`) → an event_type picker above the
+    selected event's full { meta, data[] } payload (common + specific merged).
 
   submit() just carries the trigger_kind through (persisted in node.meta by
   WorkflowEditor); there are no editable fields.
@@ -37,9 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t(introKey) }}
     </p>
 
-    <!-- SPLIT VIEW (kinds with commonMetaKeys, e.g. incidents): a stable "common
-         fields" block on top, then a picker that reveals what each event_type
-         ADDS on top of it. Preview-only — the trigger node has no config. -->
+    <!-- VARIANT VIEW (kinds with commonMetaKeys, e.g. incidents): an event_type
+         picker above the selected event's FULL payload — common and event-specific
+         fields merged in one `meta`. Preview-only — the trigger node has no config. -->
     <template v-if="isSplit">
       <OSelect
         v-model="selectedVariant"
@@ -49,53 +49,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="workflow-trigger-sample-variant"
       />
 
-      <div class="text-text-body mb-1 text-xs font-semibold">
-        {{ t("workflow.node.incidentCommonTitle") }}
-      </div>
       <div
-        data-test="workflow-trigger-common-structure"
-        class="rounded-default border-border-default h-96 w-full overflow-hidden border"
+        data-test="workflow-trigger-structure"
+        class="rounded-default border-border-default min-h-0 w-full flex-1 overflow-hidden border"
       >
         <QueryEditor
-          :key="selectedVariant + '-common'"
-          editor-id="workflow-trigger-common"
+          :key="selectedVariant"
+          editor-id="workflow-trigger-payload"
           language="json"
           :read-only="true"
           :show-auto-complete="false"
           :show-line-numbers="false"
           :sticky-scroll="false"
-          :query="commonText"
+          :query="mergedPayloadText"
           class="h-full! w-full"
         />
       </div>
-
-      <div class="text-text-body mt-4 mb-1 text-xs font-semibold">
-        {{ t("workflow.node.incidentSpecificTitle") }}
-      </div>
-      <div
-        v-if="hasSpecific"
-        data-test="workflow-trigger-specific-structure"
-        class="rounded-default border-border-default h-40 w-full overflow-hidden border"
-      >
-        <QueryEditor
-          :key="selectedVariant + '-specific'"
-          editor-id="workflow-trigger-specific"
-          language="json"
-          :read-only="true"
-          :show-auto-complete="false"
-          :show-line-numbers="false"
-          :sticky-scroll="false"
-          :query="specificText"
-          class="h-full! w-full"
-        />
-      </div>
-      <p
-        v-else
-        data-test="workflow-trigger-no-extras"
-        class="text-text-secondary text-xs leading-normal"
-      >
-        {{ t("workflow.node.incidentNoExtraFields") }}
-      </p>
     </template>
 
     <!-- SINGLE VIEW (alert): one read-only payload reference. Renders the SAME
@@ -155,50 +124,23 @@ const noteKey = def.payloadNoteKey;
 // the trigger node has no editable config, so nothing here is persisted.
 const variants = def.sampleVariants ?? [];
 const variantLabelKey = def.sampleVariantLabelKey ?? "";
-const variantOptions = variants.map((v) => ({ label: raw(v.key), value: v.key }));
+const variantOptions = variants.map((v) => ({
+  label: v.labelKey ? t(v.labelKey) : raw(v.key),
+  value: v.key,
+}));
 const selectedVariant = ref(variants[0]?.key ?? "");
 
-// Kinds that declare `commonMetaKeys` render the SPLIT view (a stable common
-// block + a per-event "what it adds" block); the rest render one combined
-// payload. Both derive from the same variant sample, so they can't drift.
-const commonKeys = def.commonMetaKeys ?? [];
-const isSplit = !!(commonKeys.length && variants.length);
+// Kinds with variant samples (e.g. incidents) render a picker + the selected
+// event's FULL payload (common + event-specific merged into one `meta`); the rest
+// render one static payload. Both derive from the same sample, so they can't drift.
+const isSplit = !!(def.commonMetaKeys?.length && variants.length);
 
-// The `meta` block of the selected variant's sample (`[{ meta, data }]`).
-const selectedMeta = computed<Record<string, unknown>>(() => {
+// The selected variant's complete sample — common and event-specific fields in a
+// single `meta` block, so users see the exact shape they receive.
+const mergedPayloadText = computed(() => {
   const variant = variants.find((v) => v.key === selectedVariant.value) ?? variants[0];
-  const sample = variant?.build() as [{ meta?: Record<string, unknown> }] | undefined;
-  return sample?.[0]?.meta ?? {};
+  return JSON.stringify(variant?.build() ?? [], null, 2);
 });
-
-// Common block, in the registry's key order, wrapped back in the real envelope.
-const commonText = computed(() => {
-  const meta = selectedMeta.value;
-  const common: Record<string, unknown> = {};
-  for (const k of commonKeys) if (k in meta) common[k] = meta[k];
-  return JSON.stringify([{ meta: common, data: [] }], null, 2);
-});
-
-// Only the fields THIS event adds on top of the common block.
-const specificFields = computed<Record<string, unknown>>(() => {
-  const meta = selectedMeta.value;
-  const commonSet = new Set(commonKeys);
-  const extras: Record<string, unknown> = {};
-  for (const k of Object.keys(meta)) if (!commonSet.has(k)) extras[k] = meta[k];
-  return extras;
-});
-// Render the extras INSIDE the real `meta` object, with a "..." placeholder
-// standing in for the common fields (shown above) — so the exact merged shape
-// is clear (these nest into the same `meta`, after the common ones) without
-// repeating the common block. Kept valid JSON so the editor never flags it.
-const specificText = computed(() =>
-  JSON.stringify(
-    { meta: { "...": t("workflow.commonFieldsAbove"), ...specificFields.value } },
-    null,
-    2,
-  ),
-);
-const hasSpecific = computed(() => Object.keys(specificFields.value).length > 0);
 
 // Combined single-payload text for non-split kinds (Alert Fired).
 const payloadText = computed(() => buildTriggerSampleText(triggerKind));

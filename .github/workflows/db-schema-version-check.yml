@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - "**"
+    # labeled/unlabeled/ready_for_review/converted_to_draft so the gate re-evaluates when the state changes.
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   merge_group:
 
 concurrency:
@@ -12,6 +14,8 @@ concurrency:
 
 jobs:
   db_schema_version_check:
+    # Nothing runs on a PR without the 'e2e' label, or on a draft; ci-gate alone reports the state.
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) }}
     name: db_schema_version_check
     runs-on: ubuntu-latest
     permissions:

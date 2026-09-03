@@ -24,8 +24,7 @@ use promql_parser::parser::{Call, Expr as PromExpr, LabelModifier, token};
 use super::Engine;
 use crate::{aggregations, functions, fused};
 
-/// A recognized `agg(range_func(...))` expression, the shape the fused
-/// evaluator accepts.
+/// A recognized `agg(range_func(...))` expression, the shape the fused evaluators accept.
 struct FusedAggShape<'a> {
     op: fused::FusedAggOp,
     func: Arc<dyn functions::RangeFunc>,
@@ -42,14 +41,29 @@ impl Engine {
     ) -> Result<Value> {
         // fused shapes fold the range function into the aggregation; others stay generic
         if let Some(shape) = fused_agg_shape(op, expr) {
+            // only a plain matrix selector can be planned as ordered shard streams
+            if let PromExpr::MatrixSelector(matrix_selector) = shape.range_arg
+                && let Some(value) = self
+                    .try_streaming_fused_agg(
+                        matrix_selector,
+                        modifier,
+                        shape.func.clone(),
+                        shape.op,
+                    )
+                    .await?
+            {
+                return Ok(value);
+            }
             let range_input = self.exec_expr(shape.range_arg).await?;
-            return fused::fused_range_agg(
+            return fused::matrix::fused_agg(
                 modifier,
                 range_input,
-                shape.func.as_ref(),
+                shape.func,
                 shape.op,
                 &self.eval_ctx,
-            );
+                self.ctx.query_ctx.timeout,
+            )
+            .await;
         }
 
         let input = self.exec_expr(expr).await?;
@@ -137,14 +151,10 @@ fn fused_agg_shape<'a>(op: &token::TokenType, expr: &'a PromExpr) -> Option<Fuse
     let PromExpr::Call(Call { func, args }) = expr else {
         return None;
     };
-    if args.len() != 1 {
+    let [range_arg] = args.args.as_slice() else {
         return None;
-    }
+    };
     let range_func = functions::fusable_range_func(func.name)?;
-    let range_arg: &PromExpr = args
-        .args
-        .last()
-        .expect("promql-parser validated the function argument");
     Some(FusedAggShape {
         op: agg_op,
         func: Arc::from(range_func),

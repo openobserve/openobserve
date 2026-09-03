@@ -553,7 +553,7 @@ export default defineComponent({
       useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
-    const { extractPatterns, patternsState } = usePatterns(t);
+    const { extractPatterns, patternsState, cancelPatterns } = usePatterns(t);
 
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -625,6 +625,7 @@ export default defineComponent({
       if (store.state.refreshIntervalID) clearInterval(store.state.refreshIntervalID);
 
       cancelQuery();
+      cancelPatterns();
 
       removeAiContextHandler();
       cleanupContextProvider();
