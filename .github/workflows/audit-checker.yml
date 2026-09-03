@@ -1,19 +1,23 @@
 name: Security audit
 on:
-  # On PRs it follows the e2e gate like every other check; on main it runs once per merge.
+  # Advisories only matter when the dependency set changes, so PRs and main runs are path-filtered
+  # to the Cargo manifests; the weekly run catches advisories published against unchanged deps.
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+    paths:
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - ".github/workflows/audit-checker.yml"
   push:
     branches:
       - "main"
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+    paths:
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - ".github/workflows/audit-checker.yml"
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
