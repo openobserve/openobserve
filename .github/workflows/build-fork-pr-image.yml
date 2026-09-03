@@ -48,6 +48,7 @@ jobs:
           # fetch-depth: 0
           # fetch-tags: true
 
+      - uses: ./.github/actions/github-auth
       - name: Set GIT_TAG env
         run: |
           git fetch -f --tags

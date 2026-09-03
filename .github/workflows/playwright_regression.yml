@@ -116,6 +116,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:

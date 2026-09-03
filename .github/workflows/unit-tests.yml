@@ -68,6 +68,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -123,6 +124,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -130,6 +132,8 @@ jobs:
           targets: x86_64-unknown-linux-gnu
 
       - uses: taiki-e/install-action@v2.87.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           tool: nextest,cargo-llvm-cov
 
@@ -184,6 +188,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -191,6 +196,8 @@ jobs:
           targets: x86_64-unknown-linux-gnu
 
       - uses: taiki-e/install-action@v2.87.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           tool: nextest,cargo-llvm-cov
 
@@ -252,6 +259,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
