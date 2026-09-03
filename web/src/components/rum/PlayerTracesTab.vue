@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, computed } from "vue";
+import { ref, watch, onMounted, onUnmounted, computed } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
@@ -233,7 +233,8 @@ import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 const { t } = useI18nTyped();
 const store = useStore();
 const { getStream } = useStreams(t);
-const { resolveTracesStreamsBulk } = useCorrelatedTracesStream(t);
+const { resolveTracesStreamsBulk, cancel: cancelCorrelatedTracesStream } =
+  useCorrelatedTracesStream(t);
 
 const props = defineProps({
   sessionId: {
@@ -272,7 +273,10 @@ const totalErrorCount = computed(
   () => correlatedViews.value.filter((v) => (v.metadata?.errorCount || 0) > 0).length,
 );
 
-const { fetchQueryDataWithHttpStream } = useHttpStreaming();
+const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
+
+// The metadata stream carries a local trace id; track it so unmount can abort an in-flight fetch.
+let activeTraceIds: string[] = [];
 
 // ── Table column definitions ────────────────────────────────
 const traceColumns = computed(() => [
@@ -379,6 +383,10 @@ async function fetchTraceMetadata(
 
   return new Promise<Record<string, any>>((resolve, reject) => {
     const traceId = generateTraceContext().traceId;
+    activeTraceIds.push(traceId);
+    const untrack = () => {
+      activeTraceIds = activeTraceIds.filter((id) => id !== traceId);
+    };
     const metadata: Record<string, any> = {};
 
     fetchQueryDataWithHttpStream(
@@ -411,13 +419,29 @@ async function fetchTraceMetadata(
             };
           });
         },
-        error: (_, error) => reject(error),
-        complete: () => resolve(metadata),
+        error: (_, error) => {
+          untrack();
+          reject(error);
+        },
+        complete: () => {
+          untrack();
+          resolve(metadata);
+        },
         reset: () => {},
       },
     );
   });
 }
+
+// An in-flight metadata fetch outlives this tab otherwise; cancel it on unmount.
+onUnmounted(() => {
+  const orgId = store.state.selectedOrganization?.identifier;
+  activeTraceIds.forEach((traceId) =>
+    cancelStreamQueryBasedOnRequestId({ trace_id: traceId, org_id: orgId }),
+  );
+  activeTraceIds = [];
+  cancelCorrelatedTracesStream();
+});
 
 async function fetchTraces() {
   if (!props.sessionId) return;
