@@ -50,8 +50,8 @@ reworded:
 
 ## PR conventions
 
-- Paid CI runs on a PR only while it carries the `e2e` label and is not a draft
-  (no label or draft = no builds or test suites, and no red checks). Add the
+- CI runs on a PR only while it carries the `e2e` label and is not a draft
+  (no label or draft = nothing runs except `ci-gate`, and no red checks). Add the
   label when you want the run, not when you open the PR. Which suites run is decided by path detection, never by
   a label. The merge queue only compiles and unit-tests the merged code, so the
   labelled PR run is the one that has to be green.
