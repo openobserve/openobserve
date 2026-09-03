@@ -241,7 +241,11 @@ const {
   backendSpanCount,
   performanceData,
   cancelTracesStream,
-} = useTraceCorrelation(computed(() => props.traceId), t, correlationRange);
+} = useTraceCorrelation(
+  computed(() => props.traceId),
+  t,
+  correlationRange,
+);
 
 onUnmounted(() => cancelTracesStream());
 

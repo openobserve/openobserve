@@ -503,8 +503,7 @@ const emit = defineEmits(["update:open", "resource-selected"]);
 const store = useStore();
 const router = useRouter();
 const { t } = useI18nTyped();
-const { resolveTraceLocation, cancel: cancelCorrelatedTracesStream } =
-  useCorrelatedTracesStream(t);
+const { resolveTraceLocation, cancel: cancelCorrelatedTracesStream } = useCorrelatedTracesStream(t);
 
 onUnmounted(() => cancelCorrelatedTracesStream());
 const relatedResources = ref<any[]>([]);
