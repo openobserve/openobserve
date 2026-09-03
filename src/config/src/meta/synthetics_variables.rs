@@ -142,6 +142,19 @@ pub struct ResolvedVariableView {
     pub has_value: bool,
 }
 
+/// Every environment's resolved set in one response, keyed by environment name.
+///
+/// One entry per environment the check targets (`""` for an unscoped check), so
+/// the editor switches environments without a request per flip. The merge runs
+/// server-side per environment — `overridden` genuinely varies by environment,
+/// so a client cannot reconstruct this from declarations.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, ToSchema)]
+pub struct ResolvedVariablesGrouped {
+    /// Environment names in the check's stored order; a single `""` when unscoped.
+    pub environments: Vec<String>,
+    pub resolved: HashMap<String, Vec<ResolvedVariableView>>,
+}
+
 /// Where a variable is being moved to, for the two promote flows.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 pub struct PromoteVariableRequest {
