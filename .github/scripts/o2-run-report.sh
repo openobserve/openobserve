@@ -83,8 +83,8 @@ WORKFLOW_TAG="test"; [ "$STREAM" = "ci_regression" ] && WORKFLOW_TAG="regression
 # to "alpha1-e2e / "); duration jobs are matched by exact configured names.
 # Suites without a matching job get null — harmless, those panels just stay empty.
 JOBDUR='if (.completed_at and .started_at) then ((.completed_at|fromdateiso8601)-(.started_at|fromdateiso8601)) else null end'
-BUILD_JOB_NAME="\${BUILD_JOB_NAME-build_binary}"
-RUNTIME_READY_JOB_NAME="\${RUNTIME_READY_JOB_NAME:-}"
+BUILD_JOB_NAME="${BUILD_JOB_NAME-build_binary}"
+RUNTIME_READY_JOB_NAME="${RUNTIME_READY_JOB_NAME:-}"
 BUILD_DUR=null
 if [ -n "$BUILD_JOB_NAME" ]; then
   BUILD_DUR=$(printf '%s' "$THIS_JOBS" | jq --arg job_name "$BUILD_JOB_NAME" "[.jobs[]|select(.name==\$job_name)]|.[0]|if . then ($JOBDUR) else null end" 2>/dev/null)

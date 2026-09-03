@@ -55,9 +55,15 @@ jobs:
           fi
 
           deleted=0
+          failed=0
           while IFS= read -r cache_id; do
             [ -n "$cache_id" ] || continue
-            gh cache delete "$cache_id"
-            deleted=$((deleted + 1))
+            if gh cache delete "$cache_id"; then
+              deleted=$((deleted + 1))
+            else
+              echo "::warning::Failed to delete cache ID $cache_id"
+              failed=$((failed + 1))
+            fi
           done <<< "$cache_ids"
-          echo "Deleted $deleted cache entries for $cache_ref"
+          echo "Deleted $deleted cache entries for $cache_ref; failures: $failed"
+          [ "$failed" -eq 0 ]
