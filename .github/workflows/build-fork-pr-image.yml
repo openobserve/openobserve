@@ -48,7 +48,17 @@ jobs:
           # fetch-depth: 0
           # fetch-tags: true
 
-      - uses: ./.github/actions/github-auth
+      # Inlined rather than `uses: ./.github/actions/github-auth`: this job checks out a caller-chosen
+      # ref, and running a local action from that checkout is a cache-poisoning vector (CodeQL).
+      - name: Authenticate github.com fetches
+        shell: bash
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          echo "GH_AUTH_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$GH_AUTH_TOKEN"; }; f'
+          echo "GIT_TERMINAL_PROMPT=0" >> "$GITHUB_ENV"
+          echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> "$GITHUB_ENV"
       - name: Set GIT_TAG env
         run: |
           git fetch -f --tags
