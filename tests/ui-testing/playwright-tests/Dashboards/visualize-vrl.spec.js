@@ -546,11 +546,8 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.openVisualiseTabWithVrl();
 
     // IMPORTANT: Run query in visualization tab to populate vrlFunctionFieldList
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion({ expectTable: true });
     await pm.logsVisualise.verifyChartRenders(page);
-
-    // Wait for table to render with data
-    // await waitForTableData(page);
 
     // Verify table panel is displayed
     const tablePanel = pm.logsVisualise.getTablePanel();
