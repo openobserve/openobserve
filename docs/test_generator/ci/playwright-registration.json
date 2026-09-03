@@ -1,6 +1,0 @@
-{
-  "group": "Traces",
-  "spec_filename": "llmInsightsPanels.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}

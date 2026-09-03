@@ -1,2 +1,0 @@
-web/src/plugins/traces/config/llmInsightsPanels.spec.ts
-web/src/plugins/traces/config/llmInsightsPanels.ts

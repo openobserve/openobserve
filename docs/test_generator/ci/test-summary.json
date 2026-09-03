@@ -1,4 +1,0 @@
-[
-  { "title": "should render the LLM Insights dashboard and settle into a terminal state", "action": "new", "verifies": "the LLM Insights dashboard shell renders and the async fetch settles into panel content or a no-data/error state" },
-  { "title": "should scope the model-grouped panels to spans with a model (no 'unknown' bucket) — not wired: no gen_ai trace data seeded in the E2E harness (trace-ingestion.js emits HTTP spans without gen_ai_* fields)", "action": "new", "verifies": "the model-grouped panels render with real model categories once gen_ai trace data is present" }
-]

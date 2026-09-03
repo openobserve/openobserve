@@ -11,12 +11,53 @@
 
 import { expect } from '@playwright/test';
 
+// The model-grouped panels — the horizontal-bar charts whose SQL buckets by
+// `gen_ai_response_model` (`spans-by-model`, `tokens-by-model`,
+// `latency-by-model`). Their `_search_stream` responses carry each bucket's
+// `model` value, which is how the E2E test verifies the scoped queries drop
+// spans that carry no model (no synthetic "unknown" bucket).
+const MODEL_GROUPED_PANEL_IDS = [
+  'llm-latency-by-model',
+  'llm-spans-by-model',
+  'llm-tokens-by-model',
+];
+
+// The streaming search endpoint answers in Server-Sent Events:
+//   event: search_response_hits
+//   data: {"hits":[{"model":"gpt-4o","count":1}, ...]}
+// Pull the `model` value out of every hit in an SSE body.
+function extractModelValuesFromSse(body) {
+  const models = [];
+  if (!body) return models;
+  for (const block of body.split(/\n\n+/)) {
+    const dataLine = block.split('\n').find((line) => line.startsWith('data:'));
+    if (!dataLine) continue;
+    const data = dataLine.slice('data:'.length).trim();
+    if (!data || data === 'end' || data === '[[DONE]]') continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      continue;
+    }
+    const hits = parsed?.hits ?? parsed?.results?.hits ?? [];
+    if (!Array.isArray(hits)) continue;
+    for (const hit of hits) {
+      if (hit && typeof hit === 'object' && 'model' in hit) models.push(hit.model);
+    }
+  }
+  return models;
+}
+
 export class LLMInsightsPage {
   constructor(page) {
     this.page = page;
 
-    // Page shell (AiPageShell wrapper) — LLMInsightsPage.vue
-    this.shell = '[data-test="ai-llm-insights"]';
+    // Page shell (AiPageShell wrapper) — LLMInsightsPage.vue passes
+    // data-test="ai-llm-insights" to AiPageShell, which resolves it to its
+    // `dataTest` prop and renders the header as `ai-llm-insights-page`
+    // (`${dataTest}-page`). The bare prefix is never emitted to the DOM.
+    this.shell = '[data-test="ai-llm-insights-page"]';
     // Terminal states — LLMInsightsDashboard.vue
     this.emptyState = '[data-test="llm-insights-empty"]';
     this.emptyErrorState = '[data-test="llm-insights-empty-error"]';
@@ -33,12 +74,16 @@ export class LLMInsightsPage {
   /**
    * Navigate directly to the LLM Insights dashboard with the org in the URL.
    * The route lives under the AI Observability shell (/web/ai/llm-insights).
+   * `type=stream` pins the scope bar to Stream mode: the model-grouped panels
+   * are scoped to `gen_ai_response_model` on the active stream, so the test
+   * exercises the model filter without depending on the agent-mapping cascade
+   * (which needs `gen_ai.agent.*` attributes the harness doesn't seed).
    * @param {string} orgName - Organization identifier (defaults to ORGNAME env).
    */
   async navigateToLLMInsights(orgName = null) {
     const org = orgName || process.env['ORGNAME'] || 'default';
     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
-    await this.page.goto(`${baseUrl}/web/ai/llm-insights?org_identifier=${org}`);
+    await this.page.goto(`${baseUrl}/web/ai/llm-insights?org_identifier=${org}&type=stream`);
     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
   }
 
@@ -80,5 +125,39 @@ export class LLMInsightsPage {
     await expect(this.page.getByText(this.latencyByModelTitle, { exact: true })).toBeVisible({
       timeout: 30000,
     });
+  }
+
+  get modelGroupedPanelIds() {
+    return MODEL_GROUPED_PANEL_IDS;
+  }
+
+  /**
+   * Start capturing the model-grouped panels' streaming search responses.
+   * Must be called BEFORE navigateToLLMInsights() so no panel query response
+   * is missed. Returns an async snapshot function resolving to
+   * `{ respondedPanelIds, models }` — the panel ids that have answered and the
+   * distinct `model` category values those panels bucketed so far.
+   */
+  startModelPanelCapture() {
+    const respondedPanelIds = new Set();
+    const bodyPromises = [];
+    const onResponse = (response) => {
+      const url = response.url();
+      if (!url.includes('_search_stream')) return;
+      const panelId = MODEL_GROUPED_PANEL_IDS.find((id) => url.includes(`panel_id=${id}`));
+      if (!panelId) return;
+      respondedPanelIds.add(panelId);
+      bodyPromises.push(response.text().catch(() => ''));
+    };
+    this.page.on('response', onResponse);
+
+    return async () => {
+      const bodies = await Promise.all(bodyPromises);
+      const models = new Set();
+      for (const body of bodies) {
+        for (const model of extractModelValuesFromSse(body)) models.add(model);
+      }
+      return { respondedPanelIds: [...respondedPanelIds], models: [...models] };
+    };
   }
 }
