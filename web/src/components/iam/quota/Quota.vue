@@ -1135,6 +1135,8 @@ export default defineComponent({
         a.download = `rate_limit_template_${selectedOrganization.value.label}.json`;
         document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
       } catch (error) {
         console.log(error);
       }

@@ -5153,6 +5153,9 @@ export default defineComponent({
       // difference between "leaving" and "the page updated its query string".
       const wasStreaming = !!currentAbortController.value;
       detachCurrentStream();
+      // detachCurrentStream early-returns when no controller is set, so clear the
+      // rotation interval directly rather than relying on that path.
+      stopAnalyzingRotation();
 
       // Home runs the chat in its own inline tab with the sidebar closed. If we
       // leave Home mid-stream, open the sidebar so its instance can re-attach

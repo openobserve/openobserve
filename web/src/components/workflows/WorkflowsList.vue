@@ -125,6 +125,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
+            <template #cell-updated_at="{ row }">
+              <span>{{ row.updated_at_display }}</span>
+            </template>
+
             <template #cell-trigger="{ row }">
               <OTag
                 v-if="row.trigger && row.trigger !== '—'"
@@ -345,11 +349,13 @@ const columns = computed(() => [
   {
     id: "updated_at",
     header: t("workflow.updated"),
-    accessorKey: "updated_at_display",
+    // Sort the raw microseconds; the formatted string sorts lexicographically,
+    // which puts every PM row ahead of every AM one.
+    accessorKey: "updated_at",
+    meta: { align: "left" },
     sortable: true,
     resizable: true,
     hideable: true,
-    meta: { align: "left" },
   },
   {
     id: "actions",

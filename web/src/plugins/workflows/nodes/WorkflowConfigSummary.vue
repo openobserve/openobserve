@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   the panel is inspecting a run (canvasReadOnly — the Runs history). A form reads as
   "what do I edit here?"; this is a display of WHAT THE NODE IS SET TO, per type:
     - Condition   → the rule as a readable expression (buildConditionPreview).
+    - Branch      → the routing table: each path's label + rule, then the fallback.
     - Function    → name + before/after-flatten badge, then the code read-only.
     - Destination → the destination name.
     - Trigger     → the trigger kind (its payload shows in the Input/Output panes).
@@ -56,6 +57,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <pre
           class="text-compact m-0 overflow-x-auto p-[0.625rem_0.875rem] font-mono leading-relaxed whitespace-pre-wrap"
           >{{ conditionText }}</pre>
+      </div>
+      <p v-else class="text-text-secondary text-sm italic">{{ t("workflow.results.noConfig") }}</p>
+    </template>
+
+    <!-- BRANCH — the routing table. Rows are listed in STORED order because paths are
+         evaluated top-down and the first match wins, so the order is the behaviour. -->
+    <template v-else-if="type === 'branch'">
+      <div
+        v-if="branchPaths.length"
+        data-test="workflow-config-summary-branch"
+        class="border-border-default rounded-default flex flex-col gap-2 border px-3 py-2"
+      >
+        <span class="text-text-secondary text-2xs font-medium">{{
+          t("workflow.results.branchPathsLabel")
+        }}</span>
+        <div
+          v-for="path in branchPaths"
+          :key="path.handle"
+          :data-test="`workflow-config-summary-branch-path-${path.handle}`"
+          class="flex items-baseline gap-2"
+        >
+          <OBadge :variant="path.isElse ? 'default-soft' : 'warning-soft'" size="sm">{{
+            path.order
+          }}</OBadge>
+          <div class="flex min-w-0 flex-col gap-0.5">
+            <span class="text-text-body text-sm font-medium">{{ path.label }}</span>
+            <span
+              v-if="!path.isElse"
+              class="text-text-secondary font-mono text-xs break-all"
+              :class="{ italic: !path.rule }"
+              >{{ path.rule || t("workflow.results.branchNoRule") }}</span
+            >
+            <span v-else class="text-text-secondary text-xs">{{
+              t("workflow.node.branchElseHint")
+            }}</span>
+          </div>
+        </div>
       </div>
       <p v-else class="text-text-secondary text-sm italic">{{ t("workflow.results.noConfig") }}</p>
     </template>
@@ -137,12 +175,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p v-else class="text-text-secondary text-sm italic">{{ t("workflow.results.noConfig") }}</p>
     </template>
 
-    <!-- TRIGGER / OTHER — the trigger kind (payload is in the I/O panes). -->
-    <template v-else>
+    <!-- TRIGGER — the trigger kind (payload is in the I/O panes). Matched on the type
+         rather than used as the fallback: as a catch-all it lent the trigger's title
+         to every unhandled type, so a Branch read "Alert Trigger". -->
+    <template v-else-if="type === 'workflow_trigger'">
       <div class="text-text-body text-sm" data-test="workflow-config-summary-trigger">
         {{ triggerKindTitle }}
       </div>
     </template>
+
+    <p v-else class="text-text-secondary text-sm italic">{{ t("workflow.results.noConfig") }}</p>
   </div>
 </template>
 
@@ -162,7 +204,12 @@ import functionsService from "@/services/jstransform";
 import { isCustomDestination } from "@/utils/destinationType";
 import { useWorkflowDestinations } from "@/plugins/workflows/useWorkflowDestinations";
 import type { Destination } from "@/ts/interfaces/alert";
-import { workflowObj, triggerDef } from "@/plugins/workflows/useWorkflowCanvas";
+import {
+  workflowObj,
+  triggerDef,
+  branchHandles,
+  branchEdgeLabel,
+} from "@/plugins/workflows/useWorkflowCanvas";
 import { DEFAULT_TRIGGER_KIND } from "@/plugins/workflows/triggers";
 
 const { t } = useI18nTyped();
@@ -171,10 +218,35 @@ const store = useStore();
 const data = computed<any>(() => workflowObj.currentSelectedNodeData?.data || {});
 const type = computed<string>(() => data.value.node_type || "");
 
+// The builder persists its rule as { version, conditions }; the preview wants the
+// inner rule node, so an unwrapped legacy value has to keep working too.
+const ruleOf = (stored: any) =>
+  stored && typeof stored === "object" && "conditions" in stored ? stored.conditions : stored;
+
 // Condition → the rule expression; "" when empty (placeholder) → noConfig.
-const conditionText = computed(() => buildConditionPreview(data.value.conditions));
+const conditionText = computed(() => buildConditionPreview(ruleOf(data.value.conditions)));
 
 const copyConditions = () => copyToClipboard(conditionText.value, t);
+
+// Branch → one row per arm, in stored (evaluation) order, with the terminal else
+// last. Naming goes through branchEdgeLabel so a path reads the same here as on the
+// canvas connector it feeds, and an unlabelled path is numbered by its POSITION
+// among the survivors — never by its handle, which is a stable id a deletion leaves
+// gapped (case-0, case-2).
+const branchPaths = computed(() => {
+  const node = workflowObj.currentSelectedNodeData;
+  if (!Array.isArray(data.value.cases) || !data.value.cases.length) return [];
+  return branchHandles(node).map((handle, i, all) => {
+    const isElse = i === all.length - 1;
+    return {
+      handle,
+      order: i + 1,
+      isElse,
+      label: branchEdgeLabel(node, handle, t),
+      rule: isElse ? "" : buildConditionPreview(ruleOf(data.value.cases[i]?.conditions)),
+    };
+  });
+});
 
 // Function → name + flatten mode. `after_flatten` = run AFTER flattening (RAF), else
 // BEFORE (RBF) — the same shorthand the function editor uses.

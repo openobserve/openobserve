@@ -20,13 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   (Backspace/Delete) using VueFlow events, so the edge itself is purely visual.
 -->
 <template>
-  <BaseEdge
-    :id="id"
-    :style="{ ...style, cursor: 'pointer', strokeDasharray: 'none' }"
-    :path="path[0]"
-    :marker-end="markerEnd"
-    type="smoothstep"
-  />
+  <BaseEdge :id="id" :style="edgeStyle" :path="path[0]" :marker-end="markerEnd" type="smoothstep" />
 
   <!-- Mid-edge "insert step here" `+` — opt-in (Workflows pass `insertable`), so
        the shared pipeline canvas is unchanged. Rendered into the EdgeLabelRenderer
@@ -44,11 +38,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <FlowAddButton data-test="workflow-edge-add" @click.stop="emit('insert', $event)" />
     </div>
   </EdgeLabelRenderer>
+
+  <!-- Branch-arm label — opt-in (Workflows pass `label`), positioned off the same
+       midpoint CSS var as the insert chip. -->
+  <EdgeLabelRenderer v-if="label">
+    <div
+      data-test="workflow-edge-label"
+      :title="label"
+      class="bg-surface-panel border-border-default text-text-secondary rounded-default text-2xs absolute top-0 left-0 max-w-40 [transform:var(--wf-edge-mid,none)] truncate border px-1.5 py-0.5"
+      :style="{ '--wf-edge-mid': `translate(-50%, -160%) translate(${path[1]}px, ${path[2]}px)` }"
+    >
+      {{ label }}
+    </div>
+  </EdgeLabelRenderer>
 </template>
 
 <script setup lang="ts">
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, Position } from "@vue-flow/core";
 import { computed, type PropType } from "vue";
+import type { I18nText } from "@/types/i18n";
 import FlowAddButton from "./FlowAddButton.vue";
 
 const props = defineProps({
@@ -66,6 +74,10 @@ const props = defineProps({
   isInView: { type: Boolean, required: false, default: false },
   // Workflows opt in to the mid-edge insert `+`; pipelines leave it off.
   insertable: { type: Boolean, required: false, default: false },
+  // Same opt-in shape: only Workflows label an edge (the Branch arm it routes).
+  label: { type: String as PropType<I18nText | "">, required: false, default: "" },
+  // Opt-in visible selection (Workflows pass VueFlow's selected flag through).
+  selected: { type: Boolean, required: false, default: false },
 });
 
 // Clicking the mid-edge `+` asks the canvas to splice a step onto THIS edge. The
@@ -78,6 +90,15 @@ const emit = defineEmits<{
 }>();
 
 const path = computed(() => getBezierPath(props));
+
+// The resting stroke arrives as an INLINE style, so the library's `.selected`
+// stylesheet rule can never win over it — selection must be painted here too.
+const edgeStyle = computed(() => ({
+  ...props.style,
+  ...(props.selected ? { stroke: "var(--color-indigo-500)", strokeWidth: 3 } : {}),
+  cursor: "pointer",
+  strokeDasharray: "none",
+}));
 </script>
 
 <script lang="ts">

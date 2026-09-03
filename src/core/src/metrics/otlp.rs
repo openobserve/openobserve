@@ -558,7 +558,7 @@ pub async fn handle_otlp_request(
         ));
         let mut triggers: TriggerAlertData =
             Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
-        let mut evaluated_alerts = HashSet::new();
+        let mut trigger_slots: HashMap<String, super::TriggerSlot> = HashMap::new();
 
         for val_map in json_data {
             let timestamp = val_map
@@ -599,10 +599,9 @@ pub async fn handle_otlp_request(
             hour_buf.records_size += value_str.len();
 
             // start check for alert trigger
-            if let Some(alerts) = cur_stream_alerts
-                && triggers.len() < alerts.len()
-            {
+            if let Some(alerts) = cur_stream_alerts {
                 let end_time = now_micros();
+                let dedup = super::series_signature(&val_map);
                 for alert in alerts {
                     let key = format!(
                         "{}/{}/{}/{}",
@@ -611,15 +610,20 @@ pub async fn handle_otlp_request(
                         alert.stream_name,
                         alert.get_unique_key()
                     );
-                    // For one alert, only one trigger per request
-                    // Trigger for this alert is already added.
-                    if evaluated_alerts.contains(&key) {
+                    // One row per label set: a series repeats its labels on every sample.
+                    if !super::trigger_wants_labels(&trigger_slots, &key, dedup) {
                         continue;
                     }
                     match alert.evaluate(Some(&val_map), (None, end_time), None).await {
                         Ok(trigger_results) if trigger_results.data.is_some() => {
-                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
-                            evaluated_alerts.insert(key);
+                            super::merge_trigger_rows(
+                                &mut triggers,
+                                &mut trigger_slots,
+                                &key,
+                                dedup,
+                                alert,
+                                trigger_results.data.unwrap(),
+                            );
                         }
                         Ok(_) => {
                             // the data doesn't satisfy the alert condition

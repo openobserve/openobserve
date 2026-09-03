@@ -2,7 +2,8 @@ name: "Feature Design Comment Checker"
 
 on:
   pull_request:
-    types: [opened, edited, reopened, synchronize]
+    # labeled/unlabeled/ready_for_review/converted_to_draft so the gate re-evaluates when the state changes.
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   issue_comment:
     types: [created, edited]
   pull_request_review_comment:
@@ -14,7 +15,8 @@ jobs:
       pull-requests: read
       statuses: write
     # Only run on pull requests
-    if: github.event_name == 'pull_request' || (github.event_name == 'issue_comment' && github.event.issue.pull_request) || github.event_name == 'pull_request_review_comment'
+    # Nothing runs on a PR without the 'e2e' label, or on a draft; ci-gate alone reports the state.
+    if: (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false)) || (github.event_name == 'issue_comment' && github.event.issue.pull_request) || github.event_name == 'pull_request_review_comment'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
