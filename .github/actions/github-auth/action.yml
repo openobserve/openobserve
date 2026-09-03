@@ -15,6 +15,9 @@ runs:
         # header actions/checkout keeps for the checked-out repository.
         echo "GH_AUTH_TOKEN=$TOKEN" >> "$GITHUB_ENV"
         git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$GH_AUTH_TOKEN"; }; f'
+        # The helper only answers a 401; GitHub's download throttling is a protocol error with no challenge, so
+        # the token has to go on the first request: rewrite every github.com URL to carry it.
+        git config --global "url.https://x-access-token:${TOKEN}@github.com/.insteadOf" "https://github.com/"
         echo "GIT_TERMINAL_PROMPT=0" >> "$GITHUB_ENV"
         # cargo's libgit2 path does not always consult the helper; the git CLI always does.
         echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> "$GITHUB_ENV"
