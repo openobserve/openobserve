@@ -194,6 +194,23 @@ describe("OSplitter", () => {
     });
   });
 
+  describe("live limits", () => {
+    it("passes limit getters so a post-mount limits change reaches the drag clamp", async () => {
+      // The Journey page mounts with the panel collapsed ([100,100]) and widens
+      // the limits when it opens; frozen numbers snapped the first drag to 100.
+      wrapper = mount(OSplitter, { props: { modelValue: 100, limits: [100, 100] } });
+
+      const opts = vi.mocked(useResizer).mock.calls.at(-1)![0];
+      expect(typeof opts.minValue).toBe("function");
+      expect(typeof opts.maxValue).toBe("function");
+      expect((opts.minValue as () => number)()).toBe(100);
+
+      await wrapper.setProps({ limits: [55, 85] });
+      expect((opts.minValue as () => number)()).toBe(55);
+      expect((opts.maxValue as () => number)()).toBe(85);
+    });
+  });
+
   describe("disabled state", () => {
     beforeEach(() => {
       wrapper = mount(OSplitter, {
