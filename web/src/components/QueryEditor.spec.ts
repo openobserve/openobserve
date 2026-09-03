@@ -50,6 +50,7 @@ vi.mock("@/aws-exports", () => ({
 
 // Component import must come after all vi.mock() declarations.
 import QueryEditor from "./QueryEditor.vue";
+import config from "@/aws-exports";
 
 // ── CodeQueryEditor stub ─────────────────────────────────────────────────────
 
@@ -162,6 +163,22 @@ describe("QueryEditor", () => {
       await nextTick();
 
       expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(false);
+    });
+
+    it("should NOT show AI bar on auto-detected NL on OSS builds (isEnterprise false) even when ai_enabled is true", async () => {
+      config.isEnterprise = "false";
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+
+      wrapper = mountQueryEditor({ hideNlToggle: true });
+      await nextTick();
+
+      wrapper.findComponent(codeQueryEditorStub).vm.$emit("nlpModeDetected", true);
+      await nextTick();
+
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(false);
+
+      config.isEnterprise = "true";
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false });
     });
 
     it("should show AI bar on auto-detected NL when ai_enabled is true", async () => {
