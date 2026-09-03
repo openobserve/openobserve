@@ -57,7 +57,7 @@ use {
     openobserve_api_management::request::{
         ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
         domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall, playground,
-        providers, remote_tasks, score_configs, scorers, service_streams, synthetics, workflows,
+        providers, remote_tasks, score_configs, scorers, service_streams, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
