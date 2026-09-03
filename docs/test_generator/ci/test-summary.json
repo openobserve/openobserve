@@ -1,0 +1,12 @@
+[
+  {
+    "title": "SUP-01: a default test run suppresses the destination (no real send)",
+    "action": "append",
+    "verifies": "a default Test run with suppression ON reports the rehearsal flask and the destination output is the {suppressed:true} preview with no ingest receipt (no real send)"
+  },
+  {
+    "title": "SUP-02: toggling suppression off reveals the live-dispatch warning banner",
+    "action": "append",
+    "verifies": "the live-dispatch warning banner is absent by default and appears naming the destination after the suppress switch is toggled off"
+  }
+]

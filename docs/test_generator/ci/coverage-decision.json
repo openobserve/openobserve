@@ -1,0 +1,10 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Workflows/workflows-delivery.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Workflows/workflows-delivery.spec.js",
+    "tests/ui-testing/playwright-tests/Workflows/workflows-negative.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The headline 'live dispatch' path (suppress OFF -> real send) is ALREADY covered: the dev's diff updated DEL-01/DEL-02/NEG-06 to testRunFromEditor({ liveSend: true }) + expectNodeTestPassed. What remains uncovered is the OTHER side of the decision — the DEFAULT suppressed path (Workflow 2), which is the safety-critical half ('a rehearsal must never page on-call') and has no test at all. Delivery-side scenarios (suppressed-rehearsal, dispatch warning banner) append to workflows-delivery.spec.js; validation-side scenarios (invalid JSON disables Run, run-from middle node, input provenance, incomplete-destination=skipped) append to workflows-negative.spec.js. Both files are already registered under the Workflows shard, so needs_registration=false."
+}
