@@ -82,6 +82,26 @@ describe("DestinationPicker", () => {
     expect(mockList).toHaveBeenCalledWith(expect.objectContaining({ module: "pipeline" }));
   });
 
+  // The dropdown shows each URL, then hides it once chosen — leaving a bare name and
+  // no way to confirm where the step actually posts without reopening the list.
+  it("shows the selected destination's endpoint after the dropdown closes", async () => {
+    const wrapper = createWrapper({ initialName: "sink-a" });
+    await flushPromises();
+    const details = wrapper.find('[data-test="destination-picker-details"]');
+    expect(details.exists()).toBe(true);
+    expect(details.text()).toContain("http://a.example.com");
+  });
+
+  it("follows the selection rather than pinning to the initial destination", async () => {
+    const wrapper = createWrapper({ initialName: "sink-a" });
+    await flushPromises();
+    (wrapper.vm as any).form.setFieldValue("selectedDestination", "sink-b");
+    await flushPromises();
+    expect(wrapper.find('[data-test="destination-picker-details"]').text()).toContain(
+      "this-is-a-very-long-destination-url",
+    );
+  });
+
   it("exposes the fetched destinations as options", async () => {
     const wrapper = createWrapper();
     await flushPromises();
@@ -254,21 +274,48 @@ describe("DestinationPicker", () => {
     ],
   };
 
-  it("forcedType custom: lists only custom destinations", async () => {
+  it("forcedType custom: drops only prebuilt provider destinations", async () => {
     mockList.mockResolvedValueOnce(mixedResponse);
     const wrapper = createWrapper({ forcedType: "custom" });
     await flushPromises();
-    expect((wrapper.vm as any).destinationOptions.map((o: any) => o.value)).toEqual(["webhook"]);
+    expect((wrapper.vm as any).destinationOptions.map((o: any) => o.value)).toEqual([
+      "webhook",
+      "legacy",
+    ]);
   });
 
-  // An untyped record is a prebuilt "openobserve" destination as far as the edit
-  // form is concerned, so it is NOT treated as custom.
-  it("forcedType custom: an untyped destination is not treated as custom", async () => {
+  // The bug this guards: `destination_type_name` is optional on the backend and omitted
+  // from the JSON when unset, so every destination made through the plain API is untyped.
+  // Treating untyped as "not custom" hid them all from the workflow picker.
+  it("forcedType custom: an untyped destination is listed", async () => {
     mockList.mockResolvedValueOnce(mixedResponse);
     const wrapper = createWrapper({ forcedType: "custom" });
     await flushPromises();
     const values = (wrapper.vm as any).destinationOptions.map((o: any) => o.value);
-    expect(values).not.toContain("legacy");
+    expect(values).toContain("legacy");
+  });
+
+  it("forcedType custom: untyped pipeline destinations are all listed", async () => {
+    mockList.mockResolvedValueOnce({
+      data: [
+        { name: "audit", url: "http://127.0.0.1:9099/audit" },
+        { name: "pagerduty", url: "http://127.0.0.1:9099/pagerduty" },
+        { name: "slack", url: "http://127.0.0.1:9099/slack" },
+        {
+          name: "wf_probe_custom",
+          url: "http://127.0.0.1:9099/probe2",
+          destination_type_name: "custom",
+        },
+      ],
+    });
+    const wrapper = createWrapper({ forcedType: "custom" });
+    await flushPromises();
+    expect((wrapper.vm as any).destinationOptions.map((o: any) => o.value)).toEqual([
+      "audit",
+      "pagerduty",
+      "slack",
+      "wf_probe_custom",
+    ]);
   });
 
   it("without forcedType: every destination is listed (pipelines are unaffected)", async () => {
@@ -294,7 +341,7 @@ describe("DestinationPicker", () => {
     const wrapper = createWrapper({ forcedType: "custom", initialName: "splunk-hec" });
     await flushPromises();
     const opts = (wrapper.vm as any).destinationOptions;
-    expect(opts.map((o: any) => o.value)).toEqual(["splunk-hec", "webhook"]);
+    expect(opts.map((o: any) => o.value)).toEqual(["splunk-hec", "webhook", "legacy"]);
     expect(opts[0].subLabel).toBe("Unsupported Type — Workflows Support Custom Destinations Only");
   });
 
@@ -311,6 +358,9 @@ describe("DestinationPicker", () => {
     mockList.mockResolvedValueOnce(mixedResponse);
     const wrapper = createWrapper({ forcedType: "custom", initialName: "webhook" });
     await flushPromises();
-    expect((wrapper.vm as any).destinationOptions.map((o: any) => o.value)).toEqual(["webhook"]);
+    expect((wrapper.vm as any).destinationOptions.map((o: any) => o.value)).toEqual([
+      "webhook",
+      "legacy",
+    ]);
   });
 });
