@@ -86,7 +86,11 @@ export class AlertLibraryPage {
   }
 
   async openViaTab() {
-    await this.page.locator(this.l.tab).click();
+    // Wait for the tab to render before clicking — under cloud load the section
+    // tab strip can take longer than the click's own actionability window.
+    const tab = this.page.locator(this.l.tab);
+    await tab.waitFor({ state: 'visible', timeout: 30000 });
+    await tab.click();
     await this.waitForGallery();
   }
 
