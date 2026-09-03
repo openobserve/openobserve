@@ -33,7 +33,11 @@ test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
    * tree → the sidebar defaults to the Preview tab.
    */
   async function openGenAiPreview(pm, streamName, spanName) {
-    await pm.tracesPage.selectTraceStream(streamName);
+    // The stream-list is fetched once on page load; a stream ingested after that
+    // load is absent from the selector options, so selectTraceStream silently
+    // no-ops. Re-navigate with the stream query param to refresh the list and
+    // auto-select the freshly-ingested stream before searching.
+    await pm.tracesPage.navigateToTracesUrlWithStream(streamName);
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runTraceSearch();
     await pm.tracesPage.waitForTraceSearchResults();
@@ -49,7 +53,7 @@ test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
     testLogger.info('Testing v5 parts conversation rendering in the Preview pane');
 
     const suffix = generateUUID();
-    const streamName = `trace-genai-parts-${suffix}`;
+    const streamName = `trace_genai_parts_${suffix}`;
     const spanName = `chat ${suffix}`;
 
     await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
@@ -87,7 +91,7 @@ test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
     testLogger.info('Testing System Instructions rendering via v5 parts');
 
     const suffix = generateUUID();
-    const streamName = `trace-genai-parts-${suffix}`;
+    const streamName = `trace_genai_parts_${suffix}`;
     const spanName = `chat ${suffix}`;
 
     await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
@@ -123,7 +127,7 @@ test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
     testLogger.info('Testing thinking / result real-world aliases');
 
     const suffix = generateUUID();
-    const streamName = `trace-genai-parts-${suffix}`;
+    const streamName = `trace_genai_parts_${suffix}`;
     const spanName = `chat ${suffix}`;
 
     await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
@@ -155,7 +159,7 @@ test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
     testLogger.info('Testing execute_tool span tool-observation rendering');
 
     const suffix = generateUUID();
-    const streamName = `trace-genai-parts-${suffix}`;
+    const streamName = `trace_genai_parts_${suffix}`;
     const spanName = `execute_tool ${suffix}`;
 
     await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
@@ -190,7 +194,7 @@ test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
     testLogger.info('Testing blob / file / uri placeholder rendering');
 
     const suffix = generateUUID();
-    const streamName = `trace-genai-parts-${suffix}`;
+    const streamName = `trace_genai_parts_${suffix}`;
     const spanName = `chat ${suffix}`;
 
     await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
@@ -228,7 +232,7 @@ test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
     testLogger.info('Testing truncation and expand/collapse behaviour');
 
     const suffix = generateUUID();
-    const streamName = `trace-genai-parts-${suffix}`;
+    const streamName = `trace_genai_parts_${suffix}`;
     const spanName = `chat ${suffix}`;
 
     const textParts = Array.from({ length: 20 }, (_, i) => ({ type: 'text', content: `line ${i} of content` }));
@@ -268,7 +272,7 @@ test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
     testLogger.info('Testing v5 parts rendering in the Thread tab');
 
     const suffix = generateUUID();
-    const streamName = `trace-genai-parts-${suffix}`;
+    const streamName = `trace_genai_parts_${suffix}`;
     const spanName = `chat ${suffix}`;
 
     await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
@@ -290,7 +294,7 @@ test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
     });
     await pm.genAiTracesIngestionPage.pollForSpan(streamName, spanName);
 
-    await pm.tracesPage.selectTraceStream(streamName);
+    await pm.tracesPage.navigateToTracesUrlWithStream(streamName);
     await pm.tracesPage.setTimeRange('15m');
     await pm.tracesPage.runTraceSearch();
     await pm.tracesPage.waitForTraceSearchResults();
@@ -298,7 +302,11 @@ test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
 
     const opened = await pm.tracesPage.openTraceDetailsTab('thread');
     expect(opened).toBeTruthy();
-    await pm.tracesPage.expectThreadViewContains('I should check the weather.');
+    // The Thread tab projects the conversation as user query + assistant output
+    // (buildTraceGroup maps only output messages to the assistant turn). The
+    // reasoning part lives in the INPUT messages, so it is not rendered here —
+    // the v5 tool_call_response part in the OUTPUT messages is.
+    await pm.tracesPage.expectThreadViewContains('rainy, 57F');
 
     testLogger.info('Test completed');
   });

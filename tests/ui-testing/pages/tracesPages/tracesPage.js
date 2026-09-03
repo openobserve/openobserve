@@ -809,6 +809,25 @@ export class TracesPage {
   }
 
   /**
+   * Navigate to the traces page carrying a `stream` query param. A full goto
+   * re-fetches the stream list (fetched once on mount), so a stream ingested
+   * AFTER the initial page load becomes selectable, and the `stream` param makes
+   * the page auto-select it (Index.vue loadStreamLists matches queryParams.stream).
+   */
+  async navigateToTracesUrlWithStream(streamName) {
+    const org = process.env["ORGNAME"] || 'default';
+    const baseUrl = (process.env["ZO_BASE_URL"] || '').replace(/\/+$/, '');
+    const tracesUrl = `${baseUrl}/web/traces?org_identifier=${org}&stream=${encodeURIComponent(streamName)}`;
+
+    await this.page.goto(tracesUrl);
+
+    try {
+      await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    } catch {
+    }
+  }
+
+  /**
    * Setup trace search with stream and time range
    * @param {string} streamName - Stream name to select
    */

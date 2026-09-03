@@ -1,8 +1,0 @@
-web/src/plugins/traces/LLMContentRenderer.spec.ts
-web/src/plugins/traces/LLMContentRenderer.vue
-web/src/plugins/traces/TraceDetailsSidebar.spec.ts
-web/src/plugins/traces/TraceDetailsSidebar.vue
-web/src/plugins/traces/genAiParts.spec.ts
-web/src/plugins/traces/genAiParts.ts
-web/src/plugins/traces/threadView.utils.spec.ts
-web/src/plugins/traces/threadView.utils.ts
