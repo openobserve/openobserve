@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="arrow-back" size="sm" />
         </OButton>
         <code class="text-text-secondary min-w-0 flex-1 truncate text-sm">{{
-          shortRoute(selectedTrace.route) || selectedTrace.label
+          traceDisplayName(selectedTrace)
         }}</code>
         <div class="flex flex-shrink-0 items-center gap-1.5">
           <span
@@ -188,8 +188,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
           </template>
           <template #cell-route="{ row }">
-            <span class="block truncate font-mono text-xs" :title="row.route">
-              {{ shortRoute(row.route) }}
+            <span class="block truncate font-mono text-xs" :title="traceDisplayName(row)">
+              {{ traceDisplayName(row) }}
             </span>
           </template>
           <template #cell-duration="{ row }">
@@ -223,6 +223,7 @@ import useHttpStreaming from "@/composables/useStreamingSearch";
 import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
 import { traceQueryWindow } from "@/utils/rum/traceWindow";
 import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -290,7 +291,7 @@ const traceColumns = computed(() => [
   {
     id: "route",
     header: t("rum.route"),
-    accessorFn: (row: any) => shortRoute(row.route),
+    accessorFn: (row: any) => traceDisplayName(row),
     size: 400,
     minSize: 80,
     maxSize: 800,
@@ -328,6 +329,11 @@ function shortRoute(url: string): string {
   } catch {
     return url;
   }
+}
+
+function traceDisplayName(trace: any): string {
+  const operation = trace.metadata?.httpOperation || trace.metadata?.rootOperation;
+  return operation && operation !== "unknown" ? operation : shortRoute(trace.route) || trace.label;
 }
 
 // Converts nanosecond trace timestamp to millisecond offset from session start,
@@ -403,7 +409,7 @@ async function fetchTraceMetadata(
       ? `trace_id='${safeTraceIds[0]}'`
       : `trace_id IN (${safeTraceIds.map((id) => `'${id}'`).join(",")})`;
 
-  return new Promise<Record<string, any>>((resolve, reject) => {
+  const metadata = await new Promise<Record<string, any>>((resolve, reject) => {
     const traceId = generateTraceContext().traceId;
     const metadata: Record<string, any> = {};
 
@@ -443,6 +449,37 @@ async function fetchTraceMetadata(
       },
     );
   });
+
+  try {
+    const stream = quoteSqlIdentifierIfNeeded(streamName);
+    const timestamp = quoteSqlIdentifierIfNeeded(store.state.zoConfig.timestamp_column);
+    const operationResponse = await searchService.search(
+      {
+        org_identifier: orgId,
+        query: {
+          query: {
+            sql: `SELECT trace_id, first_value(operation_name ORDER BY ${timestamp} ASC) AS operation_name FROM ${stream} WHERE ${filter} AND span_kind=2 AND http_route IS NOT NULL AND operation_name IS NOT NULL AND operation_name != '' GROUP BY trace_id`,
+            start_time: searchStartTime,
+            end_time: searchEndTime,
+            from: 0,
+            size: traceIds.length,
+          },
+        },
+        page_type: "traces",
+      },
+      "RUM",
+    );
+
+    for (const hit of operationResponse.data?.hits || []) {
+      if (metadata[hit.trace_id] && hit.operation_name) {
+        metadata[hit.trace_id].httpOperation = hit.operation_name;
+      }
+    }
+  } catch (err) {
+    console.warn("HTTP server operation fetch failed:", err);
+  }
+
+  return metadata;
 }
 
 async function fetchTraces() {
