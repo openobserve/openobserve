@@ -342,7 +342,13 @@ describe("LLM_INSIGHTS_PANELS — registry invariants", () => {
   // as "unknown" made that synthetic bucket outrank the real models on
   // both the span-count and the (always-zero) token panels.
   it("model-grouped panels filter out spans with no model", () => {
-    const modelPanels = ["cost-trend", "token-trend", "latency-by-model", "spans-by-model", "tokens-by-model"];
+    const modelPanels = [
+      "cost-trend",
+      "token-trend",
+      "latency-by-model",
+      "spans-by-model",
+      "tokens-by-model",
+    ];
     for (const id of modelPanels) {
       const panel = LLM_INSIGHTS_PANELS.find((p: LLMPanelDef) => p.id === id);
       expect(panel, `panel ${id} not found`).toBeTruthy();
