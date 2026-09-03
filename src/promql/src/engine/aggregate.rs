@@ -46,10 +46,12 @@ impl Engine {
             return fused::fused_range_agg(
                 modifier,
                 range_input,
-                shape.func.as_ref(),
+                shape.func,
                 shape.op,
                 &self.eval_ctx,
-            );
+                self.ctx.query_ctx.timeout,
+            )
+            .await;
         }
 
         let input = self.exec_expr(expr).await?;

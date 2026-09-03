@@ -80,8 +80,9 @@ pub enum FileSortOrder {
     /// compactor for logs, traces and non-indexed metrics.
     TimestampDesc,
     /// `__hash__ ASC, _timestamp ASC` — indexed metrics layout: all samples of
-    /// one series are contiguous and time-ordered inside a file. Only used by
-    /// the compactor merge; distributed query plans never carry it.
+    /// one series are contiguous and time-ordered inside a file. Used by the
+    /// compactor merge and, behind `ZO_FEATURE_METRICS_STREAMING_AGG_ENABLED`,
+    /// by the PromQL session's ordered table; distributed plans never carry it.
     HashTimestampAsc,
 }
 

@@ -11200,7 +11200,7 @@
             "item": "Элемент",
             "versions": "Версии"
           },
-          "versionPill": "v{version} · {count} версия | v{version} · {count} версий",
+          "versionPill": "{count} версия | {count} версий",
           "sourceSection": "Источник",
           "sourceTrace": "Трейс",
           "sourceSpan": "Спан",
@@ -11723,6 +11723,8 @@
       "schemaToggle": "Ограничить вывод JSON-схемой",
       "schemaHelp": "При заданной схеме вывод отображается в формате JSON.",
       "schemaInvalidJson": "Схема должна быть корректным JSON.",
+      "schemaIgnored": "Схема · Игнорируется этим провайдером",
+      "schemaUnsupported": "У этого провайдера нет поля структурированного вывода. Схема сохраняется в этом столбце, но не отправляется, и модель отвечает обычным текстом.",
       "outputPlaceholder": "Вывод появится здесь — нажмите «Запустить».",
       "outputNotRun": "Не запущено",
       "retry": "Повторить",

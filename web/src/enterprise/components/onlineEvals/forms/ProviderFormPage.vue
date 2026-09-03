@@ -18,148 +18,120 @@
           }}
         </span>
       </template>
-      <div class="py-4.5 [&_textarea]:max-h-55 [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
-        <section class="mb-6">
-          <div class="border-dialog-header-border mb-3 flex items-center gap-2.5 border-b pb-2.5">
-            <span
-              class="text-text-secondary text-2xs bg-text-secondary/12 inline-flex h-5.5 w-5.5 items-center justify-center rounded-full font-mono font-bold"
-              >{{ t("onlineEvals.provider.sectionStep1") }}</span
-            >
-            <div class="text-text-heading m-0 text-sm font-semibold">
-              {{ t("onlineEvals.provider.sectionTitle") }}
-            </div>
+      <div class="provider-form__main flex min-h-0 flex-col gap-2 p-2">
+        <!-- Provider details -->
+        <section
+          class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
+          data-test="provider-form-identity-section"
+        >
+          <div class="border-border-default flex items-center border-b px-3 py-2.5">
+            <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+            <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
+              t("onlineEvals.provider.sectionTitle")
+            }}</span>
           </div>
-
-          <div class="grid grid-cols-2 gap-3.5 max-[56.25rem]:grid-cols-1">
-            <div class="mb-3">
-              <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
-                {{ t("onlineEvals.provider.nameLabel") }}
-                <span class="text-status-error-text ml-0.5">*</span>
-                <OIcon
-                  v-if="mode === 'edit'"
-                  name="lock"
-                  size="xs"
-                  class="text-text-secondary ml-1.5"
+          <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+              <div>
+                <OFormInput
+                  name="name"
+                  :label="t('onlineEvals.provider.nameLabel')"
+                  :placeholder="raw('Production OpenAI')"
+                  size="sm"
+                  required
+                  :disabled="mode === 'edit'"
+                  :help-text="mode === 'edit' ? t('onlineEvals.provider.cannotRename') : undefined"
+                  data-test="provider-form-name-input"
                 />
               </div>
-              <OFormInput
-                name="name"
-                :placeholder="raw('Production OpenAI')"
-                size="sm"
-                :disabled="mode === 'edit'"
-                data-test="provider-form-name-input"
-              />
-              <div v-if="mode === 'edit'" class="text-2xs text-text-secondary mt-1">
-                {{ t("onlineEvals.provider.cannotRename") }}
-              </div>
-            </div>
 
-            <div class="mb-3">
-              <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
-                {{ t("onlineEvals.provider.typeLabel") }}
-                <span class="text-status-error-text ml-0.5">*</span>
-                <OIcon
-                  v-if="mode === 'edit'"
-                  name="lock"
-                  size="xs"
-                  class="text-text-secondary ml-1.5"
+              <div>
+                <OFormSelect
+                  name="providerType"
+                  :label="t('onlineEvals.provider.typeLabel')"
+                  :options="providerTypeOptions"
+                  size="md"
+                  required
+                  :disabled="mode === 'edit'"
+                  data-test="provider-form-type-select"
                 />
               </div>
-              <OFormSelect
-                name="providerType"
-                :options="providerTypeOptions"
-                size="md"
-                :disabled="mode === 'edit'"
-                data-test="provider-form-type-select"
-              />
             </div>
-          </div>
 
-          <div class="mb-3">
-            <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
-              {{ t("onlineEvals.provider.endpointLabel") }}
-            </div>
-            <OFormInput
-              name="endpoint"
-              :placeholder="raw(endpointPlaceholder)"
-              size="sm"
-              data-test="provider-form-endpoint-input"
-            />
-          </div>
-
-          <div class="grid grid-cols-2 gap-3.5 max-[56.25rem]:grid-cols-1">
-            <div class="mb-3">
-              <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
-                {{ t("onlineEvals.provider.defaultModelLabel") }}
-                <span class="text-status-error-text ml-0.5">*</span>
-              </div>
+            <div>
               <OFormInput
-                name="defaultModel"
-                :placeholder="raw('gpt-4o-mini')"
+                name="endpoint"
+                :label="t('onlineEvals.provider.endpointLabel')"
+                :placeholder="raw(endpointPlaceholder)"
                 size="sm"
-                data-test="provider-form-default-model-input"
+                data-test="provider-form-endpoint-input"
               />
             </div>
 
-            <div class="mb-3">
-              <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
-                {{ t("onlineEvals.provider.availableModelsLabel") }}
+            <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
+              <div>
+                <OFormInput
+                  name="defaultModel"
+                  :label="t('onlineEvals.provider.defaultModelLabel')"
+                  :placeholder="raw('gpt-4o-mini')"
+                  size="sm"
+                  required
+                  data-test="provider-form-default-model-input"
+                />
               </div>
-              <OFormInput
-                name="availableModels"
-                :placeholder="raw('gpt-4o-mini, gpt-4.1')"
-                size="sm"
-                data-test="provider-form-available-models-input"
-              />
-              <div class="text-2xs text-text-secondary mt-1">
-                {{ t("onlineEvals.provider.availableModelsHelp") }}
+
+              <div>
+                <OFormInput
+                  name="availableModels"
+                  :label="t('onlineEvals.provider.availableModelsLabel')"
+                  :placeholder="raw('gpt-4o-mini, gpt-4.1')"
+                  size="sm"
+                  :help-text="t('onlineEvals.provider.availableModelsHelp')"
+                  data-test="provider-form-available-models-input"
+                />
               </div>
             </div>
           </div>
         </section>
 
-        <section class="mb-6">
-          <div class="border-dialog-header-border mb-3 flex items-center gap-2.5 border-b pb-2.5">
-            <span
-              class="text-text-secondary text-2xs bg-text-secondary/12 inline-flex h-5.5 w-5.5 items-center justify-center rounded-full font-mono font-bold"
-              >{{ t("onlineEvals.provider.sectionStep2") }}</span
+        <!-- Authentication -->
+        <section
+          class="card-container rounded-default border-border-default bg-surface-base shrink-0 overflow-hidden border"
+          data-test="provider-form-auth-section"
+        >
+          <div class="border-border-default flex items-center border-b px-3 py-2.5">
+            <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+            <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
+              t("onlineEvals.provider.authSection")
+            }}</span>
+          </div>
+          <div class="flex flex-col gap-3 px-4 py-3.5">
+            <div
+              v-if="mode === 'edit'"
+              class="rounded-default text-2xs text-text-secondary border-status-info-text/30 bg-status-info-text/12 flex items-start gap-2 border px-3 py-2 leading-[1.4]"
             >
-            <div class="text-text-heading m-0 text-sm font-semibold">
-              {{ t("onlineEvals.provider.authSection") }}
+              <OIcon name="lock" size="xs" class="text-status-info-text mt-px shrink-0" />
+              <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
             </div>
-          </div>
 
-          <div
-            v-if="mode === 'edit'"
-            class="provider-callout rounded-default text-2xs text-text-secondary border-status-info-text/30 bg-status-info-text/12 mb-3 flex items-start gap-2 border px-3 py-2 leading-[1.4]"
-          >
-            <OIcon name="lock" size="xs" class="text-status-info-text mt-px shrink-0" />
-            <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
-          </div>
-
-          <div class="mb-3">
-            <div class="text-text-heading mb-1 flex items-center text-xs font-semibold">
-              {{ t("onlineEvals.provider.apiKeyLabel") }}
-              <span v-if="mode === 'create' && apiKeyRequired" class="text-status-error-text ml-0.5"
-                >*</span
-              >
-            </div>
-            <OFormInput
-              name="apiKey"
-              type="password"
-              size="sm"
-              :placeholder="t('onlineEvals.provider.apiKeyPlaceholder')"
-              data-test="provider-form-api-key-input"
-            />
-            <div class="text-2xs text-text-secondary mt-1">
-              {{ t("onlineEvals.provider.apiKeyHelp") }}
+            <div>
+              <OFormInput
+                name="apiKey"
+                type="password"
+                :label="t('onlineEvals.provider.apiKeyLabel')"
+                :required="mode === 'create' && apiKeyRequired"
+                size="sm"
+                :placeholder="t('onlineEvals.provider.apiKeyPlaceholder')"
+                :help-text="t('onlineEvals.provider.apiKeyHelp')"
+                data-test="provider-form-api-key-input"
+              />
             </div>
           </div>
         </section>
       </div>
 
       <footer
-        class="border-dialog-header-border bg-card-bg sticky bottom-0 z-1 flex shrink-0 items-center justify-end gap-2 border-t px-5.5 py-3"
+        class="border-border-default bg-surface-base sticky bottom-0 z-1 flex shrink-0 items-center justify-end gap-2 border-t px-5.5 py-3"
       >
         <OButton
           data-test="provider-form-cancel-btn"
