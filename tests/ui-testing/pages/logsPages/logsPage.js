@@ -2238,12 +2238,14 @@ export class LogsPage {
     }
 
     async kubernetesContainerNameJoinLimit() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
+        // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
+        await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
         await this.waitForEditorValue('LIMIT 10');
     }
 
     async kubernetesContainerNameJoinLike() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE \'%ziox%\'');
+        // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
+        await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE \'%ziox%\'');
         await this.waitForEditorValue("LIKE '%ziox%'");
     }
 
@@ -2254,12 +2256,14 @@ export class LogsPage {
     }
 
     async kubernetesContainerNameRightJoin() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the RIGHT JOIN unwritten.
+        await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('RIGHT JOIN');
     }
 
     async kubernetesContainerNameFullJoin() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the FULL JOIN unwritten.
+        await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('FULL JOIN');
     }
 
