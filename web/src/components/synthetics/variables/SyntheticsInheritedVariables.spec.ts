@@ -16,30 +16,34 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
-import type { ResolvedVariable } from "./resolved";
+import type { InheritedUnionRow } from "./resolved";
 import SyntheticsInheritedVariables from "./SyntheticsInheritedVariables.vue";
 
 const OBadgeStub = {
   props: ["variant", "size"],
   template: '<span v-bind="$attrs"><slot /></span>',
 };
-const OButtonStub = {
-  props: ["variant", "size"],
-  emits: ["click"],
-  template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
-};
 const OIconStub = { props: ["name", "size"], template: '<i v-bind="$attrs" :data-icon="name" />' };
-const OTooltipStub = { props: ["content", "side"], template: "<span><slot /></span>" };
+const OTooltipStub = {
+  props: ["content", "side"],
+  template: '<span :data-tip="content"><slot /></span>',
+};
+const OSelectStub = {
+  props: ["modelValue", "options"],
+  emits: ["update:modelValue"],
+  template: `<select v-bind="$attrs" :value="modelValue" @change="$emit('update:modelValue', $event.target.value)">
+    <option v-for="o in options" :key="o.value" :value="o.value">{{ o.label }}</option>
+  </select>`,
+};
 
-function v(over: Partial<ResolvedVariable> = {}): ResolvedVariable {
+function row(over: Partial<InheritedUnionRow> = {}): InheritedUnionRow {
   return {
     name: "BASE_URL",
-    kind: "plain",
-    scope: "staging",
+    envs: ["staging"],
+    global: false,
+    secret: false,
     overridden: false,
-    example: "",
-    description: "",
-    has_value: true,
+    hints: [{ source: "staging", example: "", has_value: true }],
     ...over,
   };
 }
@@ -51,13 +55,15 @@ function mountInherited(props: Record<string, unknown>) {
       plugins: [i18n],
       stubs: {
         OBadge: OBadgeStub,
-        OButton: OButtonStub,
         OIcon: OIconStub,
+        OSelect: OSelectStub,
         OTooltip: OTooltipStub,
       },
     },
   }) as VueWrapper;
 }
+
+const rowSel = '[data-test="synthetics-inherited-variable"]';
 
 describe("SyntheticsInheritedVariables", () => {
   let wrapper: VueWrapper;
@@ -66,27 +72,61 @@ describe("SyntheticsInheritedVariables", () => {
     wrapper?.unmount();
   });
 
-  it("renders one row per inherited variable, never the check's own", () => {
+  it("renders one row per distinct name with the rail's scope icons", () => {
     wrapper = mountInherited({
-      rows: [v({ name: "A" }), v({ name: "B", scope: "check" }), v({ name: "C", scope: "" })],
+      rows: [
+        row({ name: "ORG", envs: [], global: true }),
+        row({ name: "BASE_URL", envs: ["staging", "qa"] }),
+      ],
     });
-    const rows = wrapper.findAll('[data-test="synthetics-inherited-variable"]');
-    expect(rows.map((r) => r.text())).toEqual(
-      expect.arrayContaining([expect.stringContaining("A")]),
-    );
-    expect(rows).toHaveLength(2);
+    const icons = wrapper.findAll('[data-test="synthetics-inherited-scope-icon"]');
+    expect(icons.map((i) => i.attributes("data-icon"))).toEqual(["public", "layers"]);
+    expect(icons.map((i) => i.attributes("aria-label"))).toEqual(["Global", "staging, qa"]);
   });
 
-  it("strikes an overridden row, with the relation on its accessible name only", () => {
-    wrapper = mountInherited({ rows: [v({ name: "USER", overridden: true })] });
+  it("strikes a shadowed name, with the relation on its accessible name", () => {
+    wrapper = mountInherited({ rows: [row({ name: "USER", overridden: true })] });
     const struck = wrapper.find("span.line-through");
     expect(struck.text()).toBe("USER");
     expect(struck.attributes("aria-label")).toBe("Overridden by local variable");
   });
 
+  it("puts per-source value hints on the name's hover", () => {
+    wrapper = mountInherited({
+      rows: [
+        row({
+          name: "BASE_URL",
+          envs: ["staging", "qa"],
+          hints: [
+            { source: "staging", example: "stage.shop.com", has_value: true },
+            { source: "qa", example: "", has_value: false },
+          ],
+        }),
+      ],
+    });
+    const tip = wrapper.find(`${rowSel} span[data-tip]`).attributes("data-tip");
+    expect(tip).toBe("BASE_URL — staging: stage.shop.com · qa: Not set");
+  });
+
+  it("masks a secret's hints and marks the row with the lock", () => {
+    wrapper = mountInherited({
+      rows: [
+        row({
+          name: "API_KEY",
+          secret: true,
+          hints: [{ source: "staging", example: "sk-****", has_value: true }],
+        }),
+      ],
+    });
+    expect(wrapper.find('[data-test="synthetics-inherited-secret-lock"]').exists()).toBe(true);
+    expect(wrapper.find(`${rowSel} span[data-tip]`).attributes("data-tip")).toBe(
+      "API_KEY — staging: ••••••",
+    );
+  });
+
   it("names the environments a variable is missing from, on the triangle's label", () => {
     wrapper = mountInherited({
-      rows: [v({ name: "API_KEY" })],
+      rows: [row({ name: "API_KEY" })],
       gaps: new Map([["API_KEY", ["qa", "dev"]]]),
     });
     expect(
@@ -94,34 +134,33 @@ describe("SyntheticsInheritedVariables", () => {
     ).toBe("Not in qa, dev");
   });
 
-  it("collapses more than two missing environments into a count", () => {
-    wrapper = mountInherited({
-      rows: [v({ name: "API_KEY" })],
-      gaps: new Map([["API_KEY", ["qa", "dev", "prod"]]]),
-    });
-    expect(
-      wrapper.find('[data-test="synthetics-inherited-gap-badge"]').attributes("aria-label"),
-    ).toBe("Not in 3 environments");
-  });
-
   it("shows no gap badge for a fully covered variable", () => {
-    wrapper = mountInherited({ rows: [v({ name: "ORG", scope: "global" })], gaps: new Map() });
+    wrapper = mountInherited({ rows: [row({ name: "ORG", envs: [], global: true })] });
     expect(wrapper.find('[data-test="synthetics-inherited-gap-badge"]').exists()).toBe(false);
   });
 
-  it("shows the rail's scope icons — public for Global, layers for an environment", () => {
+  it("filters by source, with an explicit empty state per environment", async () => {
     wrapper = mountInherited({
-      rows: [v({ name: "ORG", scope: "global" }), v({ name: "BASE_URL", scope: "staging" })],
+      environments: ["staging", "qa"],
+      rows: [
+        row({ name: "ONLY_STAGING", envs: ["staging"] }),
+        row({ name: "ORG", envs: [], global: true }),
+      ],
     });
-    const icons = wrapper.findAll('[data-test="synthetics-inherited-scope-icon"]');
-    expect(icons.map((i) => i.attributes("data-icon"))).toEqual(["public", "layers"]);
-    expect(icons.map((i) => i.attributes("aria-label"))).toEqual(["Global", "staging"]);
-  });
+    const filter = wrapper.find('[data-test="synthetics-inherited-filter"]');
+    expect(filter.findAll("option").map((o) => o.text())).toEqual([
+      "All",
+      "Global",
+      "staging",
+      "qa",
+    ]);
 
-  it("marks a secret with the lock and shows no value-like content", () => {
-    wrapper = mountInherited({ rows: [v({ name: "TOKEN", kind: "secret", example: "sk-****" })] });
-    expect(wrapper.find('[data-test="synthetics-inherited-secret-lock"]').exists()).toBe(true);
-    expect(wrapper.text()).not.toContain("••••••");
-    expect(wrapper.text()).not.toContain("sk-****");
+    expect(wrapper.findAll(rowSel)).toHaveLength(2);
+    await filter.setValue("__global__");
+    expect(wrapper.findAll(rowSel).map((r) => r.text())).toEqual(["ORG"]);
+    await filter.setValue("qa");
+    expect(wrapper.find('[data-test="synthetics-inherited-empty"]').text()).toBe(
+      "No inherited variables in qa.",
+    );
   });
 });

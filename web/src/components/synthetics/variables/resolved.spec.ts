@@ -19,6 +19,7 @@ import {
   applyPlaceholder,
   coverageGaps,
   effectiveVariables,
+  inheritedUnion,
   inheritedVariables,
   placeholderAtCursor,
   suggestPlaceholders,
@@ -127,6 +128,56 @@ describe("applyPlaceholder", () => {
   it("keeps text that follows the cursor", () => {
     const context = placeholderAtCursor("{{BA", 4)!;
     expect(applyPlaceholder("{{BA/login", 4, context, "BASE_URL").text).toBe("{{BASE_URL}}/login");
+  });
+});
+
+describe("inheritedUnion", () => {
+  const grouped = {
+    environments: ["staging", "qa"],
+    resolved: {
+      staging: [
+        v({ name: "ORG", scope: "global" }),
+        v({ name: "BASE_URL", scope: "staging", example: "stage.shop.com" }),
+        v({ name: "API_KEY", scope: "staging", kind: "secret" as const }),
+        v({ name: "LOCAL_ONLY", scope: "check" }),
+      ],
+      qa: [
+        v({ name: "ORG", scope: "global" }),
+        v({ name: "BASE_URL", scope: "qa", example: "qa.shop.com" }),
+      ],
+    },
+  };
+
+  it("dedupes a name defined in several environments into one row with both sources", () => {
+    const rows = inheritedUnion(grouped, new Set());
+    const baseUrl = rows.find((r) => r.name === "BASE_URL")!;
+    expect(baseUrl.envs).toEqual(["staging", "qa"]);
+    expect(baseUrl.hints.map((h) => `${h.source}:${h.example}`)).toEqual([
+      "staging:stage.shop.com",
+      "qa:qa.shop.com",
+    ]);
+  });
+
+  it("never lists check-tier rows, and sorts by name", () => {
+    const rows = inheritedUnion(grouped, new Set());
+    expect(rows.map((r) => r.name)).toEqual(["API_KEY", "BASE_URL", "ORG"]);
+  });
+
+  it("marks a global once despite appearing in every environment's set", () => {
+    const org = inheritedUnion(grouped, new Set()).find((r) => r.name === "ORG")!;
+    expect(org.global).toBe(true);
+    expect(org.envs).toEqual([]);
+    expect(org.hints).toHaveLength(1);
+  });
+
+  it("flags names a local variable shadows", () => {
+    const rows = inheritedUnion(grouped, new Set(["BASE_URL"]));
+    expect(rows.find((r) => r.name === "BASE_URL")!.overridden).toBe(true);
+    expect(rows.find((r) => r.name === "ORG")!.overridden).toBe(false);
+  });
+
+  it("carries secrecy from any source", () => {
+    expect(inheritedUnion(grouped, new Set()).find((r) => r.name === "API_KEY")!.secret).toBe(true);
   });
 });
 
