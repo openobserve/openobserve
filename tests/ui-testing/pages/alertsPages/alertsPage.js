@@ -3484,6 +3484,29 @@ export class AlertsPage {
     }
 
     /**
+     * Wait for the add-alert form to finish mounting before interacting with its
+     * header back button — the submit button only renders once AddAlertView stops
+     * bouncing (it redirects to the list while destinations are empty).
+     */
+    async expectAddAlertFormVisible() {
+        await expect(this.page.locator(this.locators.alertSubmitButton)).toBeVisible({ timeout: 15000 });
+    }
+
+    /**
+     * Click the header back button and assert the redirect to the alerts list
+     * preserves both org_identifier and folder. goBackToAlertsList pushes a fresh
+     * query string; the Cancel button's history-based router.back() would not carry
+     * them, so parsing searchParams (not exact-string URL matching) is the real gate.
+     */
+    async expectBackRedirectPreservesOrg(org, folder) {
+        await this.clickBackButton();
+        await expect(this.page).toHaveURL(/\/web\/alerts\/?\?/, { timeout: 15000 });
+        const params = new URL(this.page.url()).searchParams;
+        expect(params.get('org_identifier')).toBe(org);
+        expect(params.get('folder')).toBe(folder);
+    }
+
+    /**
      * Click a step indicator in the v3 alert wizard to navigate between steps.
      * Step indices: 0 = Step 1 (Stream Setup), 1 = Step 2 (Query Config), etc.
      * @param {number} stepIndex - 0-based step index

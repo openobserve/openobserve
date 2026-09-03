@@ -1,0 +1,13 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-add-alert-org-identifier.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-ui.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-scheduled-features.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-ui-operations.spec.js",
+    "tests/ui-testing/playwright-tests/RegressionSet/Alerts/alerts-stream-switching.spec.js",
+    "tests/ui-testing/playwright-tests/RegressionSet/Alerts/alerts-regression.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing Alerts spec asserts the redirect target after the add-alert header back button is clicked. Existing clickBackButton() call sites (scheduled-features, stream-switching, alerts-regression) only use the back button to close the wizard and never assert that the resulting /alerts URL preserves org_identifier (and folder). alerts-composite-ui navigates to /web/alerts/add but is composite-UI focused and never asserts back-redirect org preservation. The fix (goBackToAlertsList pushing org_identifier + folder) is a distinct, self-contained regression with its own feature slug and run-context spec_path, so a dedicated spec is cleaner than bolting an org-preservation assertion onto an unrelated existing spec. New spec must be registered in ci_matrix.json run_files under the Alerts testfolder."
+}

@@ -1,0 +1,4 @@
+[
+  { "title": "back redirect preserves org_identifier and folder (folder=default)", "action": "new", "verifies": "clicking the header back button on the add-alert form redirects to /alerts preserving org_identifier and folder=default" },
+  { "title": "back redirect preserves a non-default folder value", "action": "new", "verifies": "clicking the header back button forwards a non-default folder (prod_alerts) through the redirect alongside org_identifier" }
+]

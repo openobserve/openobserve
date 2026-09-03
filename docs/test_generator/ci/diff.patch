@@ -1,0 +1,34 @@
+===== COMPLETE LIST OF CHANGED FILES (1 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/alerts/AddAlert.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/alerts/AddAlert.vue b/web/src/components/alerts/AddAlert.vue
+index 2c9520b22ec..c99e92cd1af 100644
+--- a/web/src/components/alerts/AddAlert.vue
++++ b/web/src/components/alerts/AddAlert.vue
+@@ -572,6 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ <script lang="ts">
+ import { raw } from "@/types/i18n";
+ import { defineComponent, computed, watch, provide, ref } from "vue";
++import { useStore } from "vuex";
+ // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
+ import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
+ import OButton from "@/lib/core/Button/OButton.vue";
+@@ -662,6 +663,7 @@ export default defineComponent({
+     CompositeAlertForm,
+   },
+   setup(props, { emit }) {
++    const store = useStore();
+     const alertForm = useAlertForm(props, emit);
+ 
+     // Share server SQL-validation squiggle ranges with the descendant query
+@@ -844,6 +846,7 @@ export default defineComponent({
+         path: "/alerts",
+         query: {
+           folder: alertForm.activeFolderId.value ?? "default",
++          org_identifier: store.state.selectedOrganization.identifier,
+         },
+       });
+     };

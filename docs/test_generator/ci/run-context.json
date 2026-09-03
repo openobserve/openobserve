@@ -1,0 +1,17 @@
+{
+  "feature_slug": "alerts-add-alert-org-identifier",
+  "feature_title": "Alert Creation Redirect Preserves Org Identifier",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "alerts-add-alert-org-identifier.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-add-alert-org-identifier.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/AddAlert.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
