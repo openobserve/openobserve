@@ -411,9 +411,9 @@ describe("ExperimentDetailPage", () => {
     });
     await flushPromises();
 
-    expect(wrapper.text()).toContain("0.718");
-    expect(wrapper.text()).toContain("false");
-    expect(wrapper.text()).toContain("safe");
+    expect(
+      wrapper.findAll("tbody tr")[2].findAll("td").map((cell) => cell.text()),
+    ).toEqual(expect.arrayContaining(["0.718", "false", "safe"]));
     // Text labels keep row status accessible without relying on color.
     const chipText = taskStatuses.map((_, index) =>
       wrapper.get(`[data-test="ai-experiment-row-status-row-${index}"]`).text(),

@@ -442,7 +442,7 @@ const tableRows = computed(() =>
     const violations: Record<string, boolean> = {};
     for (const id of scorerIds.value) {
       const summary = row.scoreSummaries.find((candidate) => candidate.scorerId === id);
-      scores[`score:${id}`] = experimentScoreSummaryValue(summary?.value ?? null);
+      scores[`score:${id}`] = experimentScoreSummaryValue(summary?.value ?? null, row.trialCount);
       const healthy = scorerHealthyBoolean.value[id];
       const aggregate = summary?.value as Record<string, unknown> | null | undefined;
       if (healthy !== undefined && aggregate?.kind === "boolean") {
