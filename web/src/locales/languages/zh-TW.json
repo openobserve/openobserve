@@ -7246,7 +7246,7 @@
       "sensitivityHintEveryNDays": "標記最異常的 {rate}% 時間區間——在 {resolution} 解析度下約每 {count} 天 1 個。",
       "sensitivityHintPerDay": "標記最異常的 {rate}% 時間區間——在 {resolution} 解析度下每天約 {count} 個。",
       "sensitivityRange": "請輸入 50 到 99 之間的整數",
-      "sensitivityTooltip": "一個區間在被標記為異常前必須有多不尋常，以模型訓練分數的百分位數表示。97 會標記最不尋常的 3%。數值越高表示警示越少但更精確。",
+      "sensitivityTooltip": "一個區間在被標記為異常前必須有多不尋常，以模型訓練分數的百分位數表示。95 會標記最不尋常的 5%。每個被標記的區間都會發送警示，因此數值越低，能捕捉到越多真實事件，發出的警示也越多。",
       "seriesAnomaly": "異常",
       "seriesDeviation": "偏差",
       "seriesScore": "分數",

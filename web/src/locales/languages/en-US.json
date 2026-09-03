@@ -7324,7 +7324,7 @@
       "sensitivityHintEveryNDays": "Flags the most unusual {rate}% of buckets — about one every {count} days at {resolution} resolution.",
       "sensitivityHintPerDay": "Flags the most unusual {rate}% of buckets — about {count} per day at {resolution} resolution. | Flags the most unusual {rate}% of buckets — about {count} per day at {resolution} resolution.",
       "sensitivityRange": "Enter a whole number between 50 and 99",
-      "sensitivityTooltip": "How unusual a bucket must be before it is flagged, as a percentile of the model's training scores. 97 flags the most unusual 3%. Higher means fewer, more confident alerts.",
+      "sensitivityTooltip": "How unusual a bucket must be before it is flagged, as a percentile of the model's training scores. 95 flags the most unusual 5%. Every flagged bucket sends an alert, so a lower value catches more real incidents and sends more alerts.",
       "seriesAnomaly": "Anomaly",
       "seriesDeviation": "Deviation",
       "seriesScore": "Score",

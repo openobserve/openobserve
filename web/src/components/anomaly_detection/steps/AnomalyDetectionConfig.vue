@@ -668,9 +668,9 @@ export default defineComponent({
     ]);
     // Values stay numbers — reka-ui matches the active item with ohash.isEqual.
     const sensitivityTiers = computed(() => [
-      { value: 99, label: t("alerts.anomaly.sensitivityConservative") },
-      { value: 97, label: t("alerts.anomaly.sensitivityBalanced") },
-      { value: 95, label: t("alerts.anomaly.sensitivityAggressive") },
+      { value: 97, label: t("alerts.anomaly.sensitivityConservative") },
+      { value: 95, label: t("alerts.anomaly.sensitivityBalanced") },
+      { value: 90, label: t("alerts.anomaly.sensitivityAggressive") },
     ]);
 
     const getTimestampColumn = () => store.state.zoConfig.timestamp_column || "_timestamp";

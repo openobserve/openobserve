@@ -84,6 +84,20 @@ pub mod incidents;
 pub mod slack_oauth;
 pub mod templates;
 
+/// Stripped on export: re-importing this state would claim a model the destination never trained.
+#[cfg(feature = "enterprise")]
+const ANOMALY_EXPORT_STRIPPED_KEYS: [&str; 9] = [
+    "is_trained",
+    "training_started_at",
+    "training_completed_at",
+    "last_processed_timestamp",
+    "current_model_version",
+    "status",
+    "last_error",
+    "retries",
+    "last_failed_at",
+];
+
 /// CreateAlert
 #[utoipa::path(
     post,
@@ -1526,19 +1540,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
                                 "alert_type".to_string(),
                                 serde_json::Value::String("anomaly_detection".to_string()),
                             );
-                            // Strip runtime/training state from the export payload
-                            for key in &[
-                                "is_trained",
-                                "training_started_at",
-                                "training_completed_at",
-                                "last_processed_timestamp",
-                                "current_model_version",
-                                "status",
-                                "last_error",
-                                "retries",
-                            ] {
-                                obj.remove(*key);
-                            }
+                            strip_anomaly_runtime_state(obj);
                         }
                         MetaHttpResponse::json(v)
                     }
@@ -1555,6 +1557,14 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
             }
         }
         Err(e) => e.into(),
+    }
+}
+
+/// Removes the runtime/training keys from an anomaly config's export payload, in place.
+#[cfg(feature = "enterprise")]
+fn strip_anomaly_runtime_state(obj: &mut serde_json::Map<String, serde_json::Value>) {
+    for key in ANOMALY_EXPORT_STRIPPED_KEYS {
+        obj.remove(key);
     }
 }
 
@@ -3552,6 +3562,36 @@ mod tests {
     use openobserve_core::alerts::alert::AlertError;
 
     use super::resolve_generate_sql;
+
+    /// Exporting `last_failed_at` hands an importer a backoff anchor for a model it never ran.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_export_strips_last_failed_at_with_the_rest_of_the_runtime_state() {
+        let mut config = serde_json::json!({
+            "anomaly_id": "a1",
+            "name": "keep me",
+            "threshold": 95,
+            "is_trained": true,
+            "training_started_at": 1_700_000_000_000_000i64,
+            "training_completed_at": 1_700_000_000_000_000i64,
+            "last_processed_timestamp": 1_700_000_000_000_000i64,
+            "current_model_version": 7,
+            "status": 3,
+            "last_error": "boom",
+            "retries": 4,
+            "last_failed_at": 1_700_000_000_000_000i64,
+        });
+
+        super::strip_anomaly_runtime_state(config.as_object_mut().unwrap());
+
+        let left: Vec<&str> = config
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(left, vec!["anomaly_id", "name", "threshold"]);
+    }
 
     fn status(err: AlertError) -> StatusCode {
         Response::from(err).status()

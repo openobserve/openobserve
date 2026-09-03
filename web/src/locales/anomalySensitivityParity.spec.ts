@@ -43,6 +43,12 @@ const ALL_LOCALES: Array<[string, Json]> = readdirSync(dir)
 
 const en = read("en-US.json");
 
+// Kept in step with sensitivityTiers in AnomalyDetectionConfig.vue.
+const BALANCED_PERCENTILE = 95;
+
+// The default this replaced; no locale may still quote it as the current one.
+const RETIRED_PERCENTILE = 97;
+
 const at = (root: Json, path: string): unknown =>
   path.split(".").reduce<unknown>((node, key) => (node as Json | undefined)?.[key], root);
 
@@ -150,9 +156,40 @@ describe("anomaly sensitivity locale parity", () => {
     );
   });
 
+  it.each(ALL_LOCALES)("%s quotes the current Balanced default in the tooltip", (_name, locale) => {
+    const tooltip = String(at(locale, "alerts.anomaly.sensitivityTooltip"));
+    expect(tooltip).toContain(String(BALANCED_PERCENTILE));
+    // Bounded so a percentile is matched as a whole number, not as a digit inside a longer one.
+    expect(tooltip).not.toMatch(new RegExp(`(?<!\\d)${RETIRED_PERCENTILE}(?!\\d)`));
+  });
+
   it("en-US no longer says scores outside the range are ignored", () => {
     const tooltip = String(at(en, "alerts.anomaly.sensitivityTooltip")).toLowerCase();
     // The old copy inverted the detector: it alerts ON the extremes.
     expect(tooltip).not.toContain("outside this range");
+  });
+
+  // Detection fires on `anomaly_count > 0`: there is no hysteresis and no silencing to promise.
+  it("en-US does not claim flagged buckets are suppressed before alerting", () => {
+    const tooltip = String(at(en, "alerts.anomaly.sensitivityTooltip")).toLowerCase();
+    for (const claim of [
+      "isolated flag",
+      "does not open",
+      "barely changes",
+      "barely move",
+      "stays flat",
+      "without alerting",
+      "hysteresis",
+    ]) {
+      expect(tooltip).not.toContain(claim);
+    }
+  });
+
+  // The tooltip and the hint below it describe the same direction: looser percentile, more of both.
+  it("en-US ties a lower percentile to more alerts, matching the hint underneath", () => {
+    const tooltip = String(at(en, "alerts.anomaly.sensitivityTooltip")).toLowerCase();
+    expect(tooltip).toContain("alert");
+    expect(tooltip).toMatch(/lower value|lowering/);
+    expect(tooltip).toContain("more alerts");
   });
 });

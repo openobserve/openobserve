@@ -423,9 +423,8 @@ pub async fn create_config(
         detection_window_seconds: req.detection_window_seconds,
         training_window_days: req.training_window_days.unwrap_or(7),
         retrain_interval_days: req.retrain_interval_days.unwrap_or(7),
-        // Store percentile as i32 (e.g. 97.0 → 97). Whole-number percentiles are
-        // sufficient; the valid range is 50–99 and we clamp at the model level.
-        threshold: req.percentile.unwrap_or(97.0).clamp(50.0, 99.9) as i32,
+        // Whole-number percentiles suffice; the model clamps to 50–99.9 regardless.
+        threshold: req.percentile.unwrap_or(95.0).clamp(50.0, 99.9) as i32,
         is_trained: false,
         training_started_at: None,
         training_completed_at: None,
@@ -467,6 +466,7 @@ pub async fn create_config(
         },
         status: 0i32, // 0 = waiting
         retries: 0,
+        last_failed_at: None,
         last_updated: now_us,
         // Seasonality is auto-determined at training time from training_window_days;
         // initialise to "none" as a placeholder until the first training run.
@@ -1012,6 +1012,7 @@ pub async fn clone_config(
         tags: src.tags.clone(),
         status: 0i32,
         retries: 0,
+        last_failed_at: None,
         last_updated: now_us,
         created_at: now_us,
         updated_at: now_us,

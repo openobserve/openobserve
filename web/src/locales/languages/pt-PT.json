@@ -7251,7 +7251,7 @@
       "sensitivityHintEveryNDays": "Assinala os {rate}% de intervalos mais invulgares — cerca de um a cada {count} dias com resolução de {resolution}.",
       "sensitivityHintPerDay": "Assinala os {rate}% de intervalos mais invulgares — cerca de {count} por dia com resolução de {resolution}. | Assinala os {rate}% de intervalos mais invulgares — cerca de {count} por dia com resolução de {resolution}.",
       "sensitivityRange": "Introduza um número inteiro entre 50 e 99",
-      "sensitivityTooltip": "O quão incomum um bucket deve ser antes de ser sinalizado, como um percentil das pontuações de treinamento do modelo. 97 sinaliza os 3% mais incomuns. Valores mais altos significam menos alertas, porém mais confiáveis.",
+      "sensitivityTooltip": "O quão incomum um bucket deve ser antes de ser sinalizado, como um percentil das pontuações de treinamento do modelo. 95 sinaliza os 5% mais incomuns. Cada bucket sinalizado envia um alerta, por isso um valor mais baixo deteta mais incidentes reais e envia mais alertas.",
       "seriesAnomaly": "Anomalia",
       "seriesDeviation": "Desvio",
       "seriesScore": "Pontuação",

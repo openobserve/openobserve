@@ -7251,7 +7251,7 @@
       "sensitivityHintEveryNDays": "Markiert die ungewöhnlichsten {rate}% der Zeitabschnitte – etwa einen alle {count} Tage bei einer Auflösung von {resolution}.",
       "sensitivityHintPerDay": "Markiert die ungewöhnlichsten {rate}% der Zeitabschnitte – etwa {count} pro Tag bei einer Auflösung von {resolution}. | Markiert die ungewöhnlichsten {rate}% der Zeitabschnitte – etwa {count} pro Tag bei einer Auflösung von {resolution}.",
       "sensitivityRange": "Geben Sie eine ganze Zahl zwischen 50 und 99 ein",
-      "sensitivityTooltip": "Wie ungewöhnlich ein Bucket sein muss, bevor es markiert wird, als Perzentil der Trainingswerte des Modells. 97 markiert die ungewöhnlichsten 3%. Höher bedeutet weniger, aber sicherere Warnmeldungen.",
+      "sensitivityTooltip": "Wie ungewöhnlich ein Bucket sein muss, bevor es markiert wird, als Perzentil der Trainingswerte des Modells. 95 markiert die ungewöhnlichsten 5 %. Jedes markierte Bucket löst eine Warnmeldung aus, daher erkennt ein niedrigerer Wert mehr echte Vorfälle und sendet mehr Warnmeldungen.",
       "seriesAnomaly": "Anomalie",
       "seriesDeviation": "Abweichung",
       "seriesScore": "Anomaliewert",

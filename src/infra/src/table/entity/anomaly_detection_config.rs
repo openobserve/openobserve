@@ -48,6 +48,8 @@ pub struct Model {
     /// 0=waiting, 1=ready, 2=training, 3=failed, 4=disabled
     pub status: i32,
     pub retries: i32,
+    /// When the last training attempt FAILED, in microseconds — the retry backoff's anchor.
+    pub last_failed_at: Option<i64>,
     pub last_updated: i64,
     pub created_at: i64,
     pub updated_at: i64,
@@ -109,6 +111,7 @@ mod tests {
             tags: None,
             status: 0,
             retries: 0,
+            last_failed_at: None,
             last_updated: 0,
             created_at: 1000,
             updated_at: 1000,

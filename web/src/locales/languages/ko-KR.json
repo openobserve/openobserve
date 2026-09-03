@@ -7251,7 +7251,7 @@
       "sensitivityHintEveryNDays": "가장 비정상적인 {rate}%의 버킷을 표시합니다. {resolution} 해상도에서 약 {count}일마다 1개입니다.",
       "sensitivityHintPerDay": "가장 비정상적인 {rate}%의 버킷을 표시합니다. {resolution} 해상도에서 하루 약 {count}개입니다.",
       "sensitivityRange": "50에서 99 사이의 정수를 입력하세요",
-      "sensitivityTooltip": "플래그가 지정되기 전에 버킷이 얼마나 비정상적이어야 하는지를 모델 훈련 점수의 백분위수로 나타냅니다. 97은 가장 비정상적인 3%를 플래그합니다. 값이 높을수록 더 적고 더 확실한 알림이 생성됩니다.",
+      "sensitivityTooltip": "플래그가 지정되기 전에 버킷이 얼마나 비정상적이어야 하는지를 모델 훈련 점수의 백분위수로 나타냅니다. 95는 가장 비정상적인 5%를 플래그합니다. 플래그된 버킷마다 알림이 전송되므로, 값이 낮을수록 실제 장애를 더 많이 잡아내고 알림도 더 많이 보냅니다.",
       "seriesAnomaly": "이상",
       "seriesDeviation": "편차",
       "seriesScore": "점수",
