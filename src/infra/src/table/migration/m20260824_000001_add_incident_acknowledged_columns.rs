@@ -17,10 +17,8 @@
 //!
 //! Two additive, nullable columns on `alert_incidents`:
 //!
-//! 1. `acknowledged_by` — TEXT, the user id/email that acknowledged the
-//!    incident.
-//! 2. `acknowledged_at` — BIGINT, microsecond timestamp of that
-//!    acknowledgement.
+//! 1. `acknowledged_by` — TEXT, the user id/email that acknowledged the incident.
+//! 2. `acknowledged_at` — BIGINT, microsecond timestamp of that acknowledgement.
 //!
 //! Mirrors `oncall_responses.acked_by`/`acked_at` (see
 //! `m20260806_000001_create_oncall_tables.rs`): before this, "who
@@ -47,8 +45,20 @@ impl MigrationTrait for Migration {
         // 2. `add_column_if_not_exists` is NOT idempotent on SQLite: it emits a plain ADD COLUMN,
         //    so re-running after a partial failure dies with "duplicate column name" forever. Hence
         //    the explicit `has_column` guard in the helper below.
-        add_column(manager, ALERT_INCIDENTS, AlertIncidents::AcknowledgedBy, ColType::Text).await?;
-        add_column(manager, ALERT_INCIDENTS, AlertIncidents::AcknowledgedAt, ColType::BigInt).await?;
+        add_column(
+            manager,
+            ALERT_INCIDENTS,
+            AlertIncidents::AcknowledgedBy,
+            ColType::Text,
+        )
+        .await?;
+        add_column(
+            manager,
+            ALERT_INCIDENTS,
+            AlertIncidents::AcknowledgedAt,
+            ColType::BigInt,
+        )
+        .await?;
         Ok(())
     }
 

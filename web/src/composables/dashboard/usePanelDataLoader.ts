@@ -338,7 +338,6 @@ export const usePanelDataLoader = (
 
       // Create a new AbortController for the new operation
       abortController = new AbortController();
-      window.addEventListener("cancelQuery", cancelQueryAbort);
       // Checking if there are queries to execute
       if (!panelSchema.value.queries?.length || !hasAtLeastOneQuery()) {
         log("loadData: there are no queries to execute");
@@ -380,6 +379,10 @@ export const usePanelDataLoader = (
 
       state.lastTriggeredAt = new Date().getTime();
 
+      // Wait for visibility BEFORE the cache restore below — restoring first
+      // rendered every cached panel on mount, visible or not.
+      await waitForThePanelToBecomeVisible(abortController.signal);
+
       // if force load is true, skip restoring from cache
       if (runCount == 0 && forceLoad?.value != true) {
         log("loadData: panelcache: run count is 0");
@@ -394,9 +397,6 @@ export const usePanelDataLoader = (
           return;
         }
       }
-
-      // Wait for isVisible to become true
-      await waitForThePanelToBecomeVisible(abortController.signal);
 
       log("loadData: now waiting for the variables to load");
 
@@ -671,6 +671,7 @@ export const usePanelDataLoader = (
   onMounted(async () => {
     observer = new IntersectionObserver(handleIntersection, {
       root: null,
+      // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
       rootMargin: "0px",
       threshold: 0, // Adjust as needed
     });
@@ -732,6 +733,10 @@ export const usePanelDataLoader = (
 
   onMounted(async () => {
     log("PanelSchema/Time Initial: should load the data");
+
+    // Registered here, not in loadData: a late stream callback can call loadData
+    // after onUnmounted removed it, re-adding the listener for good.
+    window.addEventListener("cancelQuery", cancelQueryAbort);
 
     loadData(); // Loading the data
   });
@@ -798,8 +803,16 @@ export const usePanelDataLoader = (
 
     const cacheKeysMatch = isEqual(normalizedCurrentKey, normalizedSavedKey);
 
+    const cachedIncompleteLoad =
+      tempPanelCacheValue?.loading === true || tempPanelCacheValue?.isPartialData === true;
+
     // Check if it is stale or not
-    if (tempPanelCacheValue && Object.keys(tempPanelCacheValue).length > 0 && cacheKeysMatch) {
+    if (
+      tempPanelCacheValue &&
+      Object.keys(tempPanelCacheValue).length > 0 &&
+      cacheKeysMatch &&
+      !cachedIncompleteLoad
+    ) {
       // const cache = getPanelCache();
       state.data = markRaw(tempPanelCacheValue.data ?? []);
       state.loading = tempPanelCacheValue.loading;

@@ -737,8 +737,19 @@ mod tests {
     #[test]
     fn test_a_signal_identified_only_by_service_still_finds_its_owner() {
         let rules = vec![
-            rule("r_deep", "team_commerce", &[("k8s-cluster", "eks-us-prod"), ("k8s-namespace", "commerce")]),
-            rule("r_service", "team_payments", &[(SERVICE_DIMENSION, "payments-gateway")]),
+            rule(
+                "r_deep",
+                "team_commerce",
+                &[
+                    ("k8s-cluster", "eks-us-prod"),
+                    ("k8s-namespace", "commerce"),
+                ],
+            ),
+            rule(
+                "r_service",
+                "team_payments",
+                &[(SERVICE_DIMENSION, "payments-gateway")],
+            ),
         ];
 
         // What the fallback produces when the row carried nothing: the service
@@ -808,7 +819,7 @@ mod tests {
 
         fn k8s_depths() -> DimensionDepth {
             DimensionDepth::from_sets([
-                ["k8s-cluster".to_string(), "k8s-namespace".to_string()].as_slice(),
+                ["k8s-cluster".to_string(), "k8s-namespace".to_string()].as_slice()
             ])
         }
 
@@ -1060,7 +1071,7 @@ mod tests {
         r.dimensions.insert("  ".to_string(), "x".to_string());
         assert_eq!(r.validate(), Err(OwnershipError::EmptyDimensionName));
 
-        let mut r = rule("r", "t", &[("k8s-cluster", "  ")]);
+        let r = rule("r", "t", &[("k8s-cluster", "  ")]);
         assert_eq!(
             r.validate(),
             Err(OwnershipError::EmptyDimensionValue("k8s-cluster".into()))
@@ -1105,27 +1116,45 @@ mod tests {
         // and a fragment of the sentence the timeline has to carry.
         let cases: [(bool, bool, bool, RoutingDecision, &str); 8] = [
             (
-                true, true, true,
-                RoutingDecision::Explicit { team_id: "chosen".into() },
+                true,
+                true,
+                true,
+                RoutingDecision::Explicit {
+                    team_id: "chosen".into(),
+                },
                 "alert's own setting",
             ),
             (
-                true, true, false,
-                RoutingDecision::Explicit { team_id: "chosen".into() },
+                true,
+                true,
+                false,
+                RoutingDecision::Explicit {
+                    team_id: "chosen".into(),
+                },
                 "alert's own setting",
             ),
             (
-                true, false, true,
-                RoutingDecision::Explicit { team_id: "chosen".into() },
+                true,
+                false,
+                true,
+                RoutingDecision::Explicit {
+                    team_id: "chosen".into(),
+                },
                 "alert's own setting",
             ),
             (
-                true, false, false,
-                RoutingDecision::Explicit { team_id: "chosen".into() },
+                true,
+                false,
+                false,
+                RoutingDecision::Explicit {
+                    team_id: "chosen".into(),
+                },
                 "alert's own setting",
             ),
             (
-                false, true, true,
+                false,
+                true,
+                true,
                 RoutingDecision::Ownership {
                     team_id: "platform".into(),
                     rule_id: "r_prod".into(),
@@ -1134,7 +1163,9 @@ mod tests {
                 "ownership rule k8s-cluster=prod",
             ),
             (
-                false, true, false,
+                false,
+                true,
+                false,
                 RoutingDecision::Ownership {
                     team_id: "platform".into(),
                     rule_id: "r_prod".into(),
@@ -1143,11 +1174,21 @@ mod tests {
                 "ownership rule k8s-cluster=prod",
             ),
             (
-                false, false, true,
-                RoutingDecision::Default { team_id: "catch-all".into() },
+                false,
+                false,
+                true,
+                RoutingDecision::Default {
+                    team_id: "catch-all".into(),
+                },
                 "no ownership rule matched, so it went to the default team catch-all",
             ),
-            (false, false, false, RoutingDecision::Unrouted, "no team was paged"),
+            (
+                false,
+                false,
+                false,
+                RoutingDecision::Unrouted,
+                "no team was paged",
+            ),
         ];
 
         for (explicit, owned, defaulted, want, sentence) in cases {
@@ -1216,7 +1257,11 @@ mod tests {
                 default_team_id: blank,
                 ..Default::default()
             });
-            assert_eq!(routed.decision, RoutingDecision::Unrouted, "blank={blank:?}");
+            assert_eq!(
+                routed.decision,
+                RoutingDecision::Unrouted,
+                "blank={blank:?}"
+            );
         }
     }
 
@@ -1403,10 +1448,11 @@ mod tests {
     /// namespaces. One rule owns the family instead of one rule per box.
     #[test]
     fn test_a_trailing_wildcard_owns_the_prefix_subtree() {
-        let rules = vec![rule("r_db", "dba", &[
-            ("environment", "prod"),
-            ("host", "db-*"),
-        ])];
+        let rules = vec![rule(
+            "r_db",
+            "dba",
+            &[("environment", "prod"), ("host", "db-*")],
+        )];
         for host in ["db-01", "db-02", "db-primary", "db-"] {
             assert_eq!(
                 resolve_owner(&rules, &dims(&[("environment", "prod"), ("host", host)]))
@@ -1438,11 +1484,16 @@ mod tests {
     #[test]
     fn test_an_exact_match_outranks_a_wildcard_at_the_same_depth() {
         let rules = vec![
-            rule("r_family", "dba", &[("environment", "prod"), ("host", "db-*")]),
-            rule("r_one", "payments", &[
-                ("environment", "prod"),
-                ("host", "db-07"),
-            ]),
+            rule(
+                "r_family",
+                "dba",
+                &[("environment", "prod"), ("host", "db-*")],
+            ),
+            rule(
+                "r_one",
+                "payments",
+                &[("environment", "prod"), ("host", "db-07")],
+            ),
         ];
         assert_eq!(
             resolve_owner(&rules, &dims(&[("environment", "prod"), ("host", "db-07")]))
@@ -1464,10 +1515,11 @@ mod tests {
     fn test_depth_still_beats_exactness() {
         let rules = vec![
             rule("r_env", "ops", &[("environment", "prod")]),
-            rule("r_hosts", "dba", &[
-                ("environment", "prod"),
-                ("host", "db-*"),
-            ]),
+            rule(
+                "r_hosts",
+                "dba",
+                &[("environment", "prod"), ("host", "db-*")],
+            ),
         ];
         assert_eq!(
             resolve_owner(&rules, &dims(&[("environment", "prod"), ("host", "db-01")]))
@@ -1476,9 +1528,12 @@ mod tests {
             "dba"
         );
         assert_eq!(
-            resolve_owner(&rules, &dims(&[("environment", "prod"), ("host", "web-01")]))
-                .unwrap()
-                .team_id,
+            resolve_owner(
+                &rules,
+                &dims(&[("environment", "prod"), ("host", "web-01")])
+            )
+            .unwrap()
+            .team_id,
             "ops"
         );
     }
@@ -1559,10 +1614,10 @@ mod tests {
     /// missing rule. A log line answers none of those.
     #[test]
     fn test_an_unrouted_entry_names_what_fired_and_what_matched_nothing() {
-        let s = unrouted("k8s-cluster=prod/k8s-namespace=search", &[
-            ("k8s-cluster", "prod"),
-            ("k8s-namespace", "search"),
-        ]);
+        let s = unrouted(
+            "k8s-cluster=prod/k8s-namespace=search",
+            &[("k8s-cluster", "prod"), ("k8s-namespace", "search")],
+        );
         assert!(s.is_open());
         assert!(s.describe().contains("payment_gateway_error_rate"));
         assert!(s.describe().contains("k8s-namespace=search"));
@@ -1584,10 +1639,10 @@ mod tests {
     /// covers drops off it without anybody ticking it off by hand.
     #[test]
     fn test_an_entry_stops_being_outstanding_once_a_rule_covers_it() {
-        let s = unrouted("k8s-cluster=prod/k8s-namespace=search", &[
-            ("k8s-cluster", "prod"),
-            ("k8s-namespace", "search"),
-        ]);
+        let s = unrouted(
+            "k8s-cluster=prod/k8s-namespace=search",
+            &[("k8s-cluster", "prod"), ("k8s-namespace", "search")],
+        );
         let signals = vec![s];
 
         assert_eq!(outstanding(&signals, &[]).len(), 1);
@@ -1665,10 +1720,10 @@ mod tests {
     /// nothing until they cost everything.
     #[test]
     fn test_a_defaulted_entry_is_distinguishable_from_an_unowned_one() {
-        let mut nobody = unrouted("k8s-cluster=prod/k8s-namespace=search", &[
-            ("k8s-cluster", "prod"),
-            ("k8s-namespace", "search"),
-        ]);
+        let mut nobody = unrouted(
+            "k8s-cluster=prod/k8s-namespace=search",
+            &[("k8s-cluster", "prod"), ("k8s-namespace", "search")],
+        );
         nobody.defaulted_team_id = None;
         assert!(!nobody.landed_on_default());
         assert!(!nobody.describe().contains("default team"));
@@ -1677,7 +1732,11 @@ mod tests {
         let mut defaulted = nobody.clone();
         defaulted.defaulted_team_id = Some("platform".into());
         assert!(defaulted.landed_on_default());
-        assert!(defaulted.describe().contains("paged the default team platform"));
+        assert!(
+            defaulted
+                .describe()
+                .contains("paged the default team platform")
+        );
         // Still a gap, and still outstanding: the default team absorbing it is
         // not the same as somebody having claimed it.
         assert_eq!(outstanding(&[defaulted], &[]).len(), 1);

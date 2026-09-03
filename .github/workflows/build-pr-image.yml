@@ -34,6 +34,17 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      # Inlined rather than `uses: ./.github/actions/github-auth`: this job checks out a caller-chosen
+      # ref, and running a local action from that checkout is a cache-poisoning vector (CodeQL).
+      - name: Authenticate github.com fetches
+        shell: bash
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          echo "GH_AUTH_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$GH_AUTH_TOKEN"; }; f'
+          echo "GIT_TERMINAL_PROMPT=0" >> "$GITHUB_ENV"
+          echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> "$GITHUB_ENV"
       - name: Set GIT_TAG env
         id: set-git-tag
         run: |
@@ -86,7 +97,7 @@ jobs:
       id-token: write
       contents: read
       packages: write
-    runs-on: ubicloud-standard-8
+    runs-on: ubicloud-standard-16
     steps:
       - name: Remove unused tools
         run: |
@@ -103,6 +114,17 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      # Inlined rather than `uses: ./.github/actions/github-auth`: this job checks out a caller-chosen
+      # ref, and running a local action from that checkout is a cache-poisoning vector (CodeQL).
+      - name: Authenticate github.com fetches
+        shell: bash
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          echo "GH_AUTH_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$GH_AUTH_TOKEN"; }; f'
+          echo "GIT_TERMINAL_PROMPT=0" >> "$GITHUB_ENV"
+          echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> "$GITHUB_ENV"
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -192,6 +214,17 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      # Inlined rather than `uses: ./.github/actions/github-auth`: this job checks out a caller-chosen
+      # ref, and running a local action from that checkout is a cache-poisoning vector (CodeQL).
+      - name: Authenticate github.com fetches
+        shell: bash
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          echo "GH_AUTH_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$GH_AUTH_TOKEN"; }; f'
+          echo "GIT_TERMINAL_PROMPT=0" >> "$GITHUB_ENV"
+          echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> "$GITHUB_ENV"
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -260,7 +293,8 @@ jobs:
   build:
     needs: [build_pr_image_amd64, build_pr_image_arm64, build_frontend]
     if: ${{ needs.build_pr_image_amd64.result == 'success' && needs.build_pr_image_arm64.result == 'success' }}
-    runs-on: ubicloud-standard-16-arm
+    # This job only publishes multi-arch manifests; it does not build either image.
+    runs-on: ubicloud-standard-4
     permissions:
       id-token: write
       contents: read

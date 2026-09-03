@@ -19,13 +19,27 @@ import { routeGuard } from "@/utils/zincutils";
 import store from "@/stores";
 
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
-// (enterprise O2_SYNTHETICS_ENABLED). Direct URL access redirects home when off.
+// (`ZO_SYNTHETICS_ENABLED`), not on the build: synthetics ships in OSS. Direct URL
+// access redirects home when off.
 const syntheticsRouteGuard = (to: any, from: any, next: any) => {
   if (store.state.zoConfig?.synthetics_enabled === false) {
     next("/");
     return;
   }
   routeGuard(to, from, next);
+};
+
+// Private locations are served by agents deployed inside the customer's network,
+// which is the one enterprise part of synthetics — so the detail page needs the
+// narrower flag as well. Same `=== false` stance as above: /config is fetched
+// without await, so redirecting on "not yet known" would bounce a bookmarked
+// link on a cold load.
+const privateLocationRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.synthetics_private_locations_enabled === false) {
+    next("/");
+    return;
+  }
+  syntheticsRouteGuard(to, from, next);
 };
 
 // Workflows routes are gated on the backend /config flag `workflows_enabled`
@@ -80,8 +94,6 @@ const Quota = () => import("@/components/iam/quota/Quota.vue");
 
 const Organizations = () => import("@/components/iam/organizations/AppOrganizations.vue");
 
-const ActionScripts = () => import("@/components/actionScripts/ActionScripts.vue");
-
 const Invitations = () => import("@/views/Invitations.vue");
 
 import Users from "@/views/User.vue";
@@ -108,7 +120,7 @@ const useEnterpriseRoutes = () => {
           path: "users",
           name: "users",
           meta: {
-            title: "Users",
+            titleKey: "iam.basicUsers",
           },
           component: Users,
           beforeEnter(to: any, from: any, next: any) {
@@ -119,7 +131,7 @@ const useEnterpriseRoutes = () => {
           path: "ingestionTokens",
           name: "ingestionTokens",
           meta: {
-            title: "Ingestion Tokens",
+            titleKey: "iam.ingestionTokens",
           },
           component: () => import("@/components/iam/IngestionTokens.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -130,7 +142,7 @@ const useEnterpriseRoutes = () => {
           path: "syntheticsTokens",
           name: "syntheticsTokens",
           meta: {
-            title: "Synthetics Tokens",
+            titleKey: "iam.syntheticsTokens",
           },
           component: () => import("@/components/iam/SyntheticsTokens.vue"),
           beforeEnter(to: any, from: any, next: any) {
@@ -141,7 +153,7 @@ const useEnterpriseRoutes = () => {
           path: "serviceAccounts",
           name: "serviceAccounts",
           meta: {
-            title: "Service Accounts",
+            titleKey: "iam.serviceAccounts",
           },
           component: ServiceAccountsList,
           beforeEnter(to: any, from: any, next: any) {
@@ -163,9 +175,24 @@ const useEnterpriseRoutes = () => {
           path: "organizations",
           name: "organizations",
           meta: {
-            title: "Organizations",
+            titleKey: "iam.organizations",
           },
           component: Organizations,
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        // Inbound MCP server setup — lives under IAM as a credentialed-access
+        // surface, alongside Service Accounts / Ingestion Tokens. Available on
+        // every edition: the backend registers `/{org}/mcp` and initialises the
+        // MCP tools for all builds (only the OAuth *discovery* endpoints are
+        // enterprise-only, which the card handles by hiding that auth mode).
+        // So there is no build or runtime gate here or on the IAM tab.
+        {
+          path: "mcpServer",
+          name: "mcpServer",
+          meta: { titleKey: "iam.mcpServerLabel" },
+          component: () => import("@/components/iam/McpServer.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -173,27 +200,88 @@ const useEnterpriseRoutes = () => {
       ],
     },
   ];
+
+  // Synthetics ships in OSS; only the private-VPC-agent half stays enterprise, so
+  // these routes register in every build. Visibility is the backend `/config` flag
+  // `synthetics_enabled` (ZO_SYNTHETICS_ENABLED) via syntheticsRouteGuard, and the
+  // private-location detail page carries the narrower
+  // `synthetics_private_locations_enabled` gate on top of it.
+  //
+  // The Status Pages admin UI is a tab on this same view (reached via
+  // `?section=status-pages`), so it needs no route of its own — it ships
+  // with synthetics, no separate toggle. Notices/Custom Domains within it
+  // are Enterprise-only, gated in-view on `build_type` instead.
+  routes.push({
+    path: "synthetics",
+    name: "synthetics",
+    component: () => import("@/views/SyntheticMonitoring.vue"),
+    meta: { titleKey: "menu.synthetic" },
+    beforeEnter(to: any, from: any, next: any) {
+      syntheticsRouteGuard(to, from, next);
+    },
+  });
+
+  routes.push(
+    {
+      path: "synthetics/add",
+      name: "synthetics-add",
+      component: () => import("@/views/synthetics/CreateCheck.vue"),
+      meta: { titleKey: "routeTitles.addCheck" },
+      beforeEnter(to: any, from: any, next: any) {
+        syntheticsRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "synthetics/edit/:id",
+      name: "synthetics-edit",
+      component: () => import("@/views/synthetics/CreateCheck.vue"),
+      meta: { titleKey: "synthetics.results.editCheck" },
+      beforeEnter(to: any, from: any, next: any) {
+        syntheticsRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "synthetics/status-pages/edit/:id",
+      name: "synthetics-status-page-edit",
+      component: () => import("@/views/synthetics/status-pages/StatusPageEditor.vue"),
+      meta: { titleKey: "statusPages.editTitle" },
+      beforeEnter(to: any, from: any, next: any) {
+        syntheticsRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "synthetic/private-locations/:id",
+      name: "synthetic-private-location",
+      component: () => import("@/views/synthetics/PrivateLocationDetail.vue"),
+      meta: { titleKey: "synthetics.privateLocations.detail.title" },
+      beforeEnter(to: any, from: any, next: any) {
+        privateLocationRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "synthetics/:id/results",
+      name: "synthetic-monitor-results",
+      component: () => import("@/views/synthetics/MonitorResults.vue"),
+      meta: { titleKey: "synthetics.results.title" },
+      beforeEnter(to: any, from: any, next: any) {
+        syntheticsRouteGuard(to, from, next);
+      },
+    },
+    {
+      path: "synthetics/:id/results/run/:runId/:executionId",
+      name: "synthetics-run-detail",
+      component: () => import("@/views/synthetics/RunDetail.vue"),
+      meta: { titleKey: "synthetics.runDetail.title" },
+      beforeEnter(to: any, from: any, next: any) {
+        syntheticsRouteGuard(to, from, next);
+      },
+    },
+  );
+
   //the below are the routes that we support for enterprise and cloud
   //the above are the routes that we support for oss including both enterprise and cloud
 
   if (config.isCloud == "true" || config.isEnterprise == "true") {
-    // Inbound MCP server setup — lives under IAM as a credentialed-access
-    // surface, alongside Service Accounts / Ingestion Tokens. MCP is an AI
-    // feature, gated on ai_enabled like the rest of the app — but that gate is
-    // enforced by the sidebar item's reactive `visible` (isEnterprise &&
-    // ai_enabled), NOT here: `window.store` is unset at runtime, so a guard read
-    // is unreliable and must never fail-closed (it would bounce every click to
-    // Users). The route itself is already limited to the enterprise/cloud build.
-    routes[0].children.push({
-      path: "mcpServer",
-      name: "mcpServer",
-      meta: { title: "MCP Server" },
-      component: () => import("@/components/iam/McpServer.vue"),
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    });
-
     // Seven on-call routes, one guard, one gate expression. `titleKey` rather
     // than `title` so the browser tab is translated like everything else.
     routes.push(
@@ -280,71 +368,13 @@ const useEnterpriseRoutes = () => {
       },
     );
 
-    routes.push({
-      path: "synthetics",
-      name: "synthetics",
-      component: () => import("@/views/SyntheticMonitoring.vue"),
-      meta: { title: "Synthetics" },
-      beforeEnter(to: any, from: any, next: any) {
-        syntheticsRouteGuard(to, from, next);
-      },
-    });
-
-    routes.push(
-      {
-        path: "synthetics/add",
-        name: "synthetics-add",
-        component: () => import("@/views/synthetics/CreateCheck.vue"),
-        meta: { title: "Add Check" },
-        beforeEnter(to: any, from: any, next: any) {
-          syntheticsRouteGuard(to, from, next);
-        },
-      },
-      {
-        path: "synthetics/edit/:id",
-        name: "synthetics-edit",
-        component: () => import("@/views/synthetics/CreateCheck.vue"),
-        meta: { title: "Edit Check" },
-        beforeEnter(to: any, from: any, next: any) {
-          syntheticsRouteGuard(to, from, next);
-        },
-      },
-      {
-        path: "synthetic/private-locations/:id",
-        name: "synthetic-private-location",
-        component: () => import("@/views/synthetics/PrivateLocationDetail.vue"),
-        meta: { title: "Private Location" },
-        beforeEnter(to: any, from: any, next: any) {
-          syntheticsRouteGuard(to, from, next);
-        },
-      },
-      {
-        path: "synthetics/:id/results",
-        name: "synthetic-monitor-results",
-        component: () => import("@/views/synthetics/MonitorResults.vue"),
-        meta: { title: "Monitor Results" },
-        beforeEnter(to: any, from: any, next: any) {
-          syntheticsRouteGuard(to, from, next);
-        },
-      },
-      {
-        path: "synthetics/:id/results/run/:runId/:executionId",
-        name: "synthetics-run-detail",
-        component: () => import("@/views/synthetics/RunDetail.vue"),
-        meta: { title: "Run Detail" },
-        beforeEnter(to: any, from: any, next: any) {
-          syntheticsRouteGuard(to, from, next);
-        },
-      },
-    );
-
     routes.push(
       {
         path: "incidents",
         name: "incidentList",
         component: IncidentList,
         meta: {
-          title: "Incidents",
+          titleKey: "menu.incidents",
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
@@ -355,22 +385,13 @@ const useEnterpriseRoutes = () => {
         name: "incidentDetail",
         component: () => import("@/components/alerts/IncidentDetailDrawer.vue"),
         meta: {
-          title: "Incident Detail",
+          titleKey: "routeTitles.incidentDetail",
         },
         beforeEnter(to: any, from: any, next: any) {
           routeGuard(to, from, next);
         },
       },
     );
-
-    routes.push({
-      path: "actions",
-      name: "actionScripts",
-      component: ActionScripts,
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    });
 
     // Workflows — enterprise/cloud only (FD3). List is the parent; the editor
     // renders in its <router-view> for add/edit.
@@ -379,7 +400,7 @@ const useEnterpriseRoutes = () => {
       name: "workflows",
       component: WorkflowsList,
       meta: {
-        title: "Workflows",
+        titleKey: "menu.workflows",
       },
       beforeEnter(to: any, from: any, next: any) {
         workflowsRouteGuard(to, from, next);
@@ -389,7 +410,7 @@ const useEnterpriseRoutes = () => {
           path: "add",
           name: "createWorkflow",
           component: WorkflowEditor,
-          meta: { title: "New Workflow" },
+          meta: { titleKey: "workflow.create" },
           beforeEnter(to: any, from: any, next: any) {
             workflowsRouteGuard(to, from, next);
           },
@@ -398,7 +419,7 @@ const useEnterpriseRoutes = () => {
           path: "edit",
           name: "workflowEditor",
           component: WorkflowEditor,
-          meta: { title: "Edit Workflow" },
+          meta: { titleKey: "workflow.editMode" },
           beforeEnter(to: any, from: any, next: any) {
             workflowsRouteGuard(to, from, next);
           },
@@ -410,7 +431,7 @@ const useEnterpriseRoutes = () => {
           path: "runs",
           name: "workflowRuns",
           component: WorkflowRuns,
-          meta: { title: "Workflow Runs" },
+          meta: { titleKey: "workflow.runs.title" },
           beforeEnter(to: any, from: any, next: any) {
             workflowsRouteGuard(to, from, next);
           },
@@ -423,7 +444,7 @@ const useEnterpriseRoutes = () => {
           path: "groups",
           name: "groups",
           meta: {
-            title: "Groups",
+            titleKey: "routeTitles.groups",
           },
           component: AppGroups,
           beforeEnter(to: any, from: any, next: any) {
@@ -434,7 +455,7 @@ const useEnterpriseRoutes = () => {
           path: "groups/edit/:group_name",
           name: "editGroup",
           meta: {
-            title: "Edit Group",
+            titleKey: "routeTitles.editGroup",
           },
           component: EditGroup,
           beforeEnter(to: any, from: any, next: any) {
@@ -445,7 +466,7 @@ const useEnterpriseRoutes = () => {
           path: "roles",
           name: "roles",
           meta: {
-            title: "Roles",
+            titleKey: "iam.roles",
           },
           component: AppRoles,
           beforeEnter(to: any, from: any, next: any) {
@@ -456,7 +477,7 @@ const useEnterpriseRoutes = () => {
           path: "roles/edit/:role_name",
           name: "editRole",
           meta: {
-            title: "Edit Role",
+            titleKey: "routeTitles.editRole",
           },
           component: EditRole,
           beforeEnter(to: any, from: any, next: any) {

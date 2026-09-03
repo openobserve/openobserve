@@ -145,6 +145,68 @@ export class DashboardPage {
     // Custom chart locators
     this.customChartItem = page.locator('[data-test="selected-chart-custom_chart-item"]');
     this.markdownEditor = page.locator('[data-test="dashboard-markdown-editor-query-editor"]');
+
+    // Custom chart validation: the error surfaces inside an OTooltip on the
+    // warning button and is not in the DOM until the button is hovered.
+    this.panelErrorDataBtn = page.locator('[data-test="panel-error-data"]');
+    this.unsafeCodeText = page.getByText("Unsafe code detected");
+    this.pleaseEnterQueryText = page.getByText("Please enter query for custom chart");
+  }
+
+  // Get the custom-chart error (warning) button locator.
+  getPanelErrorDataBtn() {
+    return this.panelErrorDataBtn;
+  }
+
+  // Hover the warning button and return the tooltip text locator matching `text`.
+  async getPanelErrorTooltipText(text) {
+    const tooltipText = this.page
+      .locator('[data-test="o-tooltip-content"] div')
+      .getByText(text);
+
+    // The tooltip only exists in the DOM while the button is hovered, and it
+    // unmounts the moment :hover is lost. Hovering ONCE and returning the
+    // locator races the panel's post-Apply re-render: a re-render landing
+    // between the hover and the caller's assertion shifts the button out from
+    // under the cursor, the tooltip never mounts (or unmounts again), and the
+    // assertion fails against an element that is no longer reachable.
+    // Re-hover each attempt so a re-render costs one retry, not the assertion.
+    // The panel header lays its buttons out right-aligned and flex-nowrap, and
+    // the partial-data/cap warning button is appended AFTER the query response
+    // finishes processing. Appending to a right-aligned row shifts the error
+    // button left, out from under a stationary cursor: the error tooltip
+    // unmounts and the newly-arrived warning button opens its own tooltip
+    // instead — the test then reads the wrong tooltip's text.
+    //
+    // Each attempt must therefore BLOCK long enough to straddle that re-render.
+    // locator.isVisible({timeout}) cannot do that — the option is documented as
+    // ignored and the call returns immediately, so a poll built on it retries
+    // several times within a few milliseconds, always before the second button
+    // has arrived. waitFor() actually waits, so a re-render costs one attempt
+    // and the next hover re-acquires the button at its new position.
+    const maxAttempts = 4;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      await this.panelErrorDataBtn.hover({ timeout: 5000 }).catch(() => {});
+      const shown = await tooltipText
+        .waitFor({ state: "visible", timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+      if (shown) break;
+    }
+
+    // Returned (not asserted) so the caller keeps ownership of the assertion
+    // and its failure message.
+    return tooltipText;
+  }
+
+  // Get the "Unsafe code detected" text locator.
+  getUnsafeCodeText() {
+    return this.unsafeCodeText;
+  }
+
+  // Get the "Please enter query for custom chart" text locator.
+  getPleaseEnterQueryText() {
+    return this.pleaseEnterQueryText;
   }
   async navigateToDashboards() {
     await this.page.waitForSelector('[data-test="menu-link-\\/dashboards-item"]');
@@ -476,9 +538,22 @@ export class DashboardPage {
     }
   }
 
-  async addCustomChart() {
+  async addCustomChart(dashboardName = "Customcharts") {
     await this.dashboardsMenuItem.waitFor({ state: 'visible', timeout: 10000 });
     await this.dashboardsMenuItem.click();
+
+    // The sidebar click can silently fail to navigate on cloud (page stays on
+    // its current route) — verify the URL actually changed and fall back to a
+    // direct goto (with the org explicitly forced) if not, instead of hanging
+    // on addDashboardButton until timeout.
+    try {
+      await this.page.waitForURL('**/dashboards**', { timeout: 10000 });
+    } catch (e) {
+      const orgId = process.env['ORGNAME'];
+      await this.page.goto(
+        `${process.env['ZO_BASE_URL']}/web/dashboards?org_identifier=${orgId}&folder=default`
+      );
+    }
 
     await this.addDashboardButton.waitFor({ state: 'visible', timeout: 10000 });
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
@@ -486,7 +561,7 @@ export class DashboardPage {
 
     // Wait for dialog and fill name
     await this.dashboardNameInput.waitFor({ state: 'visible', timeout: 10000 });
-    await this.dashboardNameInput.fill("Customcharts");
+    await this.dashboardNameInput.fill(dashboardName);
 
     // Wait for submit button to be enabled
     await expect(this.dashboardSubmitButton).toBeEnabled({ timeout: 15000 });

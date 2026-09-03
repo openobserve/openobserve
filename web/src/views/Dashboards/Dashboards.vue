@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="bg-surface-subtle text-text-body hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-accent/25 inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs leading-5 transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
+                class="bg-surface-subtle text-text-body hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-focus-ring-accent inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs leading-5 transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
@@ -496,9 +496,7 @@ import {
   computed,
   defineAsyncComponent,
   defineComponent,
-  onActivated,
   onBeforeUnmount,
-  onDeactivated,
   onMounted,
   onUnmounted,
   ref,
@@ -527,12 +525,11 @@ import {
   getAllDashboardsByFolderId,
   getDashboard,
   getFoldersList,
-  moveModuleToAnotherFolder,
 } from "../../utils/commons";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import useNotifications from "@/composables/useNotifications";
-import { debounce, filter, forIn } from "lodash-es";
+import { debounce } from "lodash-es";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { useLoading } from "@/composables/useLoading";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -647,7 +644,7 @@ export default defineComponent({
 
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
-    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard();
+    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard(t);
 
     // Per-user favorites — heart toggle on each row + a folder-independent
     // favorites view.
@@ -765,7 +762,7 @@ export default defineComponent({
       // navigates to the pinned dashboard's CURRENT folder even if it was moved
       // on another system since this tab last loaded.
       const org = store.state.selectedOrganization?.identifier;
-      if (org) useHomeDashboard().load(org);
+      if (org) useHomeDashboard(t).load(org);
       // Favorites are loaded by the landing-view onMounted below, before the
       // favorites-first landing decision needs them.
     });
@@ -967,12 +964,7 @@ export default defineComponent({
             const searchResults = await fetchSearchResults.execute(searchQuery.value);
             filteredResults.value = toRaw(searchResults);
           } catch (error) {
-            // Latent bug preserved: `!x === "AbortError"` compares a boolean to a
-            // string, so this body never runs. Kept as-is to avoid changing
-            // runtime behavior in a type-only fix; the mistaken comparison is
-            // what makes this branch dead, not the types.
-            // @ts-expect-error -- intentional no-op comparison (boolean vs string), see note
-            if (!asCaughtError(error).name === "AbortError") {
+            if (asCaughtError(error).name !== "AbortError") {
               filteredResults.value = [];
               // Handle error state
             }
@@ -1229,7 +1221,7 @@ export default defineComponent({
           (store.state.organizationData?.folders ?? []).map((f: any) => [f.folderId, f.name]),
         );
         const allLists = store.state.organizationData?.allDashboardList ?? {};
-        return favorites.value.map((fav: any, index: number) => {
+        return favorites.value.map((fav: any, _index: number) => {
           const cached = (allLists[fav.folderId] ?? []).find(
             (board: any) => board.dashboardId === fav.dashboardId,
           );
@@ -1308,7 +1300,7 @@ export default defineComponent({
           // of lingering until the next navigation.
           if (deletedWasHome) {
             const org = store.state.selectedOrganization?.identifier;
-            if (org) useHomeDashboard().load(org);
+            if (org) useHomeDashboard(t).load(org);
           }
         } catch (err) {
           showErrorNotification(
@@ -1325,7 +1317,7 @@ export default defineComponent({
     };
 
     //after adding Folder need to update the Folder list
-    const updateFolderList = async (it: any) => {
+    const updateFolderList = async (_it: any) => {
       showAddFolderDialog.value = false;
       isFolderEditMode.value = false;
     };
@@ -1641,7 +1633,7 @@ export default defineComponent({
         // home_dashboard setting so the Home shortcut/pin updates immediately.
         if (bulkIncludedHome) {
           const org = store.state.selectedOrganization?.identifier;
-          if (org) await useHomeDashboard().load(org);
+          if (org) await useHomeDashboard(t).load(org);
         }
       } catch (error) {
         dismiss();

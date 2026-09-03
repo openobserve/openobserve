@@ -197,7 +197,7 @@ describe("BaseImport.vue", () => {
     it("sets isImporting to true internally when import button clicked", async () => {
       wrapper = createWrapper();
       await wrapper.find('[data-test="dashboard-import-json-btn"]').trigger("click");
-      expect((wrapper.vm as any).isImporting).toBe(true);
+      expect((wrapper.vm as any).isImportingLocal).toBe(true);
     });
   });
 

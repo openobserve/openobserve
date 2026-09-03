@@ -23,7 +23,7 @@ use axum::body::Bytes;
 use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     BLOCKED_STREAMS, TIMESTAMP_COL_NAME, get_config,
-    meta::stream::StreamType,
+    meta::{self_reporting::usage::is_internal_rollup_stream, stream::StreamType},
     metrics,
     utils::{
         json,
@@ -153,6 +153,37 @@ pub async fn ingest(
             if is_reserved_internal_stream(&stream_name) {
                 let err_msg =
                     format!("stream '{stream_name}' is reserved and cannot be ingested into");
+                log::warn!("[LOGS:BULK] {err_msg}");
+                bulk_res.errors = true;
+                let err = BulkResponseError::new(
+                    err_msg.clone(),
+                    stream_name.to_string(),
+                    err_msg,
+                    "0".to_string(),
+                );
+                let mut item = HashMap::new();
+                item.insert(
+                    action.to_string(),
+                    BulkResponseItem::new_failed(
+                        stream_name.to_string(),
+                        doc_id.clone().unwrap_or_default(),
+                        err,
+                        Some(value),
+                        stream_name.to_string(),
+                    ),
+                );
+                bulk_res.items.push(item);
+                continue; // skip
+            }
+
+            // Reject internal rollup streams (_o2_*, _agent_signals) in ALL
+            // editions — written only by internal aggregation jobs (service
+            // graph, agent signals, database monitoring) through the internal
+            // gRPC channel; bulk is always a user path (design §5.3).
+            if is_internal_rollup_stream(&stream_name) {
+                let err_msg = format!(
+                    "stream '{stream_name}' is an internal rollup stream and cannot be ingested into"
+                );
                 log::warn!("[LOGS:BULK] {err_msg}");
                 bulk_res.errors = true;
                 let err = BulkResponseError::new(

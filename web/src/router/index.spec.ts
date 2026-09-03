@@ -27,7 +27,7 @@ vi.mock("@/composables/shared/router", () => ({
         path: "/login",
         name: "login",
         component: { template: "<div>Login</div>" },
-        meta: { title: "Login" },
+        meta: { titleKey: "login.login" },
       },
     ],
     homeChildRoutes: [
@@ -35,13 +35,13 @@ vi.mock("@/composables/shared/router", () => ({
         path: "",
         name: "home",
         component: { template: "<div>Home</div>" },
-        meta: { title: "Home" },
+        meta: { titleKey: "menu.home" },
       },
       {
         path: "logs",
         name: "logs",
         component: { template: "<div>Logs</div>" },
-        meta: { title: "Logs" },
+        meta: { titleKey: "menu.search" },
       },
     ],
   }),
@@ -264,18 +264,19 @@ describe("router/index (factory)", () => {
       router = createAppRouter(store);
     });
 
-    it("should set document.title to OpenObserve when route has no meta.title", async () => {
-      // Resolve a route without meta.title
-      await router.push("/").catch(() => {});
-      // Title guard ran: default fallback
-      // We cannot assert exact title in all environments but guard logic exists
-      expect(document.title).toMatch(/OpenObserve/);
+    it("should set document.title to OpenObserve when route has no meta.titleKey", async () => {
+      // The ingestion fixture route carries no meta at all
+      await router.push("/ingestion").catch(() => {});
+      expect(document.title).toBe("OpenObserve");
     });
 
-    it("should prefix document.title with OpenObserve - when route has meta.title", async () => {
+    it("should prefix document.title with OpenObserve - and translate meta.titleKey", async () => {
+      // Login fixture carries meta.titleKey = "login.login", which resolves to "Login".
+      // Asserting the resolved text (not the key) is the point: the guard, not the
+      // route table, is what translates — that is what keeps the tab title in the
+      // current locale.
       await router.push("/login").catch(() => {});
-      // Login route has meta.title = "Login"
-      expect(document.title).toMatch(/OpenObserve/);
+      expect(document.title).toBe("OpenObserve - Login");
     });
   });
 });

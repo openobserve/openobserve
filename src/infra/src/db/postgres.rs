@@ -36,10 +36,39 @@ use tokio::sync::{OnceCell, mpsc};
 use super::{DBIndex, IndexStatement};
 use crate::errors::*;
 
-pub static CLIENT: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false, false));
-pub static CLIENT_RO: Lazy<Pool<Postgres>> = Lazy::new(|| connect(true, false));
-pub static CLIENT_DDL: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false, true));
+pub(crate) static CLIENT_RO: Lazy<Pool<Postgres>> = Lazy::new(|| connect(true, false));
+pub(crate) static CLIENT_RW: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false, false));
+pub(crate) static CLIENT_DDL: Lazy<Pool<Postgres>> = Lazy::new(|| connect(false, true));
 static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
+
+/// The three pools come from separately configured DSNs whose roles can have
+/// different `search_path` defaults. All SQL we emit is unqualified, so if the
+/// pools resolve to different schemas, fail at startup instead of corrupting data.
+pub async fn verify_schema_consistency() -> Result<()> {
+    let mut schemas = Vec::new();
+    for (label, pool) in [
+        ("read-write", &*CLIENT_RW),
+        ("read-only", &*CLIENT_RO),
+        ("ddl", &*CLIENT_DDL),
+    ] {
+        let schema: Option<String> = sqlx::query_scalar("SELECT current_schema()")
+            .fetch_one(pool)
+            .await?;
+        let schema = schema.ok_or_else(|| {
+            Error::Message(format!(
+                "postgres search_path of the {label} connection does not resolve to any existing schema"
+            ))
+        })?;
+        schemas.push((label, schema));
+    }
+    if schemas.iter().any(|(_, s)| s != &schemas[0].1) {
+        return Err(Error::Message(format!(
+            "postgres schema mismatch, align the search_path of the roles/DSNs involved: {schemas:?}"
+        )));
+    }
+    log::info!("[POSTGRES] using schema: {}", schemas[0].1);
+    Ok(())
+}
 
 fn connect(readonly: bool, ddl: bool) -> Pool<Postgres> {
     let cfg = config::get_config();
@@ -70,11 +99,11 @@ fn connect(readonly: bool, ddl: bool) -> Pool<Postgres> {
 }
 
 async fn cache_indices() -> HashSet<DBIndex> {
-    let client = CLIENT.clone();
+    let client = CLIENT_RW.clone();
     DB_QUERY_NUMS
         .with_label_values(&["select", "pg_indexes"])
         .inc();
-    let sql = r#"SELECT indexname, tablename FROM pg_indexes;"#;
+    let sql = r#"SELECT indexname, tablename FROM pg_indexes WHERE schemaname = current_schema();"#;
     let res = sqlx::query_as::<_, (String, String)>(sql)
         .fetch_all(&client)
         .await;
@@ -159,7 +188,7 @@ impl super::Db for PostgresDb {
         start_dt: Option<i64>,
     ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let local_start_dt = start_dt.unwrap_or_default();
         let mut tx = pool.begin().await?;
         DB_QUERY_NUMS.with_label_values(&["insert", "meta"]).inc();
@@ -231,7 +260,7 @@ impl super::Db for PostgresDb {
         update_fn: Box<super::UpdateFn>,
     ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
         let lock_key = format!("get_for_update_{key}");
         let lock_id = config::utils::hash::gxhash::new().sum64(&lock_key);
@@ -422,7 +451,7 @@ impl super::Db for PostgresDb {
         }
 
         let (module, key1, key2) = super::parse_key(key);
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS.with_label_values(&["delete", "meta"]).inc();
 
         if with_prefix {
@@ -674,6 +703,8 @@ impl super::Db for PostgresDb {
 }
 
 pub async fn create_table() -> Result<()> {
+    verify_schema_consistency().await?;
+
     let pool = CLIENT_DDL.clone();
 
     DB_QUERY_NUMS.with_label_values(&["create", "meta"]).inc();
@@ -698,7 +729,7 @@ CREATE TABLE IF NOT EXISTS meta
     DB_QUERY_NUMS
         .with_label_values(&["select", "information_schema.columns"])
         .inc();
-    let has_start_dt = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='meta' AND column_name='start_dt';")
+    let has_start_dt = sqlx::query_scalar::<_,i64>("SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema=current_schema() AND table_name='meta' AND column_name='start_dt';")
             .fetch_one(&pool)
             .await?;
     if has_start_dt == 0 {
@@ -832,7 +863,7 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
 pub async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()> {
     let pool = CLIENT_DDL.clone();
     let check_sql = format!(
-        "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
+        "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema=current_schema() AND table_name='{table}' AND column_name='{column}';"
     );
     let has_column = sqlx::query_scalar::<_, i64>(&check_sql)
         .fetch_one(&pool)
@@ -860,7 +891,7 @@ pub async fn add_column(table: &str, column: &str, data_type: &str) -> Result<()
 pub async fn drop_column(table: &str, column: &str) -> Result<()> {
     let pool = CLIENT_DDL.clone();
     let check_sql = format!(
-        "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
+        "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema=current_schema() AND table_name='{table}' AND column_name='{column}';"
     );
     let has_column = sqlx::query_scalar::<_, i64>(&check_sql)
         .fetch_one(&pool)
@@ -1077,11 +1108,11 @@ mod tests {
         let column = "new_column";
 
         let check_sql = format!(
-            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
+            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema=current_schema() AND table_name='{table}' AND column_name='{column}';"
         );
         assert_eq!(
             check_sql,
-            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='test_table' AND column_name='new_column';"
+            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema=current_schema() AND table_name='test_table' AND column_name='new_column';"
         );
     }
 
@@ -1106,11 +1137,11 @@ mod tests {
         let column = "old_column";
 
         let check_sql = format!(
-            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table}' AND column_name='{column}';"
+            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema=current_schema() AND table_name='{table}' AND column_name='{column}';"
         );
         assert_eq!(
             check_sql,
-            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='test_table' AND column_name='old_column';"
+            "SELECT count(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE table_schema=current_schema() AND table_name='test_table' AND column_name='old_column';"
         );
     }
 

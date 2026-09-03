@@ -21,6 +21,7 @@ use config::{
         search::{
             Query, Request as SearchRequest, RequestEncoding, SearchEventType, default_use_cache,
         },
+        self_reporting::usage::USAGE_STREAM,
         stream::StreamType,
     },
     utils::json,
@@ -42,6 +43,11 @@ pub async fn get_usage(
         (vec![], vec![])
     };
 
+    // return empty if usage stream is not there
+    if !infra::schema::exists(META_ORG_ID, StreamType::Logs, USAGE_STREAM).await {
+        return Ok(vec![]);
+    }
+
     let req = SearchRequest {
         query: Query {
             sql,
@@ -52,7 +58,6 @@ pub async fn get_usage(
             quick_mode: false,
             query_type: "".to_string(),
             track_total_hits: false,
-            action_id: None,
             uses_zo_fn: false,
             query_fn: None,
             skip_wal: false,

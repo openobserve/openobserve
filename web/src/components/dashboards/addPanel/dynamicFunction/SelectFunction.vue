@@ -25,14 +25,14 @@
           :key="argIndex + '-' + arg.type"
           class="flex w-full flex-col"
         >
-          <div class="flex" :style="{ marginLeft: isChild ? '-48px' : '0px' }">
+          <div class="flex" :style="{ marginLeft: isChild ? '-3rem' : '0' }">
             <div class="relative mr-1.5 min-h-12.5 w-2.5">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
                 class="bg-accent absolute top-0 w-px opacity-50"
                 :style="{
-                  bottom: argIndex === fields.args.length - 1 ? 'calc(100% - 32px)' : '0',
-                  left: '5px',
+                  bottom: argIndex === fields.args.length - 1 ? 'calc(100% - 2rem)' : '0',
+                  left: '0.3125rem',
                 }"
               ></div>
 
@@ -51,6 +51,7 @@
               <div class="flex items-start gap-1">
                 <!-- Argument type switcher -->
                 <OSelect
+                  v-if="hasArgTypeChoice(fields.functionName, argIndex)"
                   v-model="fields.args[argIndex].type"
                   @update:model-value="onArgTypeChange(fields.args[argIndex])"
                   :options="
@@ -97,6 +98,18 @@
                   :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
                 />
 
+                <!-- Cast target type -->
+                <div v-if="fields.args[argIndex]?.type === 'castType'" class="w-52 flex-none">
+                  <OSelect
+                    v-model="fields.args[argIndex].value"
+                    :options="castTypeOptions"
+                    :label="t('dashboard.selectFunction.selectCastType')"
+                    label-position="inside"
+                    class="o2-custom-select-dashboard"
+                    :data-test="`dashboard-function-dropdown-arg-cast-type-select-${argIndex}`"
+                  />
+                </div>
+
                 <!-- histogram interval for sql queries -->
                 <div
                   v-if="fields.args[argIndex]?.type === 'histogramInterval'"
@@ -135,6 +148,41 @@
                 >
                 </OButton>
               </div>
+
+              <OBanner
+                v-if="castSuggestions[argIndex]"
+                variant="warning"
+                icon="warning"
+                dense
+                class="mt-2"
+                :data-test="`dashboard-function-dropdown-arg-cast-suggestion-${argIndex}`"
+              >
+                <span class="text-xs">{{ castSuggestions[argIndex].message }}</span>
+                <template #actions>
+                  <div class="flex items-center gap-2">
+                    <OButton
+                      variant="outline"
+                      size="sm"
+                      @click="applyCast(argIndex, suggestedCastType)"
+                      :data-test="`dashboard-function-dropdown-arg-cast-apply-${argIndex}`"
+                    >
+                      {{
+                        t("dashboard.selectFunction.castSuggestion.castTo", {
+                          type: castTypeLabels[suggestedCastType],
+                        })
+                      }}
+                    </OButton>
+                    <OButton
+                      variant="ghost"
+                      size="sm"
+                      @click="dismissCastSuggestion(argIndex)"
+                      :data-test="`dashboard-function-dropdown-arg-cast-dismiss-${argIndex}`"
+                    >
+                      {{ t("dashboard.selectFunction.castSuggestion.dismiss") }}
+                    </OButton>
+                  </div>
+                </template>
+              </OBanner>
             </div>
           </div>
         </div>
@@ -158,7 +206,8 @@
 
 <script lang="ts">
 import { ref, watch, computed, inject } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
+import type { I18nText } from "@/types/i18n";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
@@ -169,6 +218,21 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import {
+  CAST_TARGET_TYPES,
+  DEFAULT_CAST_TARGET_TYPE,
+  getCastSeverity,
+  resolveFieldType,
+  wrapArgInCast,
+  type CastTargetType,
+} from "@/utils/dashboard/castSuggestion";
+
+/** SQL type names shown to the user; not copy, so never translated. */
+const CAST_TYPE_LABELS: Record<CastTargetType, string> = {
+  DOUBLE: "Double",
+  BIGINT: "Bigint",
+};
 
 export default {
   name: "SelectFunction",
@@ -180,6 +244,7 @@ export default {
     OSelect,
     OInput,
     OIcon,
+    OBanner,
   },
   props: {
     modelValue: {
@@ -206,7 +271,10 @@ export default {
 
     const { t } = useI18nTyped();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { getAllSelectedStreams } = useDashboardPanelData(dashboardPanelDataPageKey, t);
+    const { getAllSelectedStreams, dashboardPanelData } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+      t,
+    );
 
     const fields = ref(addMissingArgs(props.modelValue));
 
@@ -225,6 +293,12 @@ export default {
     );
 
     const filteredFunctions: any = ref([]);
+    const dismissedSuggestions = ref<string[]>([]);
+
+    const castTypeOptions = CAST_TARGET_TYPES.map((castType) => ({
+      label: raw(CAST_TYPE_LABELS[castType]),
+      value: castType,
+    }));
 
     // Initialize filteredFunctions with all available options
     const initializeFunctions = () => {
@@ -424,10 +498,19 @@ export default {
             })),
           );
 
-          // Preserve field values where both old and new types are "field"
+          // Allowed types per new arg slot, in the same order as newArgs.
+          const allowedTypes = (funcValidation?.args ?? []).flatMap((arg: any) =>
+            Array.from({ length: arg.min ?? 1 }).map(() =>
+              (arg.type ?? []).map((argType: any) => argType.value),
+            ),
+          );
+
+          // Carry the old argument over whenever the new slot accepts its type.
+          // Preserving only field→field discarded any nested expression — most
+          // visibly a cast, which changing sum to avg would silently undo.
           for (let i = 0; i < newArgs.length && i < oldArgs.length; i++) {
-            if (newArgs[i].type === "field" && oldArgs[i].type === "field") {
-              newArgs[i].value = oldArgs[i].value;
+            if (allowedTypes[i]?.includes(oldArgs[i].type)) {
+              newArgs[i] = { type: oldArgs[i].type, value: oldArgs[i].value };
             }
           }
 
@@ -463,6 +546,52 @@ export default {
       onArgTypeChange(arg);
     };
 
+    // Keyed by field as well as index so changing the field re-offers the cast.
+    const suggestionKey = (argIndex: number) => {
+      const fieldRef = fields.value.args?.[argIndex]?.value as { field?: string } | undefined;
+      return `${fields.value.functionName}:${argIndex}:${fieldRef?.field ?? ""}`;
+    };
+
+    const castSuggestions = computed(() => {
+      const groupedFields = dashboardPanelData.meta?.streamFields?.groupedFields;
+      const functionName = fields.value.functionName;
+      const funcValidation: any = getValidationForFunction(functionName);
+      const result: Record<number, { message: I18nText }> = {};
+
+      (fields.value.args ?? []).forEach((arg: FunctionArg, argIndex: number) => {
+        if (arg?.type !== "field") return;
+
+        const fieldRef = arg.value as { field?: string; streamAlias?: string } | undefined;
+        const fieldType = resolveFieldType(groupedFields, fieldRef);
+
+        if (!getCastSeverity(functionName, fieldType)) return;
+        if (dismissedSuggestions.value.includes(suggestionKey(argIndex))) return;
+
+        result[argIndex] = {
+          message: t("dashboard.selectFunction.castSuggestion.error", {
+            fn: funcValidation?.functionLabel ?? functionName,
+            field: fieldRef?.field ?? "",
+            type: fieldType ?? "",
+          }),
+        };
+      });
+
+      return result;
+    });
+
+    const applyCast = (argIndex: number, targetType: CastTargetType) => {
+      const arg = fields.value.args?.[argIndex];
+      if (!arg) return;
+      fields.value.args[argIndex] = wrapArgInCast(arg, targetType);
+    };
+
+    const dismissCastSuggestion = (argIndex: number) => {
+      dismissedSuggestions.value.push(suggestionKey(argIndex));
+    };
+
+    const hasArgTypeChoice = (functionName: string, argIndex: number) =>
+      getSupportedTypeBasedOnFunctionNameAndIndex(functionName, argIndex).length > 1;
+
     const getIconBasedOnArgType = (type: string) => {
       switch (type) {
         case "field":
@@ -475,6 +604,8 @@ export default {
           return "123";
         case "histogramInterval":
           return "bar-chart";
+        case "castType":
+          return "transform";
         default:
           return undefined;
       }
@@ -522,6 +653,13 @@ export default {
       getAllSelectedStreams,
       getIconBasedOnArgType,
       getParameterLabel,
+      castSuggestions,
+      castTypeOptions,
+      suggestedCastType: DEFAULT_CAST_TARGET_TYPE,
+      castTypeLabels: CAST_TYPE_LABELS,
+      applyCast,
+      dismissCastSuggestion,
+      hasArgTypeChoice,
     };
   },
 };

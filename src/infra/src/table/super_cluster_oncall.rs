@@ -49,15 +49,14 @@ use super::entity::{
     oncall_overrides, oncall_ownership_rules, oncall_policies, oncall_response_events,
     oncall_responses, oncall_schedules, oncall_team_members, oncall_teams, oncall_unavailability,
 };
-use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors,
-};
+use crate::{db::get_orm_client_rw, errors};
 
 /// Applies a team exactly as the source region wrote it.
 pub async fn put_team(team: &Team) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let existing = oncall_teams::Entity::find_by_id(&team.id).one(client).await?;
+    let client = get_orm_client_rw().await;
+    let existing = oncall_teams::Entity::find_by_id(&team.id)
+        .one(client)
+        .await?;
     let model = oncall_teams::Model {
         id: team.id.clone(),
         org_id: team.org_id.clone(),
@@ -72,9 +71,11 @@ pub async fn put_team(team: &Team) -> Result<(), errors::Error> {
         channel_destinations: team
             .channel_destinations
             .as_ref()
-            .map(|d| serde_json::to_string(d))
+            .map(serde_json::to_string)
             .transpose()
-            .map_err(|e| errors::Error::Message(format!("team channel is not serialisable: {e}")))?,
+            .map_err(|e| {
+                errors::Error::Message(format!("team channel is not serialisable: {e}"))
+            })?,
         created_at: team.created_at,
         updated_at: team.updated_at,
     };
@@ -103,7 +104,7 @@ pub async fn put_team(team: &Team) -> Result<(), errors::Error> {
 /// region and not in another — the sort of divergence nobody notices until a
 /// page goes to a mailbox that closed months ago.
 pub async fn put_members(team_id: &str, members: &[TeamMember]) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let txn = client.begin().await?;
 
     let keep: Vec<String> = members.iter().map(|m| m.id.clone()).collect();
@@ -140,7 +141,7 @@ pub async fn put_members(team_id: &str, members: &[TeamMember]) -> Result<(), er
 
 /// Applies a schedule, rotations and all.
 pub async fn put_schedule(schedule: &Schedule) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = oncall_schedules::Model {
         id: schedule.id.clone(),
         org_id: schedule.org_id.clone(),
@@ -185,7 +186,7 @@ pub async fn put_schedule(schedule: &Schedule) -> Result<(), errors::Error> {
 /// them, and the two clusters would page different people for the same
 /// minute.
 pub async fn put_override(record: &ScheduleOverride) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = oncall_overrides::Model {
         id: record.id.clone(),
         org_id: record.org_id.clone(),
@@ -233,7 +234,7 @@ pub async fn put_override(record: &ScheduleOverride) -> Result<(), errors::Error
 /// letting them drift is how a future overlap rule picks a different winner in
 /// each region.
 pub async fn put_unavailability(record: &Unavailability) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = oncall_unavailability::Model {
         id: record.id.clone(),
         org_id: record.org_id.clone(),
@@ -280,7 +281,7 @@ pub async fn clear_unavailability_for_user(
 
 /// Applies a team's escalation policy.
 pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let rungs = serde_json::to_string(&policy.rungs)?;
     let destinations = serde_json::to_string(&policy.destinations)?;
     // §4's L0 block replicates with the rest of the policy, so a failover
@@ -333,7 +334,7 @@ pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> 
 
 /// Applies one ownership rule.
 pub async fn put_ownership_rule(rule: &OwnershipRule) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let dimensions = serde_json::to_string(&rule.dimensions)?;
     // `path` is derived, never sent: recomputing it locally keeps the canonical
     // form owned by one function, so a future change to the canonicalisation
@@ -388,7 +389,7 @@ pub async fn put_routing_config(
 /// timer for a record it cannot find. Renumbering here would drop every
 /// replicated page.
 pub async fn put_response(response: &Response) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = oncall_responses::Model {
         id: response.id.clone(),
         org_id: response.org_id.clone(),
@@ -446,7 +447,7 @@ pub async fn put_response(response: &Response) -> Result<(), errors::Error> {
 /// type carries no id — and content is the better key anyway: two regions that
 /// independently recorded the same page should converge on one row, not two.
 pub async fn put_event(response_id: &str, event: &ResponseEvent) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let channel = event.channel.map(|c| c.to_i32());
     let existing = oncall_response_events::Entity::find()
         .filter(oncall_response_events::Column::ResponseId.eq(response_id))
@@ -505,6 +506,7 @@ mod tests {
             ladder_run: Some(2),
             priority: 1,
             responder_role: ResponderRole::Owner,
+            exhausted_at: None,
             origin_response_id: None,
             state: ResponseState::Triggered,
             opened_at: 10,

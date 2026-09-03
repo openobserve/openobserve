@@ -17,12 +17,12 @@
 <template>
   <div class="flex h-full flex-col overflow-hidden" data-test="view-panel-screen">
     <div class="flex items-center justify-between p-3">
-      <div class="mr-3 flex items-center text-xl tracking-[0.005em]">
-        <span data-test="dashboard-viewpanel-title">
+      <div class="mr-3 flex min-w-0 items-center text-xl tracking-[0.005em]">
+        <span class="truncate" data-test="dashboard-viewpanel-title">
           {{ dashboardPanelData.data.title }}
         </span>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2">
         <!-- histogram interval for sql queries -->
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
@@ -264,7 +264,7 @@ export default defineComponent({
     // IMPORTANT: Always create a NEW isolated instance for ViewPanel
     // ViewPanel should NEVER share the variables manager with the parent dashboard
     // This ensures that variable changes in ViewPanel don't affect the parent dashboard
-    const variablesManager = useVariablesManager();
+    const variablesManager = useVariablesManager(t);
 
     // Provide to child components (ViewPanel's own isolated instance)
     provide("variablesManager", variablesManager);
@@ -613,9 +613,9 @@ export default defineComponent({
       }
 
       // if variables data is null, set it to empty list
-      if (
-        !(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)
-      ) {
+      if (!(
+        currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length
+      )) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }

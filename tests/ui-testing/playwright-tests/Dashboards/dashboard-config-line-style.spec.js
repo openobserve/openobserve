@@ -28,7 +28,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
 
     await setupLinePanelWithConfig(page, pm, dashboardName);
 
-    const symbolDropdown = page.locator('[data-test="dashboard-config-show_symbol"]');
+    const symbolDropdown = pm.dashboardPanelConfigs.showSymbols;
     await pm.dashboardPanelConfigs.scrollSidebarToElement(symbolDropdown);
     await expect(symbolDropdown).toBeVisible();
 
@@ -47,7 +47,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying symbol No persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-show_symbol-trigger"]')).toHaveAttribute('data-test-selected-value', 'false');
+    await expect(pm.dashboardPanelConfigs.showSymbolTrigger).toHaveAttribute('data-test-selected-value', 'false');
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -58,7 +58,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
 
     await setupLinePanelWithConfig(page, pm, dashboardName);
 
-    const interpolationDropdown = page.locator('[data-test="dashboard-config-line_interpolation"]');
+    const interpolationDropdown = pm.dashboardPanelConfigs.lineInterpolation;
     await pm.dashboardPanelConfigs.scrollSidebarToElement(interpolationDropdown);
     await expect(interpolationDropdown).toBeVisible();
 
@@ -73,7 +73,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying line interpolation Step After persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-line_interpolation-trigger"]')).toHaveAttribute('data-test-selected-value', 'step-end');
+    await expect(pm.dashboardPanelConfigs.lineInterpolationTrigger).toHaveAttribute('data-test-selected-value', 'step-end');
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -84,7 +84,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
 
     await setupLinePanelWithConfig(page, pm, dashboardName);
 
-    await expect(page.locator('[data-test="dashboard-config-line_thickness"]')).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.lineThickness).toBeVisible();
     await pm.dashboardPanelConfigs.selectLineThickness("3");
     await pm.dashboardPanelActions.applyDashboardBtn();
     testLogger.info("Line thickness set to 3");
@@ -94,7 +94,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying line thickness persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-line_thickness"]').locator('[data-test$="-field"]')).toHaveValue("3");
+    await expect(pm.dashboardPanelConfigs.lineThickness.locator('[data-test$="-field"]')).toHaveValue("3");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -105,7 +105,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
 
     await setupLinePanelWithConfig(page, pm, dashboardName);
 
-    const connectNullToggle = page.locator('[data-test="dashboard-config-connect-null-values"]');
+    const connectNullToggle = pm.dashboardPanelConfigs.connectNullValuesToggle;
     await expect(connectNullToggle).toBeVisible();
     await connectNullToggle.click();
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -116,7 +116,7 @@ test.describe("ConfigPanel — Line Style Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying connect null values enabled persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-connect-null-values"]').locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
+    await expect(pm.dashboardPanelConfigs.connectNullValuesToggle.locator('[data-test$="-btn"]')).toHaveAttribute("aria-checked", "true");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });

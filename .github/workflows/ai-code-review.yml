@@ -2,7 +2,8 @@ name: AI Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    # labeled/unlabeled so adding or removing 'e2e' starts or resets the review.
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review, converted_to_draft]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -17,6 +18,10 @@ on:
 
 jobs:
   review:
+    # Paid CI runs only on PRs carrying the 'e2e' label; the merge queue runs unit tests on the merged code.
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) }}
+    # Explicit name: without it GitHub serializes the whole matrix object (api_key_env, marker) into the public check name.
+    name: review (${{ matrix.provider.name }})
     runs-on: ubuntu-latest
     timeout-minutes: 25
     # Concurrency is per-job (not workflow-level) so it can see `matrix`: keyed per-PR AND
@@ -34,17 +39,20 @@ jobs:
       fail-fast: false
       matrix:
         # DeepSeek-V4-Pro is the sole reviewer (the GLM-5.2 head-to-head has ended).
-        # Adding a provider? Also add its `marker` to ALL_REVIEW_MARKERS in run-review.mjs,
-        # or the other legs will claim and overwrite this one's comment.
+        # Markers must not name the model: they ship inside the posted PR comment. Adding a
+        # provider? Give it a distinct `<!-- ai-code-review-<suffix> -->` marker — run-review.mjs
+        # matches that shape, so two legs sharing one marker overwrite each other's comment.
         provider:
           - name: deepseek
-            label: DeepSeek-V4-Pro
             provider_id: deepseek-review
             model_id: deepseek-v4-pro
             model_variant: ""
             api_key_env: DEEPSEEK_API_KEY
-            marker: "<!-- ai-code-review-deepseek -->"
+            marker: "<!-- ai-code-review -->"
     steps:
+      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
+      - if: github.event_name == 'pull_request'
+        run: sleep 60
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
@@ -109,10 +117,32 @@ jobs:
           fi
           echo "force_full=false" >> "$GITHUB_OUTPUT"
 
+      # Mint a GitHub App installation token so the review comment is authored by the
+      # "OpenObserve Code Reviewer" app (branded name + avatar) instead of github-actions[bot].
+      # Gated on the OO_REVIEWER_APP_ID repo/org variable: if the app isn't configured the step is
+      # skipped. `continue-on-error` makes it fail-safe even when the variable IS set but the app
+      # isn't installed yet (or the key is wrong): minting fails, the token output is empty, and
+      # the run step's `|| github.token` fallback posts as github-actions[bot] instead of breaking
+      # CI. So this is safe at every rollout stage; it auto-activates once the app is installed and
+      # OO_REVIEWER_APP_ID + OO_REVIEWER_APP_PRIVATE_KEY are provisioned.
+      - name: Generate OpenObserve Code Reviewer app token
+        id: app_token
+        if: ${{ steps.skip.outputs.skip_review == 'false' && vars.OO_REVIEWER_APP_ID != '' }}
+        continue-on-error: true
+        # Pinned to a full commit SHA (not a mutable tag) because this action receives the app's
+        # signing private key — a repointed/compromised release could exfiltrate it. Same pin
+        # discipline as OPENCODE_VERSION above. Bump deliberately after review.
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.OO_REVIEWER_APP_ID }}
+          private-key: ${{ secrets.OO_REVIEWER_APP_PRIVATE_KEY }}
+
       - name: Run AI Code Review
         if: steps.skip.outputs.skip_review == 'false'
         env:
-          GH_TOKEN: ${{ github.token }}
+          # App token when the app is configured (comment posts as OpenObserve Code Reviewer),
+          # else github.token (posts as github-actions[bot]). Same engine either way.
+          GH_TOKEN: ${{ steps.app_token.outputs.token || github.token }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           FORCE_FULL: ${{ steps.skip.outputs.force_full }}
           # Provider selection for this matrix leg (see run-review.mjs for how these are used).
@@ -120,7 +150,6 @@ jobs:
           REVIEW_MODEL_ID: ${{ matrix.provider.model_id }}
           REVIEW_MODEL_VARIANT: ${{ matrix.provider.model_variant }}
           REVIEW_API_KEY_ENV: ${{ matrix.provider.api_key_env }}
-          REVIEW_LABEL: ${{ matrix.provider.label }}
           REVIEW_MARKER: ${{ matrix.provider.marker }}
           # run-review.mjs reads only the key named by REVIEW_API_KEY_ENV.
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}

@@ -2,6 +2,7 @@
 // Methods for Show Legends popup and table cell copy functionality
 // PR #9677: feat: dashboard copy legends and table cells
 
+const { expect } = require("@playwright/test");
 const testLogger = require("../../playwright-tests/utils/test-logger.js");
 
 export default class DashboardLegendsCopy {
@@ -40,6 +41,16 @@ export default class DashboardLegendsCopy {
   getShowLegendsButton() {
     // The button renders icon "format_list_bulleted" as text content via OIcon
     return this.showLegendsBtn.first();
+  }
+
+  /** Returns the legends popup container locator */
+  getLegendsPopup() {
+    return this.legendsPopup;
+  }
+
+  /** Returns the raw legend-item locator (all items, unfiltered) */
+  getLegendItems() {
+    return this.page.locator('[data-test^="dashboard-legend-item-"]');
   }
 
   /**
@@ -138,8 +149,13 @@ export default class DashboardLegendsCopy {
    * @returns {Promise<boolean>}
    */
   async isCopyAllInCopiedState() {
-    const label = await this.copyAllBtn.textContent();
-    return label.includes('Copied');
+    // The label is set by a clipboard .then() callback, so a single textContent() read races it.
+    try {
+      await expect(this.copyAllBtn).toContainText('Copied', { timeout: 10000 });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -230,8 +246,9 @@ export default class DashboardLegendsCopy {
       await cell.scrollIntoViewIfNeeded();
       await cell.hover({ force: true });
     }
-    // Wait for copy button to become visible (opacity transition from 0 to 1 on hover)
-    const copyBtn = cell.locator('[data-test^="o2-table-cell-copy-"]');
+    const copyBtn = this.page
+      .locator('[data-test^="dashboard-table-cell-copy-"]')
+      .first();
     await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
     await copyBtn.click({ force: true });
 
@@ -246,9 +263,15 @@ export default class DashboardLegendsCopy {
    */
   async isTableCellCopied(rowIndex, colIndex) {
     const cell = this.getTableCell(rowIndex, colIndex);
-    const copyBtn = cell.locator('[data-test^="o2-table-cell-copy-"]');
-    // Hover to reveal the copy button, then check data-copied attribute
-    await cell.hover({ force: true });
+    const box = await cell.boundingBox();
+    if (box) {
+      await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    } else {
+      await cell.hover({ force: true });
+    }
+    const copyBtn = this.page
+      .locator('[data-test^="dashboard-table-cell-copy-"]')
+      .first();
     await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
     const copiedAttr = await copyBtn.getAttribute('data-copied');
     return copiedAttr === 'true';
@@ -285,8 +308,9 @@ export default class DashboardLegendsCopy {
       await cell.scrollIntoViewIfNeeded();
       await cell.hover({ force: true });
     }
-    // Wait briefly for opacity transition, then check visibility
-    const copyBtn = cell.locator('[data-test^="o2-table-cell-copy-"]');
+    const copyBtn = this.page
+      .locator('[data-test^="dashboard-table-cell-copy-"]')
+      .first();
     try {
       await copyBtn.waitFor({ state: 'visible', timeout: 3000 });
       return true;

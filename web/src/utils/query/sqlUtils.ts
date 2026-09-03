@@ -1,4 +1,5 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 
 let parser: any;
 let parserImportPromise: Promise<any> | null = null;
@@ -934,7 +935,7 @@ export const getStreamNameFromQuery = async (query: any) => {
   try {
     await importSqlParser();
     try {
-      if (query && query != "") {
+      if (query && query != "" && maxParenDepth(query) <= SQL_PARSE_MAX_DEPTH) {
         const parsedQuery = parser?.astify(query);
 
         // Recursively find the first base table, descending into sub-queries in

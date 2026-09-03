@@ -6,6 +6,14 @@
     :back="{ onClick: closeSearchHistory }"
     bleed
   >
+    <template #subtitle>
+      <div class="flex min-w-0 items-center gap-2">
+        <OTag type="streamType" :value="activeStreamType" />
+        <span v-if="activeStreamName" class="min-w-0 truncate leading-normal">{{
+          activeStreamName
+        }}</span>
+      </div>
+    </template>
     <template #actions>
       <OButton
         data-test="search-history-wrap-content-btn"
@@ -141,7 +149,7 @@
                   @click.stop="goToLogs(row)"
                 >
                   <template #icon-left><OIcon name="search" size="xs" /></template>
-                  {{ t("logs.searchHistory.logs") }}
+                  {{ goToLogsLabel(row) }}
                 </OButton>
                 <OButton
                   v-if="
@@ -175,8 +183,7 @@
                   <pre
                     v-else
                     class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                    >{{ row?.sql }}</pre
-                  >
+                    >{{ row?.sql }}</pre>
                 </div>
               </div>
             </div>
@@ -218,8 +225,7 @@
                   <pre
                     v-else
                     class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                    >{{ row?.function }}</pre
-                  >
+                    >{{ row?.function }}</pre>
                 </div>
               </div>
             </div>
@@ -228,7 +234,7 @@
                    the query blocks above. -->
           <div v-show="activeTab === 'more_details'" class="px-4">
             <QueryEditor
-              style="height: 200px"
+              style="height: 12.5rem"
               :ref="`QueryEditorRef${row.trace_id + row.sql}`"
               :editor-id="`search-query-editor${row.trace_id + row.sql}`"
               :debounceTime="600"
@@ -300,6 +306,8 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -324,6 +332,7 @@ export default defineComponent({
     QueryEditor,
     OButton,
     OIcon,
+    OTag,
     OTooltip,
     OTable,
     OTimeCell,
@@ -362,6 +371,25 @@ export default defineComponent({
     const moreDetailsToDisplay = ref("");
 
     const { extractTimestamps } = logsUtils();
+
+    const ALLOWED_HISTORY_STREAM_TYPES = ["logs", "metrics", "traces"];
+
+    // The route query (set by the page the user navigated from, e.g. Data
+    // Sources or the Logs page itself) is the source of truth for which
+    // telemetry type/stream this history view is scoped to; searchObj is the
+    // fallback for a same-session deep link that didn't carry the query.
+    // The query param is attacker-controlled (URL), so it's whitelisted here
+    // as defense in depth on top of the backend validation.
+    const activeStreamType = computed(() => {
+      const fromRoute = route.query.stream_type as string;
+      if (ALLOWED_HISTORY_STREAM_TYPES.includes(fromRoute)) return fromRoute;
+      return searchObj.data.stream.streamType || "logs";
+    });
+    const activeStreamName = computed(() =>
+      route.query.stream === undefined
+        ? searchObj.data.stream.selectedStream[0] || ""
+        : (route.query.stream as string),
+    );
 
     const activeTab = ref("query");
     const tabs = ref([
@@ -449,7 +477,13 @@ export default defineComponent({
           return;
         }
 
-        const response = await searchService.get_history(org_identifier, startTime, endTime);
+        const response = await searchService.get_history(
+          org_identifier,
+          startTime,
+          endTime,
+          activeStreamType.value,
+          activeStreamName.value,
+        );
         const limitedHits = response.data.hits;
         const filteredHits = limitedHits.filter((hit) => hit.event === "Search");
         if (filteredHits.length > 0) {
@@ -522,7 +556,7 @@ export default defineComponent({
       if (value.userChangedValue) fetchSearchHistory();
     };
     const formatTime = (took) => {
-      return `${took.toFixed(2)} sec`;
+      return t("logs.searchHistory.tookSeconds", { seconds: took.toFixed(2) });
     };
     const calculateDuration = (startTime, endTime) => {
       const durationMicroseconds = endTime - startTime;
@@ -531,45 +565,52 @@ export default defineComponent({
       // Store the raw duration in a separate property
       const rawDuration = durationSeconds;
 
-      let result = "";
+      // One whole-sentence key per unit combination — the remainder clause cannot
+      // be appended as a translated fragment without breaking other locales.
+      let result: string = "";
 
       if (durationSeconds < 60) {
-        result = `${durationSeconds.toFixed(2)} seconds`;
+        result = t("logs.searchHistory.durationSeconds", {
+          seconds: durationSeconds.toFixed(2),
+        });
       } else if (durationSeconds < 3600) {
         const minutes = Math.floor(durationSeconds / 60);
         const seconds = durationSeconds % 60;
-        result = `${minutes} minutes`;
-        if (seconds > 0) {
-          result += ` and ${seconds.toFixed(2)} seconds`;
-        }
+        result =
+          seconds > 0
+            ? t("logs.searchHistory.durationMinutesSeconds", {
+                minutes,
+                seconds: seconds.toFixed(2),
+              })
+            : t("logs.searchHistory.durationMinutes", { minutes });
       } else if (durationSeconds < 86400) {
         const hours = Math.floor(durationSeconds / 3600);
         const minutes = Math.floor((durationSeconds % 3600) / 60);
-        result = `${hours} hours`;
-        if (minutes > 0) {
-          result += ` and ${minutes} minutes`;
-        }
+        result =
+          minutes > 0
+            ? t("logs.searchHistory.durationHoursMinutes", { hours, minutes })
+            : t("logs.searchHistory.durationHours", { hours });
       } else if (durationSeconds < 2592000) {
         const days = Math.floor(durationSeconds / 86400);
         const hours = Math.floor((durationSeconds % 86400) / 3600);
-        result = `${days} days`;
-        if (hours > 0) {
-          result += ` and ${hours} hours`;
-        }
+        result =
+          hours > 0
+            ? t("logs.searchHistory.durationDaysHours", { days, hours })
+            : t("logs.searchHistory.durationDays", { days });
       } else if (durationSeconds < 31536000) {
         const months = Math.floor(durationSeconds / 2592000);
         const days = Math.floor((durationSeconds % 2592000) / 86400);
-        result = `${months} months`;
-        if (days > 0) {
-          result += ` and ${days} days`;
-        }
+        result =
+          days > 0
+            ? t("logs.searchHistory.durationMonthsDays", { months, days })
+            : t("logs.searchHistory.durationMonths", { months });
       } else {
         const years = Math.floor(durationSeconds / 31536000);
         const months = Math.floor((durationSeconds % 31536000) / 2592000);
-        result = `${years} years`;
-        if (months > 0) {
-          result += ` and ${months} months`;
-        }
+        result =
+          months > 0
+            ? t("logs.searchHistory.durationYearsMonths", { years, months })
+            : t("logs.searchHistory.durationYears", { years });
       }
 
       return { formatted: result, raw: rawDuration };
@@ -607,6 +648,11 @@ export default defineComponent({
         colorizeRow(row);
       }
     };
+    // goToLogs re-opens the row's own stream_type (logs/metrics/traces), so the
+    // button label must match that destination rather than always saying "Logs".
+    const goToLogsLabel = (row: { stream_type?: string }) =>
+      resolveBadgeLabel("streamType", row.stream_type || "logs");
+
     const goToLogs = (row) => {
       // emit('closeSearchHistory');
       const stream: string = row.stream_name;
@@ -615,7 +661,7 @@ export default defineComponent({
       const query = b64EncodeUnicode(row.sql);
 
       const queryObject = {
-        stream_type: "logs",
+        stream_type: row.stream_type || "logs",
         stream,
         period: "15m",
         refresh,
@@ -693,6 +739,8 @@ export default defineComponent({
     });
     return {
       searchObj,
+      activeStreamType,
+      activeStreamName,
       store,
       generateColumns,
       fetchSearchHistory,
@@ -705,6 +753,7 @@ export default defineComponent({
       searchDateTimeRef,
       expandedIds,
       goToLogs,
+      goToLogsLabel,
       goToInspector,
       onExpandedIdsChange,
       colorizedSql,

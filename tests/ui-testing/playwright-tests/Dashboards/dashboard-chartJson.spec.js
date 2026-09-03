@@ -1,5 +1,8 @@
-import { test, expect } from "../baseFixtures.js";
-import { login } from "./utils/dashLogin.js";
+const {
+  test,
+  expect,
+  navigateToBase,
+} = require("../utils/enhanced-baseFixtures.js");
 import { ingestionForDashboardChartJson } from "./utils/dashIngestion.js";
 
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
@@ -7,8 +10,46 @@ import { waitForDateTimeButtonToBeEnabled } from "../../pages/dashboardPages/das
 import PageManager from "../../pages/page-manager";
 const testLogger = require('../utils/test-logger.js');
 
-const randomDashboardName =
-  "Dashboard_" + Math.random().toString(36).substr(2, 9);
+const CHART_JSON_STREAM = "kubernetes";
+
+// Generated per test: these run in parallel, and a module-scope name is also
+// reused across CI retries (they share the worker), so a run that dies before
+// its delete leaves same-named strays behind.
+const generateDashboardName = () =>
+  "Dashboard_" + Math.random().toString(36).slice(2, 11) + "_" + Date.now();
+
+/**
+ * Wait until the freshly ingested stream is actually queryable.
+ *
+ * Replaces a flat 2s sleep after ingestion: the ingest -> queryable delay scales
+ * with load, so a constant is simultaneously wasteful on an idle box and too
+ * short on a busy one. The ingest POST itself is already awaited; what this
+ * covers is the stream becoming visible to the stream/schema API that the panel
+ * editor reads when selecting it.
+ */
+async function waitForStreamReady(page, streamName = CHART_JSON_STREAM) {
+  const orgId = process.env.ORGNAME || "default";
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(
+          async ({ orgId, streamName }) => {
+            const r = await fetch(
+              `/api/${orgId}/streams/${streamName}/schema?type=logs`,
+              { headers: { Accept: "application/json" } }
+            );
+            return r.ok;
+          },
+          { orgId, streamName }
+        ),
+      {
+        timeout: 30000,
+        intervals: [300, 600, 1200, 2000],
+        message: `stream "${streamName}" did not become queryable after ingestion`,
+      }
+    )
+    .toBe(true);
+}
 
 test.describe.configure({ mode: "parallel" });
 
@@ -17,16 +58,16 @@ test.describe.configure({ mode: "parallel" });
 test.describe("dashboard UI testcases", () => {
   test.beforeEach(async ({ page }) => {
     testLogger.debug("Test setup - beforeEach hook executing");
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestionForDashboardChartJson(page);
-    await page.waitForTimeout(2000);
+    await waitForStreamReady(page);
   });
 
   test("Should display data as JSON when the 'Render Data as JSON/Array' option is selected", async ({
     page,
   }) => {
     const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("panel-test");
 
@@ -35,7 +76,7 @@ test.describe("dashboard UI testcases", () => {
     await waitForDashboardPage(page);
 
     // Create a new dashboard
-    await pm.dashboardCreate.createDashboard(randomDashboardName);
+    await pm.dashboardCreate.createDashboard(dashboardName);
     await pm.dashboardCreate.addPanel();
 
     // Select a stream
@@ -98,7 +139,7 @@ test.describe("dashboard UI testcases", () => {
 
     // Delete the panel
     await pm.dashboardCreate.backToDashboardList();
-    await deleteDashboard(page, randomDashboardName);
+    await deleteDashboard(page, dashboardName);
   });
 });
 
@@ -106,17 +147,16 @@ test.describe("dashboard UI testcases", () => {
 test.describe("dashboard custom query mode field options testcases", () => {
   test.beforeEach(async ({ page }) => {
     testLogger.debug("Test setup - beforeEach hook executing for custom mode tests");
-    await login(page);
-    await page.waitForTimeout(1000);
+    await navigateToBase(page);
     await ingestionForDashboardChartJson(page);
-    await page.waitForTimeout(2000);
+    await waitForStreamReady(page);
   });
 
   test("Should show 'Mark this field as non-timestamp' checkbox in custom query mode for table chart", {
     tag: ['@dashboardChartJson', '@customMode', '@P0']
   }, async ({ page }) => {
     const pm = new PageManager(page);
-    const dashName = "Dashboard_" + Math.random().toString(36).substr(2, 9);
+    const dashName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("custom-nontimestamp");
 
@@ -173,7 +213,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     tag: ['@dashboardChartJson', '@customMode', '@P0']
   }, async ({ page }) => {
     const pm = new PageManager(page);
-    const dashName = "Dashboard_" + Math.random().toString(36).substr(2, 9);
+    const dashName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("custom-json");
 
@@ -230,7 +270,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     tag: ['@dashboardChartJson', '@customMode', '@P1']
   }, async ({ page }) => {
     const pm = new PageManager(page);
-    const dashName = "Dashboard_" + Math.random().toString(36).substr(2, 9);
+    const dashName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("custom-json-render");
 
@@ -289,7 +329,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     tag: ['@dashboardChartJson', '@customMode', '@P2']
   }, async ({ page }) => {
     const pm = new PageManager(page);
-    const dashName = "Dashboard_" + Math.random().toString(36).substr(2, 9);
+    const dashName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("custom-tabs-hidden");
 
@@ -344,7 +384,7 @@ test.describe("dashboard custom query mode field options testcases", () => {
     tag: ['@dashboardChartJson', '@customMode', '@P2']
   }, async ({ page }) => {
     const pm = new PageManager(page);
-    const dashName = "Dashboard_" + Math.random().toString(36).substr(2, 9);
+    const dashName = generateDashboardName();
     const panelName =
       pm.dashboardPanelActions.generateUniquePanelName("custom-both-opts");
 

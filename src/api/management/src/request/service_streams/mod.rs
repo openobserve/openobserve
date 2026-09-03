@@ -115,10 +115,27 @@ pub async fn get_dimension_analytics(
 )]
 pub async fn list_services(
     Path(org_id): Path<String>,
-    Headers(_user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    #[cfg(not(feature = "enterprise"))]
+    let _ = &user_email;
     #[cfg(feature = "enterprise")]
     {
+        if !check_permissions(
+            &org_id,
+            &org_id,
+            &user_email.user_id,
+            "service_streams",
+            "GET",
+            None,
+            true,
+            false,
+            false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
         let records = match infra::table::service_streams::list(&org_id).await {
             Ok(r) => r,
             Err(e) => {
@@ -248,12 +265,16 @@ pub async fn correlate_streams(
         )
         .await
         {
-            Ok(Some(response)) => {
+            Ok(Some(mut response)) => {
                 log::debug!(
                     "[correlation] success: found match for org_id={}, source_stream={}",
                     org_id,
                     req.source_stream
                 );
+                // F27: echo the request's source stream/type so the FE never has to
+                // guess which resolved stream (and field aliases) the source maps to.
+                response.source_stream = Some(req.source_stream.clone());
+                response.source_type = Some(req.source_type.clone());
                 MetaHttpResponse::json(response)
             }
             Ok(None) => {
@@ -415,6 +436,23 @@ pub async fn save_identity_config(
                 "Unknown alias group IDs: {}",
                 unknown.join(", ")
             ));
+        }
+        // F26: a typo in distinguish_by creates a set with permanent zero coverage —
+        // discovery never extracts the unknown id, so its rows can never match.
+        for set in &body.sets {
+            let unknown: Vec<&str> = set
+                .distinguish_by
+                .iter()
+                .filter(|id| !known_ids.contains(*id))
+                .map(String::as_str)
+                .collect();
+            if !unknown.is_empty() {
+                return MetaHttpResponse::bad_request(format!(
+                    "set '{}': unknown distinguish_by group IDs: {}",
+                    set.id,
+                    unknown.join(", ")
+                ));
+            }
         }
     }
 

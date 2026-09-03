@@ -182,7 +182,7 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     testLogger.info('✓ Navigated to alerts page');
 
     // Click "Add Alert" button (should be enabled now that beforeAll created a destination)
-    await expect(page.locator(pm.alertsPage.addAlertButton), 'Add Alert button should be visible').toBeVisible({ timeout: 5000 });
+    await expect(pm.alertsPage.getAddAlertButtonLocator(), 'Add Alert button should be visible').toBeVisible({ timeout: 5000 });
     await pm.alertsPage.clickAddAlertButton();
     testLogger.info('✓ Clicked Add Alert button');
 
@@ -200,14 +200,14 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     testLogger.info('✓ Selected stream: e2e_automate');
 
     // Add a condition
-    const addConditionBtn = page.locator(pm.alertsPage.addConditionButton);
+    const addConditionBtn = pm.alertsPage.getAddConditionButtonLocator();
     if (await addConditionBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
       await addConditionBtn.click();
       testLogger.info('✓ Added condition');
     }
 
     // Switch to the Advanced tab
-    await expect(page.locator(pm.alertsPage.advancedTabBtn).first(), 'Advanced tab should be visible').toBeVisible({ timeout: 3000 });
+    await expect(pm.alertsPage.getAdvancedTabLocator(), 'Advanced tab should be visible').toBeVisible({ timeout: 3000 });
     await pm.alertsPage.clickAdvancedTab();
     testLogger.info('✓ Switched to Advanced tab');
 
@@ -263,24 +263,24 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     testLogger.info('Navigated to alerts page');
 
     // Open the import dialog via POM locator
-    const importButton = page.locator(pm.alertsPage.alertImportButton);
+    const importButton = pm.alertsPage.getAlertImportButtonLocator();
     await expect(importButton, 'Alert import button should be visible').toBeVisible({ timeout: 5000 });
     await importButton.click();
     await page.waitForTimeout(2000);
     testLogger.info('Clicked import button');
 
     // Verify import dialog opened: the "Import JSON file" tab should be visible
-    const importFileTab = page.locator(pm.alertsPage.alertImportFileTab);
+    const importFileTab = pm.alertsPage.getAlertImportFileTabLocator();
     await expect(importFileTab, 'Import dialog should open with file tab visible').toBeVisible({ timeout: 5000 });
 
     // Verify the file upload input is present
-    const fileInput = page.locator(pm.alertsPage.alertImportJsonFileInputField);
+    const fileInput = pm.alertsPage.getAlertImportJsonFileInputLocator();
     await expect(fileInput, 'Import dialog should have file upload input').toBeVisible({ timeout: 3000 });
 
     testLogger.info('Import dialog opened with upload functionality');
 
     // Bug verification: no premature "already exists" error before import
-    const errorMessages = page.locator('[class*="error"], [class*="negative"]')
+    const errorMessages = pm.alertsPage.getErrorOrNegativeElements()
       .filter({ hasText: /already exists|duplicate/i });
     const hasPrematureError = await errorMessages.first().isVisible({ timeout: 2000 }).catch(() => false);
 
@@ -304,7 +304,7 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Navigated to alerts page');
 
-    await expect(page.locator(pm.alertsPage.addAlertButton), 'Add Alert button should be visible').toBeVisible({ timeout: 5000 });
+    await expect(pm.alertsPage.getAddAlertButtonLocator(), 'Add Alert button should be visible').toBeVisible({ timeout: 5000 });
     await pm.alertsPage.clickAddAlertButton();
     testLogger.info('Clicked Add Alert button');
 
@@ -314,7 +314,7 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await page.waitForTimeout(500);
 
     // Read back the value from the inner OInput field
-    const nameInput = page.locator(pm.alertsPage.alertNameInputField);
+    const nameInput = pm.alertsPage.getAlertNameInputFieldLocator();
     const enteredValue = await nameInput.inputValue().catch(() => '');
     testLogger.info(`Alert name entered: "${enteredValue}"`);
 
@@ -338,7 +338,7 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Navigated to alerts page');
 
-    await expect(page.locator(pm.alertsPage.addAlertButton), 'Add Alert button should be visible').toBeVisible({ timeout: 5000 });
+    await expect(pm.alertsPage.getAddAlertButtonLocator(), 'Add Alert button should be visible').toBeVisible({ timeout: 5000 });
     await pm.alertsPage.clickAddAlertButton();
     await pm.alertsPage.fillAlertName(`test_sql_default_${Date.now()}`);
 
@@ -348,47 +348,30 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     testLogger.info('Selected stream: logs / e2e_automate');
 
     // Add a condition so the inline query editor renders
-    const addConditionBtn = page.locator(pm.alertsPage.addConditionButton);
+    const addConditionBtn = pm.alertsPage.getAddConditionButtonLocator();
     await expect(addConditionBtn, 'Add Condition button should be visible').toBeVisible({ timeout: 5000 });
     await addConditionBtn.click();
     testLogger.info('Added condition');
 
     // Switch to SQL tab using POM selectors
-    const sqlTab = page.locator(pm.alertsPage.queryTabsContainer).locator(pm.alertsPage.tabSql);
+    const sqlTab = pm.alertsPage.getSqlTabInQueryTabs();
     await expect(sqlTab, 'SQL tab should be visible').toBeVisible({ timeout: 5000 });
     await sqlTab.click();
     await page.waitForTimeout(1000);
     testLogger.info('Switched to SQL tab');
 
-    // Click into the inline Monaco editor (use .last() per alert creation wizard pattern)
-    // then type via keyboard — same approach used by the POM wizard methods
-    const sqlEditor = page.locator('.monaco-editor').last();
-    await expect(sqlEditor, 'SQL editor should be visible').toBeVisible({ timeout: 5000 });
+    // Editor id, not .last(): the wizard's DOM-last Monaco instance is offscreen.
+    const sqlEditor = pm.alertsPage.getInlineSqlEditor();
+    // QueryEditor is lazily loaded, so 5s is not enough on a loaded runner.
+    await expect(sqlEditor, 'SQL editor should be visible').toBeVisible({ timeout: 30000 });
     await sqlEditor.click({ force: true });
     await page.waitForTimeout(500);
 
-    // Use Monaco API to set editor content reliably.
-    // Keyboard shortcuts (Cmd/Ctrl+A + type) are unreliable
-    // with Monaco because the virtualised viewport, focus management,
-    // and IME handling can swallow synthesized keystrokes.
-    // Retry until Monaco editors are fully initialized (parallel test runs
-    // may delay Monaco boot).
-    await expect(async () => {
-      const content = await page.evaluate(() => {
-        const editors = window.monaco?.editor?.getEditors?.();
-        if (editors && editors.length > 0) {
-          const editor = editors[editors.length - 1];
-          editor.setValue('SELECT * FROM default');
-          return editor.getValue();
-        }
-        return null;
-      });
-      expect(content).toContain('default');
-    }).toPass({ timeout: 10000, intervals: [1000] });
+    // Monaco swallows synthesized keystrokes, so the value is set through its API.
+    await pm.alertsPage.setInlineSqlEditorValue('SELECT * FROM default');
     await page.waitForTimeout(500);
 
-    // Verify the rendered .view-lines contain "default"
-    const linesText = await sqlEditor.locator('.view-lines').first().textContent().catch(() => '');
+    const linesText = await pm.alertsPage.getInlineSqlEditorLinesText();
     testLogger.info(`Monaco view-lines content: "${linesText.substring(0, 100)}"`);
 
     expect(linesText,
@@ -397,9 +380,8 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
 
     // Verify no app-level error (check OToast error variant + ARIA alerts —
     // the app's actual error notification mechanisms, not Monaco syntax squiggles)
-    const errorToastVisible = await page.locator(
-      '[data-test-variant="error"], [role="alert"]'
-    ).first().isVisible({ timeout: 2000 }).catch(() => false);
+    const errorToastVisible = await pm.alertsPage.getErrorToastOrAlert()
+      .first().isVisible({ timeout: 2000 }).catch(() => false);
 
     expect(errorToastVisible,
       'Bug #4288: "default" keyword without quotes should not cause a UI error'

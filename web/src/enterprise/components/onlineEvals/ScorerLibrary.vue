@@ -20,7 +20,7 @@ the Free Software Foundation, either version 3 of the License, or
       class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
       data-test="scorer-library-error"
     >
-      <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
+      <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
       <div class="text-status-error-text">{{ loadError }}</div>
       <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
         {{ t("common.retry") }}
@@ -59,18 +59,18 @@ the Free Software Foundation, either version 3 of the License, or
         />
       </div>
 
-      <div class="mb-2 flex items-center justify-between gap-3 pr-3 pl-4.25">
+      <div
+        class="border-border-default mb-3 flex items-center justify-between gap-3 border-b pr-3 pb-2 pl-4.25"
+      >
         <label
           v-if="filteredEntries.length > 0"
-          class="text-text-secondary inline-flex items-center gap-2 px-1 py-0.5 text-xs font-medium select-none"
+          class="text-text-body inline-flex cursor-pointer items-center gap-2 py-0.5 text-xs font-medium select-none"
           data-test="scorer-library-select-all"
         >
-          <OCheckbox :model-value="allVisibleSelected" @update:model-value="toggleSelectAll" />
-          <span>{{ allVisibleSelected ? t("common.clearAll") : t("common.selectAll") }}</span>
+          <OCheckbox :model-value="selectAllState" @update:model-value="toggleSelectAll" />
+          <span>{{ selectAllState === true ? t("common.clearAll") : t("common.selectAll") }}</span>
         </label>
-        <span class="text-text-secondary text-xs">
-          {{ t("onlineEvals.scorerLibrary.scorerCountSuffix", { count: filteredEntries.length }) }}
-        </span>
+        <span class="text-text-secondary text-xs tabular-nums">{{ countLabel }}</span>
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto">
@@ -90,12 +90,8 @@ the Free Software Foundation, either version 3 of the License, or
             <li
               v-for="entry in group.entries"
               :key="entry.name"
-              class="flex cursor-pointer items-center gap-2 border-l-4 px-3 py-2 transition-colors duration-200"
-              :class="[
-                isSelected(entry.name)
-                  ? 'selected-item border-primary bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)]'
-                  : 'hover:bg-table-row-hover-bg border-transparent',
-              ]"
+              class="flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors duration-200"
+              :class="[isSelected(entry.name) ? 'bg-accent/6' : 'hover:bg-table-row-hover-bg']"
               :data-test="`scorer-library-item-${entry.name}`"
               @click="toggle(entry)"
             >
@@ -107,7 +103,13 @@ the Free Software Foundation, either version 3 of the License, or
                 />
               </div>
               <div class="flex min-w-0 flex-1 flex-col">
-                <span class="text-sm font-medium">{{ entry.displayName }}</span>
+                <span
+                  class="text-sm"
+                  :class="
+                    isSelected(entry.name) ? 'text-text-heading font-semibold' : 'font-medium'
+                  "
+                  >{{ entry.displayName }}</span
+                >
                 <span v-if="entry.description" class="text-text-secondary block text-xs">
                   {{ entry.description }}
                 </span>
@@ -190,7 +192,7 @@ async function loadCatalog() {
     scoreConfigEntries.value = catalog.scoreConfigs.filter((e) => e.level === "span");
     scorerEntries.value = catalog.scorers.filter((e) => e.level === "span");
   } catch (err: any) {
-    loadError.value = err?.message || "Failed to load catalog";
+    loadError.value = err?.message || t("onlineEvals.failedToLoadCatalog");
   } finally {
     isLoadingCatalog.value = false;
   }
@@ -221,6 +223,31 @@ const allVisibleSelected = computed(() => {
   const visible = filteredEntries.value;
   if (visible.length === 0) return false;
   return visible.every((e) => selectedNames.value.has(e.name));
+});
+
+/** Three states, not two. With a plain boolean a part-selected list renders as
+ *  an EMPTY box, which reads as "nothing is selected" — and the next click then
+ *  looks like it selected everything from scratch rather than extending. */
+const selectAllState = computed<boolean | "indeterminate">(() => {
+  if (allVisibleSelected.value) return true;
+  return filteredEntries.value.some((e) => selectedNames.value.has(e.name))
+    ? "indeterminate"
+    : false;
+});
+
+/** The count is the only place a selection is visible while the list is
+ *  scrolled past the checked rows. */
+const countLabel = computed(() => {
+  const selected = filteredEntries.value.filter((e) => selectedNames.value.has(e.name)).length;
+  if (selected === 0) {
+    return t("onlineEvals.scorerLibrary.scorerCountSuffix", {
+      count: filteredEntries.value.length,
+    });
+  }
+  return t("onlineEvals.scorerLibrary.selectedOfTotal", {
+    selected,
+    total: filteredEntries.value.length,
+  });
 });
 
 function isSelected(name: string) {
@@ -279,7 +306,7 @@ async function importSelected() {
         continue;
       }
       failCount++;
-      if (failCount === 1) showError(err, "Failed to import scorer");
+      if (failCount === 1) showError(err, t("onlineEvals.failedToImportScorer"));
     }
   }
 
@@ -288,10 +315,12 @@ async function importSelected() {
   emit("imported");
 
   if (successCount > 0 || skipCount > 0) {
+    // Each clause is a whole translated phrase; only the list separator is
+    // assembled here, never a sentence built from translated fragments.
     const parts: string[] = [];
-    if (successCount) parts.push(`${successCount} imported`);
-    if (skipCount) parts.push(`${skipCount} skipped (already exists)`);
-    if (failCount) parts.push(`${failCount} failed`);
+    if (successCount) parts.push(t("onlineEvals.import.summaryImported", { count: successCount }));
+    if (skipCount) parts.push(t("onlineEvals.import.summarySkipped", { count: skipCount }));
+    if (failCount) parts.push(t("onlineEvals.import.summaryFailed", { count: failCount }));
     toast({
       variant: failCount > 0 && successCount === 0 ? "error" : "success",
       message: raw(parts.join(" · ")),
@@ -306,7 +335,7 @@ async function resolveRequiredScoreConfig(name: string): Promise<ScoreConfig> {
   if (existing) return existing;
 
   const catalogEntry = scoreConfigEntries.value.find((e) => e.name === name);
-  if (!catalogEntry) throw new Error(`Catalog score config not found: ${name}`);
+  if (!catalogEntry) throw new Error(t("onlineEvals.catalogScoreConfigNotFound", { name }));
 
   try {
     return await onlineEvalsService.scoreConfigs.create(

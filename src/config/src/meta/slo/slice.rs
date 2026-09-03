@@ -153,7 +153,8 @@ pub fn gap_fill_policy(sli_type: SliType) -> GapFill {
         SliType::Count => GapFill::CoveredZero,
         // The aggregate had no input, so there is no value to compare.
         SliType::TimeSlice => GapFill::Nothing,
-        // Coverage comes from the triggers stream instead (S-16, D65).
+        // Coverage is proved by the availability ledger instead, so an absent
+        // slice means the source alert was not evaluating (S-16, D65).
         SliType::Alert => GapFill::Nothing,
     }
 }

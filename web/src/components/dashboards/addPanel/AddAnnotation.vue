@@ -85,12 +85,11 @@ import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import { addAnnotationSchema } from "./AddAnnotation.schema";
+import { makeAddAnnotationSchema } from "./AddAnnotation.schema";
 import type { AddAnnotationForm } from "./AddAnnotation.schema";
 
 interface AnnotationData {
@@ -130,6 +129,8 @@ const emit = defineEmits<{
 
 const store = useStore();
 const { t } = useI18nTyped();
+
+const addAnnotationSchema = makeAddAnnotationSchema(t);
 const isOpen = ref(true);
 const showDeleteConfirm = ref(false);
 
@@ -234,7 +235,7 @@ const handleSave = async () => {
           tags: annotationData.value.tags,
         };
         const annotationId = annotationData.value.annotation_id ?? "";
-        const response = await annotationService.update_timed_annotations(
+        await annotationService.update_timed_annotations(
           organization,
           props.dashboardId,
           annotationId,
@@ -250,11 +251,9 @@ const handleSave = async () => {
     } else {
       try {
         // create annotation
-        const response = await annotationService.create_timed_annotations(
-          organization,
-          props.dashboardId,
-          [annotationData.value],
-        );
+        await annotationService.create_timed_annotations(organization, props.dashboardId, [
+          annotationData.value,
+        ]);
       } catch (error) {
         showErrorNotification(
           raw(errorMessage(error)) ||

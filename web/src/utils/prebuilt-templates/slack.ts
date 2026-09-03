@@ -16,6 +16,31 @@ import { raw } from "@/types/i18n";
 
 import { PrebuiltConfig, PrebuiltType } from "./types";
 
+export const isValidSlackWebhookUrl = (url: string): boolean => {
+  if (url !== url.trim() || /\s/.test(url) || url.includes("?") || url.includes("#")) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(url);
+    const validHost =
+      parsed.hostname === "hooks.slack.com" || parsed.hostname === "hooks.slack-gov.com";
+
+    return (
+      parsed.protocol === "https:" &&
+      validHost &&
+      parsed.username === "" &&
+      parsed.password === "" &&
+      parsed.port === "" &&
+      parsed.search === "" &&
+      parsed.hash === "" &&
+      /^\/services\/[^/]+\/[^/]+\/[^/]+\/?$/.test(parsed.pathname)
+    );
+  } catch {
+    return false;
+  }
+};
+
 /**
  * Slack prebuilt destination configuration
  * Provides predefined configuration for Slack webhook notifications
@@ -78,18 +103,7 @@ export const slackConfig: PrebuiltConfig = {
     "Content-Type": "application/json",
   },
   method: "post",
-  urlValidator: (url: string) => {
-    try {
-      const parsed = new URL(url);
-      const hostname = parsed.hostname.toLowerCase();
-      return (
-        parsed.protocol === "https:" &&
-        (hostname === "hooks.slack.com" || hostname.endsWith(".hooks.slack.com"))
-      );
-    } catch {
-      return false;
-    }
-  },
+  urlValidator: isValidSlackWebhookUrl,
   credentialFields: [
     {
       key: "webhookUrl",
@@ -99,17 +113,7 @@ export const slackConfig: PrebuiltConfig = {
       hintKey: "alerts.prebuiltDestinations.slackWebhookUrlHelp",
       validator: (url: string) => {
         const invalid = { key: "alerts.prebuiltDestinations.invalidSlackWebhookUrl" };
-        try {
-          const parsed = new URL(url);
-          const hostname = parsed.hostname.toLowerCase();
-          return (
-            (parsed.protocol === "https:" &&
-              (hostname === "hooks.slack.com" || hostname.endsWith(".hooks.slack.com"))) ||
-            invalid
-          );
-        } catch {
-          return invalid;
-        }
+        return isValidSlackWebhookUrl(url) || invalid;
       },
     },
     {
@@ -117,7 +121,8 @@ export const slackConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.slackChannel",
       type: "text",
       required: false,
-      hint: raw("e.g., #alerts"),
+      hintKey: "alerts.prebuiltDestinations.slackChannelHelp",
+      persistInMetadata: true,
     },
   ],
 };
@@ -126,7 +131,7 @@ import slackLogo from "@/assets/images/alerts/destinations/slack.png";
 
 export const slackDestinationType: PrebuiltType = {
   id: "slack",
-  name: "Slack",
+  name: raw("Slack"),
   descriptionKey: "alert_destinations.prebuilt.slackDescription",
   icon: "slack",
   image: slackLogo,

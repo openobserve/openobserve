@@ -19,6 +19,8 @@
  * Helper functions for parsing and formatting LLM trace data enriched by the backend.
  */
 
+import type { TranslateFn } from "@/types/i18n";
+
 export interface UsageDetails {
   input: number;
   output: number;
@@ -493,9 +495,9 @@ export function extractLLMData(span: any): LLMData | null {
 /**
  * Format model parameters for display
  */
-export function formatModelParameters(params: Record<string, any>): string {
+export function formatModelParameters(params: Record<string, any>, t: TranslateFn): string {
   if (!params || Object.keys(params).length === 0) {
-    return "No parameters";
+    return t("common.noParameters");
   }
 
   return Object.entries(params)

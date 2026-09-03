@@ -70,7 +70,29 @@ const effectiveError = computed(() => {
 });
 const hasError = computed(() => !!effectiveError.value);
 
+// `aria-invalid` alone tells a screen reader THAT the field is wrong but never
+// WHAT is wrong. Point the control at the message element so the reason is
+// announced with the field. Only set when a message is actually rendered —
+// `effectiveError` is " " when the text lives in OFormInput's #error slot, and
+// a dangling `aria-describedby` would reference a node that does not exist.
+const errorId = computed(() => `${inputId.value}-error`);
+const describedBy = computed(() =>
+  effectiveError.value && effectiveError.value.trim() ? errorId.value : undefined,
+);
+
 const isTextarea = computed(() => props.type === "textarea");
+
+// ── Password reveal ────────────────────────────────────────────────────────
+// The toggle swaps the RENDERED type only; `type` itself is untouched, so a
+// revealed field still reports itself as a password to the form and to
+// autocomplete. Resets whenever the field stops being a revealable password, so
+// a type change can never leave a value exposed.
+const revealed = ref(false);
+const canReveal = computed(() => Boolean(props.revealable) && props.type === "password");
+const effectiveType = computed(() => (canReveal.value && revealed.value ? "text" : props.type));
+watch(canReveal, (allowed) => {
+  if (!allowed) revealed.value = false;
+});
 
 // ── Width ──────────────────────────────────────────────────────────────────
 const fieldWidthClass = computed(() => {
@@ -219,14 +241,15 @@ const wrapperClasses = computed(() => [
   "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "bg-input-bg",
   !isTextarea.value ? heightClasses[props.size ?? "md"] : "",
-  /* Focus affordance = soft glow: a 4px translucent halo hugging the border
-     plus the focus border color. When the field has an ERROR, keep the red
-     error border on focus (don't let the focus color override it) and tint the
-     glow red — otherwise the focus border (blue) would hide the error state
-     while the field is focused. */
+  /* Focus affordance = a 2px ring hugging the border, plus the focus border color.
+     The normal ring is OPAQUE (--color-focus-ring-accent): at 25% alpha it measured
+     1.38:1 against the 3:1 SC 1.4.11 floor. Only the ERROR ring stays translucent
+     (/30) — there the red border already carries the state, and the ring is a tint
+     behind it. On error, keep that red border on focus rather than letting the focus
+     color override it, or the blue would hide the error while the field is focused. */
   hasError.value
     ? "border-input-border-error focus-within:ring-[0.125rem] focus-within:ring-input-border-error/30"
-    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-accent/25",
+    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-focus-ring-accent",
   /* Disabled inputs get a muted bg + dashed border so they read as obviously
      inactive at a glance. */
   props.disabled
@@ -298,6 +321,8 @@ const wrapperClasses = computed(() => [
         :disabled="disabled"
         :readonly="readonly"
         :aria-required="required || undefined"
+        :aria-invalid="hasError || undefined"
+        :aria-describedby="describedBy"
         :autofocus="autofocus"
         :maxlength="maxlength"
         :rows="autogrow ? 1 : rows"
@@ -310,7 +335,9 @@ const wrapperClasses = computed(() => [
           'disabled:text-input-disabled-text disabled:cursor-not-allowed',
           'py-2',
           $slots['icon-left'] || $slots.prefix || prefix ? 'ps-2' : 'ps-3',
-          $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'pe-2' : 'pe-3',
+          $slots['icon-right'] || $slots.suffix || suffix || clearable || canReveal
+            ? 'pe-2'
+            : 'pe-3',
           'text-sm',
           autogrow ? 'resize-none' : 'resize-y',
         ]"
@@ -330,7 +357,7 @@ const wrapperClasses = computed(() => [
         ref="inputRef"
         :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
         :value="String(modelValue ?? '')"
-        :type="type"
+        :type="effectiveType"
         :name="name"
         :placeholder="placeholder"
         :disabled="disabled"
@@ -338,9 +365,13 @@ const wrapperClasses = computed(() => [
         :aria-required="required || undefined"
         :autofocus="autofocus"
         :maxlength="maxlength"
+        :min="min"
+        :max="max"
+        :step="step"
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"
+        :aria-describedby="describedBy"
         :class="[
           'min-w-0 flex-1 rounded-[inherit] bg-transparent outline-none',
           'text-input-text placeholder:text-input-placeholder',
@@ -351,7 +382,9 @@ const wrapperClasses = computed(() => [
             ? 'pt-3 pb-0.5 text-xs font-semibold'
             : textSizeClasses[size ?? 'md'],
           $slots['icon-left'] || $slots.prefix || prefix ? 'ps-2' : 'ps-3',
-          $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'pe-2' : 'pe-3',
+          $slots['icon-right'] || $slots.suffix || suffix || clearable || canReveal
+            ? 'pe-2'
+            : 'pe-3',
         ]"
         @input="handleInput"
         @blur="handleBlur"
@@ -361,6 +394,21 @@ const wrapperClasses = computed(() => [
         @keypress="emit('keypress', $event)"
         @paste="emit('paste', $event)"
       />
+
+      <!-- Reveal toggle. `tabindex="-1"` matches the clear button: it is a
+           convenience, not a step in the form's tab order. -->
+      <button
+        v-if="canReveal"
+        type="button"
+        tabindex="-1"
+        :aria-pressed="revealed"
+        :aria-label="revealed ? t('components.input.hideValue') : t('components.input.showValue')"
+        :data-test="parentDataTest ? `${parentDataTest}-reveal` : undefined"
+        class="text-input-clear-btn hover:text-input-clear-btn-hover flex items-center pe-2 transition-colors"
+        @click="revealed = !revealed"
+      >
+        <OIcon :name="revealed ? 'visibility-off' : 'visibility'" size="sm" />
+      </button>
 
       <!-- Clear button -->
       <button
@@ -413,6 +461,7 @@ const wrapperClasses = computed(() => [
     >
       <span
         v-if="effectiveError && effectiveError.trim()"
+        :id="errorId"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
         :data-test-error-text="effectiveError"
         class="text-input-error-text text-xs leading-none"

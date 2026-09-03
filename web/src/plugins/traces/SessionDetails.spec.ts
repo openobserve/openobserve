@@ -348,6 +348,19 @@ describe("SessionDetails — not found state", () => {
 });
 
 describe("SessionDetails — KPI strip", () => {
+  it("shows the selected session user ID in the header", async () => {
+    mockFetchSession.mockResolvedValue({
+      detail: makeDetail({ userId: "user-a" }),
+      traces: [makeTrace()],
+    });
+
+    const wrapper = await mountComponent();
+    const userId = wrapper.find('[data-test="session-detail-user-id"]');
+
+    expect(userId.exists()).toBe(true);
+    expect(userId.text()).toBe("user-a");
+  });
+
   it("renders KPI strip with Turns value", async () => {
     mockFetchSession.mockResolvedValue({
       detail: makeDetail({ turns: 5 }),
@@ -484,9 +497,7 @@ describe("SessionDetails — turn rows", () => {
 
     const wrapper = await mountComponent();
     const row = wrapper.find(turnRowSelector("err-trace"));
-    expect(row.classes()).toContain(
-      "bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))]",
-    );
+    expect(row.classes()).toContain("bg-surface-tint-error");
   });
 
   it("turn row uses default surface for ok traces", async () => {

@@ -126,15 +126,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    without this the editor keeps its mount-time language and paints
                    a markdown body with JSON errors (pre-migration got the remount
                    for free from two v-if/v-else editors). -->
-                <QueryEditor
-                  :key="bodyLanguage"
-                  data-test="template-body-editor"
-                  editor-id="template-body-editor"
-                  class="rounded-default border-card-glass-border mb-3 min-h-77.5! w-full resize-y overflow-auto border"
-                  :language="bodyLanguage"
-                  :query="body"
-                  @update:query="onBodyChange"
-                />
+                <!-- The editor is a bare Monaco bridged into the form via
+                   setFieldValue, so it has no OFormInput error slot of its
+                   own. Mirror one here: a red border plus a message, driven
+                   by the `body` field's own validation state, so a rejected
+                   save points AT the offending field (o2-enterprise#2394). -->
+                <!-- `aria-*` goes on this shell, NOT on <QueryEditor>:
+                   CodeQueryEditor sets `inheritAttrs: false` and binds
+                   `$attrs` to a non-focusable wrapper, while Monaco builds
+                   its real textarea in a different child — so attributes
+                   passed to the component would be inert. A `group` with an
+                   accessible name and a described-by is what actually
+                   survives; the message below also carries `role="alert"`,
+                   so it is announced the moment a rejected save renders it. -->
+                <div
+                  data-test="add-template-body-editor-shell"
+                  role="group"
+                  :aria-label="t('alert_templates.body')"
+                  :aria-invalid="bodyError ? 'true' : undefined"
+                  :aria-describedby="bodyError ? 'add-template-body-error' : undefined"
+                  :data-error="String(!!bodyError)"
+                  :class="[
+                    'rounded-default mb-1 w-full overflow-hidden border',
+                    bodyError ? 'border-input-border-error' : 'border-card-glass-border',
+                  ]"
+                >
+                  <QueryEditor
+                    :key="bodyLanguage"
+                    data-test="template-body-editor"
+                    editor-id="template-body-editor"
+                    class="min-h-77.5! w-full resize-y overflow-auto"
+                    :language="bodyLanguage"
+                    :query="body"
+                    @update:query="onBodyChange"
+                  />
+                </div>
+                <div
+                  v-if="bodyError"
+                  id="add-template-body-error"
+                  data-test="add-template-body-error"
+                  class="text-input-error-text mb-3 text-xs"
+                  role="alert"
+                >
+                  {{ bodyError }}
+                </div>
+                <div v-else class="mb-3"></div>
               </div>
             </template>
           </div>
@@ -258,15 +294,14 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { scrollToFirstError } from "@/lib/forms/Form/scrollToFirstError";
 import type { TemplateData } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import {
-  validateTemplateBody,
-  getTemplateValidationErrorMessage,
-} from "@/utils/templates/validation";
+import { validateTemplateBody } from "@/utils/templates/validation";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -281,6 +316,8 @@ import {
 import ContentTemplateForm from "./template-content/ContentTemplateForm.vue";
 import {
   emptyContentSpec,
+  linkUrlBadScheme,
+  NOT_A_URL,
   starterContentSpec,
   parseContentSpec,
   serializeContentSpec,
@@ -325,6 +362,16 @@ const form = useOForm<AddTemplateForm>({
 const templateType = form.useStore((s: any) => s.values.type as "http" | "email");
 const body = form.useStore((s: any) => (s.values.body as string) ?? "");
 const bodyLanguage = computed(() => (templateType.value === "email" ? "markdown" : "json"));
+
+// The body is a bare Monaco, not an OFormInput, so nothing renders its
+// validation error. Read the SAME field state OFormInput reads
+// (`meta.errors`) and drive a hand-rolled error affordance from it, so an
+// empty body highlights the editor instead of only toasting
+// (o2-enterprise#2394). Validation timing is submit-then-change, so this
+// stays empty until the first save attempt and clears as soon as it is fixed.
+const bodyError = form.useStore((s: any) =>
+  firstFieldError(s.fieldMeta?.body?.errors as readonly unknown[] | undefined),
+);
 
 // app-tabs is a UI toggle whose value is the schema discriminator (not an
 // <input>) → bridge it into the form (sanctioned Rule-② bridge).
@@ -488,6 +535,10 @@ const handleSave = async () => {
       message: t("common.fillRequiredFields"),
       timeout: 1500,
     });
+    // The offending field is often scrolled off-screen on this form (the body
+    // editor is tall), so the toast alone left the user hunting for what was
+    // wrong. Bring the first invalid field into view and focus it.
+    await scrollToFirstError();
   }
 };
 
@@ -605,7 +656,7 @@ const isTemplateBodyValid = (bodyValue: string) => {
   if (!result.valid) {
     toast({
       variant: "error",
-      message: raw(getTemplateValidationErrorMessage()),
+      message: t("alert_templates.bodyInvalidJsonHelp"),
       timeout: 1500,
     });
   }
@@ -622,6 +673,32 @@ async function saveTemplate(value: AddTemplateForm) {
   // content mode's body is always valid JSON (it's ContentSpec, serialized
   // here) so the check never applies to it.
   if (!isContentMode && value.type !== "email" && !isTemplateBodyValid(value.body)) return;
+
+  // Content mode: don't dispatch a save the API will reject with a 400 whose
+  // message is far from the offending field. The inline error under the link
+  // input already says what is wrong (#13742); this stops the round trip and
+  // points at the first bad link.
+  if (isContentMode) {
+    const badLink = contentSpec.value.links
+      .map((l) => ({ link: l, scheme: linkUrlBadScheme(l.url) }))
+      .find((c) => c.scheme);
+    if (badLink?.scheme) {
+      toast({
+        variant: "error",
+        message: t("alerts.validation.linkUrlInvalid", {
+          label: badLink.link.label || t("alert_templates.linkUrl"),
+          reason:
+            badLink.scheme === NOT_A_URL
+              ? t("alerts.validation.linkUrlNotAUrl")
+              : t("alerts.validation.linkUrlUnsupportedScheme", {
+                  scheme: badLink.scheme,
+                }),
+        }),
+      });
+      await scrollToFirstError();
+      return;
+    }
+  }
 
   const dismiss = toast({
     variant: "loading",

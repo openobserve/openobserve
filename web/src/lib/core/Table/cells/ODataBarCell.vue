@@ -2,7 +2,7 @@
 import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
-// ODataBarCell — the headline "bars like Datadog" cell. Renders
+// ODataBarCell — the headline in-cell bar chart. Renders
 // a (right-aligned) formatted value with a subtle horizontal bar behind it,
 // width proportional to value / columnMax. The caller computes the column max
 // over the visible page and passes it in, plus the already-formatted display

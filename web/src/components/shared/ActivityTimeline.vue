@@ -318,6 +318,7 @@ const isAiLabelledOf = (event: any) => (props.isAiLabelled ? props.isAiLabelled(
 
 const badgeStyle = (c: string) => ({
   backgroundColor: `color-mix(in srgb, ${c} ${isDark.value ? "19%" : "8%"}, transparent)`,
+  // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
   border: `1px solid color-mix(in srgb, ${c} ${isDark.value ? "31%" : "19%"}, transparent)`,
   color: isDark.value ? "var(--color-grey-0)" : c,
 });

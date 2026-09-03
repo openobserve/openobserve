@@ -52,6 +52,11 @@ export interface InputProps {
   suffix?: string;
   /** Shows a ✕ button to clear the field */
   clearable?: boolean;
+  /**
+   * Adds a show/hide toggle to a `type="password"` field. Ignored for every
+   * other type — revealing a value only means anything when it starts masked.
+   */
+  revealable?: boolean;
   /** Prevents value editing */
   readonly?: boolean;
   /** Prevents interaction */
@@ -68,6 +73,12 @@ export interface InputProps {
   mask?: string;
   /** Maximum character length — shows a counter when set */
   maxlength?: number;
+  /** Minimum value — `type="number"`/`"date"`/`"datetime-local"` only */
+  min?: number | string;
+  /** Maximum value — `type="number"`/`"date"`/`"datetime-local"` only */
+  max?: number | string;
+  /** Step increment — `type="number"` only */
+  step?: number | string;
   /** Rows for textarea type */
   rows?: number;
   /** Control size */

@@ -79,7 +79,8 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     // Start monitoring for API calls BEFORE reopening dashboard
     const apiMonitorPromise = monitorVariableAPICalls(page, {
       expectedCount: 1, // Child variable should make 1 API call on initial load
-      timeout: 15000
+      // 45s: this window opens BEFORE the reopen, so navigation eats part of it.
+      timeout: 45000
     });
 
     // Reopen the dashboard to test true initial load
@@ -166,7 +167,8 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     // Start monitoring for API calls BEFORE reopening dashboard
     const apiMonitorPromise = monitorVariableAPICalls(page, {
       expectedCount: 1, // Child variable should make 1 API call on initial load
-      timeout: 15000
+      // 45s: this window opens BEFORE the reopen, so navigation eats part of it.
+      timeout: 45000
     });
 
     // Reopen the dashboard to test true initial load
@@ -249,7 +251,8 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     // Start monitoring for API calls BEFORE reopening dashboard
     const apiMonitorPromise = monitorVariableAPICalls(page, {
       expectedCount: 1, // Child variable should make 1 API call on initial load
-      timeout: 15000
+      // 45s: this window opens BEFORE the reopen, so navigation eats part of it.
+      timeout: 45000
     });
 
     // Reopen the dashboard to test true initial load
@@ -343,7 +346,8 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     // Start monitoring for API calls BEFORE reopening dashboard
     const initialApiMonitorPromise = monitorVariableAPICalls(page, {
       expectedCount: 1, // Child variable should make 1 API call on initial load
-      timeout: 15000
+      // 45s: this window opens BEFORE the reopen, so navigation eats part of it.
+      timeout: 45000
     });
 
     // Reopen the dashboard to test true initial load
@@ -356,6 +360,10 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
 
     testLogger.debug("Monitoring API calls when opening parent dropdown without changing value");
 
+    // Let the initial load settle first, or a request still in flight from the reopen
+    // lands in the 3s window and is counted against the dropdown-open.
+    await scopedVars.waitForValuesQuiet({ timeout: 15000 });
+
     // Now test that opening dropdown WITHOUT changing value doesn't trigger additional API calls
     const apiMonitorPromise = monitorVariableAPICalls(page, {
       expectedCount: 0,
@@ -367,9 +375,9 @@ test.describe("Dashboard Variables - Custom/Constant/Textbox as Parents", { tag:
     await parentSelector.click();
 
     // Confirm dropdown is open, then close without selecting
-    await page.locator(`[data-test="variable-selector-${customVar}-inner-popover"]`).waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.waitForVariablePopoverVisible(customVar, { timeout: 5000 });
     await page.keyboard.press("Escape");
-    await page.locator(`[data-test="variable-selector-${customVar}-inner-popover"]`).waitFor({ state: "hidden", timeout: 3000 });
+    await scopedVars.waitForVariablePopoverHidden(customVar, { timeout: 3000 });
 
     // Check API monitoring result (monitor has its own 3s timeout)
     const apiResult = await apiMonitorPromise;

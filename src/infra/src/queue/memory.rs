@@ -45,6 +45,11 @@ use tokio::{
 use super::{DeliverPolicy, QueueConfig, StorageType, format_key};
 use crate::errors::{QueueError, Result};
 
+pub async fn init() -> Result<()> {
+    // process-local queue, nothing to check at startup
+    Ok(())
+}
+
 /// Fixed accounting overhead charged for every entry in addition to its
 /// payload bytes: sequence, timestamps, ack state, deque/map nodes, and
 /// shared-pointer metadata. Empty payloads therefore still consume budget.

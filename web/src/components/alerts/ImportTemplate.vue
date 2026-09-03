@@ -151,10 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="error-section mb-2.5 p-2.5" v-if="tempalteCreators.length > 0">
-            <div
-              class="text-primary mb-2.5 text-base uppercase"
-              data-test="template-import-creation-title"
-            >
+            <div class="text-primary mb-2.5 text-base" data-test="template-import-creation-title">
               {{ t("alert_templates.templateCreationTitle") }}
             </div>
             <div
@@ -173,8 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <pre
                   class="m-0 font-[inherit] [overflow-wrap:break-word] [word-break:break-word] [white-space:pre-wrap] [word-wrap:break-word]"
-                  >{{ val.message }}</pre
-                >
+                  >{{ val.message }}</pre>
               </div>
             </div>
           </div>
@@ -295,7 +291,7 @@ export default defineComponent({
       try {
         // Check if jsonStr is empty or null
         if (!jsonString || jsonString.trim() === "") {
-          throw new Error("JSON string is empty");
+          throw new Error(t("alerts.import.jsonStringEmpty"));
         }
 
         const parsedJson = JSON.parse(jsonString);
@@ -303,12 +299,12 @@ export default defineComponent({
         jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
       } catch (e: any) {
         toast({
-          message: e.message || "Invalid JSON format",
+          message: e.message || t("alerts.import.invalidJsonFormat"),
           variant: "error",
         });
         // Reset BaseImport's importing flag on validation error
         if (baseImportRef.value) {
-          baseImportRef.value.isImporting = false;
+          baseImportRef.value.isImportingLocal = false;
         }
         return;
       }
@@ -346,7 +342,7 @@ export default defineComponent({
       isTemplateImporting.value = false;
 
       if (baseImportRef.value) {
-        baseImportRef.value.isImporting = false;
+        baseImportRef.value.isImportingLocal = false;
       }
     };
 

@@ -9,8 +9,8 @@ import { cleanupTestDashboard } from "./utils/dashCreation.js";
 import {
   generateDashboardName,
   setupLinePanelWithConfig,
-  setupBarPanelWithConfig,
   setupBarPanelWithBreakdownAndConfig,
+  setupPiePanelWithConfig,
   setupTablePanelWithConfig,
   setupMetricPanelWithConfig,
   reopenPanelConfig,
@@ -19,7 +19,9 @@ import { verifyColorOnCanvas, applyAndWaitForRender } from "./utils/canvasHelper
 const testLogger = require('../utils/test-logger.js');
 
 test.describe.configure({ mode: "parallel" });
-test.describe.configure({ retries: 1 });
+// No file-level `retries` override: it used to pin this file to 1 retry, which both
+// added a retry locally (project default 0, hiding flakes during development) and
+// *cut* CI's 3 retries down to 1. The project-level policy is the right one.
 
 test.describe("ConfigPanel — Advanced Settings", () => {
   test.beforeEach(async ({ page }) => {
@@ -34,7 +36,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await setupLinePanelWithConfig(page, pm, dashboardName);
 
     // Count added time shift rows by their remove buttons (0m ref row has no remove button)
-    const removeButtons = page.locator('[data-test^="dashboard-addpanel-config-time-shift-remove-"]');
+    const removeButtons = pm.dashboardPanelConfigs.timeShiftRemoveButtons;
     await expect(removeButtons).toHaveCount(0);
 
     // Add two time shifts
@@ -54,7 +56,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying time shift count persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test^="dashboard-addpanel-config-time-shift-remove-"]')).toHaveCount(1);
+    await expect(pm.dashboardPanelConfigs.timeShiftRemoveButtons).toHaveCount(1);
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -64,9 +66,17 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     const dashboardName = generateDashboardName();
 
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
+
+    // Trellis is disabled by `isBreakdownFieldEmpty || hasTimeShifts`. Without
+    // asserting it starts enabled, "disabled after adding a time shift" would also
+    // pass if the breakdown field silently failed to attach — a green test for the
+    // wrong reason. The panel has a breakdown, so it must be enabled here.
+    await expect(pm.dashboardPanelConfigs.trellisTrigger).toBeEnabled();
+    testLogger.info("Trellis enabled before time shift (breakdown present)");
+
     await pm.dashboardPanelConfigs.addTimeShift();
 
-    await expect(page.locator('[data-test="dashboard-trellis-chart-trigger"]')).toBeDisabled();
+    await expect(pm.dashboardPanelConfigs.trellisTrigger).toBeDisabled();
     testLogger.info("Trellis disabled with time shifts active");
 
     await pm.dashboardPanelActions.savePanel();
@@ -79,18 +89,32 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
 
-    await expect(page.locator('[data-test="dashboard-addpanel-config-colorBySeries-add-btn"]')).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.colorBySeriesBtn).toBeVisible();
 
     // Open popup → select first available series → set custom color → save
     await pm.dashboardPanelConfigs.openColorBySeries();
-    await expect(page.locator('[data-test="dashboard-color-by-series-popup"]')).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.colorBySeriesPopup).toBeVisible();
+
+    // Don't blind-pick option 0. The kubernetes_host breakdown yields an "(empty)"
+    // bucket for rows with no host, and that series draws next to nothing — colouring
+    // it left only ~3 matching pixels and failed the canvas check intermittently.
+    // Pick the first series that names a real host instead.
+    const seriesLabels = await pm.dashboardPanelConfigs.getColorBySeriesOptionLabels(0);
+    const targetSeries = seriesLabels.find((label) => label && label !== "(empty)");
+    expect(
+      targetSeries,
+      `no non-empty series offered in the color-by-series dropdown: ${JSON.stringify(seriesLabels)}`
+    ).toBeTruthy();
 
     const customColor = "#e63946";
-    await pm.dashboardPanelConfigs.configureColorBySeries({ rowIndex: 0, optionIndex: 0, color: customColor });
-    testLogger.info("Color by series: first series selected with custom color");
+    const selectedSeriesName = await pm.dashboardPanelConfigs.configureColorBySeries({ rowIndex: 0, matchText: targetSeries, color: customColor });
+    // matchText is a substring match — confirm it resolved to the series we picked
+    // and not a longer label that happens to contain it.
+    expect(selectedSeriesName).toBe(targetSeries);
+    testLogger.info("Color by series: series selected with custom color", { selectedSeriesName });
 
     await pm.dashboardPanelConfigs.saveColorBySeries();
-    await expect(page.locator('[data-test="dashboard-color-by-series-popup"]')).not.toBeVisible();
+    await expect(pm.dashboardPanelConfigs.colorBySeriesPopup).not.toBeVisible();
     testLogger.info("Color by series saved");
 
     // Apply, wait for API response + ECharts repaint before pixel scan
@@ -98,7 +122,11 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     const colorResult = await verifyColorOnCanvas(page, { r: 230, g: 57, b: 70 });
     testLogger.info("Canvas color verification", { matchingPixels: colorResult.matchingPixels, colorFound: colorResult.colorFound });
-    expect(colorResult.colorFound).toBe(true);
+    expect(
+      colorResult.colorFound,
+      `Expected ${customColor} on the chart canvas for series "${selectedSeriesName}", ` +
+        `but only ${colorResult.matchingPixels} pixels matched across ${colorResult.canvasCount} canvases`
+    ).toBe(true);
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -114,8 +142,12 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelConfigs.configureOverrideWithUnit({ unitName: "Bytes" });
     testLogger.info("Override config: field + Bytes unit saved");
 
+    // Wait for the query to finish before asserting on the table: the pre-existing
+    // table from the setup Apply is still on screen while the new one loads, so a
+    // bare toBeVisible() would assert against the previous render.
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
+    await pm.dashboardPanelActions.waitForChartToRender();
+    await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
     testLogger.info("Override config applied — table renders");
 
     // Verify override config persists after save
@@ -144,7 +176,8 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     testLogger.info("Value mapping: applied with value, display text, and color");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
+    await pm.dashboardPanelActions.waitForChartToRender();
+    await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
     testLogger.info("Value mapping applied — table renders");
 
     // Verify value mapping persists after save
@@ -152,8 +185,8 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     testLogger.info("Verifying value mapping persists after save");
     await reopenPanelConfig(page, pm);
     const popup = await pm.dashboardPanelConfigs.openValueMappingPopup();
-    await expect(popup.locator('[data-test="dashboard-addpanel-config-value-mapping-value-input-0"]').locator('[data-test$="-field"]')).toHaveValue("test_value");
-    await expect(popup.locator('[data-test="dashboard-addpanel-config-value-mapping-text-input-0"]').locator('[data-test$="-field"]')).toHaveValue("Mapped!");
+    await expect(pm.dashboardPanelConfigs.valueMappingRowField(popup, 0, "value")).toHaveValue("test_value");
+    await expect(pm.dashboardPanelConfigs.valueMappingRowField(popup, 0, "text")).toHaveValue("Mapped!");
     testLogger.info("Value mapping persisted after save");
     await pm.dashboardPanelConfigs.closeValueMappingPopup();
 
@@ -167,16 +200,19 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     await setupMetricPanelWithConfig(page, pm, dashboardName);
 
-    const bgColorDropdown = page.locator('[data-test="dashboard-config-color-mode"]');
+    const bgColorDropdown = pm.dashboardPanelConfigs.bgColor;
     await expect(bgColorDropdown).toBeVisible();
     await pm.dashboardPanelConfigs.selectBGColor("Single Color");
     await pm.dashboardPanelActions.applyDashboardBtn();
+    // Let the query settle before saving — savePanel racing an in-flight Apply is a
+    // recurring source of intermittent save failures.
+    await pm.dashboardPanelActions.waitForChartToRender();
     testLogger.info("Background color set to Single Color");
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying background color Single Color persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-color-mode"]')).toContainText("Single Color");
+    await expect(pm.dashboardPanelConfigs.bgColor).toContainText("Single Color");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -187,7 +223,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
 
-    const topNInput = page.locator('[data-test="dashboard-config-top_results"]');
+    const topNInput = pm.dashboardPanelConfigs.topResults;
     await expect(topNInput).toBeVisible();
     await topNInput.locator('[data-test$="-field"]').fill("5");
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -198,7 +234,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying top N value persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-top_results"]').locator('[data-test$="-field"]')).toHaveValue("5");
+    await expect(pm.dashboardPanelConfigs.topResults.locator('[data-test$="-field"]')).toHaveValue("5");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -210,12 +246,12 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await setupBarPanelWithBreakdownAndConfig(page, pm, dashboardName);
 
     // Set top N to make the "Others" toggle appear
-    const topNInput = page.locator('[data-test="dashboard-config-top_results"]');
+    const topNInput = pm.dashboardPanelConfigs.topResults;
     await expect(topNInput).toBeVisible();
     await topNInput.locator('[data-test$="-field"]').fill("5");
 
     // Others toggle should now be visible
-    const othersToggle = page.locator('[data-test="dashboard-config-top_results_others"]');
+    const othersToggle = pm.dashboardPanelConfigs.topResultsOthers;
     await expect(othersToggle).toBeVisible({ timeout: 5000 });
     testLogger.info("Top N Others toggle appeared after setting top_results");
 
@@ -241,27 +277,24 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     const pm = new PageManager(page);
     const dashboardName = generateDashboardName();
 
-    await setupBarPanelWithConfig(page, pm, dashboardName);
+    // shouldApplyChartAlign() gates this control on: pie/donut type AND show_legends
+    // AND legends_position === "right" AND a plain/scroll/null legend type AND no
+    // trellis layout. This test used to build a *bar* panel, so the control could
+    // never appear and the "skip gracefully" branch fired every single run — the
+    // test created a dashboard, asserted nothing, and deleted it again. A pie panel
+    // with the legend moved to the right is the configuration that actually shows it.
+    await setupPiePanelWithConfig(page, pm, dashboardName);
+    await pm.dashboardPanelConfigs.legendPosition("Right");
 
-    const alignDropdown = page.locator('[data-test="dashboard-config-chart-align"]');
-    // Alignment may not be present for all chart types — skip gracefully
-    const isVisible = await alignDropdown.isVisible().catch(() => false);
-    if (!isVisible) {
-      testLogger.info("chart-align not visible for bar chart — skipping alignment interaction");
-      await pm.dashboardPanelActions.savePanel();
-      await cleanupTestDashboard(page, pm, dashboardName);
-      return;
-    }
-
+    const alignDropdown = pm.dashboardPanelConfigs.chartAlign;
     await expect(alignDropdown).toBeVisible();
+    // Default is Auto (chart_align === null)
+    await expect(alignDropdown).toHaveAttribute("data-test-selected-value", "null");
 
-    // Click dropdown and pick the first available option
-    await alignDropdown.click();
-    const options = page.locator('[data-test="dashboard-config-chart-align-option"]');
-    await options.first().waitFor({ state: "visible", timeout: 5000 });
-    const firstOptionText = await options.first().textContent();
-    await options.first().click();
-    testLogger.info(`Chart alignment set to: ${firstOptionText?.trim()}`);
+    // OToggleGroup items are always visible — click the target option directly.
+    await pm.dashboardPanelConfigs.selectChartAlign("Center");
+    await expect(alignDropdown).toHaveAttribute("data-test-selected-value", "center");
+    testLogger.info("Chart alignment set to: Center");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
     await pm.dashboardPanelActions.waitForChartToRender();
@@ -270,7 +303,15 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying chart alignment persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-chart-align"]')).toBeVisible();
+    // Original assertion, kept as-is.
+    await expect(pm.dashboardPanelConfigs.chartAlign).toBeVisible();
+    // Additionally assert the *value* round-tripped — visibility alone would pass
+    // with the alignment reset back to Auto.
+    await expect(pm.dashboardPanelConfigs.chartAlign).toHaveAttribute(
+      "data-test-selected-value",
+      "center"
+    );
+    testLogger.info("Chart alignment persisted as Center");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -286,10 +327,11 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     // Sparkline is metric-only — enable it; sub-controls should appear
     await pm.dashboardPanelConfigs.enableSparkline();
     expect(await pm.dashboardPanelConfigs.isSparklineEnabled()).toBe(true);
-    await expect(page.locator('[data-test="dashboard-config-sparkline-type"]')).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.sparklineType).toBeVisible();
     testLogger.info("Sparkline enabled — sub-controls visible");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying sparkline toggle persists after save");
@@ -310,8 +352,8 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await setupMetricPanelWithConfig(page, pm, dashboardName);
     await pm.dashboardPanelConfigs.enableSparkline();
 
-    const lineWidth = page.locator('[data-test="dashboard-config-sparkline-line-width"]');
-    const fillOpacity = page.locator('[data-test="dashboard-config-sparkline-fill-opacity"]');
+    const lineWidth = pm.dashboardPanelConfigs.sparklineLineWidthInput;
+    const fillOpacity = pm.dashboardPanelConfigs.sparklineFillOpacity;
 
     // Default type is Auto (→ area): line width visible
     await expect(lineWidth).toBeVisible();
@@ -343,10 +385,23 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     };
     page.on("response", onResponse);
 
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await page
-      .waitForResponse((res) => isDataQuery(res.url()) && res.url().includes("is_ui_histogram"), { timeout: 20000 })
+    // Wait for BOTH queries, not just the histogram. The two are independent
+    // requests with no ordering guarantee, and waiting only on the histogram
+    // unhooks the listener while the main metric query is still in flight —
+    // the count is then read as 1 and the test fails intermittently.
+    const isHistogram = (res) => isDataQuery(res.url()) && res.url().includes("is_ui_histogram");
+    const mainQueryResponse = page
+      .waitForResponse((res) => isDataQuery(res.url()) && !res.url().includes("is_ui_histogram"), { timeout: 20000 })
+      .catch((e) => testLogger.warn("main query response wait:", e.message));
+    const histogramResponse = page
+      .waitForResponse(isHistogram, { timeout: 20000 })
       .catch((e) => testLogger.warn("histogram response wait:", e.message));
+
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await Promise.all([mainQueryResponse, histogramResponse]);
+    // Let the panel finish settling so a spurious third query would still be caught
+    // by the "exactly 2" assertion below rather than slipping in after the unhook.
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
     page.off("response", onResponse);
 
     testLogger.info("Network activity during Apply", { allCalls, searchCalls });
@@ -355,8 +410,8 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     testLogger.info("Apply fired exactly 2 data queries (metric value + sparkline histogram)");
 
     // Metric panels render as SVG; the sparkline trend draws at least one path.
-    const chart = page.locator('[data-test="chart-renderer"]');
-    const errorMessage = page.locator('[data-test="panel-schema-renderer-error-message"]');
+    const chart = pm.dashboardPanelActions.getChartRendererCanvas();
+    const errorMessage = pm.dashboardPanelConfigs.panelSchemaRendererError;
     await Promise.race([
       chart.waitFor({ state: "visible", timeout: 15000 }),
       errorMessage.waitFor({ state: "visible", timeout: 15000 }),
@@ -387,17 +442,18 @@ test.describe("ConfigPanel — Advanced Settings", () => {
 
     // Switch layout to Background
     await pm.dashboardPanelConfigs.selectSparklineLayout("Background");
-    await expect(page.locator('[data-test="dashboard-config-sparkline-layout"]')).toContainText("Background");
+    await expect(pm.dashboardPanelConfigs.sparklineLayout).toContainText("Background");
     testLogger.info("Sparkline colour swatch + Background layout set");
 
     await pm.dashboardPanelActions.applyDashboardBtn();
+    await pm.dashboardPanelActions.waitForChartToRender();
     await pm.dashboardPanelActions.savePanel();
 
     testLogger.info("Verifying sparkline layout persists after save");
     await reopenPanelConfig(page, pm);
     await pm.dashboardPanelConfigs.expandAllConfigSections();
     expect(await pm.dashboardPanelConfigs.isSparklineEnabled()).toBe(true);
-    await expect(page.locator('[data-test="dashboard-config-sparkline-layout"]')).toContainText("Background");
+    await expect(pm.dashboardPanelConfigs.sparklineLayout).toContainText("Background");
 
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -427,7 +483,7 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     testLogger.info("Value mapping row added then removed");
 
     await pm.dashboardPanelConfigs.applyValueMappingPopup(popup);
-    await expect(page.locator('[data-test="dashboard-panel-table"]')).toBeVisible();
+    await expect(pm.dashboardPanelActions.dashboardTable).toBeVisible();
     testLogger.info("Value mapping applied — table renders");
 
     await pm.dashboardPanelActions.savePanel();
@@ -455,11 +511,15 @@ test.describe("ConfigPanel — Advanced Settings", () => {
     await pm.dashboardPanelConfigs.applyValueMappingPopup(popup);
     testLogger.info("Between-range value mapping configured on metric panel");
 
+    // networkidle is the wrong signal here — it resolves on *network* quiet, which
+    // can land before ECharts has drawn the mapped text, and the panel's polling can
+    // also keep it from ever going idle. The Apply button's own loading state is the
+    // panel's actual "query finished" flag.
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+    await pm.dashboardPanelActions.waitForChartToRender();
 
     // The mapped text replaces the metric value on the SVG renderer
-    const chart = page.locator('[data-test="chart-renderer"]');
+    const chart = pm.dashboardPanelActions.getChartRendererCanvas();
     await expect(chart).toBeVisible();
     await expect(chart).toContainText("MAPPED_OK");
     testLogger.info("Mapped text reflected in the metric chart");

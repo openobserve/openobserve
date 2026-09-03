@@ -42,7 +42,7 @@ vi.mock("@/utils/traces/convertTraceData", () => ({
 
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
-    searchObj: { meta: { serviceColors: { alertmanager: "#1ab8be" } } },
+    searchObj: { meta: { serviceColors: { scheduler: "#1ab8be" } } },
     buildQueryDetails: mockBuildQueryDetails,
     navigateToLogs: mockNavigateToLogs,
     navigateToCorrelatedLogs: mockNavigateToCorrelatedLogs,
@@ -137,7 +137,7 @@ const mockSpan = {
   span_id: "d9603ec7f76eb499",
   trace_id: "6262666637a9ae45ad3e25f5111dd59f",
   operation_name: "service:alerts:evaluate_scheduled",
-  service_name: "alertmanager",
+  service_name: "scheduler",
   span_status: "UNSET",
   span_kind: 2, // Server
   parent_id: "6702b0494b2b6e57",
@@ -146,7 +146,7 @@ const mockSpan = {
   http_method: "GET",
   http_status_code: "200",
   http_url: "/api/v1/alerts",
-  service_service_instance: "dev2-openobserve-alertmanager-1",
+  service_service_instance: "dev2-openobserve-scheduler-1",
   service_service_version: "v0.15.0-rc3",
   busy_ns: "40550",
   idle_ns: "321332352",
@@ -589,7 +589,7 @@ describe("TraceDetailsSidebar", async () => {
     });
 
     it("should switch to attributes tab by default when span has no db_ attributes", () => {
-      expect(wrapper.vm.activeTab).toBe("attributes");
+      expect(wrapper.vm.activeTabModel).toBe("attributes");
     });
 
     it("should not show database tab when span has no db_ attributes", () => {
@@ -653,13 +653,13 @@ describe("TraceDetailsSidebar", async () => {
     it("should display service name in attributes", () => {
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
-      expect(attributesTable.text()).toContain("alertmanager");
+      expect(attributesTable.text()).toContain("scheduler");
     });
 
     it("should display service instance in attributes", () => {
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
-      expect(attributesTable.text()).toContain("dev2-openobserve-alertmanager-1");
+      expect(attributesTable.text()).toContain("dev2-openobserve-scheduler-1");
     });
   });
 
@@ -749,6 +749,239 @@ describe("TraceDetailsSidebar", async () => {
           const eventRows = wrapper.findAll('[data-test^="o2-table-row-"]');
           expect(eventRows.length).toBeGreaterThan(0);
         });
+      });
+    });
+
+    describe("event mini-timeline", () => {
+      // Span timing: start_time is nanoseconds, duration is microseconds.
+      // Event `_timestamp` is nanoseconds (OTLP time_unix_nano, stored
+      // unconverted), so the window is built in microseconds from both.
+      const spanStartUs = mockSpan.start_time / 1000;
+      const eventNsAt = (fraction: number) => (spanStartUs + mockSpan.duration * fraction) * 1000;
+
+      const timelineMarkers = () => wrapper.findAll('[data-test="span-event-timeline-marker"]');
+
+      const setSpanEvents = async (events: unknown[]) => {
+        await wrapper.setProps({ span: { ...mockSpan, events: JSON.stringify(events) } });
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+      };
+
+      it("does not render the timeline when the span has no events", () => {
+        expect(wrapper.find('[data-test="trace-details-sidebar-events-timeline"]').exists()).toBe(
+          false,
+        );
+      });
+
+      it("plots each event against the span's own duration", async () => {
+        await setSpanEvents([
+          { name: "cache.miss", _timestamp: eventNsAt(0.25) },
+          { name: "exception", _timestamp: eventNsAt(0.5), "exception.type": "TimeoutError" },
+        ]);
+
+        expect(wrapper.find('[data-test="trace-details-sidebar-events-timeline"]').exists()).toBe(
+          true,
+        );
+        expect(timelineMarkers()).toHaveLength(2);
+        expect(timelineMarkers()[0].attributes("style")).toContain("left: 25%");
+        expect(timelineMarkers()[1].attributes("style")).toContain("left: 50%");
+      });
+
+      it("distinguishes exceptions from ordinary events", async () => {
+        await setSpanEvents([
+          { name: "cache.miss", _timestamp: eventNsAt(0.25) },
+          { name: "exception", _timestamp: eventNsAt(0.5), "exception.type": "TimeoutError" },
+        ]);
+
+        expect(timelineMarkers()[0].attributes("data-event-severity")).toBe("info");
+        expect(timelineMarkers()[1].attributes("data-event-severity")).toBe("error");
+        expect(timelineMarkers()[1].attributes("title")).toContain("TimeoutError");
+      });
+
+      // Regression: 55.1% of default-stream events were hidden behind a
+      // neighbour before clustering.
+      it("renders one marker per cluster", async () => {
+        // The timeline only exists once the span has events, so measure after.
+        await setSpanEvents([
+          { name: "a", _timestamp: eventNsAt(0.5) },
+          { name: "b", _timestamp: eventNsAt(0.5005) },
+        ]);
+        Object.defineProperty((wrapper.vm as any).eventTimelineRef, "clientWidth", {
+          value: 400,
+          configurable: true,
+        });
+        (wrapper.vm as any).onEventTimelineResize();
+        await flushPromises();
+
+        expect(timelineMarkers()).toHaveLength(1);
+        expect(timelineMarkers()[0].attributes("data-event-count")).toBe("2");
+      });
+
+      // Regression: the observer was attached in `onMounted`, but the track is
+      // inside the Events tab panel — rendered `v-if="isActive"` with no
+      // keep-alive — and further gated on the span having events, so it does not
+      // exist at mount. Nothing ever observed it, the width stayed 0, and every
+      // event rendered as its own overlapping marker. The test above hand-calls
+      // `onEventTimelineResize`, so it cannot see that; this one drives the
+      // observer the component attached for itself.
+      it("attaches the resize observer when the timeline appears", async () => {
+        const observed: Array<{ element: Element; notify: () => void }> = [];
+        const OriginalResizeObserver = globalThis.ResizeObserver;
+
+        class CapturingResizeObserver {
+          constructor(private callback: () => void) {}
+          observe(element: Element) {
+            observed.push({ element, notify: () => this.callback() });
+          }
+          unobserve() {}
+          disconnect() {}
+        }
+
+        vi.stubGlobal("ResizeObserver", CapturingResizeObserver);
+
+        try {
+          await setSpanEvents([
+            { name: "a", _timestamp: eventNsAt(0.5) },
+            { name: "b", _timestamp: eventNsAt(0.5005) },
+          ]);
+
+          const track = (wrapper.vm as any).eventTimelineRef;
+          const entry = observed.find((o) => o.element === track);
+          expect(entry).toBeDefined();
+
+          Object.defineProperty(track, "clientWidth", { value: 400, configurable: true });
+          entry!.notify();
+          await flushPromises();
+
+          expect(timelineMarkers()).toHaveLength(1);
+          expect(timelineMarkers()[0].attributes("data-event-count")).toBe("2");
+        } finally {
+          vi.stubGlobal("ResizeObserver", OriginalResizeObserver);
+        }
+      });
+
+      // Regression: the expansion names a row index, not an event, so selecting
+      // a different span left the same index expanded on an unrelated row.
+      it("clears the expanded event when the span changes", async () => {
+        await setSpanEvents([
+          { name: "first", _timestamp: eventNsAt(0.25) },
+          { name: "second", _timestamp: eventNsAt(0.75) },
+        ]);
+        await timelineMarkers()[1].trigger("click");
+        expect((wrapper.vm as any).expandedEventIds).toEqual(["1"]);
+
+        await wrapper.setProps({
+          span: {
+            ...mockSpan,
+            span_id: "a-different-span",
+            events: JSON.stringify([
+              { name: "other first", _timestamp: eventNsAt(0.25) },
+              { name: "other second", _timestamp: eventNsAt(0.75) },
+            ]),
+          },
+        });
+        await flushPromises();
+
+        expect((wrapper.vm as any).expandedEventIds).toEqual([]);
+      });
+
+      // Regression: `duration` is truncated integer microseconds, so an event
+      // firing at the real span end landed past 100% and was dropped here.
+      it("shows an event that fires at the exact span end", async () => {
+        await setSpanEvents([
+          { name: "ResponseReceived", _timestamp: (spanStartUs + mockSpan.duration) * 1000 + 256 },
+        ]);
+
+        expect(timelineMarkers()).toHaveLength(1);
+      });
+
+      // Regression: OTable does not read TanStack's expansion state at all —
+      // it keeps its own private Set, synced from the `expandedIds` prop
+      // (see useTableExpansion). Calling `row.toggleExpanded()` on the table
+      // instance was always a no-op, including from the sidebar's own
+      // mini-timeline click. Driving expansion through the prop instead needs
+      // no table ref, so there's no mount-timing race to arm a watcher for.
+      it("expands the row named by focusEvent", async () => {
+        await setSpanEvents([
+          { name: "first", _timestamp: eventNsAt(0.25) },
+          { name: "second", _timestamp: eventNsAt(0.75) },
+        ]);
+        const vm = wrapper.vm as any;
+
+        vm.focusEvent(1);
+
+        expect(vm.expandedEventIds).toEqual(["1"]);
+      });
+
+      it("expands the row named by focusEventIndex", async () => {
+        await setSpanEvents([
+          { name: "first", _timestamp: eventNsAt(0.25) },
+          { name: "second", _timestamp: eventNsAt(0.75) },
+        ]);
+
+        await wrapper.setProps({ focusEventIndex: 1 });
+        await flushPromises();
+
+        expect((wrapper.vm as any).expandedEventIds).toEqual(["1"]);
+      });
+
+      it("ignores a null focusEventIndex", async () => {
+        await setSpanEvents([{ name: "only", _timestamp: eventNsAt(0.25) }]);
+
+        await wrapper.setProps({ focusEventIndex: null });
+        await flushPromises();
+
+        expect((wrapper.vm as any).expandedEventIds).toEqual([]);
+      });
+
+      it("uses the span window, not the trace window", async () => {
+        // An event one quarter through the span sits at 25% here; against the
+        // whole trace it would land somewhere else entirely.
+        await setSpanEvents([{ name: "quarter", _timestamp: eventNsAt(0.25) }]);
+
+        expect(timelineMarkers()[0].attributes("style")).toContain("left: 25%");
+      });
+
+      it("expands the matching row when a marker is clicked", async () => {
+        await setSpanEvents([
+          { name: "first", _timestamp: eventNsAt(0.25) },
+          { name: "second", _timestamp: eventNsAt(0.75) },
+        ]);
+
+        await timelineMarkers()[1].trigger("click");
+
+        expect((wrapper.vm as any).expandedEventIds).toEqual(["1"]);
+      });
+
+      it("drops events that fall outside the span window", async () => {
+        await setSpanEvents([
+          { name: "before span", _timestamp: eventNsAt(-1) },
+          { name: "inside", _timestamp: eventNsAt(0.5) },
+        ]);
+
+        expect(timelineMarkers()).toHaveLength(1);
+        expect(timelineMarkers()[0].attributes("title")).toContain("inside");
+      });
+
+      it("renders no markers when the event payload is malformed", async () => {
+        await wrapper.setProps({ span: { ...mockSpan, events: "not-json" } });
+        await flushPromises();
+        await wrapper.vm.$nextTick();
+
+        expect(timelineMarkers()).toHaveLength(0);
+      });
+
+      // The sidebar carries no marker styling of its own — it renders
+      // SEVERITY_MARKER_CLASS directly. This asserts that inheritance, so a
+      // future change to the waterfall cannot silently leave this surface behind.
+      it("draws mini-timeline markers with the shared severity vocabulary", async () => {
+        await setSpanEvents([
+          { name: "cache.miss", level: "INFO", _timestamp: eventNsAt(0.25) },
+          { name: "boom", level: "ERROR", _timestamp: eventNsAt(0.75) },
+        ]);
+
+        expect(timelineMarkers()[0].classes()).toContain("bg-trace-event-info");
+        expect(timelineMarkers()[1].classes()).toContain("bg-trace-event-error");
       });
     });
   });
@@ -949,22 +1182,22 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should highlight search terms in service information", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
 
       // Verify search query is set
-      expect(wrapper.vm.searchQuery).toBe("alertmanager");
+      expect(wrapper.vm.searchQuery).toBe("scheduler");
       // Attributes tab is default — verify it contains the search term
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
-      expect(attributesTable.text()).toContain("alertmanager");
+      expect(attributesTable.text()).toContain("scheduler");
     });
   });
 
   describe("activeTab prop", () => {
     it("should default to 'attributes'", () => {
-      expect(wrapper.vm.activeTab).toBe("attributes");
+      expect(wrapper.vm.activeTabModel).toBe("attributes");
     });
 
     it("should emit update:activeTab when tab changes", async () => {
@@ -978,7 +1211,7 @@ describe("TraceDetailsSidebar", async () => {
       wrapper.unmount();
       wrapper = mountSidebar({ activeTab: "events" });
       await wrapper.vm.$nextTick();
-      expect(wrapper.vm.activeTab).toBe("events");
+      expect(wrapper.vm.activeTabModel).toBe("events");
     });
 
     it("should emit update:activeTab with the new tab value on click", async () => {

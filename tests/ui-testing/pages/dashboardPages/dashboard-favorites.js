@@ -24,6 +24,18 @@ export default class DashboardFavorites {
     this.searchInput = page.locator('[data-test="dashboard-search-field"]');
     this.refreshBtn = page.locator('[data-test="dashboard-list-refresh"]');
 
+    // Search scope toggle + clear button. OInput derives the clear button's
+    // hook from the consumer's data-test (`${parent}-clear`), and only renders
+    // it while the field is non-empty — so its absence is a real signal, not a
+    // timing artifact.
+    this.searchScopeAllFolders = page.locator(
+      '[data-test="dashboard-search-across-folders-toggle"]'
+    );
+    this.searchScopeCurrentFolder = page.locator(
+      '[data-test="dashboard-search-scope-current"]'
+    );
+    this.searchClearBtn = page.locator('[data-test="dashboard-search-clear"]');
+
     // Bulk action bar (only rendered once at least one row is selected).
     this.bulkDeleteBtn = page.locator(
       '[data-test="dashboard-list-delete-dashboards-btn"]'
@@ -103,6 +115,41 @@ export default class DashboardFavorites {
     await this.getNameCell(dashboardName)
       .waitFor({ state: "visible", timeout: 15000 })
       .catch(() => {});
+  }
+
+  // Switch the scope toggle to "All folders" and search. In the Favorites view
+  // this is the path fixed by #13437: the rows computed used to short-circuit
+  // to the stored favorites whenever the Favorites pseudo-folder was active,
+  // so cross-folder hits could never render. Filling the field triggers a
+  // 600ms-debounced list call, so callers assert with the standard 15s
+  // web-first timeout rather than sleeping here.
+  async searchAcrossFolders(query) {
+    await this.searchScopeAllFolders.waitFor({
+      state: "visible",
+      timeout: 15000,
+    });
+    await this.searchScopeAllFolders.click();
+    await this.searchInput.waitFor({ state: "visible", timeout: 15000 });
+    await this.searchInput.fill(query);
+  }
+
+  // ── Search clearing ────────────────────────────────────────────────────
+
+  async clearSearch() {
+    await this.searchClearBtn.waitFor({ state: "visible", timeout: 15000 });
+    await this.searchClearBtn.click();
+  }
+
+  // Regression guard for the `:clearable="searchAcrossFolders"` → `clearable`
+  // change: before it, the clear button only ever rendered while the "All
+  // folders" scope was active, leaving current-folder searches with no way to
+  // reset the field from the UI.
+  async verifySearchClearButtonVisible() {
+    await expect(this.searchClearBtn).toBeVisible({ timeout: 15000 });
+  }
+
+  async verifySearchInputEmpty() {
+    await expect(this.searchInput).toHaveValue("", { timeout: 15000 });
   }
 
   // ── Favorite toggling ──────────────────────────────────────────────────

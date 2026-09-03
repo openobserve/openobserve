@@ -62,6 +62,7 @@ axum.workspace = true
 http.workspace = true
 http-body-util.workspace = true
 anyhow.workspace = true
+argon2.workspace = true
 async-trait.workspace = true
 aws-sdk-sns.workspace = true
 base64.workspace = true
@@ -81,6 +82,10 @@ image.workspace = true
 itertools.workspace = true
 jsonwebtoken.workspace = true
 log.workspace = true
+# Direct (non-workspace) dep on purpose: already in Cargo.lock transitively, and
+# keeping it out of the root [workspace.dependencies] avoids the enterprise-CI
+# Cargo.toml.openobserve swap-manifest drift hazard.
+lru = "0.16"
 md5.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
@@ -117,9 +122,15 @@ version-compare.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
+openobserve-synthetics.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
 futures-util.workspace = true
 
 [dev-dependencies]
+criterion = { version = "0.5", default-features = false, features = ["rayon"] }
 multer.workspace = true
+
+[[bench]]
+name = "db_enrich"
+harness = false

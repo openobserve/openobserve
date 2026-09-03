@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, Metadata, VALUE_LABEL},
+    meta::promql::{METRICS_HASH_EXCLUDED_LABELS, Metadata},
     utils::hash::{Sum64, gxhash},
 };
 use datafusion::arrow::datatypes::Schema;
@@ -24,17 +24,6 @@ mod native_histogram;
 pub mod otlp;
 mod otlp_json_compat;
 pub mod prom;
-
-const EXCLUDE_LABELS: [&str; 8] = [
-    VALUE_LABEL,
-    HASH_LABEL,
-    EXEMPLARS_LABEL,
-    "is_monotonic",
-    "trace_id",
-    "span_id",
-    "_timestamp",
-    "_all",
-];
 
 /// The value policy for every metric we ingest, on every path.
 ///
@@ -92,12 +81,8 @@ pub fn signature_without_labels(
     gxhash::new().sum64(&key)
 }
 
-fn get_exclude_labels() -> Vec<&'static str> {
-    let vec: Vec<&str> = EXCLUDE_LABELS.to_vec();
-    // TODO: fixed _timestamp
-    // let column_timestamp = config::TIMESTAMP_COL_NAME.as_str();
-    // vec.push(column_timestamp);
-    vec
+fn get_exclude_labels() -> &'static [&'static str] {
+    METRICS_HASH_EXCLUDED_LABELS
 }
 
 #[cfg(test)]
@@ -151,6 +136,9 @@ mod tests {
         let labels = get_exclude_labels();
         assert!(labels.contains(&"_timestamp"));
         assert!(labels.contains(&"_all"));
+        assert!(labels.contains(&"trace_id"));
+        assert!(labels.contains(&"span_id"));
+        assert!(!labels.contains(&"job"));
     }
 
     /// The policy itself. The remote-write path calls this one directly (it needs the f64

@@ -204,8 +204,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
-      <template v-if="selectedIds.length" #bottom>
-        <div class="flex w-full flex-wrap items-center gap-2">
+      <template
+        v-if="selectedIds.length || truncated || escalationCapped"
+        #bottom
+      >
+        <div v-if="selectedIds.length" class="flex w-full flex-wrap items-center gap-2">
           <OText variant="body" as="span" data-test="oncall-bulk-count">
             {{ t("oncall.selectedCount", { count: selectedIds.length }) }}
           </OText>
@@ -257,6 +260,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("oncall.cancel") }}
           </OButton>
         </div>
+
+        <!-- The server caps a page at 200 and the facets have to be honest about
+             what they counted, so say so rather than quietly under-reporting.
+             The escalation cap is stated for the same reason: a blank ladder cell
+             would otherwise read as "nothing has fired". -->
+        <span
+          v-if="!selectedIds.length && (truncated || escalationCapped)"
+          class="text-text-secondary flex flex-wrap gap-x-3 text-xs"
+        >
+          <!-- The loaded length is never presented as the total: §G.5 is
+               explicit that the list endpoint has no count, and "the first
+               2000 of 2000" is a lie exactly when the number matters. -->
+          <span v-if="truncated" data-test="oncall-responses-truncated">
+            {{ t("oncall.listTruncatedNoTotal", { count: responses.length }) }}
+          </span>
+          <span v-if="escalationCapped" data-test="oncall-escalation-capped">
+            {{ t("oncall.escalationDetailCapped", { count: ESCALATION_DETAIL_LIMIT }) }}
+          </span>
+        </span>
       </template>
 
       <template #toolbar-trailing>
@@ -695,24 +717,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="oncall-responses-empty"
           @action="onEmptyAction"
         />
-      </template>
-
-      <!-- The server caps a page at 200 and the facets have to be honest about
-           what they counted, so say so rather than quietly under-reporting.
-           The escalation cap is stated for the same reason: a blank ladder cell
-           would otherwise read as "nothing has fired". -->
-      <template v-if="truncated || escalationCapped" #bottom>
-        <span class="text-text-secondary flex flex-wrap gap-x-3 text-xs">
-          <!-- The loaded length is never presented as the total: §G.5 is
-               explicit that the list endpoint has no count, and "the first
-               2000 of 2000" is a lie exactly when the number matters. -->
-          <span v-if="truncated" data-test="oncall-responses-truncated">
-            {{ t("oncall.listTruncatedNoTotal", { count: responses.length }) }}
-          </span>
-          <span v-if="escalationCapped" data-test="oncall-escalation-capped">
-            {{ t("oncall.escalationDetailCapped", { count: ESCALATION_DETAIL_LIMIT }) }}
-          </span>
-        </span>
       </template>
     </OTable>
 

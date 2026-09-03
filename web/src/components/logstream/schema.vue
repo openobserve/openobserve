@@ -258,7 +258,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               <template #icon-left
                                 ><OIcon name="format-list-bulleted" size="sm"
                               /></template>
-                              {{ computedSchemaFieldsName }} ({{ indexData.schema.length }})
+                              {{
+                                t("logStream.allFieldsCount", { count: indexData.schema.length })
+                              }}
                             </OToggleGroupItem>
                           </OToggleGroup>
                         </div>
@@ -301,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="mb-3" v-if="isDialogOpen">
                       <OCard class="flex w-screen max-w-full flex-col">
                         <!-- Header Section -->
-                        <OCardSection class="p-0" style="padding: 4px 16px 4px 16px">
+                        <OCardSection class="p-0" style="padding: 0.25rem 1rem 0.25rem 1rem">
                           <div class="flex items-center justify-between">
                             <div class="text-xl font-semibold">
                               {{ t("logStream.addFieldsTitle") }}
@@ -318,10 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
                         </OCardSection>
                         <!-- Main Content (Scrollable if necessary) -->
-                        <OCardSection
-                          class="mb-0.5 flex-1 overflow-y-auto p-0"
-                          style="padding: 0px 16px 0px 16px"
-                        >
+                        <OCardSection class="mb-0.5 flex-1 overflow-y-auto px-4 py-0">
                           <OForm :form="newSchemaFieldsForm" @keyup="onAddFieldsKeyup">
                             <StreamFieldsInputs
                               form-field-name="newSchemaFields"
@@ -410,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               clearable
                               size="sm"
                               :data-test="`schema-field-${row.name}-index-type-select`"
-                              style="width: 190px"
+                              style="width: 11.875rem"
                               @update:model-value="
                                 (val) => updateIndexType({ row }, enforceMaxIndexTypes(val))
                               "
@@ -1114,13 +1113,17 @@ export default defineComponent({
     const tabs = computed(() => [
       {
         value: "schemaFields",
-        label: `User Defined Schema (${indexData.value.defined_schema_fields.length})`,
+        label: t("logStream.userDefinedSchemaCount", {
+          count: indexData.value.defined_schema_fields.length,
+        }),
         disabled: !hasUserDefinedSchema.value,
         hide: !hasUserDefinedSchema.value,
       },
       {
         value: "allFields",
-        label: `${computedSchemaFieldsName} (${indexData.value.schema.length})`,
+        // Whole sentence in the message, matching the userDefinedSchemaCount
+        // sibling above — the count's placement is per-language.
+        label: t("logStream.allFieldsCount", { count: indexData.value.schema.length }),
         disabled: false,
         hide: false,
       },
@@ -1128,17 +1131,17 @@ export default defineComponent({
     const mainTabs = computed(() => [
       {
         value: "schemaSettings",
-        label: `Schema Settings`,
+        label: t("logStream.schemaSettingsTab"),
         disabled: false,
       },
       {
         value: "redButton",
-        label: `Extended Retention`,
+        label: t("logStream.extendedRetentionTab"),
         disabled: false,
       },
     ]);
     // here we are setting the schema field name always be "All Fields"
-    const computedSchemaFieldsName = "All Fields";
+    const computedSchemaFieldsName = t("logStream.allFields");
 
     const streamIndexType = [
       { label: t("logStream.indexTypeOptions.fullTextSearch"), value: "fullTextSearchKey" },
@@ -1875,7 +1878,7 @@ export default defineComponent({
         ? [
             {
               id: "patterns",
-              header: t("logStream.regexPatterns"),
+              header: raw("SDR"),
               accessorKey: "patterns",
               sortable: false,
               size: COL.template,
@@ -2595,7 +2598,7 @@ export default defineComponent({
   height: 2.1875rem;
 }
 
-.indexDetailsContainer :deep(.o2-schema-table .o2-schema-table tbody td:after) {
+.indexDetailsContainer :deep(.o2-schema-table .o2-schema-table tbody td::after) {
   background: none !important;
 }
 

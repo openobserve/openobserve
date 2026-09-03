@@ -44,10 +44,7 @@ use sea_orm::{
 use serde::Serialize;
 
 use super::entity::{oncall_delivery_reads, oncall_response_events, oncall_responses};
-use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors,
-};
+use crate::{db::get_orm_client_rw, errors};
 
 /// One attempted page, addressed to one person, with enough of the record
 /// beside it that an inbox row is readable without a second fetch.
@@ -207,7 +204,7 @@ pub async fn list_for_user(
     limit: u64,
     offset: u64,
 ) -> Result<Vec<UserDelivery>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(inbox_select(org_id, user_email, q)
         .select_only()
         .column_as(oncall_response_events::Column::Id, "event_id")
@@ -248,7 +245,7 @@ pub async fn count_for_user(
     user_email: &str,
     q: &InboxQuery,
 ) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(inbox_select(org_id, user_email, q).count(client).await?)
 }
 
@@ -286,7 +283,7 @@ pub async fn set_read(
     if event_ids.is_empty() {
         return Ok(0);
     }
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     if !read {
         let deleted = oncall_delivery_reads::Entity::delete_many()
@@ -325,7 +322,10 @@ pub async fn set_read(
         // The unique index is the real arbiter — two tabs marking the same row
         // at once is normal, and the loser of that race has still had its
         // effect.
-        match oncall_delivery_reads::Entity::insert(model).exec(client).await {
+        match oncall_delivery_reads::Entity::insert(model)
+            .exec(client)
+            .await
+        {
             Ok(_) => marked += 1,
             Err(e) => {
                 let msg = e.to_string().to_lowercase();
@@ -349,7 +349,7 @@ pub async fn mark_all_read(
     limit: u64,
     now: i64,
 ) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let ids: Vec<String> = inbox_select(
         org_id,
         user_email,

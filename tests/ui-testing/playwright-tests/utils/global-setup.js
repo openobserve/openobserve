@@ -89,9 +89,10 @@ async function globalSetup() {
     // Wait for login to complete — look for navigation or success indicators.
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
-    // Verify login success by checking for the home menu item — the home
-    // route is "/" so the resulting data-test contains a literal slash.
-    await page.locator('[data-test="menu-link-/-item"]').waitFor({
+    // Verify login success by checking for the main nav rail — the current
+    // rail no longer renders per-route `menu-link-*` items (see #13659, which
+    // made the same fix in enhanced-baseFixtures.js).
+    await page.locator('[data-test="navbar-main-nav"]').waitFor({
       state: 'visible',
       timeout: 10000,
     });

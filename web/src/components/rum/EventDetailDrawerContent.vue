@@ -326,6 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="t('common.viewTraceDetails')"
                       data-test="view-trace-btn"
                       class="ml-2 h-5! px-1.5"
+                      :loading="isResolvingTraceNav"
                       @click.stop="navigateToSpecificTrace(rumField(item, 'trace_id'))"
                     >
                       <OIcon name="account-tree" size="xs" />
@@ -443,7 +444,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { rumField } from "@/utils/rum/fields";
+import { rumField, normalizeTraceId } from "@/utils/rum/fields";
+import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
+import { traceQueryWindow } from "@/utils/rum/traceWindow";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -452,7 +455,7 @@ import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -500,6 +503,7 @@ const emit = defineEmits(["update:open", "resource-selected"]);
 const store = useStore();
 const router = useRouter();
 const { t } = useI18nTyped();
+const { resolveTraceLocation } = useCorrelatedTracesStream(t);
 const relatedResources = ref<any[]>([]);
 const isLoadingRelatedResources = ref(false);
 const selectedResourceWithTrace = ref<any>(null);
@@ -510,7 +514,7 @@ const { formatTimestamp, formatId, getStatusIcon, getStatusColorClass, getEventT
 
 const copyAttributesToClipboard = () => {
   copyToClipboard(JSON.stringify(props.rawEvent, null, 2), t, {
-    successMessage: t("common.copyToClipboard") + " - " + t("common.success"),
+    successMessage: t("common.copyToClipboardSuccess"),
     errorMessage: t("common.copyContentError"),
     timeout: 1500,
   });
@@ -524,13 +528,13 @@ const actionFields = computed(() => [
   {
     key: "action_type",
     label: t("common.actionType"),
-    value: props.rawEvent?.action_type || t("common.notAvailable"),
+    value: props.rawEvent?.action_type || raw("N/A"),
     valueClass: "capitalize",
   },
   {
     key: "action_target_name",
     label: t("common.actionTarget"),
-    value: props.rawEvent?.action_target_name || t("common.notAvailable"),
+    value: props.rawEvent?.action_target_name || raw("N/A"),
   },
   {
     key: "action_id",
@@ -609,11 +613,18 @@ const viewResourceDetails = (resource: any) => {
  * Used when clicking on individual trace icons
  * Opens in a new tab
  */
-const navigateToSpecificTrace = (traceId: string) => {
-  if (!traceId) return;
+const isResolvingTraceNav = ref(false);
+const navigateToSpecificTrace = async (traceId: string) => {
+  // Canonicalize: SDK 0.4.x stored ids zero-stripped, but the traces stream
+  // (and therefore the trace-details page) uses the padded 32-char form.
+  const canonicalTraceId = normalizeTraceId(traceId) || traceId;
+  if (!canonicalTraceId) return;
 
   // Find the resource with this trace_id to get timing information
-  const resource = relatedResources.value.find((r: any) => rumField(r, "trace_id") === traceId);
+  const resource = relatedResources.value.find(
+    (r: any) =>
+      (normalizeTraceId(rumField(r, "trace_id")) || rumField(r, "trace_id")) === canonicalTraceId,
+  );
 
   // Use resource timing if available, otherwise use event timing
   const startTime = resource?.date
@@ -623,20 +634,32 @@ const navigateToSpecificTrace = (traceId: string) => {
     ? resource.date * 1000 + 10000000 // 10 seconds after
     : props.rawEvent?.date * 1000 + 10000000;
 
-  // Build the route object
-  const route = router.resolve({
-    name: "traceDetails",
-    query: {
-      stream: "default", // RUM traces stream
-      trace_id: traceId,
-      from: startTime,
-      to: endTime,
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
-
-  // Open in new tab
-  window.open(route.href, "_blank");
+  // Popup-safe: window.open after an await loses the user-gesture context and
+  // popup blockers kill the tab — open synchronously, then point the window at
+  // whichever traces stream actually contains the trace (discovered + cached;
+  // falls back to the default correlation stream).
+  const win = window.open("", "_blank");
+  isResolvingTraceNav.value = true;
+  try {
+    const location = await resolveTraceLocation(canonicalTraceId, startTime, endTime);
+    // The ±10s guess above only frames the lookup; the indexed range is what
+    // the trace actually spans, so a slow call is no longer cut off.
+    const traceWindow = traceQueryWindow(location.range, startTime, endTime);
+    const route = router.resolve({
+      name: "traceDetails",
+      query: {
+        stream: location.stream,
+        trace_id: canonicalTraceId,
+        from: traceWindow.startTime,
+        to: traceWindow.endTime,
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+    if (win) win.location.href = route.href;
+    else window.open(route.href, "_blank");
+  } finally {
+    isResolvingTraceNav.value = false;
+  }
 };
 
 defineExpose({

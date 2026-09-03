@@ -18,6 +18,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 // Mirrors Tailwind's default `sm` breakpoint (40rem / 640px) — the same
 // threshold OPageHeader's `max-sm:` utilities key off, so the app-shell
 // (navbar rail) and page-level layout collapse together.
+// eslint-disable-next-line local/no-hardcoded-px -- matchMedia query condition, not a rendered size
 const MOBILE_MEDIA_QUERY = "(max-width: 639px)";
 
 /**

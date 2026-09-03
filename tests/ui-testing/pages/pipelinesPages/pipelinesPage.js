@@ -360,7 +360,11 @@ export class PipelinesPage {
 
     // Methods from original PipelinesPage
     async gotoPipelinesPage() {
-        await openNavFlyoutChild(this.page, 'pipeline');
+        // The flyout child is a hover-reveal that can self-close mid-click, so retry the reveal+click until the pipeline route actually loads.
+        await expect(async () => {
+            await openNavFlyoutChild(this.page, 'pipeline');
+            await this.page.waitForURL(/pipeline/, { timeout: 5000 });
+        }).toPass({ timeout: 30000, intervals: [500, 1000, 2000] });
     }
 
     async pipelinesPageDefaultOrg() {
@@ -967,11 +971,7 @@ export class PipelinesPage {
         await this.sqlEditor.click();
     }
 
-    // Method to type the SQL query
-    async typeSqlQuery(query) {
-        await this.sqlQueryInput.click();
-        await this.sqlQueryInput.fill(query);
-    }
+
 
     // Method to select the frequency unit dropdown
     async selectFrequencyUnit() {
@@ -1895,6 +1895,14 @@ export class PipelinesPage {
         await this.valueInput.nth(index).locator('input').fill(value);
     }
 
+    /**
+     * Fill the first condition value input field (OInner `-field` native input).
+     * @param {string} value - The value to fill
+     */
+    async fillFirstConditionValue(value) {
+        await this.valueInputField.first().fill(value);
+    }
+
     async verifyDeleteButtonCount(expectedCount) {
         const count = await this.deleteConditionBtn.count();
         expect(count).toBe(expectedCount);
@@ -2723,12 +2731,7 @@ export class PipelinesPage {
         await this.queryNodeDeleteBtn.first().click();
     }
 
-    /**
-     * Click confirm button
-     */
-    async clickConfirmButton() {
-        await this.confirmButton.click();
-    }
+
 
     /**
      * Click cancel pipeline button
@@ -3919,6 +3922,15 @@ export class PipelinesPage {
     }
 
     /**
+     * Wait for the history search-select OSelect popover to be hidden (e.g. after
+     * pressing Escape to dismiss the dropdown overlay). Best-effort.
+     */
+    async waitForHistorySearchSelectPopoverHidden() {
+        await this.page.locator('[data-test="pipeline-history-search-select-popover"]')
+            .waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    }
+
+    /**
      * Select first option in dropdown
      */
     async selectFirstOption() {
@@ -4051,6 +4063,28 @@ export class PipelinesPage {
             }
         } catch (e) {
             // Ignore cleanup errors
+        }
+    }
+
+    /**
+     * Click a top-left corner of the page body to dismiss an open dialog/dropdown
+     * or navigate away from an editor without saving.
+     */
+    async clickBodyCorner() {
+        await this.page.locator('body').click({ position: { x: 10, y: 10 } });
+    }
+
+    /**
+     * Confirm the ResumePipelineDialog if it is open. When a paused pipeline is
+     * toggled back on, a dialog asks "from now" vs "from where paused"; clicking
+     * the primary button confirms the resume so it doesn't block later clicks.
+     */
+    async confirmResumePipelineDialog() {
+        const resumeDialog = this.page.locator('[data-test="resume-pipeline-dialog"]');
+        if (await resumeDialog.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await resumeDialog.locator('[data-test="o-dialog-primary-btn"]').click();
+            await this.page.waitForTimeout(500);
+            testLogger.info('Resume dialog confirmed');
         }
     }
 

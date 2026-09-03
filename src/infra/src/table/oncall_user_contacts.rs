@@ -19,10 +19,7 @@ use config::{ider, meta::oncall::Contact};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 use super::entity::oncall_user_contacts;
-use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors,
-};
+use crate::{db::get_orm_client_rw, errors};
 
 fn to_contact(m: oncall_user_contacts::Model) -> Contact {
     Contact {
@@ -39,7 +36,7 @@ fn to_contact(m: oncall_user_contacts::Model) -> Contact {
 
 /// The profile on file, or `None` when the person has never saved one.
 pub async fn get(org_id: &str, user_email: &str) -> Result<Option<Contact>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_user_contacts::Entity::find()
         .filter(oncall_user_contacts::Column::OrgId.eq(org_id))
         .filter(oncall_user_contacts::Column::UserEmail.eq(user_email))
@@ -80,7 +77,7 @@ pub async fn upsert(
     patch: &ContactPatch,
     now: i64,
 ) -> Result<Contact, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let existing = oncall_user_contacts::Entity::find()
         .filter(oncall_user_contacts::Column::OrgId.eq(org_id))
         .filter(oncall_user_contacts::Column::UserEmail.eq(user_email))
@@ -105,17 +102,17 @@ pub async fn upsert(
 
     let (old_phone, old_push) = (existing.phone.clone(), existing.push_token.clone());
     let mut model: oncall_user_contacts::ActiveModel = existing.into();
-    if let Some(phone) = patch.phone.clone() {
-        if phone != old_phone {
-            model.phone = Set(phone);
-            model.phone_verified_at = Set(None);
-        }
+    if let Some(phone) = patch.phone.clone()
+        && phone != old_phone
+    {
+        model.phone = Set(phone);
+        model.phone_verified_at = Set(None);
     }
-    if let Some(token) = patch.push_token.clone() {
-        if token != old_push {
-            model.push_token = Set(token);
-            model.push_verified_at = Set(None);
-        }
+    if let Some(token) = patch.push_token.clone()
+        && token != old_push
+    {
+        model.push_token = Set(token);
+        model.push_verified_at = Set(None);
     }
     if let Some(quiet) = patch.quiet_hours.clone() {
         model.quiet_hours = Set(quiet);
@@ -126,7 +123,7 @@ pub async fn upsert(
 
 /// Forgets a profile entirely. `false` when there was nothing to forget.
 pub async fn delete(org_id: &str, user_email: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let deleted = oncall_user_contacts::Entity::delete_many()
         .filter(oncall_user_contacts::Column::OrgId.eq(org_id))
         .filter(oncall_user_contacts::Column::UserEmail.eq(user_email))

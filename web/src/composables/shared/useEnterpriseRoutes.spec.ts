@@ -1,5 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
+import enLocale from "@/locales/languages/en-US.json";
+
+/** Every `meta.titleKey` in a route tree, children included. */
+const collectTitleKeys = (routes: any[]): string[] =>
+  routes.flatMap((route) => [
+    ...(route?.meta?.titleKey ? [route.meta.titleKey] : []),
+    ...collectTitleKeys(route?.children ?? []),
+  ]);
+
+const enMessage = (key: string) =>
+  key.split(".").reduce<any>((node, part) => node?.[part], enLocale);
 
 // Mock the config module with mutable reference
 vi.mock("@/aws-exports", () => {
@@ -70,10 +81,6 @@ vi.mock("@/components/iam/quota/Quota.vue", () => ({
 
 vi.mock("@/components/iam/organizations/AppOrganizations.vue", () => ({
   default: vi.fn(() => ({ name: "AppOrganizations" })),
-}));
-
-vi.mock("@/components/actionScripts/ActionScripts.vue", () => ({
-  default: vi.fn(() => ({ name: "ActionScripts" })),
 }));
 
 vi.mock("@/views/User.vue", () => ({
@@ -233,17 +240,45 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(organizationsRoute.path).toBe("organizations");
     });
 
-    // Test 19: Should have 5 children in basic configuration
-    it("should have 5 children in basic configuration", () => {
+    // Test 19: Should have 6 children in basic configuration
+    it("should have 6 children in basic configuration", () => {
       const routes = useEnterpriseRoutes();
       const iamRoute = routes.find((route: any) => route.name === "iam");
-      expect(iamRoute.children.length).toBe(5);
+      expect(iamRoute.children.length).toBe(6);
     });
 
-    // Test 20: Should have only 1 route in basic configuration
-    it("should have only 1 route in basic configuration", () => {
+    // Test 19a: MCP setup is served by every edition, so it must be present on
+    // the OSS build too — not pushed inside the enterprise/cloud branch.
+    it("should include mcpServer child route on OSS", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1);
+      const iamRoute = routes.find((route: any) => route.name === "iam");
+      const mcpRoute = iamRoute.children.find((child: any) => child.name === "mcpServer");
+      expect(mcpRoute).toBeDefined();
+      expect(mcpRoute.path).toBe("mcpServer");
+    });
+
+    // Test 20: iam + synthetics + its 6 sub-routes, all of which ship in OSS.
+    it("should have 8 routes in basic configuration", () => {
+      const routes = useEnterpriseRoutes();
+      expect(routes.length).toBe(8);
+    });
+
+    // Synthetics moved out of `o2_enterprise` into `src/synthetics`; only the
+    // private-VPC-agent half stays enterprise, so the pages register in an OSS
+    // build and the backend `/config` flag decides whether they are reachable.
+    it("should register every synthetics route on OSS", () => {
+      const routes = useEnterpriseRoutes();
+      const names = routes.map((r: any) => r.name);
+      expect(names).toEqual(
+        expect.arrayContaining([
+          "synthetics",
+          "synthetics-add",
+          "synthetics-edit",
+          "synthetic-private-location",
+          "synthetic-monitor-results",
+          "synthetics-run-detail",
+        ]),
+      );
     });
   });
 
@@ -252,34 +287,6 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = "true";
       config.default.isEnterprise = "false";
-    });
-
-    // Test 21: Should add actions route when isCloud is true
-    it("should add actions route when isCloud is true", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(actionsRoute).toBeDefined();
-    });
-
-    // Test 22: Should have correct actions route path
-    it("should have correct actions route path", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(actionsRoute.path).toBe("actions");
-    });
-
-    // Test 23: Should have actions route component
-    it("should have actions route component", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(actionsRoute.component).toBeDefined();
-    });
-
-    // Test 24: Should have actions route beforeEnter guard
-    it("should have actions route beforeEnter guard", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(typeof actionsRoute.beforeEnter).toBe("function");
     });
 
     // Test 25: Should add groups child route
@@ -353,7 +360,7 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(12);
     });
 
-    // Test 34: iam + synthetics + 5 synthetics sub-routes + actions + 2 incidents + workflows = 11
+    // Test 34: iam + synthetics + 6 synthetics sub-routes + 2 incidents + workflows = 11
     it("should have 11 routes in cloud configuration", () => {
       const routes = useEnterpriseRoutes();
       expect(routes.length).toBe(11);
@@ -367,13 +374,6 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "true";
     });
 
-    // Test 35: Should add actions route when isEnterprise is true
-    it("should add actions route when isEnterprise is true", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(actionsRoute).toBeDefined();
-    });
-
     // Test 36: Should add enterprise IAM routes
     it("should add enterprise IAM routes", () => {
       const routes = useEnterpriseRoutes();
@@ -381,7 +381,7 @@ describe("useEnterpriseRoutes.ts", () => {
       expect(iamRoute.children.length).toBe(11);
     });
 
-    // Test 37: iam + synthetics + 5 synthetics sub-routes + actions + 2 incidents + workflows = 11
+    // Test 37: iam + synthetics + 6 synthetics sub-routes + 2 incidents + workflows = 11
     it("should have enterprise routes structure", () => {
       const routes = useEnterpriseRoutes();
       expect(routes.length).toBe(11);
@@ -395,7 +395,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "true";
     });
 
-    // Test 38: Should add all routes when both flags are true (iam + synthetics + 5 synthetics sub-routes + actions + 2 incidents + workflows = 11)
+    // Test 38: Should add all routes when both flags are true (iam + synthetics + 6 synthetics sub-routes + 2 incidents + workflows = 11)
     it("should add all routes when both flags are true", () => {
       const routes = useEnterpriseRoutes();
       expect(routes.length).toBe(11);
@@ -479,20 +479,6 @@ describe("useEnterpriseRoutes.ts", () => {
       const config = await import("@/aws-exports");
       config.default.isCloud = "true";
       config.default.isEnterprise = "false";
-    });
-
-    // Test 44: Should call routeGuard for actions route
-    it("should call routeGuard for actions route", async () => {
-      const { routeGuard } = await import("@/utils/zincutils");
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-
-      const mockTo = {};
-      const mockFrom = {};
-      const mockNext = vi.fn();
-
-      actionsRoute.beforeEnter(mockTo, mockFrom, mockNext);
-      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
     });
 
     // Test 45: Should call routeGuard for groups route
@@ -646,13 +632,6 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "false";
     });
 
-    // Test 56: Should have component for actions route
-    it("should have component for actions route", () => {
-      const routes = useEnterpriseRoutes();
-      const actionsRoute = routes.find((route: any) => route.name === "actionScripts");
-      expect(typeof actionsRoute.component).toBe("function");
-    });
-
     // Test 57: Should have component for groups route
     it("should have component for groups route", () => {
       const routes = useEnterpriseRoutes();
@@ -702,7 +681,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = undefined;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should fallback to basic routes only
+      expect(routes.length).toBe(8); // Basic routes only: iam + synthetics + its 6 sub-routes
     });
 
     // Test 63: Should handle config with null values
@@ -712,7 +691,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = null;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should fallback to basic routes only
+      expect(routes.length).toBe(8); // Basic routes only: iam + synthetics + its 6 sub-routes
     });
 
     // Test 64: Should handle config with non-string values
@@ -722,7 +701,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = false;
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should only add routes when string "true"
+      expect(routes.length).toBe(8); // Only adds enterprise routes when string "true"
     });
 
     // Test 65: Should handle config with empty string values
@@ -732,7 +711,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "";
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should fallback to basic routes only
+      expect(routes.length).toBe(8); // Basic routes only: iam + synthetics + its 6 sub-routes
     });
 
     // Test 66: Should handle mixed string cases
@@ -742,7 +721,7 @@ describe("useEnterpriseRoutes.ts", () => {
       config.default.isEnterprise = "TRUE";
 
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(1); // Should be case sensitive, only "true" should work
+      expect(routes.length).toBe(8); // Case sensitive: only "true" adds enterprise routes
     });
 
     // Test 67: Should maintain iam route as first element
@@ -797,6 +776,24 @@ describe("useEnterpriseRoutes.ts", () => {
 
       const uniqueNames = [...new Set(allNames)];
       expect(uniqueNames.length).toBe(allNames.length); // No duplicates
+    });
+  });
+
+  // Route meta is untyped (`routes: any`), so a typo in a titleKey cannot be
+  // caught by the compiler — this is the gate instead. An unresolvable key would
+  // put the raw key in the browser tab.
+  describe("meta.titleKey", () => {
+    it("should only use i18n keys that exist in en-US.json", async () => {
+      const config = await import("@/aws-exports");
+      config.default.isCloud = "true";
+      config.default.isEnterprise = "true";
+
+      const titleKeys = collectTitleKeys(useEnterpriseRoutes());
+      expect(titleKeys.length).toBeGreaterThan(0);
+
+      for (const titleKey of titleKeys) {
+        expect(enMessage(titleKey), `no en-US message for "${titleKey}"`).toBeTypeOf("string");
+      }
     });
   });
 });

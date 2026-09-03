@@ -222,6 +222,16 @@ pub struct Alert {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(example = "https://wiki.example.com/runbooks/checkout")]
     pub runbook_url: Option<String>,
+
+    /// Whether a scheduler job exists for this alert (runtime status, not a
+    /// stored field). Populated on the composite detail path; omitted otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(read_only)]
+    pub scheduler_job_present: Option<bool>,
+
+    #[serde(default)]
+    #[schema(example = 10)]
+    pub pending_period_sec: i64,
 }
 
 /// Configuration for when and how an alert should be triggered.
@@ -240,7 +250,9 @@ pub struct Alert {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, PartialEq)]
 pub struct TriggerCondition {
     /// Time window in minutes to evaluate. The query looks back this many minutes.
-    #[serde(rename = "period")]
+    /// Defaulted to `0` so composite alerts — which send only `silence` — can
+    /// omit it; the composite path rejects any non-default period explicitly.
+    #[serde(rename = "period", default)]
     #[schema(example = 15)]
     pub period_minutes: i64,
 
@@ -283,8 +295,11 @@ pub struct TriggerCondition {
     pub cron: String,
 
     /// Schedule type: "minutes" for interval-based or "cron" for cron expressions.
-    #[serde(default)]
-    pub frequency_type: FrequencyType,
+    /// `None` means the field was omitted. Kept optional (rather than defaulting
+    /// to "minutes") so composite alerts can reject an explicit `frequency_type`
+    /// even when its value equals the default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frequency_type: Option<FrequencyType>,
 
     /// Silence period in minutes after an alert fires before it can fire again.
     #[serde(rename = "silence")]
@@ -528,6 +543,10 @@ pub enum Operator {
     LessThanEquals,
     Contains,
     NotContains,
+    IsNull,
+    IsNotNull,
+    IsEmpty,
+    IsNotEmpty,
 }
 
 #[derive(Hash, Clone, Copy, Debug, Eq, PartialEq, Deserialize, Serialize, ToSchema)]
@@ -600,6 +619,8 @@ impl From<(meta_alerts::alert::Alert, Option<Trigger>)> for Alert {
             tags: alert.tags,
             oncall_team: alert.oncall_team,
             runbook_url: alert.runbook_url,
+            scheduler_job_present: None,
+            pending_period_sec: alert.pending_period_sec,
         }
     }
 }
@@ -614,7 +635,7 @@ impl From<meta_alerts::TriggerCondition> for TriggerCondition {
             notify_on_warning: value.notify_on_warning,
             frequency_minutes: value.frequency / 60,
             cron: value.cron,
-            frequency_type: value.frequency_type.into(),
+            frequency_type: Some(value.frequency_type.into()),
             silence_minutes: value.silence,
             timezone: value.timezone,
             tolerance_seconds: value.tolerance_in_secs,
@@ -725,6 +746,10 @@ impl From<meta_alerts::Operator> for Operator {
             meta_alerts::Operator::LessThanEquals => Self::LessThanEquals,
             meta_alerts::Operator::Contains => Self::Contains,
             meta_alerts::Operator::NotContains => Self::NotContains,
+            meta_alerts::Operator::IsNull => Self::IsNull,
+            meta_alerts::Operator::IsNotNull => Self::IsNotNull,
+            meta_alerts::Operator::IsEmpty => Self::IsEmpty,
+            meta_alerts::Operator::IsNotEmpty => Self::IsNotEmpty,
         }
     }
 }
@@ -799,6 +824,7 @@ impl From<Alert> for meta_alerts::alert::Alert {
         // Same empty-string-is-absent rule: a form clears a text input by
         // sending "", and a stored "" would render as a link to nowhere.
         alert.runbook_url = value.runbook_url.filter(|u| !u.trim().is_empty());
+        alert.pending_period_sec = value.pending_period_sec;
 
         alert
     }
@@ -815,7 +841,7 @@ impl From<TriggerCondition> for meta_alerts::TriggerCondition {
             notify_on_warning: value.notify_on_warning,
             frequency: value.frequency_minutes * 60,
             cron: value.cron,
-            frequency_type: value.frequency_type.into(),
+            frequency_type: value.frequency_type.unwrap_or_default().into(),
             silence: value.silence_minutes,
             timezone: value.timezone,
             tolerance_in_secs: value.tolerance_seconds,
@@ -925,6 +951,10 @@ impl From<Operator> for meta_alerts::Operator {
             Operator::LessThanEquals => Self::LessThanEquals,
             Operator::Contains => Self::Contains,
             Operator::NotContains => Self::NotContains,
+            Operator::IsNull => Self::IsNull,
+            Operator::IsNotNull => Self::IsNotNull,
+            Operator::IsEmpty => Self::IsEmpty,
+            Operator::IsNotEmpty => Self::IsNotEmpty,
         }
     }
 }
@@ -1396,7 +1426,7 @@ mod tests {
             threshold_count: 3,
             frequency_minutes: 5,
             cron: "".to_string(),
-            frequency_type: FrequencyType::Minutes,
+            frequency_type: Some(FrequencyType::Minutes),
             silence_minutes: 30,
             timezone: None,
             tolerance_seconds: None,

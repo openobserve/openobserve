@@ -59,6 +59,7 @@ pub async fn queue(
     if get(db, slo_id, generation).await?.is_some() {
         return Ok(());
     }
+
     slo_backfill_jobs::ActiveModel {
         slo_id: Set(slo_id.to_string()),
         definition_generation: Set(generation),
@@ -87,6 +88,7 @@ pub async fn record_progress(
     let Some(model) = get(db, slo_id, generation).await? else {
         return Ok(());
     };
+
     let previous = model.rows_written;
     let mut active = model.into_active_model();
     active.state = Set(STATE_RUNNING);
@@ -127,6 +129,7 @@ async fn set_state(
     let Some(model) = get(db, slo_id, generation).await? else {
         return Ok(());
     };
+
     let mut active = model.into_active_model();
     active.state = Set(state);
     if let Some(e) = error {
@@ -145,12 +148,34 @@ pub async fn delete_all(db: &DatabaseConnection, slo_id: &str) -> Result<(), Err
     Ok(())
 }
 
+/// Drop every job belonging to an org's SLOs — the org-teardown path.
+///
+/// Jobs carry no org of their own, so the ids come from `slos`. This therefore
+/// has to run BEFORE `slos::delete_by_org`, or there is nothing left to
+/// resolve through.
+pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), Error> {
+    let slo_ids = super::slos::ids_in_org(db, org).await?;
+    if slo_ids.is_empty() {
+        return Ok(());
+    }
+
+    slo_backfill_jobs::Entity::delete_many()
+        .filter(slo_backfill_jobs::Column::SloId.is_in(slo_ids))
+        .exec(db)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use sea_orm::Database;
 
     use super::*;
-    use crate::table::migration::create_slo_tables_for_test;
+    // Jobs carry no org column, so the org lives one hop away in `slos` —
+    // the by-org tests need a real row there to resolve through.
+    use crate::table::{
+        migration::create_slo_tables_for_test, slos::insert_for_test as register_slo,
+    };
 
     const SLO: &str = "slo1";
 
@@ -256,5 +281,55 @@ mod tests {
             get(&db, "other", 1).await.unwrap().is_some(),
             "another SLO's job was deleted"
         );
+    }
+
+    // ===================== org teardown ===================================
+
+    const ORG: &str = "acme";
+    const OTHER_ORG: &str = "globex";
+    const OTHER_SLO: &str = "slo2";
+
+    #[tokio::test]
+    async fn delete_by_org_removes_every_generations_job_for_the_orgs_slos() {
+        let db = db().await;
+        register_slo(&db, ORG, SLO).await;
+        register_slo(&db, ORG, OTHER_SLO).await;
+        queue(&db, SLO, 1, 0, 900, 100).await.unwrap();
+        queue(&db, SLO, 2, 0, 900, 100).await.unwrap();
+        queue(&db, OTHER_SLO, 1, 0, 900, 100).await.unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        assert!(get(&db, SLO, 1).await.unwrap().is_none());
+        assert!(get(&db, SLO, 2).await.unwrap().is_none());
+        assert!(get(&db, OTHER_SLO, 1).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn delete_by_org_leaves_another_orgs_jobs_alone() {
+        let db = db().await;
+        register_slo(&db, ORG, SLO).await;
+        register_slo(&db, OTHER_ORG, OTHER_SLO).await;
+        queue(&db, SLO, 1, 0, 900, 100).await.unwrap();
+        queue(&db, OTHER_SLO, 1, 0, 900, 100).await.unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        assert!(get(&db, SLO, 1).await.unwrap().is_none());
+        assert!(
+            get(&db, OTHER_SLO, 1).await.unwrap().is_some(),
+            "another org's backfill job was deleted"
+        );
+    }
+
+    /// Org cleanup retries steps, so a second pass must find nothing and
+    /// still succeed.
+    #[tokio::test]
+    async fn delete_by_org_on_an_org_with_no_slos_is_a_no_op() {
+        let db = db().await;
+        register_slo(&db, OTHER_ORG, OTHER_SLO).await;
+        queue(&db, OTHER_SLO, 1, 0, 900, 100).await.unwrap();
+
+        delete_by_org(&db, ORG).await.unwrap();
+        delete_by_org(&db, ORG).await.unwrap();
+        assert!(get(&db, OTHER_SLO, 1).await.unwrap().is_some());
     }
 }

@@ -142,6 +142,13 @@ pub struct CorrelationResponse {
     /// `None` if the feature is not enabled or the set was not determined.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub matched_set_id: Option<String>,
+    /// Echo of the request's source stream, so consumers never have to re-derive
+    /// which stream the correlation started from (F27).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_stream: Option<String>,
+    /// Echo of the request's source stream type (logs/traces/metrics) (F27).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_type: Option<String>,
 }
 
 impl CorrelationResponse {
@@ -190,6 +197,8 @@ impl CorrelationResponse {
             related_streams,
             all_streams: Vec::new(),
             matched_set_id: None,
+            source_stream: None,
+            source_type: None,
         };
         response.build_all_streams();
         response
@@ -768,6 +777,8 @@ mod tests {
             },
             all_streams: vec![],
             matched_set_id: None,
+            source_stream: None,
+            source_type: None,
         };
         let json = serde_json::to_value(&r).unwrap();
         let obj = json.as_object().unwrap();
@@ -788,6 +799,8 @@ mod tests {
             },
             all_streams: vec![StreamInfo::with_type("x".to_string(), StreamType::Logs)],
             matched_set_id: Some("set1".to_string()),
+            source_stream: None,
+            source_type: None,
         };
         let json = serde_json::to_value(&r).unwrap();
         let obj = json.as_object().unwrap();

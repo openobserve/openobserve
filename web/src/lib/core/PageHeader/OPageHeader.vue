@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <slot name="back">
             <button
               type="button"
-              class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-accent/25 inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
+              class="rounded-default bg-surface-subtle text-text-body hover:bg-button-ghost-hover-bg focus-visible:ring-focus-ring-accent inline-flex h-9.5 w-9.5 shrink-0 items-center justify-center transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
               :title="backLabel"
               :aria-label="backLabel"
               :data-test="props.back?.dataTest ?? 'app-page-header-back'"
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { raw, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { Comment, Text, computed, useSlots } from "vue";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -200,6 +200,7 @@ const props = withDefaults(
 
 const router = useRouter();
 const slots = useSlots();
+const { t } = useI18nTyped();
 
 // A slot passed with an always-present <template> but a falsy inner v-if still
 // yields a comment placeholder node — so checking `$slots.x` is truthy even
@@ -219,7 +220,9 @@ const hasSubtitle = computed(() => Boolean(props.subtitle) || slotHasContent("su
 const hasTabs = computed(() => slotHasContent("tabs"));
 const hasActions = computed(() => slotHasContent("actions"));
 const hasBack = computed(() => Boolean(props.back) || slotHasContent("back"));
-const backLabel = computed(() => (props.back?.label ? `Back to ${props.back.label}` : "Back"));
+const backLabel = computed(() =>
+  props.back?.label ? t("common.backTo", { label: props.back.label }) : t("common.back"),
+);
 
 const onBack = () => {
   if (props.back?.onClick) props.back.onClick();

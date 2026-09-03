@@ -223,9 +223,11 @@ async fn retention_sweep(now: i64) -> Result<(), anyhow::Error> {
         log::debug!("[ONCALL_RETENTION] retention is switched off; skipping");
         return Ok(());
     };
-    let (records, events) =
-        infra::table::oncall_responses::prune_events(cutoff, retention_batch(cfg.event_retention_batch))
-            .await?;
+    let (records, events) = infra::table::oncall_responses::prune_events(
+        cutoff,
+        retention_batch(cfg.event_retention_batch),
+    )
+    .await?;
     // Only worth a line when it did something: an hourly pass over a deployment
     // with nothing old enough to drop is the normal case, and saying so every
     // hour buries the case that matters.
@@ -286,10 +288,7 @@ async fn coverage_sweep(now: i64) -> Result<(), anyhow::Error> {
             // One org's failure must not stop the rest: another org's team
             // being uncovered is the worse outcome.
             Err(e) => {
-                log::warn!(
-                    "[ONCALL_COVERAGE] could not walk {}: {e}",
-                    org.identifier
-                );
+                log::warn!("[ONCALL_COVERAGE] could not walk {}: {e}", org.identifier);
                 continue;
             }
         };

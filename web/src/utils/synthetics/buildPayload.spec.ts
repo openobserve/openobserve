@@ -73,8 +73,10 @@ describe("buildCreateBrowserTestPayload", () => {
   // second line of defence, so that a gate that ever stops agreeing with the
   // writer fails loudly here instead of posting a step the server refuses.
   it("throws rather than emitting a step it cannot build", () => {
+    // `wait`, not `hover`: hover became storable when Playwright 1.56 added it to
+    // the recorder model. scroll, wait and screenshot still have no counterpart.
     const withRetired = check({
-      journey: [...journey(), { id: "s3", action: "hover", name: "Reveal" }],
+      journey: [...journey(), { id: "s3", action: "wait", name: "Pause" }],
     });
 
     expect(() => buildCreateBrowserTestPayload(withRetired)).toThrow(/cannot be stored/);

@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="ghost"
         size="icon-sm"
-        class="!border-accent !text-accent !bg-surface-overlay pointer-events-auto !border-2 shadow-[0_2px_8px_rgba(0,0,0,0.2)] backdrop-blur-sm"
+        class="!border-accent !text-accent !bg-surface-overlay pointer-events-auto !border-2 shadow-sm backdrop-blur-sm"
         data-test="anomaly-summary-scroll-btn"
         @click="scrollToBottom"
       >
@@ -66,7 +66,7 @@ const summaryContainer = ref<HTMLElement | null>(null);
 const showScrollToBottom = ref(false);
 
 const summaryText = computed(() =>
-  generateAnomalySummary(props.config, props.destinations, undefined, props.wizardStep),
+  generateAnomalySummary(props.config, props.destinations, t, props.wizardStep),
 );
 
 const checkScrollState = () => {
@@ -121,7 +121,8 @@ onMounted(async () => {
   );
   display: inline;
   position: relative;
-  box-shadow: 0 0 0 0.0625rem color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
+  box-shadow: var(--shadow-ring-hairline-geom)
+    color-mix(in srgb, var(--color-theme-accent) 15%, transparent);
   line-height: 1.6;
   vertical-align: baseline;
   white-space: nowrap;

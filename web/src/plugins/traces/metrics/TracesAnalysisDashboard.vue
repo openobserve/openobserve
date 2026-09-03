@@ -129,7 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSplitter
           v-model="splitterModel"
           :limits="splitterLimits"
-          :style="{ width: showDimensionSelector ? '100%' : 'calc(100% - 50px)', height: '100%' }"
+          :style="{
+            width: showDimensionSelector ? '100%' : 'calc(100% - 3.125rem)',
+            height: '100%',
+          }"
           class="analysis-splitter-smooth [transition:all_0.3s_ease]"
           @update:model-value="onSplitterUpdate"
         >
@@ -195,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             align="center"
                             :side-offset="8"
                             :delay="500"
-                            max-width="300px"
+                            max-width="18.75rem"
                             :content="dimension.label"
                           />
                         </span>
@@ -220,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #separator>
             <div
-              class="h-full w-1 bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+              class="hover:bg-splitter-hover h-full w-1 bg-transparent transition-colors duration-300"
             ></div>
           </template>
 
@@ -386,8 +389,8 @@ const { isDark } = useTheme();
 const chipColors = computed(() =>
   isDark.value ? COMPARISON_COLORS.dark : COMPARISON_COLORS.light,
 );
-const { loading, error } = useLatencyInsightsAnalysis();
-const { generateDashboard } = useLatencyInsightsDashboard();
+const { loading, error } = useLatencyInsightsAnalysis(t);
+const { generateDashboard } = useLatencyInsightsDashboard(t);
 
 // Variables manager will be initialized by RenderDashboardCharts
 // and we'll receive a reference to it via the @variablesManagerReady event
@@ -1051,6 +1054,7 @@ watch(
 .time-range-chip.baseline-chip,
 .time-range-chip.selected-chip {
   background: color-mix(in srgb, var(--chip-color) 20%, transparent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel chip border must not scale with text or it smears at fractional zoom */
   border: 1px solid color-mix(in srgb, var(--chip-color) 50%, transparent);
   color: color-mix(in srgb, var(--chip-color) 80%, var(--color-text-heading)) !important;
   font-weight: 500;

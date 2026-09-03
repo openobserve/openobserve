@@ -24,8 +24,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::rotation::{
-    AwayShift, ShiftRule, CoverageSegment, DEFAULT_ROTATION_NAME, GridError, MAX_AWAY_SHIFTS, OnCallPosition,
-    Rotation, ScheduleOverride, Unavailability, away_assignments, colliding_rotations,
+    AwayShift, CoverageSegment, DEFAULT_ROTATION_NAME, GridError, MAX_AWAY_SHIFTS, OnCallPosition,
+    Rotation, ScheduleOverride, ShiftRule, Unavailability, away_assignments, colliding_rotations,
     everyone_on_call, resolve_on_call, resolve_window,
 };
 
@@ -147,9 +147,11 @@ pub enum MemberPlacement {
 pub fn place_member(rotations: &[Rotation], user_email: &str) -> MemberPlacement {
     let email = user_email.trim().to_ascii_lowercase();
     let names = |r: &Rotation| {
-        r.shift_rules
-            .iter()
-            .any(|s| s.members.iter().any(|m| m.trim().to_ascii_lowercase() == email))
+        r.shift_rules.iter().any(|s| {
+            s.members
+                .iter()
+                .any(|m| m.trim().to_ascii_lowercase() == email)
+        })
     };
     if rotations.iter().any(names) {
         return MemberPlacement::AlreadyOnRotation;
@@ -158,9 +160,7 @@ pub fn place_member(rotations: &[Rotation], user_email: &str) -> MemberPlacement
     // rule — gets the joiner appended. All of them, not just the first: a team
     // created with Primary and Secondary has two, and adding somebody to one
     // pool and not the other is how the two drift into a collision.
-    let simple = |r: &Rotation| {
-        matches!(r.shift_rules.as_slice(), [only] if only.restrictions.is_empty() && only.priority == 0)
-    };
+    let simple = |r: &Rotation| matches!(r.shift_rules.as_slice(), [only] if only.restrictions.is_empty() && only.priority == 0);
     match rotations {
         [] => MemberPlacement::NoRotationYet,
         _ if rotations.iter().all(simple) => {
@@ -458,16 +458,15 @@ impl Schedule {
     /// remembers they are on. Pure, so the awkward cases are decided here
     /// rather than in the middle of a database write:
     ///
-    /// - **On several layers.** They come off all of them; being on two layers
-    ///   is a scheduling choice, not two different people.
-    /// - **The only person on a rotation.** That rotation now staffs nobody,
-    ///   which is not a rotation — it is dropped, and named in
-    ///   [`MemberRemoval::emptied_rotations`] so the caller can say so out
-    ///   loud. Keeping it with an empty member list would be worse: it fails
-    ///   validation, so the team's next schedule edit would be refused for a
-    ///   reason nobody could see.
-    /// - **The last rotation of all.** Then the team pages nobody, which is a
-    ///   coverage gap — [`MemberRemoval::leaves_no_rotation`] says so.
+    /// - **On several layers.** They come off all of them; being on two layers is a scheduling
+    ///   choice, not two different people.
+    /// - **The only person on a rotation.** That rotation now staffs nobody, which is not a
+    ///   rotation — it is dropped, and named in [`MemberRemoval::emptied_rotations`] so the caller
+    ///   can say so out loud. Keeping it with an empty member list would be worse: it fails
+    ///   validation, so the team's next schedule edit would be refused for a reason nobody could
+    ///   see.
+    /// - **The last rotation of all.** Then the team pages nobody, which is a coverage gap —
+    ///   [`MemberRemoval::leaves_no_rotation`] says so.
     ///
     /// Matching is case-insensitive: membership is stored lowercased, but a
     /// rotation written by hand through the API may not be.
@@ -484,10 +483,11 @@ impl Schedule {
     pub fn names_member(&self, user_email: &str) -> bool {
         let email = user_email.trim().to_ascii_lowercase();
         let is = |m: &str| m.trim().to_ascii_lowercase() == email;
-        self.rotations
-            .iter()
-            .any(|r| r.shift_rules.iter().any(|s| s.members.iter().any(|m| is(m))))
-            || self.overrides.iter().any(|o| is(&o.user_email))
+        self.rotations.iter().any(|r| {
+            r.shift_rules
+                .iter()
+                .any(|s| s.members.iter().any(|m| is(m)))
+        }) || self.overrides.iter().any(|o| is(&o.user_email))
             || self.unavailability.iter().any(|u| is(&u.user_email))
     }
 
@@ -630,7 +630,11 @@ mod tests {
 
     /// A bare rule, for the tests that stack several inside one rotation.
     fn rule(name: &str, members: &[&str]) -> ShiftRule {
-        ShiftRule::weekly(name, members.iter().map(|s| s.to_string()).collect(), ANCHOR)
+        ShiftRule::weekly(
+            name,
+            members.iter().map(|s| s.to_string()).collect(),
+            ANCHOR,
+        )
     }
 
     /// One rotation holding several rules — follow-the-sun, in other words.
@@ -693,10 +697,7 @@ mod tests {
     fn test_next_handover_is_the_soonest_across_rotations() {
         let mut fast = weekly("Secondary", &["cara@o2.ai", "dev@o2.ai"]);
         fast.shift_rules[0].shift_micros = MICROS_PER_WEEK / 7;
-        let s = schedule(vec![
-            weekly("Primary", &["ana@o2.ai", "bob@o2.ai"]),
-            fast,
-        ]);
+        let s = schedule(vec![weekly("Primary", &["ana@o2.ai", "bob@o2.ai"]), fast]);
         assert_eq!(
             s.next_handover(ANCHOR),
             Some(ANCHOR + MICROS_PER_WEEK / 7),
@@ -768,7 +769,11 @@ mod tests {
         let rotations = vec![weekly("On-call rotation", &["ana@o2.ai"])];
         let placement = place_member(&rotations, "  BOB@o2.ai ");
 
-        let MemberPlacement::Appended { rotation, rotations } = placement else {
+        let MemberPlacement::Appended {
+            rotation,
+            rotations,
+        } = placement
+        else {
             panic!("a later member must still reach the rotation");
         };
         assert_eq!(rotation, "On-call rotation");
@@ -779,9 +784,21 @@ mod tests {
         );
 
         // And the ladder's second rung now reaches somebody.
-        let s = Schedule { rotations, ..schedule(vec![]) };
-        assert_eq!(s.on_call_in("On-call rotation", ANCHOR).as_deref(), Some("ana@o2.ai"));
-        assert_eq!(s.rotation("On-call rotation").unwrap().next_holder(&s.unavailability, ANCHOR, s.tz()).as_deref(), Some("bob@o2.ai"));
+        let s = Schedule {
+            rotations,
+            ..schedule(vec![])
+        };
+        assert_eq!(
+            s.on_call_in("On-call rotation", ANCHOR).as_deref(),
+            Some("ana@o2.ai")
+        );
+        assert_eq!(
+            s.rotation("On-call rotation")
+                .unwrap()
+                .next_holder(&s.unavailability, ANCHOR, s.tz())
+                .as_deref(),
+            Some("bob@o2.ai")
+        );
     }
 
     /// Adding somebody twice must not put them on the rotation twice — a
@@ -827,7 +844,10 @@ mod tests {
     /// append to; building one needs an anchor, so the caller does it.
     #[test]
     fn test_a_team_with_no_rotation_yet_asks_the_caller_to_seed_one() {
-        assert_eq!(place_member(&[], "ana@o2.ai"), MemberPlacement::NoRotationYet);
+        assert_eq!(
+            place_member(&[], "ana@o2.ai"),
+            MemberPlacement::NoRotationYet
+        );
     }
 
     /// The bug this exists to prevent: removing somebody from the team used to
@@ -857,7 +877,9 @@ mod tests {
         };
         for week in 0..6i64 {
             assert_ne!(
-                after.on_call_in("Primary", ANCHOR + week * MICROS_PER_WEEK).as_deref(),
+                after
+                    .on_call_in("Primary", ANCHOR + week * MICROS_PER_WEEK)
+                    .as_deref(),
                 Some("bob@o2.ai"),
                 "week {week}"
             );
@@ -895,14 +917,11 @@ mod tests {
     /// could see — and the emptying is reported so it can be said out loud.
     #[test]
     fn test_emptying_a_rotation_is_reported_not_stored() {
-        let s = schedule(vec![
-            weekly("Catch-all", &["ana@o2.ai"]),
-            {
-                let mut r = weekly("Weekends", &["bob@o2.ai"]);
-                r.shift_rules[0].priority = 10;
-                r
-            },
-        ]);
+        let s = schedule(vec![weekly("Catch-all", &["ana@o2.ai"]), {
+            let mut r = weekly("Weekends", &["bob@o2.ai"]);
+            r.shift_rules[0].priority = 10;
+            r
+        }]);
         let removal = s.without_member("bob@o2.ai");
 
         assert_eq!(removal.rotations.len(), 1, "the empty rotation is dropped");
@@ -930,7 +949,10 @@ mod tests {
         assert!(removal.changed, "matching is case-insensitive");
         assert!(removal.rotations.is_empty());
         assert!(removal.leaves_no_rotation);
-        assert_eq!(removal.emptied_rotations, vec!["On-call rotation".to_string()]);
+        assert_eq!(
+            removal.emptied_rotations,
+            vec!["On-call rotation".to_string()]
+        );
         assert!(removal.coverage_warning().unwrap().contains("pages nobody"));
 
         let after = Schedule {
@@ -992,7 +1014,10 @@ mod tests {
             a_cover("sam@o2.ai", ANCHOR, ANCHOR + MICROS_PER_WEEK / 7),
         );
 
-        assert_eq!(s.on_call_in("On-call rotation", ANCHOR), Some("sam@o2.ai".into()));
+        assert_eq!(
+            s.on_call_in("On-call rotation", ANCHOR),
+            Some("sam@o2.ai".into())
+        );
         assert_eq!(s.on_call_at(ANCHOR)[0].user_email, "sam@o2.ai");
         assert_eq!(
             s.on_call_at(ANCHOR)[0].override_id.as_deref(),
@@ -1000,11 +1025,16 @@ mod tests {
             "a page has to be able to say why somebody off the roster got it"
         );
         assert_eq!(
-            s.rotation("On-call rotation").unwrap().next_holder(&s.unavailability, ANCHOR, s.tz()),
+            s.rotation("On-call rotation")
+                .unwrap()
+                .next_holder(&s.unavailability, ANCHOR, s.tz()),
             Some("bob@o2.ai".into()),
             "the roster's own handover order is untouched"
         );
-        assert!(s.everyone_in("On-call rotation", ANCHOR).contains(&"sam@o2.ai".to_string()));
+        assert!(
+            s.everyone_in("On-call rotation", ANCHOR)
+                .contains(&"sam@o2.ai".to_string())
+        );
         assert!(s.is_staffed(ANCHOR));
     }
 
@@ -1021,8 +1051,14 @@ mod tests {
         let s = covered(vec![retired], a_cover("sam@o2.ai", ANCHOR, ANCHOR + 1_000));
 
         assert!(s.is_staffed(ANCHOR));
-        assert_eq!(s.on_call_in("On-call rotation", ANCHOR), Some("sam@o2.ai".into()));
-        assert!(!s.is_staffed(ANCHOR + 1_000), "and unstaffed again after it");
+        assert_eq!(
+            s.on_call_in("On-call rotation", ANCHOR),
+            Some("sam@o2.ai".into())
+        );
+        assert!(
+            !s.is_staffed(ANCHOR + 1_000),
+            "and unstaffed again after it"
+        );
     }
 
     /// A cover naming a rotation the team does not have staffs nothing.
@@ -1046,10 +1082,15 @@ mod tests {
             vec![weekly("On-call rotation", &["ana@o2.ai"])],
             a_cover("sam@o2.ai", ANCHOR + 1_000, ANCHOR + 2_000),
         );
-        let segments = s.resolved_window("On-call rotation", ANCHOR, ANCHOR + 3_000).unwrap();
+        let segments = s
+            .resolved_window("On-call rotation", ANCHOR, ANCHOR + 3_000)
+            .unwrap();
         assert_eq!(segments.len(), 3);
         assert_eq!(segments[1].user_email.as_deref(), Some("sam@o2.ai"));
-        assert!(s.resolved_window("On-call rotation", ANCHOR + 1, ANCHOR).is_err());
+        assert!(
+            s.resolved_window("On-call rotation", ANCHOR + 1, ANCHOR)
+                .is_err()
+        );
     }
 
     /// Old rows carry no overrides array; they must load as "no covers"
@@ -1105,7 +1146,10 @@ mod tests {
     /// always-on rotation covers every instant of the coming week.
     #[test]
     fn test_a_staffed_rotation_has_no_gap_in_the_coming_week() {
-        let s = schedule(vec![weekly("On-call rotation", &["ana@o2.ai", "bob@o2.ai"])]);
+        let s = schedule(vec![weekly(
+            "On-call rotation",
+            &["ana@o2.ai", "bob@o2.ai"],
+        )]);
         assert_eq!(s.first_coverage_gap(ANCHOR, WEEK, HOUR), None);
     }
 
@@ -1127,8 +1171,11 @@ mod tests {
         let gap = s
             .first_coverage_gap(ANCHOR, WEEK, HOUR)
             .expect("nights and weekends reach nobody");
-        assert!(gap >= ANCHOR && gap < ANCHOR + WEEK);
-        assert!(!s.is_staffed(gap), "the instant reported has to be a real gap");
+        assert!((ANCHOR..ANCHOR + WEEK).contains(&gap));
+        assert!(
+            !s.is_staffed(gap),
+            "the instant reported has to be a real gap"
+        );
     }
 
     /// The stride is a bound, not the cadence: a rotation that never hands
@@ -1165,8 +1212,14 @@ mod tests {
             ..schedule(vec![])
         };
 
-        assert_eq!(s.on_call_in("On-call rotation", ANCHOR).as_deref(), Some("bob@o2.ai"));
-        assert_eq!(s.everyone_in("On-call rotation", ANCHOR), vec!["bob@o2.ai".to_string()]);
+        assert_eq!(
+            s.on_call_in("On-call rotation", ANCHOR).as_deref(),
+            Some("bob@o2.ai")
+        );
+        assert_eq!(
+            s.everyone_in("On-call rotation", ANCHOR),
+            vec!["bob@o2.ai".to_string()]
+        );
 
         let warnings = s.away_assignments(ANCHOR, ANCHOR + 2 * MICROS_PER_WEEK);
         assert_eq!(warnings.len(), 1);
@@ -1194,7 +1247,10 @@ mod tests {
     fn schedule_with_a_leaver() -> Schedule {
         Schedule {
             rotations: vec![
-                weekly("On-call rotation", &["ana@o2.ai", "leaver@o2.ai", "bob@o2.ai"]),
+                weekly(
+                    "On-call rotation",
+                    &["ana@o2.ai", "leaver@o2.ai", "bob@o2.ai"],
+                ),
                 weekly("Seniors", &["leaver@o2.ai", "eve@o2.ai"]),
             ],
             overrides: vec![a_cover(
@@ -1262,7 +1318,10 @@ mod tests {
                     "week {week}, rotation {rotation}"
                 );
                 assert!(
-                    !after.everyone_in(rotation, at).iter().any(|m| m == "leaver@o2.ai"),
+                    !after
+                        .everyone_in(rotation, at)
+                        .iter()
+                        .any(|m| m == "leaver@o2.ai"),
                     "week {week}, rotation {rotation}: not even in the broadcast"
                 );
             }
@@ -1298,7 +1357,10 @@ mod tests {
         let removal = s.without_member("leaver@o2.ai");
 
         assert!(removal.changed);
-        assert_eq!(removal.emptied_rotations, vec!["On-call rotation".to_string()]);
+        assert_eq!(
+            removal.emptied_rotations,
+            vec!["On-call rotation".to_string()]
+        );
         assert!(removal.leaves_no_rotation);
         assert!(
             removal
@@ -1307,7 +1369,10 @@ mod tests {
                 .contains("pages nobody")
         );
 
-        let after = Schedule { rotations: removal.rotations, ..s };
+        let after = Schedule {
+            rotations: removal.rotations,
+            ..s
+        };
         assert_eq!(after.on_call_in("Primary", ANCHOR), None);
         assert!(!after.is_staffed(ANCHOR));
     }
@@ -1324,7 +1389,10 @@ mod tests {
             ..schedule(vec![])
         };
         let mid_shift = ANCHOR + MICROS_PER_WEEK / 2;
-        assert_eq!(s.on_call_in("On-call rotation", mid_shift), Some("leaver@o2.ai".into()));
+        assert_eq!(
+            s.on_call_in("On-call rotation", mid_shift),
+            Some("leaver@o2.ai".into())
+        );
 
         let after = Schedule {
             rotations: s.without_member("leaver@o2.ai").rotations,

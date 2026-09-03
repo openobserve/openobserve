@@ -176,6 +176,52 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 .delete(&format!("{WORKFLOWS_PREFIX}{id}",), false, true, None)
                 .await?;
         }
+        MessageType::WorkflowDraftPut => {
+            let draft: Workflow = json::from_slice(&msg.value.unwrap())?;
+            let org_id = draft.org_id.clone();
+            let id = draft.id.clone();
+            log::info!("received workflow draft put for {org_id}/{id}");
+
+            let existing = infra::table::workflows::get_draft_by_org_draft_id(&org_id, &id).await?;
+
+            match existing {
+                Some(_) => {
+                    log::info!("updating existing workflow draft for {org_id}/{id}");
+                    match infra::table::workflows::update_draft(draft.clone()).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            log::error!(
+                                "error while updating workflow draft to db {org_id}/{id} : {e}"
+                            );
+                        }
+                    }
+                }
+                None => {
+                    log::info!("saving new workflow draft for {org_id}/{id}");
+                    match infra::table::workflows::save_draft(draft.clone()).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            log::error!(
+                                "error while saving workflow draft to db {org_id}/{id} : {e}"
+                            );
+                        }
+                    }
+                }
+            }
+
+            log::info!("successfully handled workflow draft put for {org_id}/{id}");
+        }
+        MessageType::WorkflowDraftDelete => {
+            let id: String = json::from_slice(&msg.value.unwrap())?;
+            log::info!("received workflow draft delete for {id}");
+            match infra::table::workflows::delete_draft(&id).await {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("error while deleting workflow draft from db {id} : {e}");
+                }
+            }
+            log::info!("successfully handled workflow draft delete for {id}");
+        }
         MessageType::WorkflowErrorPut => {
             let errors: WorkflowRunErrors = json::from_slice(&msg.value.unwrap())?;
             let org_id = errors.org_id.clone();
@@ -266,6 +312,18 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                         org_id,
                         workflow_id,
                         entity_id,
+                    )
+                    .await?;
+                }
+                AssociationDeleteEvent::TriggerWorkflow {
+                    org_id,
+                    trigger,
+                    workflow_id,
+                } => {
+                    infra::table::workflows::delete_association_by_trigger_workflow(
+                        org_id,
+                        trigger,
+                        workflow_id,
                     )
                     .await?;
                 }

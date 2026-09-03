@@ -6,7 +6,7 @@
     size="icon-toolbar"
     @click.stop="sendToAiChat"
     data-test="o2-ai-context-add-btn"
-    class="group [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease] hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]!"
+    class="group hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease] hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:shadow-md dark:hover:shadow-md"
     :class="props.class"
     :style="props.style"
   >
@@ -20,36 +20,6 @@
     </div>
   </OButton>
 </template>
-
-<style scoped>
-/* keep(lib-override:o2-button): `.ai-btn` is this component's row-button modifier,
-   an absolute-positioning variant a caller can opt into via `props.class`. Every
-   element it styles is rendered here, so this is the owning scope.
-   Why the !important: OButton's own base `relative` outranks the positioning
-   passed via props. `translate` (not `transform`) is the property to override —
-   Tailwind v4 emits -translate-y-1/2 through the CSS `translate` shorthand. */
-.ai-btn {
-  position: absolute !important;
-  top: 50% !important;
-  right: 0.875rem !important;
-  translate: -50% -50% !important;
-  height: 0.875rem !important;
-  min-height: 0 !important;
-  width: 0.9rem !important;
-  min-width: 0 !important;
-  border-radius: 0.25rem !important;
-}
-
-.ai-btn img.ai-icon {
-  width: 0.75rem !important;
-  height: 0.75rem !important;
-}
-
-/* Suppress the hover box-shadow — it visually bleeds outside the row boundary */
-.ai-btn:hover {
-  box-shadow: none !important;
-}
-</style>
 
 <script setup lang="ts">
 import { getImageURL } from "@/utils/zincutils";
@@ -80,14 +50,15 @@ const props = defineProps({
     required: false,
   },
   //this is for image height and width sometimes we need to change the size of the image
+  // HTML dimension attributes: bare integer only. A rem value here renders at 1/16 scale (width="1.25rem" → 1.25px) with no error.
   imageHeight: {
     type: String,
-    default: "20px",
+    default: "20",
     required: false,
   },
   imageWidth: {
     type: String,
-    default: "20px",
+    default: "20",
     required: false,
   },
 });

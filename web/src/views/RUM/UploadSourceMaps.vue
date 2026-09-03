@@ -30,10 +30,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-slot="{ isSubmitting }"
     >
       <!-- Form Content Area -->
+      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
         class="bg-card-glass-bg mb-[0.675rem] flex-1 overflow-auto overflow-y-auto p-6"
         style="height: calc(100vh - 172px)"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <div class="mx-auto max-w-300">
           <!-- Input Fields -->
           <div class="mb-6 grid grid-cols-1 gap-4">
@@ -122,15 +124,13 @@ const uploadSourceMapsSchema = makeUploadSourceMapsSchema(t);
 // Dynamic (query-param prefill) defaults → a typed component computed. The
 // service/version/environment are seeded from the route query; `file` always
 // starts empty.
-const uploadSourceMapsDefaults = computed(
-  (): UploadSourceMapsForm => ({
-    service: (route.query.service as string) || "",
-    version: (route.query.version as string) || "",
-    environment: (route.query.environment as string) || "",
-    // Empty file slot at init; schema is `.nullable()` so null is valid at runtime.
-    file: null as unknown as File,
-  }),
-);
+const uploadSourceMapsDefaults = computed((): UploadSourceMapsForm => ({
+  service: (route.query.service as string) || "",
+  version: (route.query.version as string) || "",
+  environment: (route.query.environment as string) || "",
+  // Empty file slot at init; schema is `.nullable()` so null is valid at runtime.
+  file: null as unknown as File,
+}));
 
 // Navigate back to source maps list
 const navigateBack = () => {
@@ -169,7 +169,8 @@ const uploadSourceMaps = async (value: UploadSourceMapsForm) => {
     console.error("Error uploading source maps:", error);
     toast({
       variant: "error",
-      message: error?.response?.data?.message || error?.message || "Failed to upload source maps",
+      message:
+        error?.response?.data?.message || error?.message || t("rum.failedToUploadSourceMaps"),
     });
   }
 };

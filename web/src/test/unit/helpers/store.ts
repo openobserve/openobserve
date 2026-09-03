@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { createStore } from "vuex";
+import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
 
 // Mirror of the initial organizationData below; used by resetOrganizationData.
 const organizationObj = {
@@ -21,6 +22,11 @@ const organizationObj = {
   allDashboardList: {},
   rumToken: {
     rum_token: "",
+  },
+  // Mirror of the production organizationObj — see src/stores/index.ts.
+  correlatedTracesStreams: {
+    byTraceId: {} as Record<string, { stream: string; range?: TraceTimeRange }>,
+    knownStreams: [] as string[],
   },
   quotaThresholdMsg: "",
   functions: [],
@@ -85,6 +91,10 @@ const store = createStore({
     regionInfo: [],
     zoConfig: {
       service_account_enabled: true,
+      // Enterprise-shaped by default, which is what the synthetics specs were
+      // written against. The specs that cover the OSS shape set it to false
+      // themselves.
+      synthetics_private_locations_enabled: true,
       sql_mode: false,
       sql_reserved_keywords: [
         "all",
@@ -157,7 +167,6 @@ const store = createStore({
       },
       quotaThresholdMsg: "",
       functions: [],
-      actions: [],
       streams: {} as Record<string, unknown>,
       folders: [],
       organizationSettings: {
@@ -183,6 +192,15 @@ const store = createStore({
       lastFetched: null as number | null,
       cacheExpiry: 300000,
       dashboardJsonCache: {} as Record<string, any>,
+    },
+    // Mirrors the real store's alertLibrary block. Present here so that any
+    // component reading the library cache gets a defined shape in unit tests
+    // instead of dereferencing undefined.
+    alertLibrary: {
+      manifest: null as any,
+      lastFetched: null as number | null,
+      cacheExpiry: 10 * 60 * 1000,
+      fileCache: {} as Record<string, any>,
     },
   },
   mutations: {
@@ -226,6 +244,15 @@ const store = createStore({
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
     },
+    setCorrelatedTracesStream(
+      state,
+      payload: { traceId: string; stream: string; range?: TraceTimeRange },
+    ) {
+      const cache = state.organizationData.correlatedTracesStreams;
+      if (Object.keys(cache.byTraceId).length >= 1000) cache.byTraceId = {};
+      cache.byTraceId[payload.traceId] = { stream: payload.stream, range: payload.range };
+      if (!cache.knownStreams.includes(payload.stream)) cache.knownStreams.push(payload.stream);
+    },
     // setAllCurrentDashboards(state, payload) {
     //   state.allCurrentDashboards = payload;
     // },
@@ -256,9 +283,6 @@ const store = createStore({
     setFunctions(state, payload) {
       state.organizationData.functions = payload;
     },
-    setActions(state, payload) {
-      state.organizationData.actions = payload;
-    },
     setStreams(state, payload) {
       state.organizationData.streams[payload.name] = payload;
     },
@@ -284,7 +308,11 @@ const store = createStore({
       state.organizationData.folders = payload;
     },
     setFoldersByType(state, payload) {
-      state.organizationData.foldersByType = payload;
+      // Mirrors the real store: merge per type, never replace the whole map.
+      state.organizationData.foldersByType = {
+        ...state.organizationData.foldersByType,
+        ...payload,
+      };
     },
     appTheme(state, payload) {
       state.theme = payload;
@@ -339,6 +367,19 @@ const store = createStore({
     },
     setAlertListFilters(state, payload) {
       state.alertListFilters = { ...state.alertListFilters, ...payload };
+    },
+    setAlertLibraryManifest(state, payload) {
+      state.alertLibrary.manifest = payload;
+      state.alertLibrary.lastFetched = Date.now();
+    },
+    setAlertLibraryFile(state, payload) {
+      state.alertLibrary.fileCache[payload.id] = payload.file;
+    },
+    // In place, leaving cacheExpiry alone — same contract as the real store.
+    clearAlertLibrary(state) {
+      state.alertLibrary.manifest = null;
+      state.alertLibrary.lastFetched = null;
+      state.alertLibrary.fileCache = {};
     },
     setGithubDashboardGallery(state, payload) {
       state.githubDashboardGallery = {
@@ -494,9 +535,6 @@ const store = createStore({
     },
     setFunctions(context, payload) {
       context.commit("setFunctions", payload);
-    },
-    setActions(context, payload) {
-      context.commit("setActions", payload);
     },
     setStreams(context, payload) {
       context.commit("setStreams", payload);

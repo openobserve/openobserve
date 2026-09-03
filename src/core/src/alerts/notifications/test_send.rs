@@ -61,6 +61,8 @@ pub enum TestSendError {
     },
     RenderFailed(String),
     DispatchFailed(String),
+    /// Draft fails the same content validation `templates::save` applies.
+    InvalidContent(String),
 }
 
 impl std::fmt::Display for TestSendError {
@@ -73,6 +75,7 @@ impl std::fmt::Display for TestSendError {
             ),
             Self::RenderFailed(e) => write!(f, "test-send render failed: {e}"),
             Self::DispatchFailed(e) => write!(f, "test-send dispatch failed: {e}"),
+            Self::InvalidContent(e) => write!(f, "{e}"),
         }
     }
 }
@@ -161,6 +164,10 @@ fn build_test_message_with_title(
     dest_type: &DestinationType,
     spec: &ContentSpec,
 ) -> Result<(String, RenderedMessage), TestSendError> {
+    // Hold the draft to the same bar `templates::save` applies, so a
+    // test-send cannot "succeed" on a template that cannot be saved.
+    spec.validate().map_err(TestSendError::InvalidContent)?;
+
     let format = derive_channel_format(dest_type);
     let ctx: NotificationContext = synthetic_context(None);
     let mut content = resolve_content(spec, &ctx, format.channel_family());
@@ -225,6 +232,25 @@ mod tests {
             body: "**{alert_name}** exceeded threshold at {alert_agg_value}".into(),
             ..Default::default()
         }
+    }
+
+    /// A draft whose link scheme `save` would reject must be rejected here
+    /// too, or a test-send "succeeds" on a template that cannot be saved.
+    #[test]
+    fn test_send_rejects_a_draft_the_save_path_would_reject() {
+        let mut spec = sample_spec();
+        spec.links
+            .push(config::meta::alerts::content_spec::ContentLink {
+                label: "click".into(),
+                url: "javascript:alert(1)".into(),
+                show_when: None,
+            });
+        let err = build_test_message(&slack_dest(), &spec)
+            .expect_err("hostile link built a test message cleanly");
+        assert!(
+            err.to_string().contains("click"),
+            "error should name the offending link, got: {err}"
+        );
     }
 
     #[test]

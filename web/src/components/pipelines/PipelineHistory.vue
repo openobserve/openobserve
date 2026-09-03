@@ -385,8 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     font-family: var(--font-mono);
                     font-size: var(--text-xs);
                   "
-                  >{{ selectedRow.error }}</pre
-                >
+                  >{{ selectedRow.error }}</pre>
               </div>
             </div>
           </template>
@@ -409,8 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     font-family: var(--font-mono);
                     font-size: var(--text-xs);
                   "
-                  >{{ selectedRow.success_response }}</pre
-                >
+                  >{{ selectedRow.success_response }}</pre>
               </div>
             </div>
           </template>
@@ -751,7 +749,8 @@ const fetchPipelineHistory = async () => {
     console.error("Error response:", error.response);
     toast({
       variant: "error",
-      message: error.response?.data?.message || error.message || "Failed to fetch pipeline history",
+      message:
+        error.response?.data?.message || error.message || t("pipeline.fetchPipelineHistoryFailed"),
     });
   } finally {
     loading.value = false;

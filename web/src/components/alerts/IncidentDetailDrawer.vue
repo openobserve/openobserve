@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
       :subtitle="t('alerts.incidents.incident')"
       title-overflow="visible"
+      tabs-below
       bleed
     >
       <!-- Incident name — click the title to rename, Enter or blur saves,
@@ -124,49 +125,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </template>
 
+      <template #header-tabs>
+        <OTabs v-model="activeTab" align="left" class="flex-1" mobile-arrows :breakpoint="0">
+          <OTab
+            name="overview"
+            :label="t('alerts.insights.tabs.overview')"
+            data-test="incident-overview-tab"
+          />
+          <OTab
+            name="activity"
+            :label="t('alerts.incidents.activityTab')"
+            data-test="incident-activity-tab"
+          />
+          <OTab
+            name="incidentAnalysis"
+            :label="t('alerts.incidents.incidentAnalysis')"
+            data-test="incident-analysis-tab"
+          />
+          <OTab
+            name="serviceGraph"
+            :label="t('alerts.incidents.alertGraph')"
+            data-test="incident-alert-graph-tab"
+          />
+          <OTab name="alertTriggers" data-test="incident-alert-triggers-tab">
+            <template #default>
+              <div class="flex items-center gap-1.5">
+                <span>{{ t("alerts.incidents.alertTriggers") }}</span>
+                <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
+              </div>
+            </template>
+          </OTab>
+
+          <OTab name="logs" :label="t('common.logs')" data-test="incident-logs-tab" />
+          <OTab name="metrics" :label="t('search.metrics')" data-test="incident-metrics-tab" />
+          <OTab name="traces" :label="t('menu.traces')" data-test="incident-traces-tab" />
+        </OTabs>
+      </template>
+
       <!-- Content -->
       <div
         v-if="!loading && incidentDetails"
         class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        <div class="px-page-edge border-border-default flex-shrink-0 border-b">
-          <OTabs v-model="activeTab" align="left" class="flex-1" mobile-arrows :breakpoint="0">
-            <OTab
-              name="overview"
-              :label="t('alerts.insights.tabs.overview')"
-              data-test="incident-overview-tab"
-            />
-            <OTab
-              name="activity"
-              :label="t('alerts.incidents.activityTab')"
-              data-test="incident-activity-tab"
-            />
-            <OTab
-              name="incidentAnalysis"
-              :label="t('alerts.incidents.incidentAnalysis')"
-              data-test="incident-analysis-tab"
-            />
-            <OTab
-              name="serviceGraph"
-              :label="t('alerts.incidents.alertGraph')"
-              data-test="incident-alert-graph-tab"
-            />
-            <OTab name="alertTriggers" data-test="incident-alert-triggers-tab">
-              <template #default>
-                <div class="flex items-center gap-1.5">
-                  <span>{{ t("alerts.incidents.alertTriggers") }}</span>
-                  <OTag type="countChip" value="neutral">{{ triggers.length }}</OTag>
-                </div>
-              </template>
-            </OTab>
-
-            <!-- Telemetry tabs always inline -->
-            <OTab name="logs" :label="t('common.logs')" data-test="incident-logs-tab" />
-            <OTab name="metrics" :label="t('search.metrics')" data-test="incident-metrics-tab" />
-            <OTab name="traces" :label="t('menu.traces')" data-test="incident-traces-tab" />
-          </OTabs>
-        </div>
-
         <!-- Tab Content Container -->
         <div class="flex flex-1 overflow-hidden">
           <!-- Left Column: Incident Details (only show on Incident Analysis tab, HIDDEN for Overview) -->
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               incidentDetails.first_alert_at,
                               incidentDetails.last_alert_at,
                             )
-                          : t("common.notAvailable")
+                          : raw("N/A")
                       }}
                     </div>
                   </div>
@@ -356,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{
                                   incidentDetails?.first_alert_at
                                     ? formatTimestampUTC(incidentDetails.first_alert_at)
-                                    : t("common.notAvailable")
+                                    : raw("N/A")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
                                 <span>{{ t("alerts.incidents.initialTrigger") }}</span>
@@ -377,7 +377,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{
                                   peakActivity.timestamp
                                     ? formatTimestampUTC(peakActivity.timestamp)
-                                    : t("common.notAvailable")
+                                    : raw("N/A")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
                                 <span
@@ -406,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{
                                   incidentDetails?.last_alert_at
                                     ? formatTimestampUTC(incidentDetails.last_alert_at)
-                                    : t("common.notAvailable")
+                                    : raw("N/A")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
                                 <span>{{
@@ -454,7 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 font-mono text-xs"
                             >
                               <span class="min-w-0 flex-1 truncate">{{
-                                incidentDetails?.id || t("common.notAvailable")
+                                incidentDetails?.id || raw("N/A")
                               }}</span>
                               <OIcon
                                 :name="copiedField === 'incident_id' ? 'check' : 'content-copy'"
@@ -479,7 +479,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
                             >
                               <span class="min-w-0 flex-1 truncate">{{
-                                incidentDetails?.title || t("common.notAvailable")
+                                incidentDetails?.title || raw("N/A")
                               }}</span>
                               <OIcon
                                 :name="copiedField === 'incident_title' ? 'check' : 'content-copy'"
@@ -534,7 +534,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{
                                 incidentDetails?.created_at
                                   ? formatTimestamp(incidentDetails.created_at)
-                                  : t("common.notAvailable")
+                                  : raw("N/A")
                               }}
                             </div>
                           </div>
@@ -548,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               {{
                                 incidentDetails?.updated_at
                                   ? formatTimestamp(incidentDetails.updated_at)
-                                  : t("common.notAvailable")
+                                  : raw("N/A")
                               }}
                             </div>
                           </div>
@@ -985,7 +985,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Header -->
                     <div
                       :class="[
-                        'flex flex-shrink-0 items-center gap-2 border-b !bg-[var(--color-theme-table-header-bg)] px-3 py-2',
+                        '!bg-theme-table-header-bg flex flex-shrink-0 items-center gap-2 border-b px-3 py-2',
                         'border-border-default',
                       ]"
                     >
@@ -1020,73 +1020,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <div class="space-y-2">
                           <!-- Alert Name -->
                           <div class="flex flex-col gap-0.5">
-                            <span
-                              :class="'text-text-secondary'"
-                              class="text-3xs tracking-wide uppercase"
-                            >
+                            <span :class="'text-text-secondary'" class="text-3xs">
                               {{ t("alerts.incidents.alertName") }}
                             </span>
                             <span :class="'text-text-body'" class="text-sm font-medium">
-                              {{ alerts[selectedAlertIndex]?.name || t("common.notAvailable") }}
+                              {{ alerts[selectedAlertIndex]?.name || raw("N/A") }}
                             </span>
                           </div>
 
+                          <!-- Composite members have no stream/query — show the type. -->
+                          <div
+                            v-if="alerts[selectedAlertIndex]?.alert_type === 'composite'"
+                            class="flex flex-col gap-0.5"
+                          >
+                            <span :class="'text-text-secondary'" class="text-3xs">
+                              {{ t("alerts.alertType") }}
+                            </span>
+                            <OTag type="alertType" :value="'composite'" class="w-fit" />
+                          </div>
+
                           <!-- Stream Type & Name -->
-                          <div class="grid grid-cols-2 gap-2">
+                          <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.streamType") }}
                               </span>
                               <OTag
                                 type="streamType"
-                                :value="
-                                  alerts[selectedAlertIndex]?.stream_type ||
-                                  t('common.notAvailable')
-                                "
+                                :value="alerts[selectedAlertIndex]?.stream_type || raw('N/A')"
                                 class="w-fit"
                               />
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.stream_name") }}
                               </span>
                               <span :class="'text-text-body'" class="truncate text-sm font-medium">
-                                {{
-                                  alerts[selectedAlertIndex]?.stream_name ||
-                                  t("common.notAvailable")
-                                }}
+                                {{ alerts[selectedAlertIndex]?.stream_name || raw("N/A") }}
                               </span>
                             </div>
                           </div>
 
                           <!-- Threshold & Period -->
-                          <div class="grid grid-cols-2 gap-2">
+                          <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.messages.thresholdMarkLine") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{ alerts[selectedAlertIndex]?.trigger_condition?.operator || "" }}
                                 {{
                                   alerts[selectedAlertIndex]?.trigger_condition?.threshold ||
-                                  t("common.notAvailable")
+                                  raw("N/A")
                                 }}
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.period") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
@@ -1100,18 +1090,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </div>
 
                           <!-- Frequency & Silence -->
-                          <div class="grid grid-cols-2 gap-2">
+                          <div v-if="!isSelectedComposite" class="grid grid-cols-2 gap-2">
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.frequency") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{
                                   alerts[selectedAlertIndex]?.trigger_condition?.frequency ||
-                                  t("common.notAvailable")
+                                  raw("N/A")
                                 }}
                                 {{
                                   alerts[selectedAlertIndex]?.trigger_condition?.frequency_type ||
@@ -1120,16 +1107,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               </span>
                             </div>
                             <div class="flex flex-col gap-0.5">
-                              <span
-                                :class="'text-text-secondary'"
-                                class="text-3xs tracking-wide uppercase"
-                              >
+                              <span :class="'text-text-secondary'" class="text-3xs">
                                 {{ t("alerts.incidents.silence") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{
                                   alerts[selectedAlertIndex]?.trigger_condition?.silence ||
-                                  t("common.notAvailable")
+                                  raw("N/A")
                                 }}
                                 {{ t("common.min") }}
                               </span>
@@ -1139,6 +1123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                         <!-- Alert Conditions Section -->
                         <div
+                          v-if="!isSelectedComposite"
                           :class="[
                             'rounded-default border-card-glass-border rounded-default flex flex-col border',
                           ]"
@@ -1146,14 +1131,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >
                           <div
                             :class="[
-                              'flex flex-shrink-0 items-center justify-between border-b !bg-[var(--color-theme-table-header-bg)] px-2.5 py-1.5',
+                              '!bg-theme-table-header-bg flex flex-shrink-0 items-center justify-between border-b px-2.5 py-1.5',
                               'border-border-default',
                             ]"
                           >
-                            <span
-                              :class="'text-text-secondary'"
-                              class="text-2xs font-semibold tracking-wide uppercase"
-                            >
+                            <span :class="'text-text-secondary'" class="text-2xs font-semibold">
                               {{
                                 alerts[selectedAlertIndex]?.query_condition?.type === "sql"
                                   ? t("alerts.alertDetails.sqlQuery")
@@ -1171,8 +1153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   'text-compact overflow-x-auto break-words whitespace-pre-wrap',
                                   'text-text-body',
                                 ]"
-                                >{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre
-                              >
+                                >{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre>
                             </div>
 
                             <!-- PromQL Query -->
@@ -1182,8 +1163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   'text-compact overflow-x-auto break-words whitespace-pre-wrap',
                                   'text-text-body',
                                 ]"
-                                >{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre
-                              >
+                                >{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre>
                             </div>
 
                             <!-- Custom Conditions -->
@@ -1199,8 +1179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   formatCustomConditions(
                                     alerts[selectedAlertIndex]?.query_condition?.conditions,
                                   )
-                                }}</pre
-                              >
+                                }}</pre>
                             </div>
 
                             <!-- No conditions -->
@@ -1495,7 +1474,6 @@ import {
   ref,
   watch,
   computed,
-  nextTick,
   onMounted,
   onBeforeUnmount,
   onUnmounted,
@@ -1675,6 +1653,12 @@ export default defineComponent({
 
     // Alert Triggers tab - selected alert for detail view
     const selectedAlertIndex = ref(-1);
+
+    // A composite member has no stream/query/threshold/frequency, so those
+    // sections and the query panel are hidden for it (§9.6).
+    const isSelectedComposite = computed(
+      () => alerts.value[selectedAlertIndex.value]?.alert_type === "composite",
+    );
 
     // Computed property to process alerts with formatted conditions upfront
     // Editable status and severity for Overview tab
@@ -1916,24 +1900,24 @@ export default defineComponent({
     });
 
     const alertFrequency = computed(() => {
-      if (!incidentDetails.value || triggers.value.length === 0) return t("common.notAvailable");
+      if (!incidentDetails.value || triggers.value.length === 0) return raw("N/A");
 
       const durationMs =
         (incidentDetails.value.last_alert_at - incidentDetails.value.first_alert_at) / 1000;
       const durationSeconds = Math.floor(durationMs / 1000);
 
-      if (durationSeconds === 0) return "Immediate";
+      if (durationSeconds === 0) return t("alerts.incidents.frequencyImmediate");
 
       const frequency = triggers.value.length / (durationSeconds / 60); // alerts per minute
 
       if (frequency >= 1) {
-        return `${frequency.toFixed(1)} per minute`;
+        return t("alerts.incidents.frequencyPerMinute", { rate: frequency.toFixed(1) });
       } else if (frequency >= 1 / 60) {
         const perHour = frequency * 60;
-        return `${perHour.toFixed(1)} per hour`;
+        return t("alerts.incidents.frequencyPerHour", { rate: perHour.toFixed(1) });
       } else {
         const minutesBetween = Math.floor(durationSeconds / triggers.value.length / 60);
-        return `1 Per ${minutesBetween} Mins`;
+        return t("alerts.incidents.frequencyOnePerMins", { minutes: minutesBetween });
       }
     });
 
@@ -1985,7 +1969,7 @@ export default defineComponent({
 
       triggers.value.forEach((trigger) => {
         const alertId = trigger.alert_id;
-        const alertName = trigger.alert_name || "Unknown";
+        const alertName = trigger.alert_name || t("common.unknown");
 
         if (alertsMap.has(alertId)) {
           alertsMap.get(alertId)!.count++;
@@ -2004,7 +1988,7 @@ export default defineComponent({
 
     // Peak Alert Rate - find the highest concentration of alerts
     const peakAlertRate = computed(() => {
-      if (!incidentDetails.value || triggers.value.length === 0) return t("common.notAvailable");
+      if (!incidentDetails.value || triggers.value.length === 0) return raw("N/A");
 
       // Sort triggers by timestamp
       const sortedTriggers = [...triggers.value].sort(
@@ -2032,7 +2016,9 @@ export default defineComponent({
         maxCount = Math.max(maxCount, count);
       }
 
-      return maxCount > 1 ? `${maxCount} alerts in 5 min` : "1 alert";
+      return maxCount > 1
+        ? t("alerts.incidents.peakAlertRateMany", { count: maxCount })
+        : t("alerts.incidents.peakAlertRateOne");
     });
 
     // Peak activity details for timeline
@@ -2097,11 +2083,11 @@ export default defineComponent({
     const correlationTooltip = computed(() => {
       const type = correlationType.value;
       if (type === "Temporal") {
-        return "Alerts correlated by time - they occurred close together";
+        return t("alerts.incidents.correlationTooltipTemporal");
       } else if (type === "Spatial") {
-        return "Alerts correlated by common dimensions (same service, host, etc.)";
+        return t("alerts.incidents.correlationTooltipSpatial");
       }
-      return "Correlation type for this incident";
+      return t("alerts.incidents.correlationTooltipDefault");
     });
 
     // Fetch correlated telemetry streams
@@ -2119,6 +2105,7 @@ export default defineComponent({
         correlationData.value = await incidentsService.getCorrelatedStreams(
           org,
           incidentDetails.value,
+          t,
         );
 
         // Check if correlation failed (null response or no data) — try fallback
@@ -2413,7 +2400,7 @@ export default defineComponent({
 
         triggersByDay[dayKey].total++;
 
-        const alertName = trigger.alert_name || "Unknown";
+        const alertName = trigger.alert_name || t("common.unknown");
         triggersByDay[dayKey].byAlert[alertName] =
           (triggersByDay[dayKey].byAlert[alertName] || 0) + 1;
       });
@@ -2515,7 +2502,7 @@ export default defineComponent({
         },
         yAxis: {
           type: "value",
-          name: "Alert Count",
+          name: t("alerts.incidents.alertCountAxis"),
           nameTextStyle: {
             color: isDarkMode.value ? "#B7B7B7" : "#72777B",
           },
@@ -2551,7 +2538,10 @@ export default defineComponent({
         incidentDetails.value = response.data;
         void loadOnCallResponse(org, incidentId);
         triggers.value = response.data.triggers || [];
-        alerts.value = response.data.alerts || [];
+        // Composites have no `alerts` row, so the live-definition resolver
+        // returns them under `composite_alerts`; merge so the name-based
+        // trigger→details lookup finds them too (§9.6).
+        alerts.value = [...(response.data.alerts || []), ...(response.data.composite_alerts || [])];
 
         // Initialize editable status and severity from incident data
         editableStatus.value = response.data.status;
@@ -2790,7 +2780,7 @@ export default defineComponent({
         console.error("Failed to update title:", error);
         toast({
           variant: "error",
-          message: error?.response?.data?.message || "Failed to update incident title",
+          message: error?.response?.data?.message || t("alerts.incidents.titleUpdateFailed"),
         });
         cancelTitleEdit();
       }
@@ -2809,35 +2799,20 @@ export default defineComponent({
       }
     };
 
-    const getSeverityColorHex = (severity: string) => {
-      switch (severity) {
-        case "P1":
-          return "#b91c1c"; // red-700
-        case "P2":
-          return "#c2410c"; // orange-700
-        case "P3":
-          return "#d97706"; // amber-600
-        case "P4":
-          return "#6b7280"; // gray-500
-        default:
-          return "#6b7280"; // gray-500
-      }
-    };
-
     const formatPeriod = (periodInSeconds: number | undefined) => {
-      if (!periodInSeconds) return t("common.notAvailable");
+      if (!periodInSeconds) return raw("N/A");
 
       // Convert seconds to minutes
       if (periodInSeconds >= 60) {
         const minutes = Math.floor(periodInSeconds / 60);
         const seconds = periodInSeconds % 60;
         if (seconds === 0) {
-          return `${minutes} min`;
+          return t("alerts.incidents.periodMinutes", { minutes });
         }
-        return `${minutes} min ${seconds} sec`;
+        return t("alerts.incidents.periodMinutesSeconds", { minutes, seconds });
       }
 
-      return `${periodInSeconds} sec`;
+      return t("alerts.incidents.periodSeconds", { seconds: periodInSeconds });
     };
 
     // Transform V1 format conditions (or/and structure) to readable expression
@@ -2941,7 +2916,7 @@ export default defineComponent({
         console.error("Failed to update status:", error);
         toast({
           variant: "error",
-          message: error?.response?.data?.message || "Failed to update incident status",
+          message: error?.response?.data?.message || t("alerts.incidents.statusUpdateFailed"),
         });
         // Revert on error
         editableStatus.value = incidentDetails.value.status;
@@ -3010,7 +2985,8 @@ export default defineComponent({
               } catch (e: any) {
                 toast({
                   variant: "error",
-                  message: e?.response?.data?.message || "Failed to start reanalysis",
+                  message:
+                    e?.response?.data?.message || t("alerts.incidents.reanalysisStartFailed"),
                 });
               }
             }
@@ -3020,7 +2996,7 @@ export default defineComponent({
         console.error("Failed to update severity:", error);
         toast({
           variant: "error",
-          message: error?.response?.data?.message || "Failed to update incident severity",
+          message: error?.response?.data?.message || t("alerts.incidents.severityUpdateFailed"),
         });
         // Revert on error
         editableSeverity.value = incidentDetails.value.severity;
@@ -3569,7 +3545,7 @@ export default defineComponent({
         case "alert_id":
           return t("alerts.incidents.correlatedByAlertId");
         default:
-          return keyType || "Unknown";
+          return keyType || t("common.unknown");
       }
     };
 
@@ -3588,6 +3564,7 @@ export default defineComponent({
       triggers,
       alerts,
       selectedAlertIndex,
+      isSelectedComposite,
       rcaLoading,
       rcaError,
       rcaCancelling,
@@ -3655,7 +3632,6 @@ export default defineComponent({
       handleSeverityChange,
       handleTriggerRowClick,
       getStatusLabel,
-      getSeverityColorHex,
       formatPeriod,
       formatCustomConditions,
       formatTimestamp,

@@ -78,7 +78,8 @@ impl Contact {
     /// an address — the previous owner of a recycled mobile has not consented
     /// to being woken at 3am by somebody else's outage.
     pub fn phone_is_pageable(&self) -> bool {
-        self.phone.as_ref().is_some_and(|p| !p.trim().is_empty()) && self.phone_verified_at.is_some()
+        self.phone.as_ref().is_some_and(|p| !p.trim().is_empty())
+            && self.phone_verified_at.is_some()
     }
 
     /// The same test for push.
@@ -96,7 +97,8 @@ impl Contact {
     /// in and saw it saved reasonably believes they will be phoned.
     pub fn unverified_methods(&self) -> Vec<&'static str> {
         let mut out = Vec::new();
-        if self.phone.as_ref().is_some_and(|p| !p.trim().is_empty()) && self.phone_verified_at.is_none()
+        if self.phone.as_ref().is_some_and(|p| !p.trim().is_empty())
+            && self.phone_verified_at.is_none()
         {
             out.push("phone");
         }

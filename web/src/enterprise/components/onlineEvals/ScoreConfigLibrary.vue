@@ -20,7 +20,7 @@ the Free Software Foundation, either version 3 of the License, or
       class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
       data-test="score-config-library-error"
     >
-      <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
+      <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
       <div class="text-status-error-text">{{ loadError }}</div>
       <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
         {{ t("common.retry") }}
@@ -36,22 +36,20 @@ the Free Software Foundation, either version 3 of the License, or
         data-test="score-config-library-search"
       />
 
-      <div class="mb-2 flex items-center justify-between gap-3 pr-3 pl-4.25">
+      <div
+        class="border-border-default mb-3 flex items-center justify-between gap-3 border-b pr-3 pb-2 pl-4.25"
+      >
         <div
           v-if="filteredEntries.length > 0"
-          class="text-text-secondary inline-flex items-center gap-2 px-1 py-0.5 text-xs font-medium select-none"
+          class="text-text-body inline-flex items-center gap-2 py-0.5 text-xs font-medium select-none"
           data-test="score-config-library-select-all"
         >
-          <OCheckbox :model-value="allVisibleSelected" @update:model-value="toggleSelectAll" />
+          <OCheckbox :model-value="selectAllState" @update:model-value="toggleSelectAll" />
           <span class="cursor-pointer" @click="toggleSelectAll">{{
-            allVisibleSelected ? t("common.clearAll") : t("common.selectAll")
+            selectAllState === true ? t("common.clearAll") : t("common.selectAll")
           }}</span>
         </div>
-        <span class="text-text-secondary text-xs">
-          {{
-            t("onlineEvals.scoreConfigLibrary.scoreConfigsLabel", { count: filteredEntries.length })
-          }}
-        </span>
+        <span class="text-text-secondary text-xs tabular-nums">{{ countLabel }}</span>
       </div>
 
       <div class="min-h-0 flex-1 overflow-y-auto pb-4">
@@ -71,10 +69,8 @@ the Free Software Foundation, either version 3 of the License, or
             <li
               v-for="entry in group.entries"
               :key="entry.name"
-              class="flex cursor-pointer items-center gap-2 border-l-4 px-3 py-2 transition-colors duration-200"
-              :class="[
-                isSelected(entry.name) ? 'bg-primary/5 border-primary' : 'border-transparent',
-              ]"
+              class="flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors duration-200"
+              :class="[isSelected(entry.name) ? 'bg-accent/6' : 'hover:bg-table-row-hover-bg']"
               :data-test="`score-config-library-item-${entry.name}`"
               @click="toggle(entry)"
             >
@@ -86,7 +82,13 @@ the Free Software Foundation, either version 3 of the License, or
                 />
               </div>
               <div class="flex min-w-0 flex-1 flex-col">
-                <span class="text-sm font-medium">{{ entry.displayName }}</span>
+                <span
+                  class="text-sm"
+                  :class="
+                    isSelected(entry.name) ? 'text-text-heading font-semibold' : 'font-medium'
+                  "
+                  >{{ entry.displayName }}</span
+                >
                 <span v-if="entry.description" class="text-text-secondary block text-xs">
                   {{ entry.description }}
                 </span>
@@ -113,7 +115,7 @@ import {
   type CatalogScoreConfig,
 } from "@/services/online-evals-catalog.service";
 import { showError } from "./utils/evalFormat";
-import { useI18nTyped, raw } from "@/types/i18n";
+import { useI18nTyped, raw, type I18nKey } from "@/types/i18n";
 
 const { t } = useI18nTyped();
 
@@ -142,7 +144,7 @@ async function loadCatalog() {
     const catalog = await fetchOnlineEvalsCatalog();
     entries.value = catalog.scoreConfigs.filter((entry) => entry.level === "span");
   } catch (err: any) {
-    loadError.value = err?.message || "Failed to load catalog";
+    loadError.value = err?.message || t("onlineEvals.failedToLoadCatalog");
   } finally {
     isLoadingCatalog.value = false;
   }
@@ -160,10 +162,12 @@ const filteredEntries = computed(() => {
 });
 
 const DATA_TYPE_ORDER = ["numeric", "categorical", "boolean"] as const;
-const DATA_TYPE_LABELS: Record<string, string> = {
-  numeric: "Numeric",
-  categorical: "Categorical",
-  boolean: "Boolean",
+// Keys, not resolved text: this map is built once at setup, so a resolved
+// string would freeze at the locale in force then.
+const DATA_TYPE_LABEL_KEYS: Record<string, I18nKey> = {
+  numeric: "onlineEvals.scoreConfig.dataTypes.numeric",
+  categorical: "onlineEvals.scoreConfig.dataTypes.categorical",
+  boolean: "onlineEvals.scoreConfig.dataTypes.boolean",
 };
 
 const groupedEntries = computed(() => {
@@ -180,7 +184,7 @@ const groupedEntries = computed(() => {
   for (const k of buckets.keys()) if (!ordered.includes(k)) ordered.push(k);
   return ordered.map((dataType) => ({
     dataType,
-    label: DATA_TYPE_LABELS[dataType] ?? dataType,
+    label: DATA_TYPE_LABEL_KEYS[dataType] ? t(DATA_TYPE_LABEL_KEYS[dataType]) : raw(dataType),
     entries: buckets.get(dataType) ?? [],
   }));
 });
@@ -189,6 +193,28 @@ const allVisibleSelected = computed(() => {
   const visible = filteredEntries.value;
   if (visible.length === 0) return false;
   return visible.every((e) => selectedNames.value.has(e.name));
+});
+
+/** Three states, not two. With a plain boolean a part-selected list renders as
+ *  an EMPTY box, which reads as "nothing is selected". */
+const selectAllState = computed<boolean | "indeterminate">(() => {
+  if (allVisibleSelected.value) return true;
+  return filteredEntries.value.some((e) => selectedNames.value.has(e.name))
+    ? "indeterminate"
+    : false;
+});
+
+const countLabel = computed(() => {
+  const selected = filteredEntries.value.filter((e) => selectedNames.value.has(e.name)).length;
+  if (selected === 0) {
+    return t("onlineEvals.scoreConfigLibrary.scoreConfigsLabel", {
+      count: filteredEntries.value.length,
+    });
+  }
+  return t("onlineEvals.scoreConfigLibrary.selectedOfTotal", {
+    selected,
+    total: filteredEntries.value.length,
+  });
 });
 
 function toggleSelectAll() {
@@ -239,7 +265,7 @@ async function importSelected() {
       }
       failCount++;
       // Surface only the first hard error; subsequent failures keep counting.
-      if (failCount === 1) showError(err, "Failed to import score config");
+      if (failCount === 1) showError(err, t("onlineEvals.failedToImportScoreConfig"));
     }
   }
 
@@ -248,10 +274,12 @@ async function importSelected() {
   emit("imported");
 
   if (successCount > 0 || skipCount > 0) {
+    // Each clause is a whole translated phrase; only the list separator is
+    // assembled here, never a sentence built from translated fragments.
     const parts: string[] = [];
-    if (successCount) parts.push(`${successCount} imported`);
-    if (skipCount) parts.push(`${skipCount} skipped (already exists)`);
-    if (failCount) parts.push(`${failCount} failed`);
+    if (successCount) parts.push(t("onlineEvals.import.summaryImported", { count: successCount }));
+    if (skipCount) parts.push(t("onlineEvals.import.summarySkipped", { count: skipCount }));
+    if (failCount) parts.push(t("onlineEvals.import.summaryFailed", { count: failCount }));
     toast({
       variant: failCount > 0 && successCount === 0 ? "error" : "success",
       message: raw(parts.join(" · ")),

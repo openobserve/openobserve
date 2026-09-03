@@ -28,13 +28,13 @@
 //!
 //! * pages went out, and on which channel — the denominator for everything else;
 //! * deliveries failed — the numerator that says the channel is broken;
-//! * somebody acknowledged, and how long it took — MTTA, the number the on-call
-//!   rotation is actually managed by;
-//! * a ladder ran out of rungs with nobody acknowledging — the worst outcome the
-//!   system has, and it should be near zero;
+//! * somebody acknowledged, and how long it took — MTTA, the number the on-call rotation is
+//!   actually managed by;
+//! * a ladder ran out of rungs with nobody acknowledging — the worst outcome the system has, and it
+//!   should be near zero;
 //! * a signal did not route to any team — a page that was never even attempted;
-//! * a rung resolved to nobody — the schedule has a hole, so the ladder advanced
-//!   past a step that notified no human.
+//! * a rung resolved to nobody — the schedule has a hole, so the ladder advanced past a step that
+//!   notified no human.
 //!
 //! The last three are the ones with no other trace. A dropped signal writes no
 //! record at all, so if it is not counted here it did not happen as far as any
@@ -717,7 +717,10 @@ mod tests {
             ("oncall_l0_severity_clamp_total", vec![]),
             ("oncall_l0_suppressed_total", vec![]),
             ("oncall_l0_downgraded_total", vec![]),
-            ("oncall_l0_verdict_before_first_ack_total", vec!["verdict_first"]),
+            (
+                "oncall_l0_verdict_before_first_ack_total",
+                vec!["verdict_first"],
+            ),
             ("oncall_l0_false_suppress_total", vec![]),
         ];
         // Touch one series per family so `gather` emits it.

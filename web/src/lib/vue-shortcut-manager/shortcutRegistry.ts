@@ -46,7 +46,7 @@ export interface ShortcutEntry {
 
 export interface ShortcutGroup {
   /** i18n key under shortcuts.pages.* */
-  pageKey: string;
+  pageKey: I18nKey;
   /** Manager scope shared by this group's registerable shortcuts (omit = global). */
   scope?: string;
   shortcuts: ShortcutEntry[];
@@ -55,8 +55,14 @@ export interface ShortcutGroup {
 export interface ShortcutModule {
   /** i18n key under shortcuts.modules.* */
   titleKey: I18nKey;
+  /**
+   * Literal title, used INSTEAD of `titleKey` when the name must not be translated.
+   * Acronyms only: "RUM" and "IAM" came back from the translator as "RON"/"RHUM"
+   * (the drink) and "SOY YO" ("I am me").
+   */
+  title?: string;
   /** pageKeys (ShortcutGroup.pageKey) grouped under this module, in display order */
-  pages: string[];
+  pages: I18nKey[];
 }
 
 /**
@@ -113,6 +119,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
   { titleKey: "shortcuts.modules.reports", pages: ["shortcuts.pages.reports"] },
   {
     titleKey: "shortcuts.modules.iam",
+    title: "IAM",
     pages: [
       "shortcuts.pages.iamUsers",
       "shortcuts.pages.iamRoles",
@@ -141,6 +148,7 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
   },
   {
     titleKey: "shortcuts.modules.rum",
+    title: "RUM",
     pages: [
       "shortcuts.pages.rumErrors",
       "shortcuts.pages.rumSessions",
@@ -982,6 +990,12 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     scope: "rum-errors",
     shortcuts: [
       { id: "rumErrorsRefresh", key: "r", descriptionKey: "shortcuts.actions.rumErrorsRefresh" },
+      {
+        id: "rumErrorsCopyUrl",
+        keyForWindows: "ctrl+shift+c",
+        keyForMac: "meta+shift+c",
+        descriptionKey: "shortcuts.actions.rumErrorsCopyUrl",
+      },
     ],
   },
 
@@ -994,6 +1008,12 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         id: "rumSessionsRefresh",
         key: "r",
         descriptionKey: "shortcuts.actions.rumSessionsRefresh",
+      },
+      {
+        id: "rumSessionsCopyUrl",
+        keyForWindows: "ctrl+shift+c",
+        keyForMac: "meta+shift+c",
+        descriptionKey: "shortcuts.actions.rumSessionsCopyUrl",
       },
     ],
   },

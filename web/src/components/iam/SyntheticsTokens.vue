@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-secondary cursor-help"
           data-test="synthetics-tokens-info-icon"
         />
-        <OTooltip :content="t('synthetics.tokens.explanation')" max-width="360px" />
+        <OTooltip :content="t('synthetics.tokens.explanation')" max-width="22.5rem" />
       </span>
     </template>
     <template #subtitle>
@@ -224,8 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <pre
             class="bg-surface-subtle border-border-default rounded-default overflow-x-auto border p-3 font-mono text-xs whitespace-pre"
             data-test="synthetics-token-install-cmd"
-            >{{ installCommand }}</pre
-          >
+            >{{ installCommand }}</pre>
           <OButton
             variant="ghost"
             size="icon-sm"

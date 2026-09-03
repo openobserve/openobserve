@@ -333,6 +333,8 @@ impl SchedulerJobPuller {
             for trigger in triggers {
                 let job_id = trigger.id;
                 let job_key = trigger.module_key.clone();
+                let claim =
+                    (trigger.module == TriggerModule::CompositeAlert).then(|| trigger.clone());
                 let (tx, mut rx) = mpsc::channel::<()>(1);
                 let scheduled_job = ScheduledJob {
                     trace_id: trace_id.clone(),
@@ -370,7 +372,26 @@ impl SchedulerJobPuller {
                             return;
                         }
 
-                        if let Err(e) =
+                        if let Some(claim) = claim.as_ref() {
+                            match infra::scheduler::keep_alive_claim(
+                                claim,
+                                alert_timeout,
+                                report_timeout,
+                            )
+                            .await
+                            {
+                                Ok(true) => {}
+                                Ok(false) => {
+                                    log::warn!(
+                                        "[SCHEDULER][JobPuller-{trace_id_keep_alive}] composite claim for job[{job_id}] trigger[{job_key}] is stale; stopping keep_alive"
+                                    );
+                                    return;
+                                }
+                                Err(e) => log::error!(
+                                    "[SCHEDULER][JobPuller-{trace_id_keep_alive}] keep_alive for composite job[{job_id}] trigger[{job_key}] failed: {e}"
+                                ),
+                            }
+                        } else if let Err(e) =
                             infra::scheduler::keep_alive(&[job_id], alert_timeout, report_timeout)
                                 .await
                         {
@@ -626,6 +647,14 @@ fn resolve_module_configs(
             module: TriggerModule::Alert,
             // Alert is the base module: its budget and cadence ARE the shared defaults
             // (ZO_ALERT_SCHEDULE_CONCURRENCY / ZO_ALERT_SCHEDULE_INTERVAL), so no dedicated vars.
+            concurrency: default_concurrency,
+            poll_interval_secs: default_interval,
+            lease_timeout_secs: None,
+        },
+        ModuleSchedulerConfig {
+            module: TriggerModule::CompositeAlert,
+            // Composite evaluation reuses the ordinary alert scheduler budget and
+            // cadence (§9.4); it has no dedicated concurrency/interval vars.
             concurrency: default_concurrency,
             poll_interval_secs: default_interval,
             lease_timeout_secs: None,
@@ -926,6 +955,7 @@ mod tests {
         assert_eq!(modules.len(), 9, "duplicate module in resolved configs");
         for m in [
             TriggerModule::Alert,
+            TriggerModule::CompositeAlert,
             TriggerModule::Report,
             TriggerModule::DerivedStream,
             TriggerModule::Backfill,
@@ -952,6 +982,7 @@ mod tests {
         // `test_oncall_lane_prefers_the_scheduler_var_then_the_feature_var` covers.
         for m in [
             TriggerModule::Alert,
+            TriggerModule::CompositeAlert,
             TriggerModule::Report,
             TriggerModule::DerivedStream,
             TriggerModule::AnomalyDetection,
@@ -1093,7 +1124,11 @@ mod tests {
         );
         assert_eq!(scheduler.lanes.len(), 2);
         assert_eq!(
-            scheduler.workers.iter().filter(|w| w.module.is_none()).count(),
+            scheduler
+                .workers
+                .iter()
+                .filter(|w| w.module.is_none())
+                .count(),
             cfg.alert_schedule_concurrency as usize,
             "the shared lane must keep its full worker pool"
         );

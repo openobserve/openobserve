@@ -62,6 +62,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="service-graph-node-panel-view-related-traces-btn"
             >{{ t("traces.serviceGraphNodeSidePanel.traces") }}</ODropdownItem
           >
+          <!-- FR-7's missing direction: service → the databases it queries.
+               Database Monitoring already accepts a `service` scope; this is
+               the entry point that sets it. Hidden when the feature is off. -->
+          <ODropdownItem
+            v-if="dbmEnabled"
+            @select="viewRelatedDatabases"
+            data-test="service-graph-node-panel-view-related-databases-btn"
+            >{{ t("traces.serviceGraphNodeSidePanel.databases") }}</ODropdownItem
+          >
         </ODropdown>
       </div>
     </template>
@@ -70,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- No horizontal padding here: sections that need an inset (charts, chip row, tab labels)
            add px-page-edge themselves, so dividers and tables can bleed to the edges naturally. -->
     <div
-      class="panel-content bg-surface-base flex-1 overflow-x-hidden overflow-y-auto py-2.5 dark:bg-[color-mix(in_srgb,var(--color-grey-950)_85%,var(--color-indigo-900))]"
+      class="panel-content bg-surface-base dark:bg-graph-panel-scrim flex-1 overflow-x-hidden overflow-y-auto py-2.5"
     >
       <!-- RED Charts Section -->
       <div
@@ -423,7 +432,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="active"
                     variant="ghost"
                     size="icon"
-                    class="bg-table-row-hover-bg! rounded-default shadow-[-0.5rem_0_0.5rem_var(--color-table-row-hover-bg)]"
                     :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                     @click.stop="
                       navigateToTraces({
@@ -621,7 +629,7 @@ import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
-import { useI18nTyped, raw, type I18nText, type I18nKey } from "@/types/i18n";
+import { gt, useI18nTyped, raw, type I18nText, type I18nKey } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -853,11 +861,21 @@ const DEFAULT_GROUP_FIELDS = new Set([
 // Generic environment display labels for non-primary-platform segments.
 // Primary platform labels (k8s/aws/azure/gcp) come from the shared ENV_SEGMENTS.
 const GENERIC_ENV_LABELS: Record<string, string> = {
-  host: "Host",
-  container: "Container",
-  faas: "Serverless",
-  process: "Runtime",
-  cloud: "Cloud",
+  get host() {
+    return gt("traces.serviceGraphNodeSidePanel.envHost");
+  },
+  get container() {
+    return gt("traces.serviceGraphNodeSidePanel.envContainer");
+  },
+  get faas() {
+    return gt("traces.serviceGraphNodeSidePanel.envServerless");
+  },
+  get process() {
+    return gt("traces.serviceGraphNodeSidePanel.envRuntime");
+  },
+  get cloud() {
+    return gt("traces.serviceGraphNodeSidePanel.envCloud");
+  },
 };
 
 /** Gets a display label for any environment key, platform or generic. */
@@ -1044,13 +1062,31 @@ export default defineComponent({
     // is a plain `FROM "{stream}"` with no join.
     const serviceNameField = computed(() => identityField());
 
+    const hasCatalogServiceIdentity = computed(
+      () =>
+        Boolean(props.selectedNode?.service_type) &&
+        Object.prototype.hasOwnProperty.call(props.selectedNode ?? {}, "service_system"),
+    );
+
+    const serviceFilter = (alias = ""): string => {
+      const serviceName = buildServiceName();
+      let filter = `${identityField(alias)} = '${serviceName}'`;
+      if (!hasCatalogServiceIdentity.value) return filter;
+
+      filter += ` AND ${alias}infer_service_type = '${escapeSingleQuotes(props.selectedNode.service_type)}'`;
+      const serviceSystem = props.selectedNode.service_system;
+      if (serviceSystem) {
+        return `${filter} AND ${alias}infer_service_system = '${escapeSingleQuotes(serviceSystem)}'`;
+      }
+      return `${filter} AND (${alias}infer_service_system IS NULL OR ${alias}infer_service_system = '')`;
+    };
+
     const loadDashboard = () => {
       if (!props.selectedNode || props.streamFilter === "all") {
         dashboardData.value = {};
         return;
       }
 
-      const serviceName = buildServiceName();
       const streamName = props.streamFilter;
 
       selectedTimeObj.value = {
@@ -1066,15 +1102,15 @@ export default defineComponent({
       };
 
       const convertedDashboard = convertDashboardSchemaVersion(deepCopy(metrics));
-      const serviceFilter = `${serviceNameField.value} = '${serviceName}'`;
+      const catalogServiceFilter = serviceFilter();
 
       convertedDashboard.tabs[0].panels.forEach((panel: any, index: number) => {
         let whereClause: string;
 
         if (panel.title === "Errors") {
-          whereClause = `WHERE span_status = 'ERROR' AND ${serviceFilter}`;
+          whereClause = `WHERE span_status = 'ERROR' AND ${catalogServiceFilter}`;
         } else {
-          whereClause = `WHERE ${serviceFilter}`;
+          whereClause = `WHERE ${catalogServiceFilter}`;
         }
 
         panel.layout.h = 10;
@@ -1323,7 +1359,6 @@ export default defineComponent({
 
     // Fetch the most recent span for this service to extract rich semantic dimensions
     const fetchLatestSpan = async (): Promise<Record<string, any> | null> => {
-      const serviceName = buildServiceName();
       const streamName = props.streamFilter || "default";
       const org = store.state.selectedOrganization.identifier;
 
@@ -1332,7 +1367,7 @@ export default defineComponent({
           org_identifier: org,
           query: {
             query: {
-              sql: `SELECT * FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' ORDER BY _timestamp DESC`,
+              sql: `SELECT * FROM "${streamName}" WHERE ${serviceFilter()} ORDER BY _timestamp DESC`,
               start_time: props.timeRange.startTime,
               end_time: props.timeRange.endTime,
               from: 0,
@@ -1637,15 +1672,15 @@ export default defineComponent({
     const serviceMetrics = computed(() => {
       if (!props.selectedNode || !props.graphData) {
         return {
-          requestRate: t("common.notAvailable"),
-          requestRateValue: t("common.notAvailable"),
+          requestRate: raw("N/A"),
+          requestRateValue: raw("N/A"),
           totalRequests: 0,
           incomingRequests: 0,
           outgoingRequests: 0,
-          errorRate: t("common.notAvailable"),
-          p50Latency: t("common.notAvailable"),
-          p95Latency: t("common.notAvailable"),
-          p99Latency: t("common.notAvailable"),
+          errorRate: raw("N/A"),
+          p50Latency: raw("N/A"),
+          p95Latency: raw("N/A"),
+          p99Latency: raw("N/A"),
         };
       }
 
@@ -1701,9 +1736,9 @@ export default defineComponent({
         incomingRequests: incomingRequests,
         outgoingRequests: outgoingRequests,
         errorRate: errorRate.toFixed(2) + "%",
-        p50Latency: incomingEdges.length > 0 ? formatLatency(p50Latency) : t("common.notAvailable"),
-        p95Latency: incomingEdges.length > 0 ? formatLatency(p95Latency) : t("common.notAvailable"),
-        p99Latency: incomingEdges.length > 0 ? formatLatency(p99Latency) : t("common.notAvailable"),
+        p50Latency: incomingEdges.length > 0 ? formatLatency(p50Latency) : raw("N/A"),
+        p95Latency: incomingEdges.length > 0 ? formatLatency(p95Latency) : raw("N/A"),
+        p99Latency: incomingEdges.length > 0 ? formatLatency(p99Latency) : raw("N/A"),
       };
     });
 
@@ -1947,7 +1982,6 @@ export default defineComponent({
       recentOperations.value = [];
 
       try {
-        const serviceName = buildServiceName();
         const streamName = props.streamFilter || "default";
         const st = props.selectedNode?.service_type;
         // A tool/model node's caller is its OWNING AGENT, which usually sits on an
@@ -1963,16 +1997,13 @@ export default defineComponent({
         let sql: string;
         if (isGenAiChild) {
           const { callerExpr, joins } = genAiCallerClimb(streamName);
-          // The identity field, built already aliased to the child table `c`
-          // (no post-processing of the expression string).
-          const childField = identityField("c.");
-          sql = `SELECT ${callerExpr} as caller_service, c.operation_name, ${metrics} FROM "${streamName}" AS c ${joins} WHERE ${childField} = '${serviceName}' GROUP BY ${callerExpr}, c.operation_name`;
+          sql = `SELECT ${callerExpr} as caller_service, c.operation_name, ${metrics} FROM "${streamName}" AS c ${joins} WHERE ${serviceFilter("c.")} GROUP BY ${callerExpr}, c.operation_name`;
         } else {
           const selectCols = isInf
             ? "service_name as caller_service, operation_name"
             : "operation_name";
           const groupCols = isInf ? "service_name, operation_name" : "operation_name";
-          sql = `SELECT ${selectCols}, ${metrics} FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' GROUP BY ${groupCols}`;
+          sql = `SELECT ${selectCols}, ${metrics} FROM "${streamName}" WHERE ${serviceFilter()} GROUP BY ${groupCols}`;
         }
 
         const response = await searchService.search({
@@ -2017,7 +2048,6 @@ export default defineComponent({
       recentSpanData.value = { errorSpans: [], slowSpans: [] };
 
       try {
-        const serviceName = buildServiceName();
         const streamName = props.streamFilter || "default";
         const org = store.state.selectedOrganization.identifier;
         const timeParams = {
@@ -2031,7 +2061,7 @@ export default defineComponent({
             org_identifier: org,
             query: {
               query: {
-                sql: `SELECT operation_name, duration, start_time FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' AND span_status = 'ERROR' ORDER BY start_time DESC`,
+                sql: `SELECT operation_name, duration, start_time FROM "${streamName}" WHERE ${serviceFilter()} AND span_status = 'ERROR' ORDER BY start_time DESC`,
                 ...timeParams,
                 size: 5,
               },
@@ -2042,7 +2072,7 @@ export default defineComponent({
             org_identifier: org,
             query: {
               query: {
-                sql: `SELECT operation_name, duration FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' ORDER BY duration DESC`,
+                sql: `SELECT operation_name, duration FROM "${streamName}" WHERE ${serviceFilter()} ORDER BY duration DESC`,
                 ...timeParams,
                 size: 20,
               },
@@ -2111,7 +2141,6 @@ export default defineComponent({
       resourceTabData.value = { ...resourceTabData.value, [config.id]: [] };
 
       try {
-        const serviceName = buildServiceName();
         const streamName = props.streamFilter || "default";
         const groupField = config.groupField;
         const alias = config.colId + "_name";
@@ -2122,7 +2151,7 @@ export default defineComponent({
           ? `(${buildNullCheck(config.fields)})`
           : `${groupField} IS NOT NULL`;
 
-        const sql = `SELECT ${groupField} as ${alias}, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE ${serviceNameField.value} = '${serviceName}' AND ${nullClause} GROUP BY ${alias} ORDER BY request_count DESC`;
+        const sql = `SELECT ${groupField} as ${alias}, count(*) as request_count, count(*) FILTER (WHERE span_status = 'ERROR') as error_count, approx_percentile_cont(duration, 0.50) as p50_latency, approx_percentile_cont(duration, 0.75) as p75_latency, approx_percentile_cont(duration, 0.95) as p95_latency, approx_percentile_cont(duration, 0.99) as p99_latency FROM "${streamName}" WHERE ${serviceFilter()} AND ${nullClause} GROUP BY ${alias} ORDER BY request_count DESC`;
 
         const response = await searchService.search({
           org_identifier: store.state.selectedOrganization.identifier,
@@ -2326,6 +2355,9 @@ export default defineComponent({
         serviceName:
           props.selectedNode?.name || props.selectedNode?.label || props.selectedNode?.id,
         serviceType: props.selectedNode?.service_type,
+        ...(hasCatalogServiceIdentity.value
+          ? { serviceSystem: props.selectedNode?.service_system }
+          : {}),
         operationName: params.operationName,
         callerService: params.callerService,
         nodeName: params.nodeName,
@@ -2346,6 +2378,33 @@ export default defineComponent({
 
     const viewRelatedTraces = () => {
       navigateToTraces({ mode: "traces" });
+    };
+
+    /** Database Monitoring is on for this instance, so the service→databases
+     *  entry point may render. Same flag the DBM routes and nav gate on. */
+    const dbmEnabled = computed(() => Boolean(store.state.zoConfig?.database_monitoring_enabled));
+
+    /**
+     * Service → databases (DBM FR-7). Top queries scoped to this service over
+     * the panel's window: the question from a service is "which of MY queries
+     * is hurting", which is the query grain — the databases tab cannot scope
+     * to a service without collapsing to estimated per-query totals. The name
+     * goes in RAW (the router encodes it); `buildServiceName` is SQL-escaped
+     * and would corrupt an O'Reilly-style name in a URL.
+     */
+    const viewRelatedDatabases = () => {
+      const node = props.selectedNode;
+      const serviceName = node?.name || node?.label || node?.id;
+      if (!serviceName) return;
+      router.push({
+        name: "dbmQueries",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          service: String(serviceName),
+          from: String(props.timeRange.startTime),
+          to: String(props.timeRange.endTime),
+        },
+      });
     };
 
     const viewRelatedLogs = async () => {
@@ -2490,6 +2549,8 @@ export default defineComponent({
       handleClose,
       viewRelatedTraces,
       viewRelatedLogs,
+      dbmEnabled,
+      viewRelatedDatabases,
       handleShowTelemetry,
       // RED Charts
       dashboardData,

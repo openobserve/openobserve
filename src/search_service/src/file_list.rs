@@ -71,12 +71,14 @@ pub async fn query_for_merge(
     stream_name: &str,
     date_start: &str,
     date_end: &str,
+    max_original_size: i64,
 ) -> Result<Vec<FileKey>> {
     infra_file_list::query_for_merge(
         org_id,
         stream_type,
         stream_name,
         (date_start.to_string(), date_end.to_string()),
+        max_original_size,
     )
     .await
 }

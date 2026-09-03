@@ -43,7 +43,6 @@ pub use agent::{
     severity_pages, update_channels, verdict_lines,
 };
 pub use contact::{Contact, ContactError, normalize_phone};
-pub use target::{EscalationTarget, RotationMode, TargetError};
 pub use policy::{
     AfterRung, BREAKER_OPEN_MICROS, BREAKER_WINDOW_MICROS, Channel, ChannelBreaker,
     DEFAULT_PAGING_PRIORITY, DEFAULT_REPEAT_COUNT, EscalationPolicy, FALLBACK_ORDER, FinalAction,
@@ -63,10 +62,10 @@ pub use response::{
     dependents_all_clear, flap_note, next_ladder_run, page_decision, upstream_recovery,
 };
 pub use rotation::{
-    AwayShift, CoverageSegment, DEFAULT_ROTATION_NAME, DEFAULT_SHIFT_RULE_NAME, GridError, MAX_AWAY_SHIFTS, MAX_GRID_MICROS,
-    MAX_GRID_SEGMENTS, MAX_ROTATION_NAME_CHARS, MICROS_PER_DAY, MICROS_PER_HOUR,
-    MICROS_PER_MINUTE, MICROS_PER_WEEK, OVERRIDE_ROTATION_NAME, OnCallPosition, Rotation,
-    RotationError, SECONDARY_ROTATION_NAME, SOURCE_DEFAULT, ScheduleOverride, ShiftRule,
+    AwayShift, CoverageSegment, DEFAULT_ROTATION_NAME, DEFAULT_SHIFT_RULE_NAME, GridError,
+    MAX_AWAY_SHIFTS, MAX_GRID_MICROS, MAX_GRID_SEGMENTS, MAX_ROTATION_NAME_CHARS, MICROS_PER_DAY,
+    MICROS_PER_HOUR, MICROS_PER_MINUTE, MICROS_PER_WEEK, OVERRIDE_ROTATION_NAME, OnCallPosition,
+    Rotation, RotationError, SECONDARY_ROTATION_NAME, SOURCE_DEFAULT, ScheduleOverride, ShiftRule,
     ShiftRuleError, TimeWindow, Unavailability, away_assignments, colliding_rotations,
     covering_override, covering_override_for, everyone_on_call, is_unavailable, resolve_on_call,
     resolve_window,
@@ -77,6 +76,7 @@ pub use routing::{
     resolve_owner, resolve_owner_ranked, route,
 };
 pub use subject::{SubjectError, SubjectRef, SubjectType};
+pub use target::{EscalationTarget, RotationMode, TargetError};
 pub use team::{
     MemberPlacement, MemberRemoval, Schedule, Team, TeamError, TeamMember, place_member,
 };

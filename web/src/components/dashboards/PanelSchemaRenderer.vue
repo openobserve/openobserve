@@ -47,11 +47,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
           @row-click="onChartClick"
+          @explore-cell="(params) => exploreCellInLogs(params.columnId, params.value, params.row)"
+          @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
           :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
+          :enable-column-format="enableColumnFormat"
+          :drilldown-columns="store.state.printMode ? [] : drilldownColumnAliases"
+          :drilldown-all-columns="!store.state.printMode && drilldownAllColumns"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -174,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="rounded-default border-dropdown-border bg-dropdown-bg absolute top-0 left-0 z-9999999 hidden min-w-50 border px-0 py-1 whitespace-nowrap shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+        class="rounded-default border-dropdown-border bg-dropdown-bg absolute top-0 left-0 z-9999999 hidden min-w-50 border px-0 py-1 whitespace-nowrap shadow-sm dark:shadow-sm"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
@@ -223,6 +228,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close="hideContextMenu"
       />
     </div>
+
+    <!-- Cell explorer drawer -->
+    <ODrawer
+      v-model:open="cellDrawer.open"
+      side="right"
+      :width="75"
+      bleed
+      :title="t('panel.logExplorer.title')"
+      data-test="dashboard-cell-explorer-drawer"
+      @update:open="onCellDrawerOpenChange"
+    >
+      <DashboardLogDrawer
+        v-if="cellDrawer.open"
+        :stream="cellDrawer.stream"
+        :stream-type="cellDrawer.streamType"
+        :field="cellDrawer.field"
+        :value="cellDrawer.value"
+        :start-time="cellDrawer.startTime"
+        :end-time="cellDrawer.endTime"
+        :base-where="cellDrawer.baseWhere"
+      />
+    </ODrawer>
   </div>
 </template>
 
@@ -297,8 +324,14 @@ import CustomChartRenderer from "./panels/CustomChartRenderer.vue";
 const AlertContextMenu = defineAsyncComponent(() => {
   return import("./AlertContextMenu.vue");
 });
+
+const DashboardLogDrawer = defineAsyncComponent(() => {
+  return import("./DashboardLogDrawer.vue");
+});
+
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
@@ -322,6 +355,8 @@ export default defineComponent({
     OButton,
     OIcon,
     OEmptyState,
+    ODrawer,
+    DashboardLogDrawer,
   },
   props: {
     selectedTimeObj: {
@@ -413,6 +448,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // Table preview's per-column format icon; explicit opt-in, not derived from `viewOnly` (which tracks print mode) — only PanelEditor sets this.
+    enableColumnFormat: {
+      type: Boolean,
+      default: false,
+    },
     shouldRefreshWithoutCache: {
       type: Boolean,
       required: false,
@@ -458,6 +498,7 @@ export default defineComponent({
     "series-data-update",
     "contextmenu",
     "show-legends",
+    "format-column",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -598,6 +639,7 @@ export default defineComponent({
         top: `${Math.max(cyLocal, COPY_BTN_PX / 2)}px`,
         transform: "translateY(-50%)",
         backgroundColor: (void isDark.value, chartColor("--color-surface-base")),
+        // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
         boxShadow: "0 0 3px rgba(0, 0, 0, 0.35)",
       };
     };
@@ -822,19 +864,19 @@ export default defineComponent({
 
       const currentXLabel =
         panelSchema?.value?.type == "table"
-          ? "First Column"
+          ? t("panel.firstColumn")
           : panelSchema?.value?.type == "h-bar"
-            ? "Y-Axis"
-            : "X-Axis";
+            ? t("panel.yAxisShort")
+            : t("panel.xAxisShort");
 
       const currentYLabel =
         panelSchema?.value?.type == "table"
-          ? "Other Columns"
+          ? t("panel.otherColumn")
           : panelSchema?.value?.type == "h-bar"
-            ? "X-Axis"
-            : "Y-Axis";
+            ? t("panel.xAxisShort")
+            : t("panel.yAxisShort");
 
-      validateSQLPanelFields(panelSchema.value, 0, currentXLabel, currentYLabel, errors, true);
+      validateSQLPanelFields(t, panelSchema.value, 0, currentXLabel, currentYLabel, errors, true);
 
       return errors;
     });
@@ -1312,6 +1354,37 @@ export default defineComponent({
       }
     });
 
+    // Restore the cell drawer when navigating to a URL that already carries cell-explorer params.
+    onMounted(() => {
+      const query = route?.query;
+      if (!query || String(query.cell_panel) !== String(props.panelSchema.id)) return;
+      if (props.panelSchema.type !== "table" || props.panelSchema.queryType === "promql") return;
+      const field = String(query.cell_field ?? "");
+      const rawValue = String(query.cell_value ?? "");
+      const value: string | number =
+        String(query.cell_vtype) === "number" &&
+        rawValue !== "" &&
+        Number.isFinite(Number(rawValue))
+          ? Number(rawValue)
+          : rawValue;
+      const stream = String(query.cell_stream ?? "");
+      const stype = String(query.cell_stype ?? "logs");
+      const t0 = Number(query.cell_t0 ?? 0);
+      const t1 = Number(query.cell_t1 ?? 0);
+      const SQL_IDENT = /^[A-Za-z_][A-Za-z0-9_.]*$/;
+      if (!SQL_IDENT.test(field) || !SQL_IDENT.test(stream) || !t0 || !t1) return;
+      cellDrawer.value = {
+        open: true,
+        field,
+        value,
+        stream,
+        streamType: stype,
+        startTime: t0,
+        endTime: t1,
+        baseWhere: "",
+      };
+    });
+
     onUnmounted(() => {
       if (resizeObserver) {
         resizeObserver.disconnect();
@@ -1323,13 +1396,11 @@ export default defineComponent({
       }
     });
 
-    watch(
-      panelData,
-      () => {
-        emit("series-data-update", panelData.value);
-      },
-      { deep: true },
-    );
+    // panelData is a shallowRef replaced wholesale, so no deep watch needed —
+    // deep would traverse every data point of the chart options per update.
+    watch(panelData, () => {
+      emit("series-data-update", panelData.value);
+    });
 
     // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
     watch(
@@ -1464,31 +1535,44 @@ export default defineComponent({
 
     const { showErrorNotification, showPositiveNotification } = useNotifications();
 
-    const { drilldownArray, onChartClick, openDrilldown, hidePopupsAndOverlays } =
-      usePanelDrilldown({
-        panelSchema,
-        variablesData,
-        selectedTimeObj,
-        metadata,
-        data,
-        panelData,
-        filteredData,
-        resultMetaData,
-        store,
-        route,
-        router,
-        emit,
-        allowAnnotationsAdd,
-        isAddAnnotationMode,
-        editAnnotation,
-        handleAddAnnotation,
-        chartPanelRef,
-        drilldownPopUpRef,
-        annotationPopupRef,
-        selectedAnnotationData,
-        isCursorOverPanel,
-        showErrorNotification,
-      });
+    const onFormatColumn = (field: string) => emit("format-column", field);
+
+    const {
+      drilldownArray,
+      onChartClick,
+      openDrilldown,
+      hidePopupsAndOverlays,
+      drilldownColumnAliases,
+      drilldownAllColumns,
+      getCellDrilldownField,
+      panelBaseWhere,
+      panelWhereByStream,
+      ensureDrilldownSchema,
+    } = usePanelDrilldown({
+      panelSchema,
+      variablesData,
+      selectedTimeObj,
+      metadata,
+      data,
+      panelData,
+      filteredData,
+      resultMetaData,
+      store,
+      route,
+      router,
+      emit,
+      allowAnnotationsAdd,
+      isAddAnnotationMode,
+      editAnnotation,
+      handleAddAnnotation,
+      chartPanelRef,
+      drilldownPopUpRef,
+      annotationPopupRef,
+      selectedAnnotationData,
+      isCursorOverPanel,
+      showErrorNotification,
+      t,
+    });
 
     const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
       panelSchema,
@@ -1497,6 +1581,7 @@ export default defineComponent({
       tableRendererRef,
       showErrorNotification,
       showPositiveNotification,
+      t,
     });
 
     // Trellis only applies when EVERY query has a breakdown field (each
@@ -1563,6 +1648,147 @@ export default defineComponent({
       return { options: { backgroundColor: "transparent" } };
     });
 
+    const cellDrawer = ref<{
+      open: boolean;
+      field: string;
+      value: string | number;
+      stream: string;
+      streamType: string;
+      startTime: number;
+      endTime: number;
+      baseWhere: string;
+    }>({
+      open: false,
+      field: "",
+      value: "",
+      stream: "",
+      streamType: "logs",
+      startTime: 0,
+      endTime: 0,
+      baseWhere: "",
+    });
+
+    function resolveAliasToColumn(alias: string, query: any, executedSql = ""): string {
+      // Field-config lookup (field-based panels).
+      const allConfigFields: any[] = [
+        ...(Array.isArray(query?.fields?.x) ? query.fields.x : []),
+        ...(Array.isArray(query?.fields?.y) ? query.fields.y : []),
+        ...(Array.isArray(query?.fields?.breakdown) ? query.fields.breakdown : []),
+      ];
+      const fromConfig = allConfigFields.find((f: any) => f.alias === alias && f.column);
+      if (fromConfig) return fromConfig.column;
+
+      // SQL fallback (custom SQL panels): aliases are double-quoted; column may carry a stream prefix.
+      const sql: string = executedSql || query?.query || "";
+      if (sql) {
+        const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const re = new RegExp(
+          `([\\w.]+)\\s+(?:as\\s+)?"?${escaped}"?(?=\\s*,|\\s+from|\\s*\\)|\\s*$)`,
+          "i",
+        );
+        const m = re.exec(sql.replace(/\n/g, " "));
+        if (m?.[1]) {
+          const parts = m[1].split("."); // strip stream prefix
+          const col = parts[parts.length - 1];
+          if (col && col.toLowerCase() !== alias.toLowerCase()) return col;
+        }
+      }
+
+      return alias; // last resort — works when the alias IS the stream field name
+    }
+
+    // Dashboard timestamps are µs; Dates are built from µs so getTime() returns µs.
+    function toMicros(v: any): number {
+      if (v instanceof Date) return v.getTime();
+      const n = Number(v);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    }
+
+    function openCellDrawer(params: {
+      field: string;
+      value: string | number;
+      stream: string;
+      streamType: string;
+      startTime: number;
+      endTime: number;
+      baseWhere: string;
+    }) {
+      cellDrawer.value = { open: true, ...params };
+      // Sync to URL so the drawer state is shareable.
+      router.replace({
+        query: {
+          ...route.query,
+          cell_panel: props.panelSchema.id,
+          cell_field: params.field,
+          cell_value: String(params.value),
+          cell_vtype: typeof params.value,
+          cell_stream: params.stream,
+          cell_stype: params.streamType,
+          cell_t0: String(params.startTime),
+          cell_t1: String(params.endTime),
+        },
+      });
+    }
+
+    function onCellDrawerOpenChange(open: boolean) {
+      cellDrawer.value.open = open;
+      if (!open) {
+        // Clear cell-explorer URL params without touching other query params.
+        const q = { ...route.query };
+        for (const k of [
+          "cell_panel",
+          "cell_field",
+          "cell_value",
+          "cell_vtype",
+          "cell_stream",
+          "cell_stype",
+          "cell_t0",
+          "cell_t1",
+          "cell_where",
+          "cell_event_ts",
+        ]) {
+          delete (q as any)[k];
+        }
+        router.replace({ query: q });
+      }
+    }
+
+    // Called directly by the search icon so it works even with a panel drilldown config.
+    async function exploreCellInLogs(alias: string, value: unknown, row: any) {
+      const queries = props.panelSchema.queries ?? [];
+      const qi = Number.isInteger(row?.__q) && queries[row.__q] ? row.__q : 0;
+      const query = queries[qi];
+      const executedSql = String(metadata.value?.queries?.[qi]?.query ?? query?.query ?? "");
+
+      // Panel WHERE is fetched lazily (not on panel render) — resolve it for THIS query
+      await ensureDrilldownSchema(qi);
+
+      const cell = getCellDrilldownField(qi, alias);
+      const stream = cell?.streamName ?? query?.fields?.stream ?? query?.stream ?? "";
+      const streamType =
+        cell?.streamType ?? query?.fields?.stream_type ?? query?.stream_type ?? "logs";
+      const realField = cell?.column ?? resolveAliasToColumn(alias, query, executedSql);
+      // Base WHERE is BE-only (result_schema); no FE fallback — if the BE gives none, use none.
+      const baseWhere = cell?.isJoin
+        ? (panelWhereByStream.value[cell.streamName] ?? "")
+        : panelBaseWhere.value;
+
+      const metaStartMicros = Number(metadata.value?.queries?.[qi]?.startTime ?? 0);
+      const metaEndMicros = Number(metadata.value?.queries?.[qi]?.endTime ?? 0);
+      const selStartMicros = toMicros((props.selectedTimeObj as any).start_time);
+      const selEndMicros = toMicros((props.selectedTimeObj as any).end_time);
+
+      openCellDrawer({
+        field: realField,
+        value: value as string | number,
+        stream,
+        streamType,
+        startTime: metaStartMicros || selStartMicros,
+        endTime: metaEndMicros || selEndMicros || Date.now() * 1000,
+        baseWhere,
+      });
+    }
+
     return {
       t,
       store,
@@ -1579,7 +1805,10 @@ export default defineComponent({
       tableRendererRef,
       tableRendererData,
       onChartClick,
+      onFormatColumn,
       onDataZoom,
+      drilldownColumnAliases,
+      drilldownAllColumns,
       drilldownArray,
       selectedAnnotationData,
       openDrilldown,
@@ -1628,6 +1857,9 @@ export default defineComponent({
       onChartDomContextMenu,
       hideContextMenu,
       handleCreateAlert,
+      cellDrawer,
+      exploreCellInLogs,
+      onCellDrawerOpenChange,
     };
   },
 });

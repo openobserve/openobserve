@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
   <div
     class="flex flex-1 flex-col overflow-hidden"
-    :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0px; flex: none;' : ''"
+    :style="!dashboardPanelData.layout.showQueryBar ? 'height: 0; flex: none;' : ''"
     data-test="dashboard-query"
   >
     <div class="flex h-full w-full flex-col">
@@ -288,7 +288,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-addpanel-config-drilldown-info"
                     >
                       <template #icon-left><OIcon name="info-outline" size="sm" /></template>
-                      <OTooltip :content="t('dashboard.vrlExtractionTooltip')" max-width="250px" />
+                      <OTooltip
+                        :content="t('dashboard.vrlExtractionTooltip')"
+                        max-width="15.625rem"
+                      />
                     </OButton>
                   </div>
                 </div>
@@ -533,7 +536,9 @@ export default defineComponent({
       if (promqlMode.value) return null;
 
       if (isPivotTable.value) {
-        return t("dashboard.multiQueryWarning", { chartType: "Pivot Table" });
+        return t("dashboard.multiQueryWarning", {
+          chartType: t("dashboard.configSectionPivotTable"),
+        });
       }
 
       return null;
@@ -910,7 +915,12 @@ export default defineComponent({
     const startEditQueryName = (rawIndex: string | number, tab: any) => {
       const index = Number(rawIndex);
       editingQueryIndex.value = index;
-      editingQueryName.value = tab.tabName || t("common.queryNumber", { index: index + 1 });
+      // English on purpose. This seeds the EDITABLE value, and `saveQueryName`
+      // is bound to @blur — so merely opening the rename box and clicking away
+      // writes this straight into `queries[].tabName`, which is persisted in the
+      // dashboard document and read by everyone in the org. The tab LABEL at the
+      // top of this file is translated; only the stored value stays English.
+      editingQueryName.value = tab.tabName || raw(`Query ${index + 1}`);
       // Caret at the end, not select-all: the first keystroke must not wipe
       // the whole name.
       nextTick(() => {

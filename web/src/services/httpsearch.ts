@@ -16,7 +16,7 @@
 import store from "../stores";
 import axios from "axios";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { raw } from "@/types/i18n";
+import { gt } from "@/types/i18n";
 
 const http = () => {
   const instance = axios.create({
@@ -34,13 +34,13 @@ const http = () => {
         switch (error.response.status) {
           case 400:
             toast({
-              message: raw(JSON.stringify(error.response.data["error"] || "Bad Request")),
+              message: error.response.data["error"] || gt("common.badRequest"),
               variant: "error",
             });
             break;
           case 401:
             toast({
-              message: error.response.data["error"] || "Invalid credentials",
+              message: error.response.data["error"] || gt("common.invalidCredentials"),
               variant: "error",
             });
             store.dispatch("logout");
@@ -50,13 +50,13 @@ const http = () => {
             break;
           case 404:
             toast({
-              message: error.response.data["error"] || "Not Found",
+              message: error.response.data["error"] || gt("common.notFound"),
               variant: "error",
             });
             break;
           case 500:
             toast({
-              message: raw(JSON.stringify(error.response.data["error"] || "Internal ServerError")),
+              message: error.response.data["error"] || gt("common.internalServerError"),
               variant: "error",
             });
             break;

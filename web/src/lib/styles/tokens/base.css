@@ -211,60 +211,6 @@
   --color-indigo-800: #3730a3;
   --color-indigo-900: #312e81;
 
-  /* --- Trace span categorical palette (50 colors) ---
-     Theme-neutral (same in light/dark); consumed as --color-span-{n} by
-     utils/traces/traceColors.ts. */
-  --color-span-1: #3b82f6;
-  --color-span-2: #ef4444;
-  --color-span-3: #10b981;
-  --color-span-4: #a855f7;
-  --color-span-5: #f97316;
-  --color-span-6: #06b6d4;
-  --color-span-7: #ec4899;
-  --color-span-8: #84cc16;
-  --color-span-9: #6366f1;
-  --color-span-10: #f59e0b;
-  --color-span-11: #14b8a6;
-  --color-span-12: #d946ef;
-  --color-span-13: #16a34a;
-  --color-span-14: #7c3aed;
-  --color-span-15: #f59e0b;
-  --color-span-16: #0284c7;
-  --color-span-17: #e11d48;
-  --color-span-18: #84cc16;
-  --color-span-19: #6366f1;
-  --color-span-20: #ef4444;
-  --color-span-21: #10b981;
-  --color-span-22: #8b5cf6;
-  --color-span-23: #f97316;
-  --color-span-24: #06b6d4;
-  --color-span-25: #ec4899;
-  --color-span-26: #22c55e;
-  --color-span-27: #a855f7;
-  --color-span-28: #fbbf24;
-  --color-span-29: #3b82f6;
-  --color-span-30: #f43f5e;
-  --color-span-31: #14b8a6;
-  --color-span-32: #d946ef;
-  --color-span-33: #84cc16;
-  --color-span-34: #6366f1;
-  --color-span-35: #fb923c;
-  --color-span-36: #0ea5e9;
-  --color-span-37: #f472b6;
-  --color-span-38: #22d3ee;
-  --color-span-39: #a78bfa;
-  --color-span-40: #34d399;
-  --color-span-41: #fca5a5;
-  --color-span-42: #818cf8;
-  --color-span-43: #fcd34d;
-  --color-span-44: #2dd4bf;
-  --color-span-45: #f9a8d4;
-  --color-span-46: #67e8f9;
-  --color-span-47: #c4b5fd;
-  --color-span-48: #86efac;
-  --color-span-49: #fde68a;
-  --color-span-50: #fca5a5;
-
   /* --- Dashboard classic series palette — light values (dark overrides in dark.css).
      Read by utils/dashboard/colorPalette.ts getColorPalette() via chartColor(), so the
      light/dark swap lives in CSS instead of a `theme === "dark"` branch in JS. --- */
@@ -280,6 +226,8 @@
   --color-chart-series-10: #4ade80;
   --color-chart-series-11: #e879f9;
   --color-chart-series-12: #facc15;
+
+  --color-chart-markline-shadow: rgba(255, 255, 255, 0.7);
 
   /* --- Dashboard table row-highlight palette — light values (dark overrides in
      dark.css). Read by colorPalette.ts getColorForTable() via chartColor(). --- */
@@ -308,51 +256,53 @@
   --color-chart-table-23: #ffe6e6;
   --color-chart-table-24: #e8f4fd;
 
-  /* --- Chart grid line (dashed split-line) — light value; dark in dark.css --- */
-  --color-chart-gridline: rgba(0, 0, 0, 0.08);
+  /* --- Chart grid line (dashed split-line) — light value; dark in dark.css.
+     1.4.11 exempt (object required to understand content), raised for
+     perceptibility rather than to hit 3:1. --- */
+  --color-chart-gridline: rgba(0, 0, 0, 0.2);
 
   /* --- Chart crosshair label chip is intentionally NOT declared here (light): it is
      dark-only (#333 in dark.css). chartColor() returns "" in light, which is the
      empty value ECharts reads as its own "auto" default — preserving today's look. --- */
 
-  /* --- Trace span palette (35 colors, HEX/canvas variant) — light values; dark
-     overrides in dark.css. Read by traceColors.ts getSpanColorHex()/getAllSpanColors()
-     via chartColor(). Distinct from --color-span-* (the 50-colour var() palette). --- */
-  --color-trace-span-1: #10b981;
-  --color-trace-span-2: #06b6d4;
-  --color-trace-span-3: #84cc16;
-  --color-trace-span-4: #6366f1;
-  --color-trace-span-5: #f59e0b;
-  --color-trace-span-6: #3b82f6;
-  --color-trace-span-7: #14b8a6;
-  --color-trace-span-8: #d946ef;
-  --color-trace-span-9: #7c3aed;
-  --color-trace-span-10: #f59e0b;
-  --color-trace-span-11: #0284c7;
-  --color-trace-span-12: #84cc16;
-  --color-trace-span-13: #6366f1;
-  --color-trace-span-14: #f9a8d4;
-  --color-trace-span-15: #10b981;
+  /* --- Trace span palette (16 colors) — light values; dark overrides in dark.css.
+     Read by traceColors.ts getSpanColorHex()/getAllSpanColors() via chartColor().
+
+     RESERVED HUES: no value here may fall in OKLab hue 345°-115° (rose through
+     red, orange and amber to yellow). That band belongs to the span-event
+     markers, which draw from --color-status-* — error sits at hue 20°, warning
+     at 49°. Reserving it is what lets a red or amber tick mean "event" and never
+     "service": no colour clears 3:1 contrast against an arbitrary bar, so the
+     markers are identified by hue, not luminance. See
+     composables/traces/useSpanEvents.ts.
+
+     The palette shrank from 35 slots to 16 to honour that rule. It lost nothing
+     real: the 35 held only 23 distinct values, and because getOrSetServiceColor
+     hands out slots sequentially, the duplicates meant two services in one trace
+     already drew identical bars past ~11 services. Separation improved — min
+     pairwise OKLab ΔE is 0.051, up from 0.042, and min ΔE from a bar to a status
+     colour is 0.127, up from 0.039.
+
+     Ordered farthest-point, so consecutively allocated services differ as much
+     as the set allows (min adjacent ΔE 0.071). Keep both themes the same length:
+     SPAN_COLOR_COUNT is one number for both, derived from chartTheme's
+     FALLBACKS. --- */
+  --color-trace-span-1: #84cc16;
+  --color-trace-span-2: #7c3aed;
+  --color-trace-span-3: #0ea5e9;
+  --color-trace-span-4: #d946ef;
+  --color-trace-span-5: #a78bfa;
+  --color-trace-span-6: #10b981;
+  --color-trace-span-7: #22d3ee;
+  --color-trace-span-8: #0284c7;
+  --color-trace-span-9: #a855f7;
+  --color-trace-span-10: #6366f1;
+  --color-trace-span-11: #3b82f6;
+  --color-trace-span-12: #21cb60;
+  --color-trace-span-13: #06b6d4;
+  --color-trace-span-14: #14b8a6;
+  --color-trace-span-15: #818cf8;
   --color-trace-span-16: #8b5cf6;
-  --color-trace-span-17: #f97316;
-  --color-trace-span-18: #22d3ee;
-  --color-trace-span-19: #06b6d4;
-  --color-trace-span-20: #21cb60;
-  --color-trace-span-21: #a855f7;
-  --color-trace-span-22: #fbbf24;
-  --color-trace-span-23: #3b82f6;
-  --color-trace-span-24: #14b8a6;
-  --color-trace-span-25: #6366f1;
-  --color-trace-span-26: #fb923c;
-  --color-trace-span-27: #0ea5e9;
-  --color-trace-span-28: #f472b6;
-  --color-trace-span-29: #a855f7;
-  --color-trace-span-30: #818cf8;
-  --color-trace-span-31: #f97316;
-  --color-trace-span-32: #fca5a5;
-  --color-trace-span-33: #06b6d4;
-  --color-trace-span-34: #a78bfa;
-  --color-trace-span-35: #3b82f6;
 
   /* --- Chart metric-panel text default — contrast fallback when a panel has no
      background; read via chartColor() by getContrastColor's callers. --- */
@@ -369,6 +319,7 @@
   --color-black: #000000;
 
   /* --- Spacing scale --- */
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
   --spacing-px: 1px;
   --spacing-3: 0.75rem; /* 12px */
   --spacing-4: 1rem; /* 16px */
@@ -389,6 +340,7 @@
      (small→default, large→surface). Do NOT reintroduce sm/md/lg/xl. */
   --radius-default: 0.375rem; /* 6px  — control tier */
   --radius-surface: 0.75rem; /* 12px — surface tier (matches the historical dialog curve) */
+  /* eslint-disable-next-line local/no-hardcoded-px -- fully-rounded pill sentinel */
   --radius-full: 9999px; /* pills / avatars / circles */
   /* Checkboxes stay at the original 4px: the tick box is tiny (12–16px), and the
      control tier's 6px reads as visibly round on a box that small. Pinned to its
@@ -396,10 +348,17 @@
   --radius-checkbox: 0.25rem; /* 4px  — checkbox tick box only */
 
   /* --- Shadow scale — hairline-border philosophy ---
-     Only md/lg render real elevation (overlays: dialogs, menus). Cards use a
+     Only sm/md/lg render real elevation (overlays: dialogs, menus). Cards use a
      1px border, not a drop shadow — a flat surface needs NO shadow class. */
-  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.06);
-  --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.1), 0 4px 8px -4px rgb(0 0 0 / 0.06);
+  --shadow-xs-c: rgb(0 0 0 / 0.08);
+  --shadow-sm-c1: rgb(0 0 0 / 0.1);
+  --shadow-sm-c2: rgb(0 0 0 / 0.06);
+  --shadow-md-c1: rgb(0 0 0 / 0.08);
+  --shadow-md-c2: rgb(0 0 0 / 0.06);
+  --shadow-lg-c1: rgb(0 0 0 / 0.1);
+  --shadow-lg-c2: rgb(0 0 0 / 0.06);
+  --shadow-scroll-c: rgb(0 0 0 / 0.1);
+  --shadow-glow-c: rgb(0 0 0 / 0.6);
 }
 
 /* ============================================================
@@ -625,13 +584,21 @@
   --color-service-health-degraded: #faad14;
   --color-service-health-healthy: #52c41a;
   --color-service-health-warning: #fa8c16;
-  --color-severity-error-color: #ef5350;
-  --color-severity-warning-color: #fb8c00;
+  /* Darkened from #ef5350 to clear 4.5:1 on white — also drawn as literal chart
+     label text (SloBurndownChart.vue), not only as a fill/border/dot. */
+  --color-severity-error-color: #ea1a17;
+  /* Darkened from #fb8c00 to clear 4.5:1 on white — same chart-label-text case. */
+  --color-severity-warning-color: #b16300;
   --color-status-info-bg: #edf3ff;
-  --color-status-info-text: #588cf3;
+  /* Darkened from #588cf3 (2.92:1 on its own -bg sibling) to clear 4.5:1 for
+     genuine text uses painted on --color-status-info-bg — filter chips
+     (AlertInsights.vue) and the HTTP-status legend (TraceTree.vue). */
+  --color-status-info-text: #2065ef;
   --color-status-neutral-text: #6c707e;
   --color-status-warning-bg: #fff4eb;
-  --color-status-warning-text: #e56d17;
+  /* Darkened from #e56d17 to clear 4.5:1 on white for genuine text uses
+     (MonitorRuns.vue row text, chart label text). */
+  --color-status-warning-text: #be5a13;
   --color-sticky-col-header-bg: #e0e0e0;
   --color-tab-text-color: #19191e;
   --color-trace-border: #e8ecf0;

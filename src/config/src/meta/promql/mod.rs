@@ -76,6 +76,30 @@ pub const BUCKET_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
+/// Suffix of the extra table that declares the `(__hash__, _timestamp)` file order.
+pub const STREAMING_AGG_TABLE_SUFFIX: &str = "__hash_sorted";
+
+/// Columns that metrics ingestion may exclude when deriving [`HASH_LABEL`].
+///
+/// Values in these columns are therefore not guaranteed to be stable within a
+/// contiguous hash run. Consumers such as the metrics sidecar index must not
+/// use them to prune a run from a query; the final PromQL filter can still
+/// evaluate them against the data rows.
+pub const METRICS_HASH_EXCLUDED_LABELS: &[&str] = &[
+    VALUE_LABEL,
+    HASH_LABEL,
+    EXEMPLARS_LABEL,
+    "is_monotonic",
+    "trace_id",
+    "span_id",
+    crate::TIMESTAMP_COL_NAME,
+    crate::INDEX_FIELD_NAME_FOR_ALL,
+];
+
+#[inline]
+pub fn is_metrics_hash_excluded_label(name: &str) -> bool {
+    METRICS_HASH_EXCLUDED_LABELS.contains(&name)
+}
 
 pub fn get_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
     let metadata = schema.metadata.get(METADATA_LABEL)?;

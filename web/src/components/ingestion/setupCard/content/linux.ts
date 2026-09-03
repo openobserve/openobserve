@@ -18,13 +18,13 @@
 // callout; it is now a variant toggle, with the EC2 IAM prerequisite riding on
 // the EC2 variant's note where it is actually relevant.
 
-import { gt, raw } from "@/types/i18n";
+import { raw, type TranslateFn } from "@/types/i18n";
 
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import {
   AGENTS_REPO,
-  EC2_IAM_NOTE,
+  EC2_IAM_NOTE_KEY,
   agentCode,
   agentUninstall,
   envIcons,
@@ -37,17 +37,17 @@ const install = (env: "" | "/ec2") =>
   && chmod +x install.sh \\
   && sudo ./install.sh {url}/api/{org}/ {token}`;
 
-export default function linuxCard(subs: CardSubstitutions): RichCardContent {
+export default function linuxCard(subs: CardSubstitutions, t: TranslateFn): RichCardContent {
   const icon = envIcons();
   return {
     provider: {
-      name: "Linux",
-      tagline: gt("ingestion.setupCard.taglineLinux"),
+      name: raw("Linux"),
+      tagline: t("ingestion.setupCard.taglineLinux"),
       logo: getImageURL("images/common/linux.svg"),
       tone: "#f5b53d",
-      runtime: "Host",
-      setupTime: "~1 min",
-      metaBadges: [gt("common.logs"), gt("common.metrics")],
+      runtime: t("ingestion.setupCard.runtimeHost"),
+      setupTime: t("ingestion.setupCard.setupTime1Min"),
+      metaBadges: [t("common.logs"), t("common.metrics")],
     },
     steps: [
       {
@@ -63,14 +63,14 @@ export default function linuxCard(subs: CardSubstitutions): RichCardContent {
             labelKey: "ingestion.setupCard.genericLinuxVariant",
             icon: icon.linux,
             code: agentCode(install(""), subs, "bash"),
-            note: "Any Linux server or VM.",
+            note: t("ingestion.setupCard.anyLinuxHostNote"),
           },
           {
             id: "ec2",
             label: raw("AWS EC2"),
             icon: icon.ec2,
             code: agentCode(install("/ec2"), subs, "bash"),
-            note: EC2_IAM_NOTE,
+            note: t(EC2_IAM_NOTE_KEY),
           },
         ],
       },
@@ -82,25 +82,24 @@ export default function linuxCard(subs: CardSubstitutions): RichCardContent {
         completeOn: "detect",
         detectionAnchor: true,
         pills: [
-          gt("ingestion.setupCard.pillSystemLogs"),
+          t("ingestion.setupCard.pillSystemLogs"),
           // Daemon name and a universal acronym — the same token in every locale.
           raw("journald"),
           raw("CPU"),
-          gt("ingestion.setupCard.pillMemory"),
-          gt("ingestion.setupCard.pillDisk"),
-          gt("common.network"),
+          t("ingestion.setupCard.pillMemory"),
+          t("ingestion.setupCard.pillDisk"),
+          t("common.network"),
         ],
       },
     ],
     detect: hostMetricsDetect,
     extras: {
-      fixTitle: "Check The Agent Service",
-      fixBody:
-        "The installer starts the agent as a systemd service. If nothing arrives, confirm it is running and read its logs for an auth or connectivity error:",
+      fixTitle: t("ingestion.setupCard.agentServiceFixTitle"),
+      fixBody: t("ingestion.setupCard.linuxAgentFixBody"),
       fixLang: "bash",
       fixSnippet: `sudo systemctl status openobserve-agent
 sudo journalctl -u openobserve-agent -n 50 --no-pager`,
-      troubleshooting: sharedAgentTroubleshooting("`sudo systemctl status openobserve-agent`"),
+      troubleshooting: sharedAgentTroubleshooting(t, "`sudo systemctl status openobserve-agent`"),
       uninstall: agentUninstall("linux"),
     },
     docUrl: "https://github.com/openobserve/agents",

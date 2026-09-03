@@ -99,7 +99,7 @@
     <template #cell-condition="{ row }">
       <div class="flex min-w-0 items-center gap-1.5">
         <span class="text-compact font-mono whitespace-nowrap tabular-nums">
-          {{ conditionSummary(row) }}
+          {{ conditionText(row) }}
         </span>
         <template v-if="row.level">
           <span class="text-2xs text-text-secondary shrink-0">→</span>
@@ -108,11 +108,26 @@
       </div>
     </template>
 
+    <template #cell-retries="{ row }">
+      <span class="text-compact tabular-nums" data-test="alerts-alertevaluationhistory-retries">
+        {{ row.retries != null ? row.retries : "—" }}
+      </span>
+    </template>
+
     <template #cell-evaluation_time="{ row }">
       <span class="text-compact tabular-nums">
         {{
           row.evaluation_took_in_secs != null ? row.evaluation_took_in_secs.toFixed(3) + "s" : "—"
         }}
+      </span>
+    </template>
+
+    <template #cell-anomaly_count="{ row }">
+      <span
+        class="text-compact tabular-nums"
+        :class="row.anomaly_count > 0 ? 'text-status-error-text font-medium' : ''"
+      >
+        {{ row.anomaly_count ?? "—" }}
       </span>
     </template>
 
@@ -158,7 +173,10 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
 import { conditionSummary } from "@/utils/alerts/runOutcome";
 
-const props = defineProps<{ alertId: string }>();
+const props = withDefaults(
+  defineProps<{ alertId: string; isComposite?: boolean; isAnomaly?: boolean }>(),
+  { isComposite: false, isAnomaly: false },
+);
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -191,6 +209,17 @@ const rows = computed(() =>
     .map((row, index) => ({ ...row, rowKey: `${row.timestamp}-${index}` })),
 );
 
+// A composite's `actual_value` is the boolean expression result (1/0) with no
+// threshold; render it as true/false rather than a bare 1/0.
+const conditionText = (row: Record<string, unknown>): string => {
+  if (props.isComposite) {
+    if (row.actual_value === 1) return "true";
+    if (row.actual_value === 0) return "false";
+    return "—";
+  }
+  return conditionSummary(row);
+};
+
 const fetchHistory = async () => {
   const orgId = store.state.selectedOrganization?.identifier;
   if (!orgId || !props.alertId) return;
@@ -199,7 +228,8 @@ const fetchHistory = async () => {
     const endTime = Date.now() * 1000;
     const startTime = endTime - (RANGE_MS[range.value] ?? RANGE_MS["1h"]) * 1000;
     const res = await alertsService.getHistory(orgId, {
-      alert_id: props.alertId,
+      // An anomaly id fails the endpoint's `alert_id` existence check outright.
+      ...(props.isAnomaly ? { anomaly_id: props.alertId } : { alert_id: props.alertId }),
       start_time: startTime,
       end_time: endTime,
       from: (currentPage.value - 1) * pageSize.value,
@@ -257,13 +287,38 @@ const columns = computed<OTableColumnDef[]>(() => [
     resizable: true,
     meta: { align: "left" },
   },
+  // An anomaly run reports no threshold and no query timing, but does report a count.
+  ...(props.isAnomaly
+    ? [
+        {
+          id: "anomaly_count",
+          accessorKey: "anomaly_count",
+          header: t("alerts.historyTable.anomalies"),
+          cell: " ",
+          size: 140,
+          resizable: true,
+          meta: { align: "left" },
+        } as OTableColumnDef,
+      ]
+    : [
+        {
+          id: "condition",
+          accessorKey: "actual_value",
+          header: t("alerts.historyTable.condition"),
+          cell: " ",
+          resizable: true,
+          meta: { align: "left", flex: true },
+        } as OTableColumnDef,
+      ]),
   {
-    id: "condition",
-    accessorKey: "actual_value",
-    header: t("alerts.historyTable.condition"),
+    id: "retries",
+    accessorKey: "retries",
+    header: t("alerts.retries"),
     cell: " ",
+    size: 90,
     resizable: true,
-    meta: { align: "left", flex: true },
+    hideable: true,
+    meta: { align: "left" },
   },
   {
     id: "evaluation_time",
@@ -275,16 +330,20 @@ const columns = computed<OTableColumnDef[]>(() => [
     hideable: true,
     meta: { align: "left" },
   },
-  {
-    id: "query_time",
-    accessorKey: "query_took",
-    header: t("alerts.historyTable.queryTime"),
-    cell: " ",
-    size: 120,
-    resizable: true,
-    hideable: true,
-    meta: { align: "left" },
-  },
+  ...(props.isAnomaly
+    ? []
+    : [
+        {
+          id: "query_time",
+          accessorKey: "query_took",
+          header: t("alerts.historyTable.queryTime"),
+          cell: " ",
+          size: 120,
+          resizable: true,
+          hideable: true,
+          meta: { align: "left" },
+        } as OTableColumnDef,
+      ]),
   {
     id: "error",
     accessorKey: "error",

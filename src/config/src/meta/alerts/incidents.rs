@@ -405,6 +405,18 @@ pub struct IncidentAlert {
     pub detected_source: Option<String>,
 }
 
+/// A composite alert's light summary, for the incident's live-definition list.
+/// Composites have no `alerts` row, so they cannot be a [`super::alert::Alert`];
+/// this carries the fields the topology/detail surface needs.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct CompositeAlertSummary {
+    pub id: String,
+    pub name: String,
+    pub alert_type: String,
+    pub enabled: bool,
+    pub folder_id: String,
+}
+
 /// Incident with its alerts (for detail view)
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct IncidentWithAlerts {
@@ -414,6 +426,9 @@ pub struct IncidentWithAlerts {
     pub triggers: Vec<IncidentAlert>,
     /// Unique alerts with full details
     pub alerts: Vec<super::alert::Alert>,
+    /// Live composite definitions for incident members (`alert_type="composite"`).
+    #[serde(default)]
+    pub composite_alerts: Vec<CompositeAlertSummary>,
 }
 
 /// Organization-level incident correlation configuration
@@ -1897,7 +1912,10 @@ mod tests {
         incident.acknowledged_at = Some(1500);
         let json = serde_json::to_value(&incident).unwrap();
         let obj = json.as_object().unwrap();
-        assert_eq!(obj["acknowledged_by"], serde_json::json!("user@example.com"));
+        assert_eq!(
+            obj["acknowledged_by"],
+            serde_json::json!("user@example.com")
+        );
         assert_eq!(obj["acknowledged_at"], serde_json::json!(1500_i64));
     }
 

@@ -15,6 +15,8 @@
 // It always occupies its space (fixed tile height + skeleton while `loading`) so
 // data arriving never shifts the layout below it.
 
+import { computed } from "vue";
+
 import OStatCard from "./OStatCard.vue";
 import type { StatItem } from "./OStatStrip.types";
 
@@ -26,11 +28,39 @@ const props = withDefaults(
     selectable?: boolean;
     /** Key of the currently-selected tile (draws the ring). */
     selectedKey?: string | null;
+    /**
+     * Tile that reads as active when nothing is filtered — the "All"/"Total"
+     * one. Without it the strip shows no tile selected while the list behind it
+     * shows everything, which is a state the control cannot express, and the
+     * reset tile is a button that never looks pressed.
+     */
+    defaultKey?: string | null;
+    /**
+     * Narrows the wrap threshold for strips of short-labelled tiles (filter
+     * counts, buckets), so five or six fit one row instead of wrapping to two.
+     * Leave off for the standard strip — long labels need the wider basis.
+     */
+    compact?: boolean;
   }>(),
-  { items: () => [], loading: false, selectable: false, selectedKey: null },
+  {
+    items: () => [],
+    loading: false,
+    selectable: false,
+    selectedKey: null,
+    defaultKey: null,
+    compact: false,
+  },
 );
 
 const emit = defineEmits<{ select: [key: string] }>();
+
+// Callers spell "no filter" as null, as "all", or as a key they never render;
+// all three mean the default tile.
+const activeKey = computed(() => {
+  if (!props.selectable) return null;
+  const named = props.items.some((item) => item.key === props.selectedKey);
+  return named ? props.selectedKey : props.defaultKey;
+});
 
 const onCardClick = (item: StatItem) => {
   if (props.selectable && item.selectable !== false) emit("select", item.key);
@@ -39,21 +69,23 @@ const onCardClick = (item: StatItem) => {
 
 <template>
   <div class="flex flex-wrap gap-2" data-test="o-stat-strip">
-    <!-- basis-52 is the wrap threshold, not a fixed width: tiles still grow to fill
-         a wide strip, but a 5-tile strip wraps to two rows on a laptop instead of
-         squeezing every tile until the labels vanish. -->
+    <!-- The basis is the wrap threshold, not a fixed width: tiles still grow to
+         fill a wide strip. The default suits long labels; `compact` is for short
+         ones, where basis-52 would wrap a five-tile strip onto two rows. -->
     <OStatCard
       v-for="item in items"
       :key="item.key"
-      class="grow basis-52"
+      class="grow"
+      :class="compact ? 'basis-36' : 'basis-52'"
       :label="item.label"
       :value="item.value"
+      :sub="item.sub"
       :icon="item.icon"
       :tone="item.tone"
       :trend="item.trend"
       :max="item.max"
       :clickable="selectable && item.selectable !== false"
-      :selected="selectable && item.selectable !== false && selectedKey === item.key"
+      :selected="item.selectable !== false && activeKey === item.key"
       :data-test="item.dataTest"
       @click="onCardClick(item)"
     />

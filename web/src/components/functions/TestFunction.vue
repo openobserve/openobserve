@@ -1,5 +1,5 @@
 <template>
-  <div data-test="test-function-section" class="flex flex-wrap items-center pb-2">
+  <div v-if="!hideQuery" data-test="test-function-section" class="flex flex-wrap items-center pb-2">
     <div data-test="test-function-query-section" class="test-function-query-container w-full">
       <FullViewContainer
         data-test="test-function-query-title-section"
@@ -50,7 +50,7 @@
             labelKey="label"
             valueKey="value"
             @update:model-value="updateStreams()"
-            style="width: 100px"
+            style="width: 6.25rem"
           />
         </div>
         <div class="function-stream-select-input w-75">
@@ -63,7 +63,7 @@
             :loading="isFetchingStreams"
             :placeholder="t('pipeline.selectStream')"
             searchable
-            style="min-width: 120px"
+            style="min-width: 7.5rem"
             @search="filterStreams"
             @update:model-value="updateQuery"
           />
@@ -159,15 +159,16 @@
         <template #right>
           <!-- o2 ai context add button in the test function -->
           <O2AIContextAddBtn
+            v-if="!hideAiAssist"
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
-            imageHeight="24px"
-            imageWidth="24px"
+            imageHeight="24"
+            imageWidth="24"
             :class="'mr-4 px-2'"
             style="
-              width: 32px !important;
-              height: 32px !important;
-              min-width: 32px !important;
-              min-height: 32px !important;
+              width: 2rem !important;
+              height: 2rem !important;
+              min-width: 2rem !important;
+              min-height: 2rem !important;
             "
           />
         </template>
@@ -177,6 +178,7 @@
         class="relative"
         data-test="test-function-input-editor-section"
       >
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <QueryEditor
           data-test="vrl-function-test-events-editor"
           ref="eventsEditorRef"
@@ -186,6 +188,7 @@
           v-model:query="inputEvents"
           language="json"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
     <div class="mt-2">
@@ -237,6 +240,7 @@
             {{ outputMessage }}
           </div>
         </div>
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <QueryEditor
           data-test="vrl-function-test-events-output-editor"
           ref="outputEventsEditorRef"
@@ -247,6 +251,7 @@
           language="json"
           read-only
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
   </div>
@@ -273,6 +278,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useQuery from "@/composables/useQuery";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
 import { getConsumableRelativeTime } from "@/utils/date";
@@ -300,6 +306,19 @@ const props = defineProps({
   sampleEvents: {
     type: Array,
     default: undefined,
+  },
+  // Hide the SQL "Query" section (stream + query + Run query). Workflows run the
+  // function on the trigger event (seeded into "Events"), not a stream query, so the
+  // Query section is irrelevant there.
+  hideQuery: {
+    type: Boolean,
+    default: false,
+  },
+  // Hide the "send to AI chat" button on the Events header (workflows keep only the
+  // inline editor AI, not the chat-panel context buttons).
+  hideAiAssist: {
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -351,7 +370,7 @@ const outputEventsErrorMsg = ref<string>("");
 // JavaScript function failed as VRL. Reactive so flipping the toggle re-labels
 // an error already on screen.
 const functionLanguage = computed(() =>
-  isJsFunction(props.vrlFunction) ? t("function.javascript") : t("function.vrl"),
+  isJsFunction(props.vrlFunction) ? raw("JavaScript") : t("function.vrl"),
 );
 
 const loading = ref({
@@ -414,6 +433,7 @@ const { placeholder: queryEditorPlaceholder } = useQueryPlaceholder(
   ref({}),
   isSqlMode,
   noStream,
+  t,
   { noStreamText: t("pipeline.queryEditorPlaceholder") },
 );
 
@@ -535,6 +555,10 @@ watch(inputQuery, (value) => {
 // the SQL the user typed.
 const debouncedSyncStreamFromQuery = debounce(async (sql: string) => {
   if (!sql || !parser) return;
+  // parse() is exponential in paren nesting depth — skip a pathologically
+  // nested query rather than freeze the tab. Losing this convenience sync
+  // is fine; the user can still pick the stream from the dropdown.
+  if (maxParenDepth(sql) > SQL_PARSE_MAX_DEPTH) return;
   try {
     const parsed = parser.parse(sql);
     const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;
@@ -592,7 +616,7 @@ const getResults = async () => {
     .catch((err: any) => {
       sqlQueryErrorMsg.value = err.response?.data?.message
         ? err.response?.data?.message
-        : "Invalid SQL Query";
+        : t("functions.invalidSqlQuery");
 
       // Locate the offending token in the SQL and squiggle it in the editor.
       rangesFromServerError({
@@ -624,7 +648,7 @@ const isInputValid = () => {
     JSON.parse(inputEvents.value);
     return true;
   } catch (e: any) {
-    eventsErrorMsg.value = `Invalid events: ${e?.message}`;
+    eventsErrorMsg.value = t("functions.invalidEvents", { error: e?.message });
     toast({
       variant: "error",
       message: raw(eventsErrorMsg.value),
@@ -660,7 +684,7 @@ const processTestResults = async (results: any) => {
 };
 
 const handleTestError = (err: any) => {
-  const rawErrMsg = err.response?.data?.message || "Error in testing function";
+  const rawErrMsg = err.response?.data?.message || t("functions.testFunctionError");
 
   // Display the raw error message from the backend without modification
   // The backend now extracts detailed error information from rquickjs
@@ -809,7 +833,7 @@ defineExpose({
 .test-function-query-container :deep(.test-function-run-query-btn) {
   padding: 0.125rem 0.5rem !important;
   font-size: var(--text-2xs) !important;
-  margin: 1px 0.125rem !important;
+  margin: 0.0625rem 0.125rem !important;
 }
 
 .functions-duration-input :deep(.date-time-button) {

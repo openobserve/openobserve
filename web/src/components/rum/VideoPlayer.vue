@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="bg-button-primary! absolute"
           :style="{
-            width: '2px',
+            width: '0.125rem',
             left: playerState.progressWidth - 2 + 'px',
             bottom: '-0.3125rem',
             height: '0.9375rem',
@@ -70,7 +70,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="absolute cursor-pointer"
           :class="getEventMarkerClass(event)"
           :style="{
-            width: event.frustration_types && event.frustration_types.length > 0 ? '3px' : '2px',
+            width:
+              event.frustration_types && event.frustration_types.length > 0
+                ? '0.1875rem'
+                : '0.125rem',
             left: (event.relativeTime / playerState.totalTime) * playerState.width + 'px',
             bottom: '-0.3125rem',
             height:
@@ -471,7 +474,7 @@ const updatePlayerState = () => {
 
 const getEventMarkerClass = (event: any) => {
   if (event.frustration_types && event.frustration_types.length > 0) {
-    return "bg-badge-orange-solid-bg! shadow-[0_0_4px_rgba(251,146,60,0.6)]";
+    return "bg-badge-orange-solid-bg! shadow-glow shadow-badge-orange-solid-bg/60";
   }
   if (event.type === "error") {
     return "bg-badge-error-solid-bg!";
@@ -488,7 +491,7 @@ const getEventTooltip = (event: any) => {
         return type.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase());
       })
       .join(", ");
-    return `⚠️ FRUSTRATION: ${frustrationLabels}\n${eventName}`;
+    return t("rum.frustrationEventTooltip", { types: frustrationLabels, name: eventName });
   }
 
   return eventName;

@@ -20,7 +20,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        alerts::TriggerCondition,
+        alerts::{TriggerCondition, level::DeliveryDecision},
         dashboards::reports::ReportFrequencyType,
         pipeline::components::NodeData,
         self_reporting::{
@@ -38,7 +38,7 @@ use config::{
 };
 use cron::Schedule;
 use infra::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     scheduler::get_scheduler_max_retries,
 };
 #[cfg(feature = "enterprise")]
@@ -77,6 +77,7 @@ use crate::{
 /// that it happened.
 #[must_use]
 async fn persist_alert_run_state(
+    alert: &config::meta::alerts::alert::Alert,
     alert_id: &str,
     outcome: &RunOutcome,
     level: Option<config::meta::alerts::level::AlertLevel>,
@@ -102,15 +103,52 @@ async fn persist_alert_run_state(
                 return false;
             }
         };
+        let at = now_micros();
         let plan = config::meta::alerts::grouping::plan_group_updates(
             alert_id,
             classification,
             &prev,
-            now_micros(),
+            at,
+            alert.pending_period_sec,
         );
-        if let Err(e) = infra::table::alert_states::persist_group_plan(&plan, alert_id).await {
+        if let Err(e) = db::alerts::alert_states::persist_group_plan(&plan, alert_id).await {
             log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
             return false;
+        }
+
+        // A composite reads only this multi-alert's rollup row. Nudge its
+        // parents on a rollup transition or a stale-to-fresh return, exactly
+        // as the single-row path does — otherwise a grouped child is sweep-only.
+        let rollup = plan.updates.iter().find(|update| {
+            update
+                .state
+                .as_ref()
+                .is_some_and(|state| state.group_key.as_str() == ROLLUP_GROUP_KEY)
+        });
+        let transition_changed = rollup.is_some_and(|update| update.transition.is_some());
+        let stale_to_fresh = prev
+            .get(ROLLUP_GROUP_KEY)
+            .and_then(|state| state.level_at)
+            .is_some_and(|level_at| {
+                config::meta::alerts::composite::alert_stale_deadline_micros(
+                    level_at,
+                    &alert.trigger_condition,
+                    alert.tz_offset,
+                    composite_stale_k(),
+                )
+                .map(|deadline| at > deadline)
+                .unwrap_or(false)
+            });
+        if transition_changed || stale_to_fresh {
+            let db = get_orm_client_ro().await;
+            nudge_composite_parents(
+                db,
+                &alert.org_id,
+                alert_id,
+                infra::table::alert_composites::ChildKind::Alert,
+                at,
+            )
+            .await;
         }
         return true;
     }
@@ -125,20 +163,80 @@ async fn persist_alert_run_state(
         }
     };
 
+    // One instant for both writes: `level_at` and the ledger's `to_us` describe
+    // the same evaluation, and two `now_micros()` calls would let the coverage
+    // record and the freshness clock disagree about when it happened.
+    let now = now_micros();
     let update = apply_outcome(
         alert_id,
         ROLLUP_GROUP_KEY,
         prev.as_ref(),
         outcome.clone(),
         level,
-        now_micros(),
+        now,
     );
-    if update.is_noop() {
+
+    // ── Availability ledger (S-16) ──────────────────────────────────────────
+    // Fleet-wide from the day this ships, deliberately: a lazy
+    // per-referenced-alert scheme would start history at SLO creation and
+    // forfeit every day of retroactive measurement. It writes in the state
+    // transaction below, so a failure loses the state refresh and the coverage
+    // together — and the ledger consequence of that is a gap, the safe
+    // direction under D34.
+    //
+    // "Grouped" here means *maintains per-group state* (§2), not the `group_by`
+    // column list alone. A PromQL multi-alert has no `group_by` list at all,
+    // and reaches this single-row path on the `NotifyFailed` re-persist below;
+    // a column-list test would let it write a sparse ledger it can never
+    // explain, since a grouped source cannot say which of its groups were
+    // measured (D65).
+    let is_grouped = config::meta::alerts::grouping::maintains_group_state(&alert.query_condition);
+    let ledger = config::meta::alerts::state::ledger_write_for_evaluation(
+        &alert.org_id,
+        alert_id,
+        outcome,
+        level,
+        is_grouped,
+        &alert.trigger_condition,
+        now,
+    );
+
+    if update.is_noop() && ledger.is_none() {
         return true;
     }
-    if let Err(e) = infra::table::alert_states::persist(&update).await {
+    if let Err(e) = db::alerts::alert_states::persist(&update, ledger.as_ref()).await {
         log::error!("[SCHEDULER] could not persist alert state for {alert_id}: {e}");
         return false;
+    }
+
+    // Composite parents observe this rollup row. Nudge them on a level/outcome
+    // transition or a stale-to-fresh return so a composite over an ordinary or
+    // SLO child is event-driven, not only sweep-driven (§11.2). Repeated fresh
+    // same-level evaluations deliberately do not nudge.
+    let transition_changed = update.transition.is_some();
+    let stale_to_fresh = prev
+        .as_ref()
+        .and_then(|previous| previous.level_at)
+        .is_some_and(|level_at| {
+            config::meta::alerts::composite::alert_stale_deadline_micros(
+                level_at,
+                &alert.trigger_condition,
+                alert.tz_offset,
+                composite_stale_k(),
+            )
+            .map(|deadline| now > deadline)
+            .unwrap_or(false)
+        });
+    if transition_changed || stale_to_fresh {
+        let db = get_orm_client_ro().await;
+        nudge_composite_parents(
+            db,
+            &alert.org_id,
+            alert_id,
+            infra::table::alert_composites::ChildKind::Alert,
+            now,
+        )
+        .await;
     }
     true
 }
@@ -188,6 +286,8 @@ async fn load_tracked_group_states(
 struct GroupDispatchOutcome {
     delivered: usize,
     failed: usize,
+    // how many have transitioned to pending state
+    pending: usize,
     errors: Vec<String>,
     /// Group keys whose send succeeded. A dedup reservation is confirmed by
     /// its OWN group's delivery, never a sibling's (§5.5 MN-6).
@@ -232,6 +332,7 @@ async fn dispatch_per_group(
     // evaluation can reach dispatch with every group healthy.
     let rollup_outcome = config::meta::alerts::grouping::group_outcome(classification.rollup);
     if !persist_alert_run_state(
+        alert,
         &alert_id,
         &rollup_outcome,
         rollup_level,
@@ -250,6 +351,7 @@ async fn dispatch_per_group(
         return Some(GroupDispatchOutcome {
             delivered: 0,
             failed: 0,
+            pending: 0,
             errors: vec!["group state did not commit".to_string()],
             delivered_groups: Default::default(),
             state_failed: true,
@@ -263,6 +365,7 @@ async fn dispatch_per_group(
             return Some(GroupDispatchOutcome {
                 delivered: 0,
                 failed: 0,
+                pending: 0,
                 errors: vec![format!("group state read failed: {e}")],
                 delivered_groups: Default::default(),
                 state_failed: true,
@@ -398,7 +501,7 @@ async fn dispatch_per_group(
             infra::table::alert_states::DeliveryOutcome::Failed { at: resolved_at }
         };
 
-        if let Err(e) = infra::table::alert_states::advance_delivery_state(
+        if let Err(e) = db::alerts::alert_states::advance_delivery_state(
             &alert_id,
             &item.group_key,
             item.episode,
@@ -416,13 +519,15 @@ async fn dispatch_per_group(
 
     log::info!(
         "[SCHEDULER trace_id {trace_id}] alert {alert_id}: per-group dispatch delivered={delivered} \
-         failed={failed} suppressed={} candidates={}",
+         pending={} failed={failed} suppressed={} candidates={}",
         plan.suppressed,
+        plan.pending,
         plan.items.len()
     );
     Some(GroupDispatchOutcome {
         delivered,
         failed,
+        pending: plan.pending,
         errors,
         delivered_groups,
         state_failed: false,
@@ -442,9 +547,7 @@ async fn confirm_dedup_reservations(fingerprints: &[String], delivered: bool) {
     }
     #[cfg(feature = "enterprise")]
     {
-        let db = infra::db::ORM_CLIENT
-            .get_or_init(infra::db::connect_to_orm)
-            .await;
+        let db = infra::db::get_orm_client_rw().await;
         if let Err(e) =
             crate::alerts::deduplication::confirm_notification_sent(db, fingerprints).await
         {
@@ -493,6 +596,9 @@ pub async fn handle_triggers(
         }
         db::scheduler::TriggerModule::Slo => handle_slo_triggers(trigger).await,
         db::scheduler::TriggerModule::SloBackfill => handle_slo_backfill_triggers(trigger).await,
+        db::scheduler::TriggerModule::CompositeAlert => {
+            handle_composite_alert_trigger(trace_id, trigger).await
+        }
         db::scheduler::TriggerModule::OncallEscalation => {
             handle_oncall_escalation_triggers(trigger).await
         }
@@ -598,6 +704,556 @@ async fn handle_oncall_escalation_triggers(
     Ok(())
 }
 
+fn composite_debounce_secs() -> i64 {
+    config::get_config().alert_composite.debounce_secs.max(1)
+}
+
+fn composite_sweep_secs() -> i64 {
+    config::get_config().alert_composite.sweep_secs.max(1)
+}
+
+fn composite_stale_k() -> i64 {
+    config::get_config().alert_composite.stale_k.max(1)
+}
+
+/// Advance composite parents after a committed rollup write that changes what
+/// they observe (a level/outcome transition, or a stale-to-fresh return at the
+/// same level). Idempotent and coalesced: `next_run_at` is only ever pulled
+/// earlier, never pushed out.
+async fn nudge_composite_parents(
+    db: &sea_orm::DatabaseConnection,
+    org: &str,
+    child_id: &str,
+    child_kind: infra::table::alert_composites::ChildKind,
+    now: i64,
+) {
+    let parents =
+        match infra::table::alert_composites::list_parents(db, org, child_kind, child_id).await {
+            Ok(parents) => parents,
+            Err(error) => {
+                log::error!("[COMPOSITE_ALERT] failed to look up parents for {child_id}: {error}");
+                return;
+            }
+        };
+    for parent in parents {
+        // Order matters: generation first, then the job advance. A completion
+        // that later re-reads the generation must observe the nudge.
+        if let Err(error) =
+            infra::table::alert_composites::increment_evaluation_generation(db, org, &parent.id)
+                .await
+        {
+            log::error!(
+                "[COMPOSITE_ALERT] failed to increment generation for parent {}: {error}",
+                parent.id
+            );
+            continue;
+        }
+        if let Ok(mut parent_job) = infra::scheduler::get(
+            org,
+            db::scheduler::TriggerModule::CompositeAlert,
+            &parent.id,
+        )
+        .await
+        {
+            let debounce_at = now + composite_debounce_secs() * 1_000_000;
+            parent_job.next_run_at = parent_job.next_run_at.min(debounce_at);
+            if let Err(error) = infra::scheduler::update_trigger(parent_job, false).await {
+                log::error!(
+                    "[COMPOSITE_ALERT] failed to advance parent {}: {error}",
+                    parent.id
+                );
+            }
+        }
+    }
+}
+
+/// Composite jobs are routed explicitly by their append-only scheduler
+/// module. The definition/evaluation service is intentionally separate from
+/// the query-alert handler so a composite can never execute child queries.
+async fn handle_composite_alert_trigger(
+    trace_id: &str,
+    mut trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        infra::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::CompositeAlert,
+            &trigger.module_key,
+        )
+        .await?;
+        return Ok(());
+    }
+    // Until a production database-backed evaluator can obtain the metadata
+    // transaction used for state fencing, a missing/stale definition is
+    // completed safely through the epoch-fenced scheduler seam. This path is
+    // also the required lifecycle behavior after deletion.
+    let db = get_orm_client_rw().await;
+    let definition =
+        infra::table::alert_composites::get_by_id(db, &trigger.org, &trigger.module_key).await?;
+    let Some(definition) = definition else {
+        infra::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::CompositeAlert,
+            &trigger.module_key,
+        )
+        .await?;
+        return Ok(());
+    };
+    if !definition.definition.enabled {
+        infra::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::CompositeAlert,
+            &trigger.module_key,
+        )
+        .await?;
+        return Ok(());
+    }
+    let mut scheduled_data: config::meta::triggers::ScheduledTriggerData =
+        config::utils::json::from_str(&trigger.data).unwrap_or_default();
+
+    use config::meta::{
+        alerts::{
+            composite::StaleChildPolicy,
+            state::{ROLLUP_GROUP_KEY, apply_outcome},
+        },
+        self_reporting::usage::RunOutcome,
+    };
+    let now = now_micros();
+    let child_ids = definition
+        .children
+        .iter()
+        .map(|child| child.child_alert_id.clone())
+        .collect::<Vec<_>>();
+    let states = infra::table::alert_states::get_rollups(&child_ids).await?;
+    let states = states
+        .into_iter()
+        .map(|state| (state.alert_id.clone(), state))
+        .collect::<std::collections::HashMap<_, _>>();
+    let resolved =
+        infra::table::alert_composites::resolve_many(db, &trigger.org, &child_ids).await?;
+    let stale_k = composite_stale_k();
+    let composite_sweep_seconds = composite_sweep_secs();
+    let mut children = Vec::with_capacity(definition.children.len());
+    for child in &definition.children {
+        let state = states.get(&child.child_alert_id);
+        let (name, alert_type, enabled, cadence_seconds, stale_deadline) =
+            match resolved.get(&child.child_alert_id) {
+                Some(infra::table::alert_composites::Resolution::Alert(model)) => {
+                    let alert: config::meta::alerts::alert::Alert = (**model).clone().try_into()?;
+                    if alert.is_real_time {
+                        anyhow::bail!("composite child is no longer eligible");
+                    }
+                    let stale_deadline = state
+                        .and_then(|state| state.level_at)
+                        .map(|level_at| {
+                            config::meta::alerts::composite::alert_stale_deadline_micros(
+                                level_at,
+                                &alert.trigger_condition,
+                                alert.tz_offset,
+                                stale_k,
+                            )
+                        })
+                        .transpose()?;
+                    (
+                        alert.name,
+                        if alert.query_condition.slo_condition.is_some() {
+                            "slo"
+                        } else {
+                            "scheduled"
+                        },
+                        alert.enabled,
+                        alert.trigger_condition.frequency.max(1),
+                        stale_deadline,
+                    )
+                }
+                Some(infra::table::alert_composites::Resolution::Composite(model)) => (
+                    model.name.clone(),
+                    "composite",
+                    model.enabled,
+                    composite_sweep_seconds,
+                    state.and_then(|state| state.level_at).and_then(|level_at| {
+                        composite_sweep_seconds
+                            .checked_mul(stale_k)
+                            .and_then(|seconds| seconds.checked_mul(1_000_000))
+                            .and_then(|window| level_at.checked_add(window))
+                    }),
+                ),
+                _ => anyhow::bail!("composite child definition missing"),
+            };
+        children.push(crate::alerts::composite::CompositeStateInput {
+            alert_id: child.child_alert_id.clone(),
+            name,
+            alert_type: alert_type.to_string(),
+            enabled,
+            level: state.and_then(|state| state.level),
+            level_at: state.and_then(|state| state.level_at),
+            effective_cadence_seconds: cadence_seconds,
+            stale_deadline,
+        });
+    }
+    let stale_policy = match definition.definition.stale_child_policy {
+        1 => StaleChildPolicy::TreatAsFalse,
+        2 => StaleChildPolicy::TreatAsTrue,
+        _ => StaleChildPolicy::UseLastState,
+    };
+    let evaluated = crate::alerts::composite::CompositeEvaluator::evaluate(
+        &definition.definition.expression,
+        children,
+        definition.definition.warning_counts_as_firing,
+        stale_policy,
+        now,
+    )?;
+    let previous =
+        infra::table::alert_states::get(&definition.definition.id, ROLLUP_GROUP_KEY).await?;
+
+    let base_outcome = if evaluated.result {
+        RunOutcome::Firing
+    } else {
+        RunOutcome::Normal
+    };
+
+    let outcome = if definition.definition.pending_period_sec > 0 {
+        match &previous {
+            // non existent state -> firing = pending
+            None if evaluated.result => RunOutcome::Pending,
+            // non-existent state -> normal = normal
+            None => RunOutcome::Normal,
+            Some(state) => match (state.last_outcome.as_ref(), state.since.as_ref()) {
+                (None, _) | (Some(RunOutcome::Normal), _) if evaluated.result => {
+                    RunOutcome::Pending
+                }
+                (Some(RunOutcome::Pending), Some(last)) if evaluated.result => {
+                    if now - last
+                        < definition
+                            .definition
+                            .pending_period_sec
+                            .saturating_mul(1_000_000)
+                    {
+                        RunOutcome::Pending
+                    } else {
+                        base_outcome
+                    }
+                }
+                _ => base_outcome,
+            },
+        }
+    } else {
+        base_outcome
+    };
+
+    let update = apply_outcome(
+        &definition.definition.id,
+        ROLLUP_GROUP_KEY,
+        previous.as_ref(),
+        outcome.clone(),
+        Some(evaluated.level),
+        now,
+    );
+
+    use sea_orm::{
+        ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
+    };
+    let transaction = db.begin().await?;
+    let lease_deadline = now + config::get_config().limit.alert_schedule_timeout * 1_000_000;
+    if !infra::scheduler::renew_claim_in_transaction(
+        &transaction,
+        trigger.id,
+        trigger.claim_epoch,
+        lease_deadline,
+    )
+    .await?
+    {
+        transaction.rollback().await?;
+        return Ok(());
+    }
+    let mut current_query =
+        infra::table::entity::alert_composites::Entity::find_by_id(&definition.definition.id)
+            .filter(infra::table::entity::alert_composites::Column::Org.eq(&trigger.org));
+    if transaction.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
+        current_query = current_query.lock(sea_orm::sea_query::LockType::Update);
+    }
+    let current = current_query.one(&transaction).await?;
+    if current.is_none_or(|current| {
+        !current.enabled
+            || current.evaluation_generation != definition.definition.evaluation_generation
+    }) {
+        transaction.rollback().await?;
+        trigger.status = db::scheduler::TriggerStatus::Waiting;
+        trigger.next_run_at = now + composite_debounce_secs() * 1_000_000;
+        let _ = infra::scheduler::complete_claim(trigger).await?;
+        return Ok(());
+    }
+    infra::table::alert_states::persist_update_in_transaction(&transaction, &update).await?;
+    transaction.commit().await?;
+
+    let mut delivery_retry_at = None;
+    if evaluated.result {
+        let delivery = if matches!(outcome, RunOutcome::Pending) {
+            DeliveryDecision::SuppressedByPending
+        } else {
+            config::meta::alerts::level::delivery_decision(
+                evaluated.level,
+                scheduled_data
+                    .last_notified_level
+                    .and_then(config::meta::alerts::level::AlertLevel::from_i32),
+                scheduled_data.delivery_silenced_until,
+                now,
+                Some(true),
+            )
+        };
+        if delivery.should_deliver()
+            && (!definition
+                .definition
+                .destinations
+                .as_array()
+                .is_none_or(Vec::is_empty)
+                || !definition
+                    .definition
+                    .workflows
+                    .as_array()
+                    .is_none_or(Vec::is_empty))
+        {
+            let notification_alert = composite_notification_alert(&definition.definition);
+            let notification_row = composite_notification_row(
+                &definition.definition.expression,
+                evaluated.result,
+                &evaluated.children,
+            );
+            let rows = [notification_row];
+
+            #[cfg(feature = "enterprise")]
+            let incident_handled = if notification_alert.creates_incident
+                && o2_enterprise::enterprise::common::config::get_config()
+                    .incidents
+                    .enabled
+            {
+                crate::alerts::incidents::correlate_alert_to_incident(
+                    &notification_alert,
+                    &rows[0],
+                    &rows,
+                    now,
+                    Some(evaluated.level),
+                )
+                .await
+                .map(|outcome| outcome.is_some())
+                .unwrap_or_else(|error| {
+                    log::error!(
+                        "[COMPOSITE_ALERT] incident correlation failed for {}: {error}",
+                        definition.definition.id
+                    );
+                    false
+                })
+            } else {
+                false
+            };
+            #[cfg(not(feature = "enterprise"))]
+            let incident_handled = false;
+
+            let delivery_result = if incident_handled {
+                Ok(crate::alerts::alert::NotificationOutcome::default())
+            } else {
+                notification_alert
+                    .send_notification(
+                        trace_id,
+                        &rows,
+                        now,
+                        None,
+                        now,
+                        Some(evaluated.level),
+                        Some(i32::from(evaluated.result) as f64),
+                        None,
+                        &scheduled_data.notified_destinations,
+                    )
+                    .await
+            };
+            match delivery_result {
+                Ok(outcome) if outcome.failed.is_empty() => {
+                    scheduled_data.notified_destinations.clear();
+                    scheduled_data.last_notified_level = Some(evaluated.level.to_i32());
+                    scheduled_data.delivery_silenced_until = definition
+                        .definition
+                        .silence_seconds
+                        .checked_mul(1_000_000)
+                        .and_then(|window| now.checked_add(window));
+                    trigger.retries = 0;
+                }
+                Ok(outcome) => {
+                    for destination in outcome.succeeded {
+                        if !scheduled_data.notified_destinations.contains(&destination) {
+                            scheduled_data.notified_destinations.push(destination);
+                        }
+                    }
+                    trigger.retries = trigger.retries.saturating_add(1);
+                    delivery_retry_at = Some(now.saturating_add(10_000_000));
+                }
+                Err(error) => {
+                    log::error!(
+                        "[COMPOSITE_ALERT] delivery failed for {}: {error}",
+                        definition.definition.id
+                    );
+                    trigger.retries = trigger.retries.saturating_add(1);
+                    delivery_retry_at = Some(now.saturating_add(10_000_000));
+                }
+            }
+        }
+    }
+
+    // Publish composite history through the existing trigger path with an
+    // `alert_type="composite"` discriminator (§12.4). `actual_value` is the
+    // boolean result (1/0); threshold fields are absent.
+    publish_triggers_usage(TriggerData {
+        _timestamp: now,
+        org: trigger.org.clone(),
+        module: TriggerDataType::CompositeAlert,
+        key: format!(
+            "{}/{}",
+            definition.definition.name, definition.definition.id
+        ),
+        status: outcome.clone(),
+        actual_value: Some(i32::from(evaluated.result) as f64),
+        level: Some(evaluated.level.to_i32()),
+        scheduler_trace_id: Some(trace_id.to_string()),
+        retries: trigger.retries,
+        is_realtime: trigger.is_realtime,
+        is_silenced: trigger.is_silenced,
+        start_time: now,
+        end_time: now,
+        next_run_at: trigger.next_run_at,
+        ..Default::default()
+    });
+
+    let significant = previous.as_ref().is_none_or(|previous| {
+        previous.level != Some(evaluated.level)
+            || previous.last_outcome.as_ref() != Some(&outcome)
+            || previous.level_at.is_some_and(|level_at| {
+                // Composite staleness is measured against
+                // `ZO_ALERT_COMPOSITE_STALE_K * ZO_ALERT_COMPOSITE_SWEEP_SECS`.
+                // If the composite was stale before this run and just wrote a
+                // fresh `level_at`, its parent must re-evaluate even at an
+                // unchanged level.
+                let window = composite_stale_k()
+                    .saturating_mul(composite_sweep_secs())
+                    .saturating_mul(1_000_000);
+                now.saturating_sub(level_at) > window
+            })
+    });
+    if significant {
+        nudge_composite_parents(
+            db,
+            &trigger.org,
+            &definition.definition.id,
+            infra::table::alert_composites::ChildKind::Composite,
+            now,
+        )
+        .await;
+    }
+
+    log::info!(
+        "[COMPOSITE_ALERT] trace_id={trace_id} composite_id={} generation_start={} generation_end={} child_count={} result={} stale_count={} nudge_reason=scheduler error_code=",
+        definition.definition.id,
+        definition.definition.evaluation_generation,
+        definition.definition.evaluation_generation,
+        evaluated.children.len(),
+        evaluated.result,
+        evaluated
+            .children
+            .iter()
+            .filter(|child| child.stale)
+            .count(),
+    );
+    let sweep_at = now + composite_sweep_secs() * 1_000_000;
+    trigger.status = db::scheduler::TriggerStatus::Waiting;
+    trigger.next_run_at = evaluated
+        .next_stale_deadline
+        .map(|deadline| deadline.saturating_add(1).min(sweep_at))
+        .unwrap_or(sweep_at);
+    if let Some(retry_at) = delivery_retry_at {
+        trigger.next_run_at = trigger.next_run_at.min(retry_at);
+    }
+    // Lost-wakeup protection (§11.4): a child nudge, manual trigger, or
+    // mutation that lands after the state transaction commits advances
+    // `evaluation_generation`. If the generation has moved past the snapshot
+    // taken at the start of this run, completion must schedule another run no
+    // later than `now + debounce` rather than overwrite that event with the
+    // sweep deadline.
+    if let Ok(Some(current_generation)) =
+        infra::table::alert_composites::current_generation(db, &trigger.org, &trigger.module_key)
+            .await
+        && current_generation > definition.definition.evaluation_generation
+    {
+        trigger.next_run_at = trigger
+            .next_run_at
+            .min(now + composite_debounce_secs() * 1_000_000);
+    }
+    trigger.data = config::utils::json::to_string(&scheduled_data)?;
+    let _ = infra::scheduler::complete_claim(trigger).await?;
+    Ok(())
+}
+
+fn composite_notification_alert(
+    definition: &infra::table::entity::alert_composites::Model,
+) -> config::meta::alerts::alert::Alert {
+    let mut alert = config::meta::alerts::alert::Alert::default();
+    alert.id = svix_ksuid::Ksuid::from_str(&definition.id).ok();
+    alert.org_id = definition.org.clone();
+    alert.name = definition.name.clone();
+    alert.description = definition.description.clone().unwrap_or_default();
+    alert.destinations =
+        serde_json::from_value(definition.destinations.clone()).unwrap_or_default();
+    alert.template = definition.template.clone();
+    alert.context_attributes = definition
+        .context_attributes
+        .clone()
+        .and_then(|value| serde_json::from_value(value).ok());
+    alert.creates_incident = definition.creates_incident;
+    alert.workflows = serde_json::from_value(definition.workflows.clone()).unwrap_or_default();
+    alert.priority = definition
+        .priority
+        .and_then(config::meta::alerts::priority::AlertPriority::from_i32);
+    alert.tags = definition
+        .tags
+        .clone()
+        .and_then(|value| serde_json::from_value(value).ok())
+        .unwrap_or_default();
+    alert.trigger_condition.silence = definition.silence_seconds;
+    alert.pending_period_sec = definition.pending_period_sec;
+    alert
+}
+
+fn composite_notification_row(
+    expression: &str,
+    result: bool,
+    children: &[crate::alerts::composite::EvaluatedChild],
+) -> config::utils::json::Map<String, config::utils::json::Value> {
+    let mut resolved_expression = expression.to_string();
+    for child in children {
+        resolved_expression =
+            resolved_expression.replace(&format!("{{{}}}", child.alert_id), &child.name);
+    }
+    let value = config::utils::json::json!({
+        "composite_result": result,
+        "composite_expression": resolved_expression,
+        "composite_expression_ids": expression,
+        "firing_children": children.iter().filter(|child| child.truth).map(|child| child.name.clone()).collect::<Vec<_>>(),
+        "stale_children": children.iter().filter(|child| child.stale).map(|child| child.name.clone()).collect::<Vec<_>>(),
+        "child_states": children.iter().map(|child| config::utils::json::json!({
+            "alert_id": child.alert_id,
+            "name": child.name,
+            "alert_type": child.alert_type,
+            "enabled": child.enabled,
+            "level": child.level.map(|level| level.to_string()),
+            "level_at": child.level_at,
+            "stale": child.stale,
+            "truth": child.truth,
+        })).collect::<Vec<_>>(),
+    });
+    value.as_object().cloned().unwrap_or_default()
+}
+
 /// Handle an anomaly detection trigger.
 ///
 /// Loads the config, runs detection via the enterprise crate (if trained),
@@ -624,13 +1280,14 @@ async fn handle_anomaly_detection_triggers(
     {
         trigger.next_run_at = now_micros() + 60 * 1_000_000;
         trigger.status = db::scheduler::TriggerStatus::Completed;
+        // The row is parked and never pulled again, so without this the last
+        // real outcome stands forever on a detector the kill switch stopped.
+        record_anomaly_outcome(&mut trigger, &RunOutcome::Skipped, now_micros());
         db::scheduler::update_trigger(trigger, true, "").await?;
         return Ok(());
     }
 
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let config = anomaly_config_table::get_by_id(db, &trigger.org, &anomaly_id)
         .await
@@ -657,6 +1314,11 @@ async fn handle_anomaly_detection_triggers(
     if !config.is_trained || !config.enabled {
         trigger.next_run_at = now_micros() + 60 * 1_000_000;
         trigger.status = db::scheduler::TriggerStatus::Waiting;
+        // Untrained only: a DISABLED config is not running, and its last real
+        // outcome is what should stand when it is re-enabled.
+        if !config.is_trained {
+            record_anomaly_outcome(&mut trigger, &RunOutcome::Skipped, now_micros());
+        }
         db::scheduler::update_trigger(trigger.clone(), true, "").await?;
 
         usage_reporting::publish_triggers_usage(TriggerData {
@@ -753,6 +1415,8 @@ async fn handle_anomaly_detection_triggers(
         td.last_satisfied_at = Some(run_end_us);
         trigger.data = td.to_json_string();
     }
+    // An errored run and an empty one leave the config row identical.
+    record_anomaly_outcome(&mut trigger, &trigger_status, run_end_us);
 
     // If detection succeeded and the config is trained but status is not Active
     // (e.g. stuck at Waiting after a manual retrain request that hasn't been
@@ -782,6 +1446,20 @@ async fn handle_anomaly_detection_triggers(
     db::scheduler::update_trigger(trigger, true, "").await?;
 
     Ok(())
+}
+
+/// Stamp the run outcome onto the trigger, the only per-row record of it —
+/// anomaly detection writes no `alert_states` rollup the list could read.
+fn record_anomaly_outcome(trigger: &mut db::scheduler::Trigger, outcome: &RunOutcome, at: i64) {
+    use config::meta::triggers::ScheduledTriggerData;
+    // Skip rather than default on a parse failure: rewriting the blob would
+    // erase `last_satisfied_at`, and for an untrained config that repeats hourly.
+    let Ok(mut td) = ScheduledTriggerData::from_json_string(&trigger.data) else {
+        return;
+    };
+    td.last_outcome = Some(outcome.to_string());
+    td.last_outcome_at = Some(at);
+    trigger.data = td.to_json_string();
 }
 
 /// Parse a detection interval string like "5m", "1h" into microseconds.
@@ -938,6 +1616,7 @@ pub(crate) async fn impacted_services(
     callers
 }
 
+#[allow(clippy::cognitive_complexity, clippy::too_many_lines)]
 async fn handle_alert_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
@@ -963,7 +1642,7 @@ async fn handle_alert_triggers(
 
     // here it can be alert id or alert name
     let alert = if let Ok(alert_id) = svix_ksuid::Ksuid::from_str(&trigger.module_key) {
-        let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+        let client = get_orm_client_rw().await;
         match db::alerts::alert::get_by_id(client, &trigger.org, alert_id).await {
             Ok(Some((_, alert))) => alert,
             Ok(None) => {
@@ -1194,6 +1873,8 @@ async fn handle_alert_triggers(
             period_end_time: None,
             tolerance: 0,
             last_satisfied_at: None,
+            last_outcome: None,
+            last_outcome_at: None,
             delivery_silenced_until: None,
             last_notified_level: None,
             backfill_job: None,
@@ -1298,11 +1979,21 @@ async fn handle_alert_triggers(
     // This will be used in alert evaluation as the start time.
     // If this is None, alert will use the period to evaluate alert
     let start_time =
-        // approximate the start time involving the alert manager delay
+        // approximate the start time involving the scheduler delay
             final_end_time - Duration::try_minutes(alert.trigger_condition.period)
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
+
+    let last_states = if !alert.query_condition.multi_alert_enabled()
+        && alert.pending_period_sec > 0
+    {
+        load_tracked_group_states(&alert.get_unique_key()).await.inspect_err(|e|{
+            log::error!("[SCHEDULER trace_id {scheduler_trace_id}] alert {} error in getting alert state: {e}",trigger.module_key);
+        })?
+    } else {
+        Default::default()
+    };
 
     let mut should_store_last_end_time =
         alert.trigger_condition.frequency == (alert.trigger_condition.period * 60);
@@ -1413,6 +2104,7 @@ async fn handle_alert_triggers(
             // Best-effort: a state write must not fail an evaluation that has
             // already run. Only the per-group caller checks the result.
             let _ = persist_alert_run_state(
+                &alert,
                 &alert_id.to_string(),
                 &trigger_data_stream.status,
                 None,
@@ -1441,7 +2133,15 @@ async fn handle_alert_triggers(
     let matched_level = trigger_results.level;
     let recorded_level =
         config::meta::alerts::level::level_for_successful_evaluation(matched_level);
-    let eval_level = Some(recorded_level);
+    // A FROZEN evaluation (SLO alert, every window unobserved — §7.6) records
+    // no level at all: `None` sends state persistence down the same
+    // carry-forward path as a query error, so `level`, `level_since` and
+    // `level_at` rot rather than reset. `recorded_level` (Ok) is still what
+    // the delivery decision sees, which correctly reads as NotFiring.
+    let eval_level = config::meta::alerts::level::level_for_completed_evaluation(
+        trigger_results.frozen,
+        matched_level,
+    );
 
     // A healthy evaluation closes whatever this alert had open. This sits
     // OUTSIDE the fired branch on purpose — that branch only runs when the
@@ -1471,27 +2171,12 @@ async fn handle_alert_triggers(
     trigger_data_stream.actual_value = trigger_results.actual_value;
     trigger_data_stream.group_label = trigger_results.group_label.clone();
     trigger_data_stream.value_is_lower_bound = trigger_results.value_is_lower_bound.then_some(true);
+    // One function per family, so a new family cannot be added to evaluation
+    // without also being described correctly in history — an SLO alert
+    // compares against `slo_condition`, not the count gate SA-4 pins at its
+    // default.
     let (ctx_operator, ctx_critical, ctx_warning) =
-        if let Some(agg) = alert.query_condition.aggregation.as_ref() {
-            let (crit, warn) = config::meta::alerts::aggregation_level::aggregation_thresholds(agg)
-                .unwrap_or((alert.trigger_condition.threshold as f64, None));
-            (agg.having.operator, crit, warn)
-        } else if let Some(pc) = alert.query_condition.promql_condition.as_ref() {
-            // PromQL compares the sample VALUE from `promql_condition`, not the
-            // series count — reporting the trigger_condition operator/threshold
-            // here would describe a comparison the alert never made.
-            (
-                pc.operator,
-                config::utils::json::get_float_value(&pc.value),
-                alert.query_condition.promql_warning_value,
-            )
-        } else {
-            (
-                alert.trigger_condition.operator,
-                alert.trigger_condition.threshold as f64,
-                alert.trigger_condition.warning_threshold.map(|w| w as f64),
-            )
-        };
+        config::meta::alerts::level::threshold_context(&alert);
     trigger_data_stream.threshold_operator = Some(ctx_operator.to_string());
     // Only a MATCHED threshold is recorded — a healthy run has none (T-10).
     trigger_data_stream.threshold_value = matched_level.map(|l| match l {
@@ -1531,17 +2216,12 @@ async fn handle_alert_triggers(
     // escalation inside the window is never observed and no fingerprint scheme
     // can recover it. For them, silence suppresses DELIVERY only; the decision
     // is made by `delivery_decision` further down.
-    // Multi-level if ANY warning source is configured. There are three, one per
-    // threshold family, and checking only `trigger_condition` would leave
-    // aggregation- and PromQL-warning alerts on the legacy silence path where
-    // an escalation can never be observed.
-    let multi_level = alert.trigger_condition.warning_threshold.is_some()
-        || alert
-            .query_condition
-            .aggregation
-            .as_ref()
-            .is_some_and(|a| a.warning_value.is_some())
-        || alert.query_condition.promql_warning_value.is_some();
+    // Multi-level if ANY warning source is configured. There are four, one per
+    // threshold family, and checking only `trigger_condition` would leave the
+    // aggregation-, PromQL- and SLO-warning alerts on the legacy silence path
+    // where an escalation can never be observed. Kept in `level` so a fifth
+    // family cannot be added to evaluation without answering this question.
+    let multi_level = config::meta::alerts::level::is_multi_level(&alert);
     let notify_on_warning = alert.trigger_condition.notify_on_warning;
     // §5.5 MN-10: a multi-alert evaluates through silence UNCONDITIONALLY,
     // warning configured or not. Its silence state is per group, so pausing
@@ -1679,6 +2359,98 @@ async fn handle_alert_triggers(
             false
         };
 
+        // for non multi alert, we need to check if it should move to pending state or firing state
+        // this only applies if the pending period > 0, for 0 pending period, always immediately
+        // transition to firing etc.
+        if !is_multi_alert && alert.pending_period_sec > 0 {
+            if let Some(last_state) = last_states.get("") {
+                match (last_state.last_outcome.as_ref(), last_state.since) {
+                    (None, _) | (Some(RunOutcome::Normal), _) => {
+                        // last state not recorded, so maybe first firing, or normal
+                        // so set to pending
+                        trigger_data_stream.status = RunOutcome::Pending;
+                        trigger_data.period_end_time = if should_store_last_end_time {
+                            Some(trigger_results.end_time)
+                        } else {
+                            None
+                        };
+                        new_trigger.data = json::to_string(&trigger_data).unwrap();
+                        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                        // Condition matched; only the notification was
+                        // deduplicated away. State must reflect the firing.
+                        if let Some(alert_id) = alert.id.as_ref() {
+                            let _ = persist_alert_run_state(
+                                &alert,
+                                &alert_id.to_string(),
+                                &trigger_data_stream.status,
+                                eval_level,
+                                trigger_results.group_classification.as_ref(),
+                            )
+                            .await;
+                        }
+                        publish_triggers_usage(trigger_data_stream);
+                        return Ok(());
+                    }
+                    #[allow(clippy::collapsible_match)]
+                    (Some(RunOutcome::Pending), Some(last)) => {
+                        // last state was pending, so check if the the pending state exists for more
+                        // than pending seconds or not.
+                        if now - last < alert.pending_period_sec.saturating_mul(1_000_000) {
+                            trigger_data_stream.status = RunOutcome::Pending;
+                            trigger_data.period_end_time = if should_store_last_end_time {
+                                Some(trigger_results.end_time)
+                            } else {
+                                None
+                            };
+                            new_trigger.data = json::to_string(&trigger_data).unwrap();
+                            db::scheduler::update_trigger(new_trigger, true, &query_trace_id)
+                                .await?;
+                            // Condition matched; only the notification was
+                            // deduplicated away. State must reflect the firing.
+                            if let Some(alert_id) = alert.id.as_ref() {
+                                let _ = persist_alert_run_state(
+                                    &alert,
+                                    &alert_id.to_string(),
+                                    &trigger_data_stream.status,
+                                    eval_level,
+                                    trigger_results.group_classification.as_ref(),
+                                )
+                                .await;
+                            }
+                            publish_triggers_usage(trigger_data_stream);
+                            return Ok(());
+                        }
+                    }
+                    // for all other states, continue processing
+                    _ => {}
+                }
+            } else {
+                // last state not recorded, so maybe first firing, set it to pending
+                trigger_data_stream.status = RunOutcome::Pending;
+                trigger_data.period_end_time = if should_store_last_end_time {
+                    Some(trigger_results.end_time)
+                } else {
+                    None
+                };
+                new_trigger.data = json::to_string(&trigger_data).unwrap();
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                // Condition matched; only the notification was
+                // deduplicated away. State must reflect the firing.
+                if let Some(alert_id) = alert.id.as_ref() {
+                    let _ = persist_alert_run_state(
+                        &alert,
+                        &alert_id.to_string(),
+                        &trigger_data_stream.status,
+                        eval_level,
+                        trigger_results.group_classification.as_ref(),
+                    )
+                    .await;
+                }
+                publish_triggers_usage(trigger_data_stream);
+                return Ok(());
+            }
+        }
+
         if grouping_enabled {
             #[cfg(feature = "enterprise")]
             {
@@ -1799,6 +2571,7 @@ async fn handle_alert_triggers(
                 // must reflect the firing (Part IV write-coverage).
                 if let Some(alert_id) = alert.id.as_ref() {
                     let _ = persist_alert_run_state(
+                        &alert,
                         &alert_id.to_string(),
                         &trigger_data_stream.status,
                         eval_level,
@@ -1813,7 +2586,8 @@ async fn handle_alert_triggers(
 
         // Apply deduplication if enabled (enterprise-only feature)
         #[cfg(feature = "enterprise")]
-        let data = if let Some(db) = ORM_CLIENT.get() {
+        let data = {
+            let db = get_orm_client_rw().await;
             match crate::alerts::deduplication::apply_deduplication(
                 db,
                 &alert,
@@ -1857,6 +2631,7 @@ async fn handle_alert_triggers(
                         // deduplicated away. State must reflect the firing.
                         if let Some(alert_id) = alert.id.as_ref() {
                             let _ = persist_alert_run_state(
+                                &alert,
                                 &alert_id.to_string(),
                                 &trigger_data_stream.status,
                                 eval_level,
@@ -1879,11 +2654,6 @@ async fn handle_alert_triggers(
                     data
                 }
             }
-        } else {
-            log::warn!(
-                "[SCHEDULER trace_id {scheduler_trace_id}] Could not connect to ORM for deduplication, continuing without it"
-            );
-            data
         };
 
         // [ENTERPRISE] Collect alert events for batched incident creation
@@ -2256,6 +3026,7 @@ async fn handle_alert_triggers(
                 // record and the failed groups.
                 if let Some(alert_id) = alert.id.as_ref() {
                     let _ = persist_alert_run_state(
+                        &alert,
                         &alert_id.to_string(),
                         &RunOutcome::NotifyFailed,
                         eval_level,
@@ -2268,6 +3039,22 @@ async fn handle_alert_triggers(
                 // Partial-destination failures reach the record too, even when
                 // the group counts as delivered.
                 trigger_data_stream.error = Some(dispatch.errors.join("; "));
+            }
+
+            if dispatch.delivered == 0 && dispatch.failed == 0 && dispatch.pending != 0 {
+                // this is when no group was fired, but some were pending,
+                // in which case mark the whole alert in pending state
+                trigger_data_stream.status = RunOutcome::Pending;
+                if let Some(alert_id) = alert.id.as_ref() {
+                    let _ = persist_alert_run_state(
+                        &alert,
+                        &alert_id.to_string(),
+                        &RunOutcome::Pending,
+                        eval_level,
+                        None,
+                    )
+                    .await;
+                }
             }
             // MN-6: a reservation is confirmed by its own group's delivery.
             // An unkeyed one falls back to "any delivery confirms".
@@ -2511,6 +3298,18 @@ async fn handle_alert_triggers(
                 new_trigger.org,
                 new_trigger.module_key
             );
+        } else if trigger_results.frozen {
+            // Frozen is not Normal: nothing was measured (§7.6). `Skipped` is
+            // the outcome `should_persist` drops entirely, so BOTH state axes
+            // carry forward — recording `Normal` would flip a firing alert's
+            // outcome to healthy on a measurement outage, the same D34
+            // collapse as the level axis.
+            log::info!(
+                "[SCHEDULER trace_id {scheduler_trace_id}] SLO alert evaluation frozen (unobserved), org: {}, module_key: {}",
+                new_trigger.org,
+                new_trigger.module_key
+            );
+            trigger_data_stream.status = RunOutcome::Skipped;
         } else {
             log::info!(
                 "[SCHEDULER trace_id {scheduler_trace_id}] Alert conditions not satisfied, org: {}, module_key: {}",
@@ -2548,6 +3347,7 @@ async fn handle_alert_triggers(
     // state those callbacks just recorded.
     if let Some(alert_id) = alert.id.as_ref().filter(|_| !multi_alert_dispatched) {
         let _ = persist_alert_run_state(
+            &alert,
             &alert_id.to_string(),
             &trigger_data_stream.status,
             eval_level,
@@ -2654,7 +3454,7 @@ async fn handle_report_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
 ) -> Result<(), anyhow::Error> {
-    let conn = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let conn = get_orm_client_rw().await;
     let query_trace_id = ider::generate_trace_id();
     let scheduler_trace_id = format!("{trace_id}/{query_trace_id}");
     let (_, max_retries) = get_scheduler_max_retries();
@@ -5033,20 +5833,8 @@ async fn handle_slo_triggers(mut trigger: db::scheduler::Trigger) -> Result<(), 
     use config::utils::time::{now_micros, second_micros};
 
     let slo_id = trigger.module_key.clone();
-    let cfg = config::get_config();
 
-    // Turned off at runtime: keep the trigger alive so it resumes on restart
-    // rather than silently losing its schedule.
-    if !cfg.slo.enabled {
-        trigger.next_run_at = now_micros() + second_micros(300);
-        trigger.status = db::scheduler::TriggerStatus::Waiting;
-        db::scheduler::update_trigger(trigger, true, "").await?;
-        return Ok(());
-    }
-
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_ro().await;
     let slo = infra::table::slos::get(db, &trigger.org, &slo_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
@@ -5105,17 +5893,8 @@ async fn handle_slo_backfill_triggers(
     use config::utils::time::{now_micros, second_micros};
 
     let slo_id = trigger.module_key.clone();
-    let cfg = config::get_config();
-    if !cfg.slo.enabled {
-        trigger.next_run_at = now_micros() + second_micros(300);
-        trigger.status = db::scheduler::TriggerStatus::Waiting;
-        db::scheduler::update_trigger(trigger, true, "").await?;
-        return Ok(());
-    }
 
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_ro().await;
     let Some(slo) = infra::table::slos::get(db, &trigger.org, &slo_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
@@ -5216,6 +5995,7 @@ mod tests {
             ladder_run: None,
             priority: 2,
             responder_role: ResponderRole::Owner,
+            exhausted_at: None,
             origin_response_id: None,
             state,
             opened_at: 0,
@@ -6183,6 +6963,7 @@ mod tests {
                 name: "my_func".to_string(),
                 after_flatten: false,
                 num_args: 0,
+                raw_fn: None,
             }),
             0.0,
             0.0,
@@ -6324,5 +7105,72 @@ mod tests {
         let result = get_destination_stream_from_pipeline(&pipeline).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].stream_name.as_str(), "output-stream");
+    }
+
+    /// The alert list's only source for an anomaly's outcome, so the recorded
+    /// value must survive alongside the anomaly timestamp written beside it.
+    mod record_anomaly_outcome_tests {
+        use config::meta::triggers::ScheduledTriggerData;
+
+        use super::*;
+
+        fn trigger_with(data: &str) -> db::scheduler::Trigger {
+            db::scheduler::Trigger {
+                data: data.to_string(),
+                ..Default::default()
+            }
+        }
+
+        #[test]
+        fn records_the_outcome_onto_the_trigger_data() {
+            let mut trigger = trigger_with("{}");
+            record_anomaly_outcome(&mut trigger, &RunOutcome::Firing, 1_700);
+
+            let td = ScheduledTriggerData::from_json_string(&trigger.data).unwrap();
+            assert_eq!(td.last_outcome.as_deref(), Some("firing"));
+            assert_eq!(td.last_outcome_at, Some(1_700));
+        }
+
+        /// The detection path writes `last_satisfied_at` immediately before
+        /// this runs; losing it blanks the list's "last anomaly" column.
+        #[test]
+        fn preserves_the_rest_of_the_blob() {
+            let td = ScheduledTriggerData {
+                last_satisfied_at: Some(900),
+                tolerance: 42,
+                ..Default::default()
+            };
+            let mut trigger = trigger_with(&td.to_json_string());
+
+            record_anomaly_outcome(&mut trigger, &RunOutcome::Normal, 1_000);
+
+            let out = ScheduledTriggerData::from_json_string(&trigger.data).unwrap();
+            assert_eq!(out.last_satisfied_at, Some(900));
+            assert_eq!(out.tolerance, 42);
+            assert_eq!(out.last_outcome.as_deref(), Some("normal"));
+        }
+
+        /// Defaulting here would rewrite the blob and erase `last_satisfied_at`
+        /// — every 60s for an untrained config. Losing one update is cheaper.
+        #[test]
+        fn leaves_an_unparseable_blob_untouched() {
+            let mut trigger = trigger_with("{not json");
+            record_anomaly_outcome(&mut trigger, &RunOutcome::Error, 1_000);
+
+            assert_eq!(trigger.data, "{not json");
+        }
+
+        /// An errored run and an empty one are indistinguishable on the config
+        /// row, which is the whole reason the outcome is recorded.
+        #[test]
+        fn records_error_distinctly_from_normal() {
+            let mut trigger = trigger_with("{}");
+            record_anomaly_outcome(&mut trigger, &RunOutcome::Error, 1);
+            assert!(trigger.data.contains("\"error\""));
+
+            record_anomaly_outcome(&mut trigger, &RunOutcome::Normal, 2);
+            assert!(trigger.data.contains("\"normal\""));
+            assert!(!trigger.data.contains("\"error\""));
+        }
     }
 }

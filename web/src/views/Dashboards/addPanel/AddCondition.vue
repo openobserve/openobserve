@@ -167,7 +167,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { type SelectModelValue } from "@/lib/forms/Select/OSelect.types";
+import { type SelectModelValue, type SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
@@ -235,27 +235,30 @@ export default defineComponent({
       update(() => filteredListOptions.value);
     };
 
-    const operators = [
-      "=",
-      "<>",
-      ">=",
-      "<=",
-      ">",
-      "<",
-      "IN",
-      "NOT IN",
-      "str_match",
-      "str_match_ignore_case",
-      "match_all",
-      "re_match",
-      "re_not_match",
-      "Contains",
-      "Starts With",
-      "Ends With",
-      "Not Contains",
-      "Is Null",
-      "Is Not Null",
-    ];
+    // `value` is persisted as `condition.operator` and matched by identity in
+    // sqlUtils / dashboardAutoQueryBuilder / panelValidation, so it stays English.
+    // Only `label` is translated, and only where it is prose rather than syntax.
+    const operators = computed<SelectOption[]>(() => [
+      { label: raw("="), value: "=" },
+      { label: raw("<>"), value: "<>" },
+      { label: raw(">="), value: ">=" },
+      { label: raw("<="), value: "<=" },
+      { label: raw(">"), value: ">" },
+      { label: raw("<"), value: "<" },
+      { label: raw("IN"), value: "IN" },
+      { label: raw("NOT IN"), value: "NOT IN" },
+      { label: raw("str_match"), value: "str_match" },
+      { label: raw("str_match_ignore_case"), value: "str_match_ignore_case" },
+      { label: raw("match_all"), value: "match_all" },
+      { label: raw("re_match"), value: "re_match" },
+      { label: raw("re_not_match"), value: "re_not_match" },
+      { label: t("dashboard.filterOperators.contains"), value: "Contains" },
+      { label: t("dashboard.filterOperators.startsWith"), value: "Starts With" },
+      { label: t("dashboard.filterOperators.endsWith"), value: "Ends With" },
+      { label: t("dashboard.filterOperators.notContains"), value: "Not Contains" },
+      { label: t("dashboard.filterOperators.isNull"), value: "Is Null" },
+      { label: t("dashboard.filterOperators.isNotNull"), value: "Is Not Null" },
+    ]);
 
     const filterOptions = [
       { label: raw("AND"), value: "AND" },

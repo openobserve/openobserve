@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
+import { gt } from "@/types/i18n";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 import authService from "@/services/auth";
 import store from "@/stores";
@@ -195,12 +196,6 @@ const useHttpStreaming = () => {
         url += `&fallback_order_by_col=${meta?.fallback_order_by_col}`;
       if (clear_cache) url += `&clear_cache=${clear_cache}`;
       if (meta?.is_ui_histogram) url += `&is_ui_histogram=${meta?.is_ui_histogram}`;
-
-      if (type === "histogram") {
-        let is_multi_stream_search = false;
-        if (queryReq.query?.sql.indexOf(" UNION ALL ") !== -1) is_multi_stream_search = true;
-        url += `&is_multi_stream_search=${is_multi_stream_search}`;
-      }
     } else if (type === "values") {
       url = `/_values_stream`;
       if (meta?.keyword) url += `?keyword=${encodeURIComponent(meta.keyword)}`;
@@ -415,7 +410,7 @@ const useHttpStreaming = () => {
                 // Refresh succeeded but stream is broken — signal error so UI can retry
                 onError(traceId, {
                   status: 401,
-                  message: "Session refreshed, please retry search",
+                  message: gt("search.sessionRefreshedRetrySearch"),
                 });
               } catch {
                 // Refresh failed — logout/reload already handled inside attemptTokenRefresh
@@ -442,7 +437,8 @@ const useHttpStreaming = () => {
       activeStreamId.value = traceId;
     } catch (error) {
       if ((error as any).name === "AbortError") {
-        // console.error('Stream was canceled');
+        // An aborted stream reaches no completion handler, so release it here.
+        cleanUpListeners(traceId);
       } else if ((error as any).status === 401) {
         // A refresh was already attempted in Path 1 (initial fetch 401 handler).
         // Reaching here means the refresh didn't help or json() parsing failed
@@ -486,6 +482,11 @@ const useHttpStreaming = () => {
   const cleanUpListeners = (traceId: string) => {
     if (traceMap.value[traceId]) {
       delete traceMap.value[traceId];
+    }
+    // Also release the controller: leaving it here after a normal completion
+    // leaked it (and the panel state its abort listeners hold) for the session.
+    if (abortControllers.value[traceId]) {
+      delete abortControllers.value[traceId];
     }
   };
 

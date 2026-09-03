@@ -37,10 +37,7 @@ use sea_orm::{
 };
 
 use super::entity::{oncall_ownership_rules, oncall_unrouted_signals};
-use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors,
-};
+use crate::{db::get_orm_client_rw, errors};
 
 /// An org's ownership rules, for the paging path (`06` §3).
 ///
@@ -110,7 +107,7 @@ pub async fn create(
     team_id: &str,
     dimensions: HashMap<String, String>,
 ) -> Result<OwnershipRule, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = now_micros();
     let rule = OwnershipRule {
         id: ider::uuid(),
@@ -149,7 +146,7 @@ pub async fn update(
     team_id: &str,
     dimensions: HashMap<String, String>,
 ) -> Result<Option<OwnershipRule>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Some(existing) = oncall_ownership_rules::Entity::find()
         .filter(oncall_ownership_rules::Column::OrgId.eq(org_id))
         .filter(oncall_ownership_rules::Column::Id.eq(id))
@@ -184,7 +181,7 @@ pub async fn update(
 /// memory: the match is longest-prefix over a map, which SQL cannot express,
 /// and an org has tens of rules, not thousands.
 pub async fn list(org_id: &str) -> Result<Vec<OwnershipRule>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_ownership_rules::Entity::find()
         .filter(oncall_ownership_rules::Column::OrgId.eq(org_id))
         .order_by_asc(oncall_ownership_rules::Column::Path)
@@ -215,7 +212,7 @@ pub async fn list_by_team(
     org_id: &str,
     team_id: &str,
 ) -> Result<Vec<OwnershipRule>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_ownership_rules::Entity::find()
         .filter(oncall_ownership_rules::Column::OrgId.eq(org_id))
         .filter(oncall_ownership_rules::Column::TeamId.eq(team_id))
@@ -228,7 +225,7 @@ pub async fn list_by_team(
 }
 
 pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let deleted = oncall_ownership_rules::Entity::delete_many()
         .filter(oncall_ownership_rules::Column::OrgId.eq(org_id))
         .filter(oncall_ownership_rules::Column::Id.eq(id))
@@ -245,7 +242,7 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
 /// Drops every rule a team owns. Called when the team is deleted, so its
 /// claims do not keep routing alerts at a team that no longer exists.
 pub async fn delete_by_team(org_id: &str, team_id: &str) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let dropped = oncall_ownership_rules::Entity::delete_many()
         .filter(oncall_ownership_rules::Column::OrgId.eq(org_id))
         .filter(oncall_ownership_rules::Column::TeamId.eq(team_id))
@@ -326,7 +323,7 @@ pub async fn record_unrouted(
     defaulted_team_id: Option<&str>,
     now: i64,
 ) -> Result<UnroutedSignal, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let path = truncate_path(&canonical_path(dimensions));
     let defaulted_team_id = defaulted_team_id
         .map(str::trim)
@@ -419,7 +416,7 @@ pub async fn list_unrouted(
     landing: Landing,
     limit: u64,
 ) -> Result<Vec<UnroutedSignal>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let mut q = oncall_unrouted_signals::Entity::find()
         .filter(oncall_unrouted_signals::Column::OrgId.eq(org_id));
     if !include_dismissed {
@@ -443,7 +440,7 @@ pub async fn list_unrouted(
 
 /// How many gaps are outstanding — the number a badge shows.
 pub async fn count_unrouted(org_id: &str) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_unrouted_signals::Entity::find()
         .filter(oncall_unrouted_signals::Column::OrgId.eq(org_id))
         .filter(oncall_unrouted_signals::Column::DismissedAt.is_null())
@@ -457,7 +454,7 @@ pub async fn dismiss_unrouted(
     id: &str,
     now: i64,
 ) -> Result<Option<UnroutedSignal>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Some(existing) = oncall_unrouted_signals::Entity::find_by_id(id)
         .filter(oncall_unrouted_signals::Column::OrgId.eq(org_id))
         .one(client)
@@ -594,7 +591,10 @@ mod tests {
         let s = to_unrouted(m);
         assert!(s.landed_on_default());
         assert_eq!(s.defaulted_team_id.as_deref(), Some("team_platform"));
-        assert!(s.describe().contains("paged the default team team_platform"));
+        assert!(
+            s.describe()
+                .contains("paged the default team team_platform")
+        );
 
         for blank in [None, Some(""), Some("   ")] {
             let mut m = unrouted_model("{}");

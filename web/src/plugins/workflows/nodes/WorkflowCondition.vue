@@ -22,46 +22,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   carry the workflow filter wording.
 
   A Condition is a filter (single output): matching records continue, the rest
-  are dropped. WorkflowNodeDrawer's Save calls submit() → { version, conditions }
-  or null when nothing is configured.
+  are dropped. Dummy-node model (C1): the builder is `optional`, so an empty or
+  incomplete rule doesn't block — the panel-close commit saves it as a placeholder
+  (flagged `meta.incomplete`, Publish blocked) instead. submit() returns
+  { version, conditions } and sets the node's incomplete flag from the builder's
+  `complete` result.
 -->
 <template>
-  <div data-test="workflow-condition-body" class="w-full">
-    <ConditionBuilder ref="builder" :fields="fields" :initial-conditions="savedConditions">
-      <!-- The examples below are CODE SAMPLES held in en-US.json: only the
-           illustrative column name ("severity") is meant to vary per locale —
-           the operators and literals (`!=`, `""`, `null`) are expression syntax
-           and must be copied verbatim, so translators should leave them alone. -->
+  <div data-test="workflow-condition-body" class="flex w-full flex-col">
+    <!-- Config pane header (shared) — title + the guidelines info icon RIGHT AFTER
+         it. Always visible; hovering the icon shows the tips (tooltip is the app-wide
+         info pattern), reachable whether or not the first-run box below is dismissed. -->
+    <WorkflowConfigHeader>
+      <span
+        class="text-text-secondary hover:text-text-body inline-flex cursor-help items-center"
+        data-test="workflow-condition-guidelines-info"
+      >
+        <OIcon name="info" size="sm" />
+        <OTooltip side="right" align="start" :side-offset="8" max-width="22rem">
+          <template #content>
+            <div class="flex flex-col gap-1.5 p-1 text-left">
+              <div class="text-xs font-semibold">{{ t("workflow.node.conditionNoteTitle") }}</div>
+              <div v-for="(tip, i) in tips" :key="i" class="text-xs leading-snug">
+                {{ tip.note }}
+                <span
+                  v-if="tip.example"
+                  class="rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
+                  >{{ tip.example }}</span
+                >
+              </div>
+            </div>
+          </template>
+        </OTooltip>
+      </span>
+    </WorkflowConfigHeader>
+
+    <ConditionBuilder
+      ref="builder"
+      :fields="fields"
+      :initial-conditions="savedConditions"
+      normalize-column-names
+      optional
+    >
       <template #guidelines>
+        <!-- First-run hint; dismissed once, it stays gone (localStorage) and the
+             recall icon above takes over. -->
         <div
+          v-if="!guidelinesDismissed"
           class="bg-banner-warning-bg border-banner-warning-border text-banner-warning-text rounded-default mt-4 flex w-full flex-col gap-2 border p-3"
           data-test="workflow-condition-note"
         >
-          <div class="text-sm font-bold">
-            {{ t("workflow.node.conditionNoteTitle") }}
+          <div class="flex items-start justify-between gap-2">
+            <div class="text-sm font-bold">{{ t("workflow.node.conditionNoteTitle") }}</div>
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              data-test="workflow-condition-note-dismiss"
+              :aria-label="t('common.close')"
+              @click="dismissGuidelines"
+            >
+              <OIcon name="close" size="xs" />
+            </OButton>
           </div>
           <div class="flex flex-col gap-1 text-sm">
-            <div class="flex items-start gap-2">
+            <div v-for="(tip, i) in tips" :key="i" class="flex items-start gap-2">
               <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
               <span>
-                {{ t("workflow.node.conditionNoteEmpty") }}
-                <span class="rounded-default bg-code-bg text-code-text px-1 py-px font-mono">{{
-                  t("workflow.node.conditionExampleEmpty")
-                }}</span>
+                {{ tip.note }}
+                <span
+                  v-if="tip.example"
+                  class="rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
+                  >{{ tip.example }}</span
+                >
               </span>
-            </div>
-            <div class="flex items-start gap-2">
-              <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
-              <span>
-                {{ t("workflow.node.conditionNoteNull") }}
-                <span class="rounded-default bg-code-bg text-code-text px-1 py-px font-mono">{{
-                  t("workflow.node.conditionExampleNull")
-                }}</span>
-              </span>
-            </div>
-            <div class="flex items-start gap-2">
-              <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
-              <span>{{ t("workflow.node.conditionNoteCustom") }}</span>
             </div>
           </div>
         </div>
@@ -72,13 +105,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
-import { workflowObj, currentTriggerKind } from "@/plugins/workflows/useWorkflowCanvas";
+import WorkflowConfigHeader from "./WorkflowConfigHeader.vue";
+import {
+  workflowObj,
+  currentTriggerKind,
+  setNodeIncomplete,
+} from "@/plugins/workflows/useWorkflowCanvas";
 import { triggerDef } from "@/plugins/workflows/triggers";
 
 const { t } = useI18nTyped();
+
+// The guidelines, as data — rendered in BOTH the inline first-run box and the
+// recall tooltip, so the copy lives in one place. The null/empty value hints
+// are gone (dedicated is_null/is_empty operators replaced them); `example`
+// stays for future tips that carry a verbatim code sample.
+const tips: Array<{ note: I18nText; example?: I18nText }> = [
+  { note: t("workflow.node.conditionNoteCustom") },
+];
+
+// The inline guidelines box is a first-run hint: shown until the user dismisses
+// it, then remembered so it never nags again. The recall icon (+ tooltip) is the
+// way back to the tips afterward.
+const GUIDELINES_SEEN_KEY = "workflows:conditionGuidelinesSeen";
+const guidelinesDismissed = ref(localStorage.getItem(GUIDELINES_SEEN_KEY) === "true");
+const dismissGuidelines = () => {
+  guidelinesDismissed.value = true;
+  localStorage.setItem(GUIDELINES_SEEN_KEY, "true");
+};
 // The pickable fields are the CURRENT trigger's payload fields, so an incident
 // workflow branches on incident fields and an alert workflow on alert fields.
 // With no trigger (it was deleted), we offer nothing rather than a wrong set —
@@ -88,9 +146,18 @@ const fields = kind ? triggerDef(kind).conditionFields : [];
 const savedConditions = workflowObj.currentSelectedNodeData?.data?.conditions ?? null;
 
 const builder = ref<any>(null);
-// The builder validates through its zod schema (async) and renders the error
-// inline, returning null when the rule is empty/incomplete.
-const submit = async () => (await builder.value?.submit()) ?? null;
+// The builder is `optional`, so submit() never blocks on an incomplete rule — it
+// returns { version, conditions, complete }. Flag the node incomplete when the rule
+// isn't complete (drives the "Set up later" badge + blocks Publish), then strip the
+// `complete` flag before it's persisted into node data. Custom columns are
+// normalized to the flattened form (dots → underscores) by ConditionBuilder.
+const submit = async () => {
+  const payload = await builder.value?.submit();
+  if (!payload) return null;
+  const { complete, ...data } = payload;
+  setNodeIncomplete(workflowObj.currentSelectedNodeData, !complete);
+  return data;
+};
 
 defineExpose({ submit });
 </script>

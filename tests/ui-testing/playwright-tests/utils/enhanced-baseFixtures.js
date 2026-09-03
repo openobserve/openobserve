@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { test: baseTest } = require('@playwright/test');
 const testLogger = require('./test-logger.js');
 const { waitUtils } = require('./wait-helpers.js');
+const { gotoWithRetry } = require('./navigation.js');
 const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
 const istanbulCLIOutput = path.join(process.cwd(), '.nyc_output');
@@ -28,12 +29,18 @@ const test = baseTest.extend({
         testLogger.info('Using saved authentication state');
         context = await browser.newContext({
           storageState: authFile,
-          viewport: { width: 1500, height: 1024 }
+          viewport: { width: 1500, height: 1024 },
+          // browser.newContext() does NOT inherit the project's `use.permissions`,
+          // so overriding this fixture silently drops them. Specs that read the
+          // clipboard (share-link, legends-copy, table-copy-cell) then fail on a
+          // rejected navigator.clipboard.readText().
+          permissions: ['clipboard-read', 'clipboard-write']
         });
       } else {
         testLogger.warn('No saved auth state found, creating fresh context');
         context = await browser.newContext({
-          viewport: { width: 1500, height: 1024 }
+          viewport: { width: 1500, height: 1024 },
+          permissions: ['clipboard-read', 'clipboard-write']
         });
       }
       
@@ -141,9 +148,11 @@ async function navigateToBase(page) {
   const baseUrlWithOrg = `${process.env["ZO_BASE_URL"]}/web/?org_identifier=${process.env["ORGNAME"]}`;
   testLogger.info('Navigating to base URL with org identifier', { url: baseUrlWithOrg });
 
-  // Use 60s navigation timeout for all environments (dev/staging can be slow to load)
+  // Use 60s navigation timeout for all environments (dev/staging can be slow to load).
+  // Settle on domcontentloaded, not the default `load`: the SPA is interactive well
+  // before every subresource finishes, and the waits below already gate on what we need.
   const navTimeout = 60000;
-  await page.goto(baseUrlWithOrg, { timeout: navTimeout });
+  await gotoWithRetry(page, baseUrlWithOrg, { timeout: navTimeout, waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('domcontentloaded');
   // Cloud needs full hydration before sidebar clicks — without this, clicks trigger Dex redirect
   if (isCloudEnvironment()) {
@@ -162,7 +171,7 @@ async function navigateToBase(page) {
     const { reauthenticateAlpha1 } = require('./reauth-alpha1.js');
     const recovered = await reauthenticateAlpha1(page);
     if (recovered) {
-      await page.goto(baseUrlWithOrg, { timeout: navTimeout });
+      await gotoWithRetry(page, baseUrlWithOrg, { timeout: navTimeout, waitUntil: 'domcontentloaded' });
       await page.waitForLoadState('domcontentloaded');
       await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
       isAuthenticated = await verifyAuthentication(page);

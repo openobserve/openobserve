@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Advanced Options -->
         <div
-          class="collapsible-section bg-card-glass-bg rounded-default border-card-glass-border flex flex-col overflow-hidden border shadow-[0_0_5px_1px_var(--color-hover-shadow)] transition-all"
+          class="collapsible-section bg-card-glass-bg rounded-default border-card-glass-border shadow-hover-shadow flex flex-col overflow-hidden border shadow-md transition-all"
           data-test="advanced-options-section"
         >
           <div
@@ -284,14 +284,12 @@ const errorMessage = ref("");
 
 // Typed dynamic defaults for the form-owned fields. The time range is an
 // absolute range seeded empty (forces the picker to absolute mode).
-const backfillDefaults = computed(
-  (): BackfillForm => ({
-    timerange: { type: "absolute", from: undefined, to: undefined },
-    chunkPeriodMinutes: (props.scheduleFrequency || 60) as number | null,
-    delayBetweenChunks: null,
-    deleteBeforeBackfill: false,
-  }),
-);
+const backfillDefaults = computed((): BackfillForm => ({
+  timerange: { type: "absolute", from: undefined, to: undefined },
+  chunkPeriodMinutes: (props.scheduleFrequency || 60) as number | null,
+  delayBetweenChunks: null,
+  deleteBeforeBackfill: false,
+}));
 
 // Rule ③ OWNER pattern: this component OWNS <OForm> and needs the live values
 // (timerange/chunk/delay/deleteBeforeBackfill) for estimatedInfo + the delete
@@ -443,7 +441,7 @@ const createBackfillJobRequest = async (value: BackfillForm) => {
   } catch (error: any) {
     console.error("Error creating backfill job:", error);
     errorMessage.value =
-      error?.response?.data?.message || error?.message || "Failed to create backfill job";
+      error?.response?.data?.message || error?.message || t("pipeline.createBackfillJobFailed");
 
     toast({
       variant: "error",

@@ -213,27 +213,3 @@ export function canDefaultToAnd(parts: CompositePart[], recorded: string[]): boo
   const known = new Set(recorded);
   return parts.length > 0 && parts.every((p) => known.has(p.value));
 }
-
-/** Relation → the phrase used to describe a join in the compact row. */
-const RELATION_PHRASE: Record<CompositeRelation, string> = {
-  and: "and",
-  has: "containing",
-  has_not: "not containing",
-  descendant: "inside",
-};
-
-/**
- * A one-line, readable summary of a combined locator, for the compact step row.
- *
- * Prose rather than the selector string. The string is JSON-escaped Playwright
- * syntax and unreadable at a glance, which is also why the dialog shows it as a
- * copy target rather than as something to edit.
- */
-export function describeComposite(parts: CompositePart[]): string {
-  const [base, ...joins] = parts;
-  if (!base) return "";
-  return joins.reduce(
-    (acc, p) => `${acc} ${RELATION_PHRASE[p.relation ?? "and"]} ${p.value}`,
-    base.value,
-  );
-}

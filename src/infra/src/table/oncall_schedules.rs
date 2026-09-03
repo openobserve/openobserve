@@ -33,10 +33,7 @@ use config::{
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 
 use super::entity::oncall_schedules;
-use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors,
-};
+use crate::{db::get_orm_client_rw, errors};
 
 /// The team's schedule *with its covers*, for the paging path (`06` §3).
 ///
@@ -220,7 +217,7 @@ pub async fn upsert(
     timezone: &str,
     rotations: &[Rotation],
 ) -> Result<Schedule, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let encoded = serde_json::to_string(rotations)?;
     let now = now_micros();
 
@@ -259,7 +256,7 @@ pub async fn upsert(
 /// The team's schedule, covers included, so the result resolves correctly on
 /// its own.
 pub async fn get_by_team(org_id: &str, team_id: &str) -> Result<Option<Schedule>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let found = oncall_schedules::Entity::find()
         .filter(oncall_schedules::Column::OrgId.eq(org_id))
         .filter(oncall_schedules::Column::TeamId.eq(team_id))
@@ -304,7 +301,7 @@ pub async fn get_by_team_cached(
 /// round trip on a screen nobody is paged by. Absences are org-scoped and read
 /// the same way for the same reason.
 pub async fn list(org_id: &str) -> Result<Vec<Schedule>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let rows = oncall_schedules::Entity::find()
         .filter(oncall_schedules::Column::OrgId.eq(org_id))
         .order_by_asc(oncall_schedules::Column::Id)
@@ -319,7 +316,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Schedule>, errors::Error> {
 }
 
 pub async fn delete_by_team(org_id: &str, team_id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let deleted = oncall_schedules::Entity::delete_many()
         .filter(oncall_schedules::Column::OrgId.eq(org_id))
         .filter(oncall_schedules::Column::TeamId.eq(team_id))
@@ -350,9 +347,12 @@ mod tests {
 
     #[test]
     fn test_rotations_round_trip_through_the_json_column() {
-        let rotations = vec![
-            Rotation::weekly("Weekdays", "Weekdays", vec!["ana@o2.ai".into()], 100),
-        ];
+        let rotations = vec![Rotation::weekly(
+            "Weekdays",
+            "Weekdays",
+            vec!["ana@o2.ai".into()],
+            100,
+        )];
         let encoded = serde_json::to_string(&rotations).unwrap();
         let s = to_schedule(model(&encoded));
         assert_eq!(s.rotations, rotations);

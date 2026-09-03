@@ -25,12 +25,12 @@
 //! Two invariants are the reason the rest of it is safe to ship, and both are
 //! enforced here rather than in a prompt:
 //!
-//! 1. **P1 is never gated.** [`gate_plan`] returns [`GatePlan::Parallel`] for P1
-//!    whatever the stored policy says. A model delaying a critical page is the
-//!    one failure that would end the programme, so it is not a setting.
-//! 2. **Severity is a ratchet.** [`ratchet`] may raise a firing's severity and
-//!    can express no other outcome. A verdict that degrades, is jailbroken by
-//!    log content, or simply misreads cannot quiet a page through this field.
+//! 1. **P1 is never gated.** [`gate_plan`] returns [`GatePlan::Parallel`] for P1 whatever the
+//!    stored policy says. A model delaying a critical page is the one failure that would end the
+//!    programme, so it is not a setting.
+//! 2. **Severity is a ratchet.** [`ratchet`] may raise a firing's severity and can express no other
+//!    outcome. A verdict that degrades, is jailbroken by log content, or simply misreads cannot
+//!    quiet a page through this field.
 //!
 //! Scope: this is the read-only L0. `proposed_actions` is display text. Nothing
 //! here executes anything.
@@ -933,7 +933,8 @@ pub fn analysis_status_for_start(
     analysis_in_flight: bool,
     cooldown_elapsed: bool,
 ) -> AnalysisStatus {
-    let clear = rca_enabled && agent_url_set && agent_healthy && !analysis_in_flight && cooldown_elapsed;
+    let clear =
+        rca_enabled && agent_url_set && agent_healthy && !analysis_in_flight && cooldown_elapsed;
     if clear {
         AnalysisStatus::Pending
     } else {
@@ -1202,7 +1203,10 @@ pub fn verdict_lines(analysis: &AnalysisState, decision: &SeverityDecision) -> V
         ));
     }
     if !verdict.impacted_services.is_empty() {
-        lines.push(format!("impacted: {}", verdict.impacted_services.join(", ")));
+        lines.push(format!(
+            "impacted: {}",
+            verdict.impacted_services.join(", ")
+        ));
     }
     for link in &verdict.evidence_links {
         lines.push(format!("· {} — {}", link.label, link.url));
@@ -1282,7 +1286,8 @@ pub fn is_false_suppress(
     }
     // At **or above**: a suppressed P3 coming back as a P3 is exactly the case
     // the trust metric exists to count.
-    refired_severity == suppressed_severity || refired_severity.is_more_urgent_than(suppressed_severity)
+    refired_severity == suppressed_severity
+        || refired_severity.is_more_urgent_than(suppressed_severity)
 }
 
 #[cfg(test)]
@@ -1302,6 +1307,7 @@ mod tests {
 
     /// A policy built by hand, so a test can express one that a stored row
     /// could hold even though `validate` would refuse it.
+    #[allow(clippy::too_many_arguments)]
     fn raw(
         p1: L0Mode,
         p2: L0Mode,
@@ -1418,7 +1424,10 @@ mod tests {
         assert_eq!(d.mode.p4, L0Mode::Only, "P4 investigates and pages nobody");
         assert_eq!(d.triage_budget_seconds, 90);
         assert!(d.allow_promotion, "the capability that pays for L0");
-        assert_eq!(d.max_promotion_steps, 2, "a P4 cannot become a P1 in one hop");
+        assert_eq!(
+            d.max_promotion_steps, 2,
+            "a P4 cannot become a P1 in one hop"
+        );
         assert!(d.allow_downgrade);
         assert!(
             !d.allow_suppress,
@@ -1435,7 +1444,17 @@ mod tests {
     #[test]
     fn test_p1_is_parallel_even_when_a_stored_policy_says_otherwise() {
         for forbidden in [L0Mode::Gate, L0Mode::Only] {
-            let p = raw(forbidden, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 2, true, false);
+            let p = raw(
+                forbidden,
+                L0Mode::Gate,
+                L0Mode::Gate,
+                L0Mode::Only,
+                90,
+                true,
+                2,
+                true,
+                false,
+            );
             assert_eq!(
                 p.validate(),
                 Err(L0Error::P1MustBeParallel(forbidden)),
@@ -1510,8 +1529,14 @@ mod tests {
     fn test_a_budget_outside_the_bound_is_clamped_when_it_is_read() {
         let cases = [
             (90_i64, 90 * SECOND),
-            (MIN_TRIAGE_BUDGET_SECONDS, MIN_TRIAGE_BUDGET_SECONDS * SECOND),
-            (MAX_TRIAGE_BUDGET_SECONDS, MAX_TRIAGE_BUDGET_SECONDS * SECOND),
+            (
+                MIN_TRIAGE_BUDGET_SECONDS,
+                MIN_TRIAGE_BUDGET_SECONDS * SECOND,
+            ),
+            (
+                MAX_TRIAGE_BUDGET_SECONDS,
+                MAX_TRIAGE_BUDGET_SECONDS * SECOND,
+            ),
             (0, MIN_TRIAGE_BUDGET_SECONDS * SECOND),
             (-1, MIN_TRIAGE_BUDGET_SECONDS * SECOND),
             (i64::MIN, MIN_TRIAGE_BUDGET_SECONDS * SECOND),
@@ -1535,7 +1560,17 @@ mod tests {
     /// it could have meant.
     #[test]
     fn test_only_mode_outside_p4_is_read_as_parallel() {
-        let p = raw(L0Mode::Parallel, L0Mode::Only, L0Mode::Only, L0Mode::Only, 90, true, 2, true, false);
+        let p = raw(
+            L0Mode::Parallel,
+            L0Mode::Only,
+            L0Mode::Only,
+            L0Mode::Only,
+            90,
+            true,
+            2,
+            true,
+            false,
+        );
         for pr in [P1, P2, P3] {
             assert_eq!(p.mode_for(pr), L0Mode::Parallel, "{pr} still has to page");
             assert_eq!(
@@ -1561,7 +1596,17 @@ mod tests {
     #[test]
     fn test_p4_and_p5_are_agent_only_even_when_a_stored_policy_gates_them() {
         for forbidden in [L0Mode::Gate, L0Mode::Parallel] {
-            let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, forbidden, 90, true, 2, true, false);
+            let p = raw(
+                L0Mode::Parallel,
+                L0Mode::Gate,
+                L0Mode::Gate,
+                forbidden,
+                90,
+                true,
+                2,
+                true,
+                false,
+            );
             assert_eq!(
                 p.validate(),
                 Err(L0Error::P4MustBeAgentOnly(forbidden)),
@@ -1597,8 +1642,21 @@ mod tests {
         );
         // The two guards are about different severities and must not be
         // confused for one another.
-        let p1_wrong = raw(L0Mode::Gate, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 2, true, false);
-        assert_eq!(p1_wrong.validate(), Err(L0Error::P1MustBeParallel(L0Mode::Gate)));
+        let p1_wrong = raw(
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            90,
+            true,
+            2,
+            true,
+            false,
+        );
+        assert_eq!(
+            p1_wrong.validate(),
+            Err(L0Error::P1MustBeParallel(L0Mode::Gate))
+        );
     }
 
     /// P5 is absent from the stored mode map. It pages nobody, exactly like P4,
@@ -1622,8 +1680,15 @@ mod tests {
         let d = shipped();
         let json = serde_json::to_string(&d).unwrap();
         for key in [
-            "\"P1\"", "\"P2\"", "\"P3\"", "\"P4\"", "triage_budget_seconds",
-            "allow_promotion", "max_promotion_steps", "allow_downgrade", "allow_suppress",
+            "\"P1\"",
+            "\"P2\"",
+            "\"P3\"",
+            "\"P4\"",
+            "triage_budget_seconds",
+            "allow_promotion",
+            "max_promotion_steps",
+            "allow_downgrade",
+            "allow_suppress",
         ] {
             assert!(json.contains(key), "{key} missing from {json}");
         }
@@ -1702,15 +1767,26 @@ mod tests {
         }
         assert_eq!(
             ratchet(P3, Some(P2), &p),
-            SeverityDecision::Promoted { from: P3, to: P2, requested: P2 }
+            SeverityDecision::Promoted {
+                from: P3,
+                to: P2,
+                requested: P2
+            }
         );
         assert_eq!(
             ratchet(P5, Some(P4), &p),
-            SeverityDecision::Promoted { from: P5, to: P4, requested: P4 }
+            SeverityDecision::Promoted {
+                from: P5,
+                to: P4,
+                requested: P4
+            }
         );
         assert_eq!(
             ratchet(P2, Some(P5), &p),
-            SeverityDecision::Discarded { current: P2, requested: P5 }
+            SeverityDecision::Discarded {
+                current: P2,
+                requested: P5
+            }
         );
     }
 
@@ -1758,7 +1834,12 @@ mod tests {
                         // always strictly more urgent than `from`, so a clamp
                         // that lands back on the current severity cannot be
                         // reported as one.
-                        if let SeverityDecision::Promoted { from, to, requested } = decision {
+                        if let SeverityDecision::Promoted {
+                            from,
+                            to,
+                            requested,
+                        } = decision
+                        {
                             assert!(to.is_more_urgent_than(from), "not a promotion: {why}");
                             assert!(
                                 requested.is_more_urgent_than(from),
@@ -1818,7 +1899,11 @@ mod tests {
         assert_eq!(
             metrics_for(
                 &p,
-                &complete(FIRED_AT, FIRED_AT + SECOND, verdict(PageAction::Page, Some(P4))),
+                &complete(
+                    FIRED_AT,
+                    FIRED_AT + SECOND,
+                    verdict(PageAction::Page, Some(P4))
+                ),
                 P2,
                 FIRED_AT + SECOND
             )
@@ -1919,7 +2004,17 @@ mod tests {
             (255, P5, P1, P1),
         ];
         for (steps, current, requested, want) in cases.iter().copied() {
-            let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, steps, true, false);
+            let p = raw(
+                L0Mode::Parallel,
+                L0Mode::Gate,
+                L0Mode::Gate,
+                L0Mode::Only,
+                90,
+                true,
+                steps,
+                true,
+                false,
+            );
             assert_eq!(
                 ratchet(current, Some(requested), &p),
                 SeverityDecision::Promoted {
@@ -1932,7 +2027,17 @@ mod tests {
         }
         // The bound never invents a promotion that was not asked for.
         for steps in 1u8..=5 {
-            let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, steps, true, false);
+            let p = raw(
+                L0Mode::Parallel,
+                L0Mode::Gate,
+                L0Mode::Gate,
+                L0Mode::Only,
+                90,
+                true,
+                steps,
+                true,
+                false,
+            );
             assert_eq!(
                 ratchet(P3, Some(P4), &p),
                 SeverityDecision::Discarded {
@@ -1944,8 +2049,28 @@ mod tests {
         }
         // Widening the bound must move the answer. A bound that is really a
         // constant makes these equal.
-        let one = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 1, true, false);
-        let three = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 3, true, false);
+        let one = raw(
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            90,
+            true,
+            1,
+            true,
+            false,
+        );
+        let three = raw(
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            90,
+            true,
+            3,
+            true,
+            false,
+        );
         assert_ne!(
             ratchet(P4, Some(P1), &one).applied(),
             ratchet(P4, Some(P1), &three).applied()
@@ -1957,7 +2082,17 @@ mod tests {
     /// itself — a `SeverityPromoted{P3 → P3}` line and a page for nothing.
     #[test]
     fn test_a_clamp_that_lands_on_the_current_severity_is_not_a_promotion() {
-        let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 0, true, false);
+        let p = raw(
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            90,
+            true,
+            0,
+            true,
+            false,
+        );
         assert_eq!(
             ratchet(P3, Some(P1), &p),
             SeverityDecision::Refused {
@@ -1973,7 +2108,17 @@ mod tests {
     /// in the dark.
     #[test]
     fn test_promotion_is_refused_but_still_recorded_when_the_team_turned_it_off() {
-        let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, false, 2, true, false);
+        let p = raw(
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            90,
+            false,
+            2,
+            true,
+            false,
+        );
         let d = ratchet(P3, Some(P2), &p);
         assert_eq!(
             d,
@@ -2002,11 +2147,8 @@ mod tests {
         // off is exactly the person who needs to read "the agent thinks this is
         // a P2, and here is why" — they are the one who can act on it.
         let v = verdict(PageAction::Page, Some(P2));
-        let rendered = verdict_lines(
-            &complete(FIRED_AT, FIRED_AT + 4 * SECOND, v.clone()),
-            &d,
-        )
-        .join("\n");
+        let rendered =
+            verdict_lines(&complete(FIRED_AT, FIRED_AT + 4 * SECOND, v.clone()), &d).join("\n");
         assert!(
             rendered.contains("P2"),
             "the severity the agent asked for is on the page: {rendered}"
@@ -2053,10 +2195,23 @@ mod tests {
     /// P3. It may not do the reverse at P1.
     #[test]
     fn test_a_team_may_turn_the_gate_off_at_p2_and_p3() {
-        let p = raw(L0Mode::Parallel, L0Mode::Parallel, L0Mode::Parallel, L0Mode::Only, 90, true, 2, true, true);
+        let p = raw(
+            L0Mode::Parallel,
+            L0Mode::Parallel,
+            L0Mode::Parallel,
+            L0Mode::Only,
+            90,
+            true,
+            2,
+            true,
+            true,
+        );
         p.validate().unwrap();
         for pr in [P2, P3] {
-            assert_eq!(gate_plan(&p, pr, &pending(FIRED_AT), FIRED_AT), GatePlan::Parallel);
+            assert_eq!(
+                gate_plan(&p, pr, &pending(FIRED_AT), FIRED_AT),
+                GatePlan::Parallel
+            );
             assert_eq!(
                 first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Pending, None),
                 Some(FIRED_AT),
@@ -2066,7 +2221,13 @@ mod tests {
         // And loses the suppression branch: the page has already gone out.
         let v = verdict(PageAction::Suppress, None);
         assert_eq!(
-            first_page_at(&p, P2, FIRED_AT, AnalysisStatus::Complete, Some((&v, FIRED_AT + SECOND))),
+            first_page_at(
+                &p,
+                P2,
+                FIRED_AT,
+                AnalysisStatus::Complete,
+                Some((&v, FIRED_AT + SECOND))
+            ),
             Some(FIRED_AT),
             "a Suppress verdict cannot un-send a page that already went"
         );
@@ -2091,7 +2252,10 @@ mod tests {
                 );
             }
             for pr in [P4, P5] {
-                assert_eq!(gate_plan(&p, pr, &dead(status, FIRED_AT), FIRED_AT), GatePlan::L0Only);
+                assert_eq!(
+                    gate_plan(&p, pr, &dead(status, FIRED_AT), FIRED_AT),
+                    GatePlan::L0Only
+                );
             }
         }
     }
@@ -2112,11 +2276,17 @@ mod tests {
     fn test_the_configured_triage_budget_is_the_one_that_gates() {
         // (stored seconds, the hold it must actually produce)
         let cases = [
-            (MIN_TRIAGE_BUDGET_SECONDS, MIN_TRIAGE_BUDGET_SECONDS * SECOND),
+            (
+                MIN_TRIAGE_BUDGET_SECONDS,
+                MIN_TRIAGE_BUDGET_SECONDS * SECOND,
+            ),
             (45, 45 * SECOND),
             (90, 90 * SECOND),
             (300, 300 * SECOND),
-            (MAX_TRIAGE_BUDGET_SECONDS, MAX_TRIAGE_BUDGET_SECONDS * SECOND),
+            (
+                MAX_TRIAGE_BUDGET_SECONDS,
+                MAX_TRIAGE_BUDGET_SECONDS * SECOND,
+            ),
             // Out of bounds: clamped on the paging path, not merely on the getter.
             (0, MIN_TRIAGE_BUDGET_SECONDS * SECOND),
             (-1, MIN_TRIAGE_BUDGET_SECONDS * SECOND),
@@ -2125,7 +2295,17 @@ mod tests {
             (i64::MAX, MAX_TRIAGE_BUDGET_SECONDS * SECOND),
         ];
         for (stored, hold) in cases {
-            let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, stored, true, 2, true, false);
+            let p = raw(
+                L0Mode::Parallel,
+                L0Mode::Gate,
+                L0Mode::Gate,
+                L0Mode::Only,
+                stored,
+                true,
+                2,
+                true,
+                false,
+            );
             let deadline = FIRED_AT + hold;
             for pr in [P2, P3] {
                 assert_eq!(
@@ -2152,7 +2332,8 @@ mod tests {
                 // a clock will reach. This is the assertion an unclamped
                 // multiplication cannot satisfy.
                 assert!(
-                    deadline > FIRED_AT && deadline - FIRED_AT <= MAX_TRIAGE_BUDGET_SECONDS * SECOND,
+                    deadline > FIRED_AT
+                        && deadline - FIRED_AT <= MAX_TRIAGE_BUDGET_SECONDS * SECOND,
                     "{pr}: a stored {stored}s produced a hold of {}us",
                     deadline - FIRED_AT
                 );
@@ -2161,7 +2342,13 @@ mod tests {
             let v = verdict(PageAction::Page, None);
             let early = FIRED_AT + hold / 2;
             assert_eq!(
-                first_page_at(&p, P2, FIRED_AT, AnalysisStatus::Complete, Some((&v, early))),
+                first_page_at(
+                    &p,
+                    P2,
+                    FIRED_AT,
+                    AnalysisStatus::Complete,
+                    Some((&v, early))
+                ),
                 Some(early),
                 "{stored}s: a verdict inside the hold ends it"
             );
@@ -2169,8 +2356,28 @@ mod tests {
 
         // Two teams, two budgets, same firing instant: the gate must tell them
         // apart. A hardcoded 90 makes these equal.
-        let short = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 30, true, 2, true, false);
-        let long = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 600, true, 2, true, false);
+        let short = raw(
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            30,
+            true,
+            2,
+            true,
+            false,
+        );
+        let long = raw(
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            600,
+            true,
+            2,
+            true,
+            false,
+        );
         assert_ne!(
             gate_plan(&short, P2, &pending(FIRED_AT), FIRED_AT),
             gate_plan(&long, P2, &pending(FIRED_AT), FIRED_AT),
@@ -2188,7 +2395,12 @@ mod tests {
         let state = pending(FIRED_AT);
         let deadline = FIRED_AT + 90 * SECOND;
         // The same row, recomputed at four different instants after a re-queue.
-        for later in [FIRED_AT, FIRED_AT + SECOND, FIRED_AT + 60 * SECOND, FIRED_AT + 3_600 * SECOND] {
+        for later in [
+            FIRED_AT,
+            FIRED_AT + SECOND,
+            FIRED_AT + 60 * SECOND,
+            FIRED_AT + 3_600 * SECOND,
+        ] {
             assert_eq!(
                 gate_plan(&p, P2, &state, later),
                 GatePlan::Gate { fire_at: deadline },
@@ -2224,14 +2436,37 @@ mod tests {
     fn test_p1_dispatch_time_does_not_move_when_the_agent_is_ten_minutes_late() {
         // Suppression and promotion both enabled, so nothing here is prevented
         // by a knob rather than by the invariant.
-        let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 2, true, true);
-        let delays = [0, SECOND, 89 * SECOND, 90 * SECOND, 91 * SECOND, 600 * SECOND];
+        let p = raw(
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            90,
+            true,
+            2,
+            true,
+            true,
+        );
+        let delays = [
+            0,
+            SECOND,
+            89 * SECOND,
+            90 * SECOND,
+            91 * SECOND,
+            600 * SECOND,
+        ];
         for action in PageAction::ALL {
             for suggestion in [None, Some(P1)] {
                 let v = verdict(action, suggestion);
                 for delay in delays {
                     assert_eq!(
-                        first_page_at(&p, P1, FIRED_AT, AnalysisStatus::Complete, Some((&v, FIRED_AT + delay))),
+                        first_page_at(
+                            &p,
+                            P1,
+                            FIRED_AT,
+                            AnalysisStatus::Complete,
+                            Some((&v, FIRED_AT + delay))
+                        ),
                         Some(FIRED_AT),
                         "P1 with a {action} verdict {delay}us late did not page at t=0"
                     );
@@ -2254,7 +2489,17 @@ mod tests {
     fn test_a_gated_page_fires_at_most_the_triage_budget_after_the_firing() {
         let budget = 90 * SECOND;
         for allow_suppress in [true, false] {
-            let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 2, true, allow_suppress);
+            let p = raw(
+                L0Mode::Parallel,
+                L0Mode::Gate,
+                L0Mode::Gate,
+                L0Mode::Only,
+                90,
+                true,
+                2,
+                true,
+                allow_suppress,
+            );
             for pr in [P2, P3] {
                 for action in PageAction::ALL {
                     for suggestion in [None, Some(P1), Some(P2), Some(P5)] {
@@ -2292,10 +2537,7 @@ mod tests {
                                 );
                             }
                             if let Some(page_at) = got {
-                                assert!(
-                                    page_at >= FIRED_AT,
-                                    "{pr}/{action} paged before it fired"
-                                );
+                                assert!(page_at >= FIRED_AT, "{pr}/{action} paged before it fired");
                                 assert!(
                                     page_at - FIRED_AT <= budget,
                                     "{pr}/{action}, verdict at {at:?}, suggestion {suggestion:?}: paged {}us after the firing, past the {budget}us budget",
@@ -2331,10 +2573,26 @@ mod tests {
         // agent answered in four seconds waits the full budget anyway.
         let quiet = verdict(PageAction::Downgrade, None);
         for allow_downgrade in [true, false] {
-            let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 2, allow_downgrade, false);
+            let p = raw(
+                L0Mode::Parallel,
+                L0Mode::Gate,
+                L0Mode::Gate,
+                L0Mode::Only,
+                90,
+                true,
+                2,
+                allow_downgrade,
+                false,
+            );
             for pr in [P2, P3] {
                 assert_eq!(
-                    first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Complete, Some((&quiet, FIRED_AT + 4 * SECOND))),
+                    first_page_at(
+                        &p,
+                        pr,
+                        FIRED_AT,
+                        AnalysisStatus::Complete,
+                        Some((&quiet, FIRED_AT + 4 * SECOND))
+                    ),
                     Some(FIRED_AT + 4 * SECOND),
                     "{pr}: a downgrade with allow_downgrade={allow_downgrade} did not end the hold"
                 );
@@ -2345,7 +2603,13 @@ mod tests {
         // now rather than at the budget.
         let hushed = verdict(PageAction::Suppress, None);
         assert_eq!(
-            first_page_at(&p, P3, FIRED_AT, AnalysisStatus::Complete, Some((&hushed, FIRED_AT + 4 * SECOND))),
+            first_page_at(
+                &p,
+                P3,
+                FIRED_AT,
+                AnalysisStatus::Complete,
+                Some((&hushed, FIRED_AT + 4 * SECOND))
+            ),
             Some(FIRED_AT + 4 * SECOND)
         );
     }
@@ -2361,17 +2625,35 @@ mod tests {
         let v = verdict(PageAction::Page, None);
         for pr in [P2, P3] {
             assert_eq!(
-                first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Complete, Some((&v, deadline - 1))),
+                first_page_at(
+                    &p,
+                    pr,
+                    FIRED_AT,
+                    AnalysisStatus::Complete,
+                    Some((&v, deadline - 1))
+                ),
                 Some(deadline - 1),
                 "{pr}: a verdict one microsecond early still ends the hold early"
             );
             assert_eq!(
-                first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Complete, Some((&v, deadline))),
+                first_page_at(
+                    &p,
+                    pr,
+                    FIRED_AT,
+                    AnalysisStatus::Complete,
+                    Some((&v, deadline))
+                ),
                 Some(deadline),
                 "{pr}: at the deadline the page has already gone"
             );
             assert_eq!(
-                first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Complete, Some((&v, deadline + 60 * SECOND))),
+                first_page_at(
+                    &p,
+                    pr,
+                    FIRED_AT,
+                    AnalysisStatus::Complete,
+                    Some((&v, deadline + 60 * SECOND))
+                ),
                 Some(deadline),
                 "{pr}: a late verdict must not move the page it missed"
             );
@@ -2390,7 +2672,17 @@ mod tests {
     #[test]
     fn test_p4_and_p5_record_a_verdict_and_page_nobody() {
         for allow_suppress in [true, false] {
-            let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 2, true, allow_suppress);
+            let p = raw(
+                L0Mode::Parallel,
+                L0Mode::Gate,
+                L0Mode::Gate,
+                L0Mode::Only,
+                90,
+                true,
+                2,
+                true,
+                allow_suppress,
+            );
             for pr in [P4, P5] {
                 for action in PageAction::ALL {
                     let v = verdict(action, None);
@@ -2443,7 +2735,13 @@ mod tests {
         // nobody is paged.
         let to_p5 = verdict(PageAction::Page, Some(P5));
         assert_eq!(
-            first_page_at(&p, P5, FIRED_AT, AnalysisStatus::Complete, Some((&to_p5, at))),
+            first_page_at(
+                &p,
+                P5,
+                FIRED_AT,
+                AnalysisStatus::Complete,
+                Some((&to_p5, at))
+            ),
             None,
             "P5 suggested at P5 is not a promotion and pages nobody"
         );
@@ -2462,17 +2760,81 @@ mod tests {
         let at = FIRED_AT + 4 * SECOND;
         // (allow_downgrade, allow_suppress, action, expected outcome at P3)
         let cases: [(bool, bool, PageAction, VerdictOutcome); 8] = [
-            (true, false, PageAction::Page, VerdictOutcome::Page { severity: P3, promoted_from: None, quieter_channels: false }),
-            (true, true, PageAction::Page, VerdictOutcome::Page { severity: P3, promoted_from: None, quieter_channels: false }),
-            (true, false, PageAction::Downgrade, VerdictOutcome::Page { severity: P3, promoted_from: None, quieter_channels: true }),
-            (false, false, PageAction::Downgrade, VerdictOutcome::Page { severity: P3, promoted_from: None, quieter_channels: false }),
+            (
+                true,
+                false,
+                PageAction::Page,
+                VerdictOutcome::Page {
+                    severity: P3,
+                    promoted_from: None,
+                    quieter_channels: false,
+                },
+            ),
+            (
+                true,
+                true,
+                PageAction::Page,
+                VerdictOutcome::Page {
+                    severity: P3,
+                    promoted_from: None,
+                    quieter_channels: false,
+                },
+            ),
+            (
+                true,
+                false,
+                PageAction::Downgrade,
+                VerdictOutcome::Page {
+                    severity: P3,
+                    promoted_from: None,
+                    quieter_channels: true,
+                },
+            ),
+            (
+                false,
+                false,
+                PageAction::Downgrade,
+                VerdictOutcome::Page {
+                    severity: P3,
+                    promoted_from: None,
+                    quieter_channels: false,
+                },
+            ),
             (true, true, PageAction::Suppress, VerdictOutcome::Suppress),
-            (true, false, PageAction::Suppress, VerdictOutcome::Page { severity: P3, promoted_from: None, quieter_channels: false }),
+            (
+                true,
+                false,
+                PageAction::Suppress,
+                VerdictOutcome::Page {
+                    severity: P3,
+                    promoted_from: None,
+                    quieter_channels: false,
+                },
+            ),
             (false, true, PageAction::Suppress, VerdictOutcome::Suppress),
-            (false, false, PageAction::Suppress, VerdictOutcome::Page { severity: P3, promoted_from: None, quieter_channels: false }),
+            (
+                false,
+                false,
+                PageAction::Suppress,
+                VerdictOutcome::Page {
+                    severity: P3,
+                    promoted_from: None,
+                    quieter_channels: false,
+                },
+            ),
         ];
         for (downgrade, suppress, action, want) in cases {
-            let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 2, downgrade, suppress);
+            let p = raw(
+                L0Mode::Parallel,
+                L0Mode::Gate,
+                L0Mode::Gate,
+                L0Mode::Only,
+                90,
+                true,
+                2,
+                downgrade,
+                suppress,
+            );
             let state = complete(FIRED_AT, at, verdict(action, None));
             assert_eq!(
                 apply_verdict(&p, &state, P3, at),
@@ -2495,7 +2857,17 @@ mod tests {
     fn test_a_parallel_severity_loses_the_suppression_and_downgrade_branches() {
         let at = FIRED_AT + 4 * SECOND;
         // Everything the team could possibly have opted into.
-        let p = raw(L0Mode::Parallel, L0Mode::Parallel, L0Mode::Parallel, L0Mode::Only, 90, true, 2, true, true);
+        let p = raw(
+            L0Mode::Parallel,
+            L0Mode::Parallel,
+            L0Mode::Parallel,
+            L0Mode::Only,
+            90,
+            true,
+            2,
+            true,
+            true,
+        );
         for pr in [P1, P2, P3] {
             for action in PageAction::ALL {
                 let state = complete(FIRED_AT, at, verdict(action, None));
@@ -2515,7 +2887,13 @@ mod tests {
                     "{pr}/{action}: a parallel severity cannot be suppressed — nothing to suppress"
                 );
                 assert_eq!(
-                    first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Complete, Some((state.verdict.as_ref().unwrap(), at))),
+                    first_page_at(
+                        &p,
+                        pr,
+                        FIRED_AT,
+                        AnalysisStatus::Complete,
+                        Some((state.verdict.as_ref().unwrap(), at))
+                    ),
                     Some(FIRED_AT),
                     "{pr}/{action}: parallel means t=0, whatever the verdict says"
                 );
@@ -2554,7 +2932,10 @@ mod tests {
         let state = complete(FIRED_AT, at, verdict(PageAction::Suppress, None));
         for pr in [P2, P3] {
             let outcome = apply_verdict(&p, &state, pr, at);
-            assert!(outcome.pages_anyone(), "{pr} was silenced by default: {outcome:?}");
+            assert!(
+                outcome.pages_anyone(),
+                "{pr} was silenced by default: {outcome:?}"
+            );
             assert_eq!(
                 first_page_at(
                     &p,
@@ -2573,18 +2954,47 @@ mod tests {
     /// verdict about *this* firing. Nothing here is a standing mute.
     #[test]
     fn test_suppression_only_applies_to_a_gated_firing_for_an_opted_in_team() {
-        let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 2, true, true);
+        let p = raw(
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            90,
+            true,
+            2,
+            true,
+            true,
+        );
         let at = FIRED_AT + 4 * SECOND;
         let v = verdict(PageAction::Suppress, None);
         for pr in [P2, P3] {
-            assert_eq!(apply_verdict(&p, &complete(FIRED_AT, at, v.clone()), pr, at), VerdictOutcome::Suppress);
-            assert_eq!(first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Complete, Some((&v, at))), None);
+            assert_eq!(
+                apply_verdict(&p, &complete(FIRED_AT, at, v.clone()), pr, at),
+                VerdictOutcome::Suppress
+            );
+            assert_eq!(
+                first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Complete, Some((&v, at))),
+                None
+            );
         }
         // Not at P1, which is never gated by invariant.
-        assert!(apply_verdict(&p, &complete(FIRED_AT, at, v.clone()), P1, at) != VerdictOutcome::Suppress);
+        assert!(
+            apply_verdict(&p, &complete(FIRED_AT, at, v.clone()), P1, at)
+                != VerdictOutcome::Suppress
+        );
         // And not at a P2 whose team chose `parallel` — gated by MODE, which is
         // the case a check on `allow_suppress` alone gets wrong.
-        let parallel = raw(L0Mode::Parallel, L0Mode::Parallel, L0Mode::Gate, L0Mode::Only, 90, true, 2, true, true);
+        let parallel = raw(
+            L0Mode::Parallel,
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Only,
+            90,
+            true,
+            2,
+            true,
+            true,
+        );
         assert_eq!(
             apply_verdict(&parallel, &complete(FIRED_AT, at, v.clone()), P2, at),
             VerdictOutcome::FollowUp { severity: P2 },
@@ -2622,7 +3032,17 @@ mod tests {
     /// is how "the agent can never demote" becomes false by a side door.
     #[test]
     fn test_a_downgrade_never_changes_the_recorded_severity() {
-        let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 2, true, false);
+        let p = raw(
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            90,
+            true,
+            2,
+            true,
+            false,
+        );
         let at = FIRED_AT + 4 * SECOND;
         for pr in [P2, P3] {
             for suggestion in [None, Some(P4), Some(P5), Some(pr)] {
@@ -2633,7 +3053,10 @@ mod tests {
                         promoted_from,
                         quieter_channels,
                     } => {
-                        assert_eq!(severity, pr, "{pr}: a downgrade moved the recorded severity");
+                        assert_eq!(
+                            severity, pr,
+                            "{pr}: a downgrade moved the recorded severity"
+                        );
                         assert_eq!(promoted_from, None);
                         assert!(quieter_channels, "{pr}: the downgrade was not applied");
                     }
@@ -2649,7 +3072,17 @@ mod tests {
     /// channel set.
     #[test]
     fn test_a_promotion_outranks_a_suppress_or_downgrade_in_the_same_verdict() {
-        let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 2, true, true);
+        let p = raw(
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            90,
+            true,
+            2,
+            true,
+            true,
+        );
         let at = FIRED_AT + 4 * SECOND;
         for action in [PageAction::Suppress, PageAction::Downgrade] {
             let state = complete(FIRED_AT, at, verdict(action, Some(P2)));
@@ -2674,12 +3107,22 @@ mod tests {
         let late = FIRED_AT + 200 * SECOND;
         for pr in [P2, P3] {
             assert_eq!(
-                apply_verdict(&p, &complete(FIRED_AT, late, verdict(PageAction::Page, None)), pr, late),
+                apply_verdict(
+                    &p,
+                    &complete(FIRED_AT, late, verdict(PageAction::Page, None)),
+                    pr,
+                    late
+                ),
                 VerdictOutcome::FollowUp { severity: pr },
                 "{pr}: news arriving is not a reason to page again"
             );
             assert_eq!(
-                apply_verdict(&p, &complete(FIRED_AT, late, verdict(PageAction::Page, Some(P1))), pr, late),
+                apply_verdict(
+                    &p,
+                    &complete(FIRED_AT, late, verdict(PageAction::Page, Some(P1))),
+                    pr,
+                    late
+                ),
                 VerdictOutcome::Page {
                     severity: P1,
                     promoted_from: Some(pr),
@@ -2690,7 +3133,12 @@ mod tests {
         }
         // Same on the P1/parallel side, where the page went out at t=0.
         assert_eq!(
-            apply_verdict(&p, &complete(FIRED_AT, FIRED_AT + SECOND, verdict(PageAction::Page, None)), P1, FIRED_AT + SECOND),
+            apply_verdict(
+                &p,
+                &complete(FIRED_AT, FIRED_AT + SECOND, verdict(PageAction::Page, None)),
+                P1,
+                FIRED_AT + SECOND
+            ),
             VerdictOutcome::FollowUp { severity: P1 }
         );
     }
@@ -2805,7 +3253,12 @@ mod tests {
     fn test_a_failed_analysis_and_a_skipped_one_are_treated_identically() {
         let p = shipped();
         for pr in ALL {
-            for now in [FIRED_AT, FIRED_AT + 45 * SECOND, FIRED_AT + 90 * SECOND, FIRED_AT + 600 * SECOND] {
+            for now in [
+                FIRED_AT,
+                FIRED_AT + 45 * SECOND,
+                FIRED_AT + 90 * SECOND,
+                FIRED_AT + 600 * SECOND,
+            ] {
                 assert_eq!(
                     apply_verdict(&p, &dead(AnalysisStatus::Failed, FIRED_AT), pr, now),
                     apply_verdict(&p, &dead(AnalysisStatus::Skipped, FIRED_AT), pr, now),
@@ -2839,7 +3292,13 @@ mod tests {
     fn test_the_triage_budget_stays_well_inside_the_rung_it_sits_in() {
         use super::super::policy::EscalationPolicy;
         let budget = shipped().triage_budget_micros();
-        let policy = EscalationPolicy::default_for_team("p", "default", "t", "rot_primary", Some("rot_secondary".into()));
+        let policy = EscalationPolicy::default_for_team(
+            "p",
+            "default",
+            "t",
+            "rot_primary",
+            Some("rot_secondary".into()),
+        );
         for (priority, factor) in [(P2, 3), (P3, 10)] {
             let first_escalation = policy
                 .rung(priority)
@@ -2860,10 +3319,12 @@ mod tests {
         // escalation interval. That is the team's trade to make, and §4 says
         // so. What must never drift is the shipped default, above — the value
         // every team that never opened the screen is running.
-        assert!(
-            MAX_TRIAGE_BUDGET_SECONDS * SECOND > 5 * 60 * SECOND,
-            "if this ever becomes false the comment above is stale, not the code"
-        );
+        const {
+            assert!(
+                MAX_TRIAGE_BUDGET_SECONDS * SECOND > 5 * 60 * SECOND,
+                "if this ever becomes false the comment above is stale, not the code"
+            );
+        };
     }
 
     /// **The compound invariant of §6: removing the agent from the system
@@ -2878,10 +3339,24 @@ mod tests {
     fn test_removing_the_agent_reproduces_todays_behaviour_exactly() {
         for allow_suppress in [true, false] {
             for allow_promotion in [true, false] {
-                let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, allow_promotion, 2, true, allow_suppress);
+                let p = raw(
+                    L0Mode::Parallel,
+                    L0Mode::Gate,
+                    L0Mode::Gate,
+                    L0Mode::Only,
+                    90,
+                    allow_promotion,
+                    2,
+                    true,
+                    allow_suppress,
+                );
                 let skipped = dead(AnalysisStatus::Skipped, FIRED_AT);
                 for pr in ALL {
-                    let today = if severity_pages(pr) { Some(FIRED_AT) } else { None };
+                    let today = if severity_pages(pr) {
+                        Some(FIRED_AT)
+                    } else {
+                        None
+                    };
                     assert_eq!(
                         first_page_at(&p, pr, FIRED_AT, AnalysisStatus::Skipped, None),
                         today,
@@ -2889,7 +3364,9 @@ mod tests {
                     );
                     assert_ne!(
                         gate_plan(&p, pr, &skipped, FIRED_AT),
-                        GatePlan::Gate { fire_at: FIRED_AT + 90 * SECOND },
+                        GatePlan::Gate {
+                            fire_at: FIRED_AT + 90 * SECOND
+                        },
                         "{pr} must not be held when no agent will ever answer"
                     );
                     assert_eq!(
@@ -2992,7 +3469,13 @@ mod tests {
             }
         );
         assert_eq!(
-            first_page_at(&p, P3, fired, AnalysisStatus::Complete, Some((&v, verdict_at))),
+            first_page_at(
+                &p,
+                P3,
+                fired,
+                AnalysisStatus::Complete,
+                Some((&v, verdict_at))
+            ),
             Some(verdict_at),
             "the Platform primary is paged at 02:14:04, as a P2"
         );
@@ -3036,7 +3519,12 @@ mod tests {
         // And that status is the one that stops the hold immediately.
         let p = shipped();
         assert_eq!(
-            apply_verdict(&p, &dead(analysis_status_after_run(false), FIRED_AT), P2, FIRED_AT + SECOND),
+            apply_verdict(
+                &p,
+                &dead(analysis_status_after_run(false), FIRED_AT),
+                P2,
+                FIRED_AT + SECOND
+            ),
             VerdictOutcome::FailOpen { severity: P2 }
         );
     }
@@ -3079,7 +3567,12 @@ mod tests {
         let p = shipped();
         let at = FIRED_AT + 4 * SECOND;
         let count = |current: AlertPriority, suggestion: Option<AlertPriority>| {
-            metrics_for(&p, &complete(FIRED_AT, at, verdict(PageAction::Page, suggestion)), current, at)
+            metrics_for(
+                &p,
+                &complete(FIRED_AT, at, verdict(PageAction::Page, suggestion)),
+                current,
+                at,
+            )
         };
 
         assert!(count(P2, Some(P3)).contains(&L0Metric::SeverityClamped));
@@ -3096,9 +3589,7 @@ mod tests {
             count(P5, Some(P1)).contains(&L0Metric::Promoted { from: P5, to: P3 }),
             "it is a promotion, and it is counted as the promotion that was applied"
         );
-        assert!(
-            count(P3, Some(P2)).contains(&L0Metric::Promoted { from: P3, to: P2 })
-        );
+        assert!(count(P3, Some(P2)).contains(&L0Metric::Promoted { from: P3, to: P2 }));
     }
 
     /// "Only ever nonzero for opted-in teams" is the claim §8 makes about the
@@ -3108,8 +3599,28 @@ mod tests {
     #[test]
     fn test_suppressed_and_downgraded_count_only_when_they_actually_happened() {
         let at = FIRED_AT + 4 * SECOND;
-        let opted_out = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 2, false, false);
-        let opted_in = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 2, true, true);
+        let opted_out = raw(
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            90,
+            true,
+            2,
+            false,
+            false,
+        );
+        let opted_in = raw(
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            90,
+            true,
+            2,
+            true,
+            true,
+        );
 
         let suppress = complete(FIRED_AT, at, verdict(PageAction::Suppress, None));
         let downgrade = complete(FIRED_AT, at, verdict(PageAction::Downgrade, None));
@@ -3145,13 +3656,18 @@ mod tests {
             metrics_for(&p, &pending(FIRED_AT), P2, deadline).contains(&L0Metric::BudgetExpired)
         );
         assert!(
-            !metrics_for(&p, &pending(FIRED_AT), P2, deadline - 1).contains(&L0Metric::BudgetExpired),
+            !metrics_for(&p, &pending(FIRED_AT), P2, deadline - 1)
+                .contains(&L0Metric::BudgetExpired),
             "the hold has not expired yet"
         );
         assert!(
             !metrics_for(
                 &p,
-                &complete(FIRED_AT, FIRED_AT + 4 * SECOND, verdict(PageAction::Page, None)),
+                &complete(
+                    FIRED_AT,
+                    FIRED_AT + 4 * SECOND,
+                    verdict(PageAction::Page, None)
+                ),
                 P2,
                 FIRED_AT + 4 * SECOND
             )
@@ -3173,7 +3689,17 @@ mod tests {
     /// to carry both labels for every verdict, whatever the engine then did.
     #[test]
     fn test_every_verdict_counts_its_action_and_its_confidence_band() {
-        let p = raw(L0Mode::Parallel, L0Mode::Gate, L0Mode::Gate, L0Mode::Only, 90, true, 2, true, true);
+        let p = raw(
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            90,
+            true,
+            2,
+            true,
+            true,
+        );
         let at = FIRED_AT + 4 * SECOND;
         for action in PageAction::ALL {
             for confidence in Confidence::ALL {
@@ -3237,12 +3763,17 @@ mod tests {
         let v = parsed.verdict.expect("a valid block must parse");
         assert_eq!(v.probable_cause, "fd leak introduced by querier v0.14.2");
         assert_eq!(v.confidence, Confidence::High);
-        let change = v.suspect_change.expect("the suspect change is the 'what changed' answer");
+        let change = v
+            .suspect_change
+            .expect("the suspect change is the 'what changed' answer");
         assert_eq!(change.kind, ChangeKind::Deploy);
         assert_eq!(change.reference, "v0.14.2");
         assert_eq!(change.author.as_deref(), Some("dana"));
         assert_eq!(change.occurred_at, 1_699_978_400_000_000);
-        assert_eq!(v.impacted_services, vec!["production/openobserve".to_string()]);
+        assert_eq!(
+            v.impacted_services,
+            vec!["production/openobserve".to_string()]
+        );
         assert_eq!(v.evidence_links.len(), 1);
         assert_eq!(v.evidence_links[0].url, "https://o2.example/short/x7h3k2");
         assert_eq!(v.page_recommendation.action, PageAction::Page);
@@ -3264,9 +3795,18 @@ mod tests {
             ("not json at all", "the cause is a file descriptor leak"),
             ("empty block", ""),
             ("json but not a verdict", "{ \"summary\": \"fd leak\" }"),
-            ("missing page_recommendation", "{ \"probable_cause\": \"x\", \"confidence\": \"high\", \"report_ref\": \"r\" }"),
-            ("unknown confidence band", "{ \"probable_cause\": \"x\", \"confidence\": \"very high\", \"page_recommendation\": { \"action\": \"page\", \"reason\": \"r\" }, \"report_ref\": \"r\" }"),
-            ("unknown action", "{ \"probable_cause\": \"x\", \"confidence\": \"high\", \"page_recommendation\": { \"action\": \"ignore\", \"reason\": \"r\" }, \"report_ref\": \"r\" }"),
+            (
+                "missing page_recommendation",
+                "{ \"probable_cause\": \"x\", \"confidence\": \"high\", \"report_ref\": \"r\" }",
+            ),
+            (
+                "unknown confidence band",
+                "{ \"probable_cause\": \"x\", \"confidence\": \"very high\", \"page_recommendation\": { \"action\": \"page\", \"reason\": \"r\" }, \"report_ref\": \"r\" }",
+            ),
+            (
+                "unknown action",
+                "{ \"probable_cause\": \"x\", \"confidence\": \"high\", \"page_recommendation\": { \"action\": \"ignore\", \"reason\": \"r\" }, \"report_ref\": \"r\" }",
+            ),
             ("a json array", "[1, 2, 3]"),
         ];
         let p = shipped();
@@ -3323,12 +3863,17 @@ mod tests {
   "report_ref": "inc_9/rca/2"
 }"#,
         );
-        let v = parse_report(&content).verdict.expect("unknown cause is legal");
+        let v = parse_report(&content)
+            .verdict
+            .expect("unknown cause is legal");
         assert_eq!(v.probable_cause, "cause unknown");
         assert_eq!(v.confidence, Confidence::Low);
         assert_eq!(v.page_recommendation.action, PageAction::Page);
         assert_eq!(v.page_recommendation.severity_suggestion, None);
-        assert!(!v.evidence_links.is_empty(), "it still says where it looked");
+        assert!(
+            !v.evidence_links.is_empty(),
+            "it still says where it looked"
+        );
         assert!(v.suspect_change.is_none());
         assert!(v.proposed_actions.is_empty());
     }
@@ -3352,7 +3897,10 @@ mod tests {
             let v = parse_report(&content)
                 .verdict
                 .unwrap_or_else(|| panic!("{spelling} must parse"));
-            assert_eq!(v.page_recommendation.severity_suggestion, want, "{spelling}");
+            assert_eq!(
+                v.page_recommendation.severity_suggestion, want,
+                "{spelling}"
+            );
         }
     }
 
@@ -3437,7 +3985,12 @@ mod tests {
         for c in [Channel::Email, Channel::Chat, Channel::Push] {
             assert_eq!(update_channels(&[c]), vec![c], "{c} is named in §5.2");
         }
-        for c in [Channel::Voice, Channel::Sms, Channel::InApp, Channel::Webhook] {
+        for c in [
+            Channel::Voice,
+            Channel::Sms,
+            Channel::InApp,
+            Channel::Webhook,
+        ] {
             assert!(
                 update_channels(&[c]).is_empty(),
                 "{c} is not one of the three §5.2 names"
@@ -3539,7 +4092,10 @@ mod tests {
         .join("\n");
         assert!(rendered.contains(&v.probable_cause), "{rendered}");
         assert!(rendered.contains("high"), "the confidence band: {rendered}");
-        assert!(rendered.contains("v0.14.2"), "the suspect change: {rendered}");
+        assert!(
+            rendered.contains("v0.14.2"),
+            "the suspect change: {rendered}"
+        );
         assert!(
             rendered.contains("Restart q-4, q-6, q-7"),
             "the suggestion is text on the page: {rendered}"
@@ -3600,7 +4156,10 @@ mod tests {
 
     #[test]
     fn test_a_page_that_beat_the_verdict_says_an_investigation_is_running() {
-        let lines = verdict_lines(&pending(FIRED_AT), &SeverityDecision::Unchanged { current: P2 });
+        let lines = verdict_lines(
+            &pending(FIRED_AT),
+            &SeverityDecision::Unchanged { current: P2 },
+        );
         assert!(!lines.is_empty(), "a live investigation is worth one line");
         let rendered = lines.join("\n").to_lowercase();
         assert!(
@@ -3618,7 +4177,12 @@ mod tests {
         for c in [Channel::Chat, Channel::Push, Channel::InApp] {
             assert!(updates_in_place(c), "{c} can revise what it already sent");
         }
-        for c in [Channel::Email, Channel::Sms, Channel::Voice, Channel::Webhook] {
+        for c in [
+            Channel::Email,
+            Channel::Sms,
+            Channel::Voice,
+            Channel::Webhook,
+        ] {
             assert!(
                 !updates_in_place(c),
                 "{c} cannot take a finding back once it has gone"
@@ -3696,8 +4260,17 @@ mod tests {
             vec!["detail", "kind", "title"],
             "a proposed action is text a human carries out; execution is out of scope"
         );
-        for forbidden in ["workflow_ref", "args", "reversible", "verify_signal", "grant"] {
-            assert!(!object.contains_key(forbidden), "{forbidden} is not in scope");
+        for forbidden in [
+            "workflow_ref",
+            "args",
+            "reversible",
+            "verify_signal",
+            "grant",
+        ] {
+            assert!(
+                !object.contains_key(forbidden),
+                "{forbidden} is not in scope"
+            );
         }
     }
 
@@ -3730,7 +4303,10 @@ mod tests {
         let json = serde_json::to_string(&bare).unwrap();
         assert!(!json.contains("suspect_change"));
         assert!(!json.contains("severity_suggestion"));
-        assert_eq!(serde_json::from_str::<AnalysisVerdict>(&json).unwrap(), bare);
+        assert_eq!(
+            serde_json::from_str::<AnalysisVerdict>(&json).unwrap(),
+            bare
+        );
     }
 
     /// The analysis state rides `Trigger.data`, which the super cluster already
@@ -3738,14 +4314,21 @@ mod tests {
     /// holds if the state serialises whole.
     #[test]
     fn test_the_analysis_state_round_trips_through_json() {
-        let state = complete(FIRED_AT, FIRED_AT + 4 * SECOND, verdict(PageAction::Page, Some(P2)));
+        let state = complete(
+            FIRED_AT,
+            FIRED_AT + 4 * SECOND,
+            verdict(PageAction::Page, Some(P2)),
+        );
         let back: AnalysisState =
             serde_json::from_str(&serde_json::to_string(&state).unwrap()).unwrap();
         assert_eq!(back, state);
 
         for status in AnalysisStatus::ALL {
             let json = serde_json::to_string(&status).unwrap();
-            assert_eq!(serde_json::from_str::<AnalysisStatus>(&json).unwrap(), status);
+            assert_eq!(
+                serde_json::from_str::<AnalysisStatus>(&json).unwrap(),
+                status
+            );
         }
         // A skipped analysis is the common case and must not carry an empty
         // verdict object into the trigger row.

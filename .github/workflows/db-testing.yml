@@ -1,12 +1,15 @@
 name: Database Validation Tests
 
 on:
+  # Kept as the Rust cache writer on main: caches saved from merge-queue refs are never restored by PRs.
   push:
     branches:
       - "main"
   pull_request:
     branches:
       - "**"
+    # labeled/unlabeled so adding or removing 'e2e' starts or resets CI; drafts never run paid CI.
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   merge_group:
 
 concurrency:
@@ -25,6 +28,8 @@ env:
 
 jobs:
   check_changes:
+    # Paid CI runs only on PRs carrying the 'e2e' label; the merge queue runs unit tests on the merged code.
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) }}
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
@@ -32,6 +37,9 @@ jobs:
     outputs:
       has_changes: ${{ steps.check.outputs.has_changes }}
     steps:
+      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
+      - if: github.event_name == 'pull_request'
+        run: sleep 60
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -39,9 +47,10 @@ jobs:
       - id: check
         run: |
           CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          if [ -z "$CHANGED" ]; then
+          # Same contract as playwright/api: other workflows' files are irrelevant, this file re-tests itself.
+          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qE '^\.github/workflows/db-testing\.yml$'; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
-          elif echo "$CHANGED" | grep -qvE '(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/)'; then
+          elif echo "$CHANGED" | grep -qvE '(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
@@ -52,6 +61,8 @@ jobs:
     needs: [check_changes]
     if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubicloud-standard-8
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
     permissions:
       contents: read
 
@@ -77,6 +88,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -85,8 +97,10 @@ jobs:
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          cache-on-failure: true
-          shared-key: backend-debug-mimalloc
+          # This successful main-branch build is the single writer for the
+          # canonical dev(debug=0)+mimalloc cache consumed by API and DB PRs.
+          shared-key: backend-debug0-mimalloc-deps-v1
+          add-job-id-key: false
           save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
@@ -98,6 +112,7 @@ jobs:
 
       - name: Setup Python
         uses: actions/setup-python@v7
+        id: setup-python
         with:
           python-version: "3.11.6"
 
@@ -139,6 +154,9 @@ jobs:
 
       - name: Setup rye
         uses: eifinger/setup-rye@v4
+        env:
+          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: false
           working-directory: "tests/db-testing/"
@@ -212,7 +230,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     needs: [check_changes, db_validation_tests]
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
         run: |

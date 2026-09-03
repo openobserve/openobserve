@@ -151,6 +151,9 @@ pub struct Alert {
     /// moment nobody has the patience to debug a URL.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runbook_url: Option<String>,
+
+    #[serde(default)]
+    pub pending_period_sec: i64,
 }
 
 /// Accept a runbook link, or say why not.
@@ -251,6 +254,7 @@ impl Default for Alert {
             workflows: vec![],
             priority: None,
             tags: vec![],
+            pending_period_sec: 0,
         }
     }
 }
@@ -359,6 +363,8 @@ pub enum AlertTypeFilter {
     /// column, not the JSON payload, which is why it can be a SQL predicate
     /// rather than an app-side scan (D60).
     Slo,
+    /// Composite definitions are stored outside the ordinary `alerts` table.
+    Composite,
 }
 
 /// Parameters for listing alerts.
@@ -420,6 +426,14 @@ pub struct ListAlertsParams {
 
     /// Sort direction; ignored when `sort_by` is `None`.
     pub sort_desc: bool,
+
+    /// Filter to the alerts pointing at one SLO (B1). Reads the indexed
+    /// `slo_id` column, not the JSON payload — the same column D60 added for
+    /// the reverse lookup.
+    ///
+    /// Unlike the burn-pair lookup this does NOT filter on `enabled`: the SLO
+    /// page must show disabled alerts so they can be re-enabled.
+    pub slo_id: Option<String>,
 }
 
 /// Columns the alert list can be sorted by (PT-3).
@@ -447,6 +461,7 @@ impl ListAlertsParams {
             tag_alert_ids: None,
             sort_by: None,
             sort_desc: false,
+            slo_id: None,
         }
     }
 
@@ -751,6 +766,16 @@ mod tests {
         assert_eq!(params.enabled, None);
         assert_eq!(params.owner, None);
         assert_eq!(params.page_size_and_idx, None);
+    }
+
+    #[test]
+    fn alert_type_filter_composite_has_a_stable_wire_discriminator() {
+        let encoded = serde_json::to_string(&AlertTypeFilter::Composite).unwrap();
+        assert_eq!(encoded, r#""composite""#);
+        assert_eq!(
+            serde_json::from_str::<AlertTypeFilter>(&encoded).unwrap(),
+            AlertTypeFilter::Composite
+        );
     }
 
     #[test]
@@ -1118,7 +1143,11 @@ mod tests {
             "https://192.168.1.10:8080/rb",
             "  https://wiki/rb  ",
         ] {
-            assert_eq!(normalize_runbook_url(good).unwrap(), good.trim(), "{good:?}");
+            assert_eq!(
+                normalize_runbook_url(good).unwrap(),
+                good.trim(),
+                "{good:?}"
+            );
         }
     }
 
@@ -1139,7 +1168,10 @@ mod tests {
             "https:///runbooks",
             "https://wiki example.com/rb",
         ] {
-            assert!(normalize_runbook_url(bad).is_err(), "{bad:?} must be refused");
+            assert!(
+                normalize_runbook_url(bad).is_err(),
+                "{bad:?} must be refused"
+            );
         }
         assert!(
             normalize_runbook_url(&format!("https://x/{}", "a".repeat(3000))).is_err(),

@@ -25,20 +25,13 @@
 //! second round trip to have the database pick the maximum would cost more
 //! than sorting a handful of rows.
 
-use config::{
-    ider,
-    meta::oncall::ScheduleOverride,
-    utils::time::now_micros,
-};
+use config::{ider, meta::oncall::ScheduleOverride, utils::time::now_micros};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
 
 use super::entity::oncall_overrides;
-use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors,
-};
+use crate::{db::get_orm_client_rw, errors};
 
 /// How far back a resolution load reaches.
 ///
@@ -86,7 +79,7 @@ pub async fn create(
     reason: Option<String>,
     created_by: &str,
 ) -> Result<ScheduleOverride, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let record = ScheduleOverride {
         id: ider::uuid(),
         org_id: org_id.to_string(),
@@ -124,7 +117,7 @@ pub async fn create(
 }
 
 pub async fn get(org_id: &str, id: &str) -> Result<Option<ScheduleOverride>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_overrides::Entity::find_by_id(id)
         .filter(oncall_overrides::Column::OrgId.eq(org_id))
         .one(client)
@@ -137,7 +130,7 @@ pub async fn list_by_team(
     org_id: &str,
     team_id: &str,
 ) -> Result<Vec<ScheduleOverride>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_overrides::Entity::find()
         .filter(oncall_overrides::Column::OrgId.eq(org_id))
         .filter(oncall_overrides::Column::TeamId.eq(team_id))
@@ -162,7 +155,7 @@ pub async fn list_in_window(
     from: i64,
     to: i64,
 ) -> Result<Vec<ScheduleOverride>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_overrides::Entity::find()
         .filter(oncall_overrides::Column::OrgId.eq(org_id))
         .filter(oncall_overrides::Column::TeamId.eq(team_id))
@@ -189,7 +182,7 @@ pub async fn list_for_resolution(
     team_id: &str,
     at: i64,
 ) -> Result<Vec<ScheduleOverride>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     // Ordered **descending** so that the truncation keeps the covers that win.
     //
     // Overlapping covers are legal, and `covering_override_for` resolves
@@ -219,7 +212,7 @@ pub async fn list_for_resolution(
 }
 
 pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     // Read before the delete purely to learn the team: the invalidation is
     // keyed on the team, and after the row is gone there is nothing left to ask.
     let team_id = get(org_id, id).await?.map(|o| o.team_id);
@@ -238,7 +231,7 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
 /// Drops every cover a team has. Called when the team is deleted, so its
 /// overrides do not outlive it as rows pointing at nothing.
 pub async fn delete_by_team(org_id: &str, team_id: &str) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let dropped = oncall_overrides::Entity::delete_many()
         .filter(oncall_overrides::Column::OrgId.eq(org_id))
         .filter(oncall_overrides::Column::TeamId.eq(team_id))
@@ -262,7 +255,7 @@ pub async fn delete_future_for_user(
     user_email: &str,
     at: i64,
 ) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let dropped = oncall_overrides::Entity::delete_many()
         .filter(oncall_overrides::Column::OrgId.eq(org_id))
         .filter(oncall_overrides::Column::TeamId.eq(team_id))
@@ -343,8 +336,14 @@ mod tests {
             to_override(model("ov_b", 0, 1000, 20)),
         ];
         let reversed: Vec<_> = rows.iter().rev().cloned().collect();
-        assert_eq!(covering_override(&rows, "rot_primary", 500).unwrap().id, "ov_b");
-        assert_eq!(covering_override(&reversed, "rot_primary", 500).unwrap().id, "ov_b");
+        assert_eq!(
+            covering_override(&rows, "rot_primary", 500).unwrap().id,
+            "ov_b"
+        );
+        assert_eq!(
+            covering_override(&reversed, "rot_primary", 500).unwrap().id,
+            "ov_b"
+        );
     }
 
     /// Which end `list_for_resolution` must truncate from, pinned as an
@@ -360,14 +359,27 @@ mod tests {
         let all: Vec<_> = (0..5)
             .map(|i| to_override(model(&format!("ov_{i}"), 0, 1000, i as i64 * 10)))
             .collect();
-        let winner = covering_override(&all, "rot_primary", 500).unwrap().id.clone();
+        let winner = covering_override(&all, "rot_primary", 500)
+            .unwrap()
+            .id
+            .clone();
         assert_eq!(winner, "ov_4", "the newest cover wins");
 
         // Truncating from the newest end loses the winner; from the oldest end
         // does not. `list_for_resolution` therefore orders descending.
         let kept_oldest = &all[..2];
         let kept_newest = &all[all.len() - 2..];
-        assert_ne!(covering_override(kept_oldest, "rot_primary", 500).unwrap().id, winner);
-        assert_eq!(covering_override(kept_newest, "rot_primary", 500).unwrap().id, winner);
+        assert_ne!(
+            covering_override(kept_oldest, "rot_primary", 500)
+                .unwrap()
+                .id,
+            winner
+        );
+        assert_eq!(
+            covering_override(kept_newest, "rot_primary", 500)
+                .unwrap()
+                .id,
+            winner
+        );
     }
 }

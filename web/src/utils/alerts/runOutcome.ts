@@ -30,7 +30,8 @@
  */
 
 /** Canonical outcomes the backend can send. */
-export type RunOutcome = "firing" | "normal" | "succeeded" | "error" | "notify_failed" | "skipped";
+export type RunOutcome =
+  "firing" | "normal" | "succeeded" | "error" | "notify_failed" | "skipped" | "pending";
 
 /**
  * Coarse bucket used for colouring and counting.
@@ -38,8 +39,13 @@ export type RunOutcome = "firing" | "normal" | "succeeded" | "error" | "notify_f
  * `error` is its own bucket, not a flavour of "other", because it is a
  * first-class backend outcome (`RunOutcome::Error`): the evaluation ran and
  * failed. It is neither a firing (the alert did not trigger) nor healthy.
+ *
+ * `pending` is likewise its own bucket, not "other": it's a first-class
+ * outcome (`RunOutcome::Pending`) meaning the condition matched but hasn't
+ * held for the alert's configured pending period yet — distinct from both a
+ * confirmed firing and a skipped/unknown row.
  */
-export type OutcomeBucket = "firing" | "ok" | "error" | "other";
+export type OutcomeBucket = "firing" | "ok" | "error" | "pending" | "other";
 
 const normalize = (s: unknown): string =>
   String(s ?? "")
@@ -68,6 +74,10 @@ const OK = new Set(["normal", "succeeded", "ok", "success", "conditionnotsatisfi
  */
 const ERROR = new Set(["error", "failed"]);
 
+/** The condition matched but hasn't held for the pending period yet — not a
+ *  confirmed firing, not healthy. */
+const PENDING = new Set(["pending"]);
+
 export function isFiringOutcome(status: unknown): boolean {
   return FIRING.has(normalize(status));
 }
@@ -80,10 +90,15 @@ export function isErrorOutcome(status: unknown): boolean {
   return ERROR.has(normalize(status));
 }
 
+export function isPendingOutcome(status: unknown): boolean {
+  return PENDING.has(normalize(status));
+}
+
 export function outcomeBucket(status: unknown): OutcomeBucket {
   if (isFiringOutcome(status)) return "firing";
   if (isOkOutcome(status)) return "ok";
   if (isErrorOutcome(status)) return "error";
+  if (isPendingOutcome(status)) return "pending";
   return "other";
 }
 
@@ -98,11 +113,13 @@ export function outcomeLabel(
   errorLabel = "Error",
   skippedLabel = "Skipped",
   unknownLabel = "Unknown",
+  pendingLabel = "Pending",
 ): string {
   const v = normalize(status);
   if (FIRING.has(v)) return firingLabel;
   if (OK.has(v)) return okLabel;
   if (ERROR.has(v)) return errorLabel;
+  if (PENDING.has(v)) return pendingLabel;
   if (v === "skipped") return skippedLabel;
   return String(status ?? "").replace(/_/g, " ") || unknownLabel;
 }
@@ -211,24 +228,4 @@ export function conditionSummary(row: {
     parts.push(String(row.threshold_operator), fmt(row.threshold_value));
   }
   return parts.join(" ");
-}
-
-/** Human label for a level. */
-export function levelLabel(level: unknown): string {
-  switch (
-    String(level ?? "")
-      .trim()
-      .toLowerCase()
-  ) {
-    case "critical":
-      return "Critical";
-    case "warning":
-      return "Warning";
-    case "ok":
-      return "Ok";
-    case "no_data":
-      return "No Data";
-    default:
-      return "Unknown";
-  }
 }

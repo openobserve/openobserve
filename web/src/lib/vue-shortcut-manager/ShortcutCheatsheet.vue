@@ -14,7 +14,7 @@
         <div class="flex items-center gap-3">
           <div class="flex shrink-0 items-center gap-2.5">
             <div
-              class="rounded-default flex h-8 w-8 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)]"
+              class="rounded-default bg-accent/12 flex h-8 w-8 shrink-0 items-center justify-center"
             >
               <OIcon name="key" class="text-accent h-4 w-4" />
             </div>
@@ -126,7 +126,7 @@
                       }}</span>
                       <kbd
                         v-else
-                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary inline-flex h-6 min-w-6 items-center justify-center border px-1.5 font-mono font-medium whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
+                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary border-border-default inline-flex h-6 min-w-6 items-center justify-center border border-b px-1.5 font-mono font-medium whitespace-nowrap"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -183,7 +183,7 @@
                       }}</span>
                       <kbd
                         v-else
-                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary inline-flex h-6 min-w-6 items-center justify-center border px-1.5 font-mono font-medium whitespace-nowrap shadow-[0_1px_0_0_var(--color-border-default)]"
+                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary border-border-default inline-flex h-6 min-w-6 items-center justify-center border border-b px-1.5 font-mono font-medium whitespace-nowrap"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -201,13 +201,13 @@
       <div class="text-2xs text-text-secondary flex items-center justify-between">
         <div class="flex flex-wrap items-center gap-1.5">
           <kbd
-            class="bg-surface-base border-border-default rounded-default text-2xs inline-flex h-5 items-center justify-center border px-1.5 font-mono shadow-[0_1px_0_0_var(--color-border-default)]"
+            class="bg-surface-base border-border-default rounded-default text-2xs border-border-default inline-flex h-5 items-center justify-center border border-b px-1.5 font-mono"
             >{{ t("shortcuts.escKey") }}</kbd
           >
           <span>{{ t("shortcuts.footerClose") }}</span>
           <span class="opacity-40">·</span>
           <kbd
-            class="bg-surface-base border-border-default rounded-default text-2xs inline-flex h-5 items-center justify-center border px-1.5 font-mono shadow-[0_1px_0_0_var(--color-border-default)]"
+            class="bg-surface-base border-border-default rounded-default text-2xs border-border-default inline-flex h-5 items-center justify-center border border-b px-1.5 font-mono"
             >?</kbd
           >
           <span>{{ t("shortcuts.footerReopen") }}</span>
@@ -273,6 +273,15 @@ interface DisplayModule {
 const groupByPage = new Map(SHORTCUT_REGISTRY.map((g) => [g.pageKey, g]));
 
 /**
+ * Product names inside a page title, supplied from code so translators cannot
+ * touch them (the same reason `ShortcutModule.title` exists — "RUM" came back
+ * as "RON"/"RHUM"). Keyed by `pageKey`; pages absent here take no parameters.
+ */
+const PAGE_TITLE_PARAMS: Partial<Record<string, Record<string, I18nText>>> = {
+  "shortcuts.pages.rumSessions": { product: raw("RUM") },
+};
+
+/**
  * Cheatsheet display combo. Always the Windows/common form — `sym()` renders
  * `ctrl`→`⌘` on Mac, so we never need the explicit `keyForMac` here.
  */
@@ -282,13 +291,13 @@ function entryDisplay(e: ShortcutEntry): string {
 
 const allModules = computed<DisplayModule[]>(() => {
   return SHORTCUT_MODULES.map((m) => ({
-    title: t(m.titleKey),
+    title: m.title ? raw(m.title) : t(m.titleKey),
     sections: m.pages.flatMap((pageKey) => {
       const group = groupByPage.get(pageKey);
       if (!group) return [];
       return [
         {
-          title: t(group.pageKey),
+          title: t(group.pageKey, PAGE_TITLE_PARAMS[group.pageKey] ?? {}),
           entries: group.shortcuts.map((s) => ({
             id: s.id,
             display: entryDisplay(s),

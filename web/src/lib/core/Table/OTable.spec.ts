@@ -741,6 +741,38 @@ describe("OTable", () => {
       expect(wrapper.find('[data-test="o2-table-select-cell"]').exists()).toBe(false);
     });
 
+    it("hides the header select-all but keeps its cell when showSelectAll is false", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          selection: "multiple",
+          showSelectAll: false,
+        },
+      });
+      const header = wrapper.find('[data-test="o2-table-th-select"]');
+      // The cell stays so the body's selection gutter keeps its width; only the
+      // checkbox goes.
+      expect(header.exists()).toBe(true);
+      expect(header.find('[data-test="o2-table-select-all"]').exists()).toBe(false);
+    });
+
+    it("renders the header select-all by default", () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          selection: "multiple",
+        },
+      });
+      expect(
+        wrapper
+          .find('[data-test="o2-table-th-select"]')
+          .find('[data-test="o2-table-select-all"]')
+          .exists(),
+      ).toBe(true);
+    });
+
     it("emits update:selectedIds when a row checkbox is toggled", async () => {
       wrapper = mount(OTable, {
         props: {
@@ -945,7 +977,7 @@ describe("OTable", () => {
   // ── Cell hover-action overlay ─────────────────────────
 
   describe("cell hover actions", () => {
-    it("renders a cell-hover-actions overlay per cell and activates only the hovered cell", async () => {
+    it("teleports one cell-hover-actions toolbar, only for the hovered cell", async () => {
       vi.useFakeTimers();
       wrapper = mount(OTable, {
         props: { data: makeRows(2), columns: makeColumns() },
@@ -954,20 +986,48 @@ describe("OTable", () => {
         },
       });
 
-      expect(wrapper.findAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBeGreaterThan(
-        0,
-      );
-      expect(wrapper.findAll('.hover-act[data-active="true"]').length).toBe(0);
+      // The toolbar floats above the pointer, so it lives in <body> and exists only
+      // while a cell is hovered — never one overlay per cell.
+      const toolbars = () =>
+        document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]');
+      expect(toolbars().length).toBe(0);
 
       await wrapper.find('[data-test="o2-table-cell-id"]').trigger("mouseenter");
       vi.advanceTimersByTime(250);
       await nextTick();
-      expect(wrapper.findAll('.hover-act[data-active="true"]').length).toBe(1);
+      expect(toolbars().length).toBe(1);
+      expect(document.querySelectorAll('.hover-act[data-active="true"]').length).toBe(1);
 
       await wrapper.find('[data-test="o2-table-cell-id"]').trigger("mouseleave");
       vi.advanceTimersByTime(200);
       await nextTick();
-      expect(wrapper.findAll('.hover-act[data-active="true"]').length).toBe(0);
+      expect(toolbars().length).toBe(0);
+      vi.useRealTimers();
+    });
+
+    it("stays hidden on cells where the slot renders nothing", async () => {
+      vi.useFakeTimers();
+      wrapper = mount(OTable, {
+        props: { data: makeRows(1), columns: makeColumns() },
+        slots: {
+          "cell-hover-actions": `<span v-if="column.id === 'name'" class="hover-act">A</span>`,
+        },
+      });
+
+      // Hovering the 'id' cell yields only a v-if comment — no empty box should float.
+      await wrapper.find('[data-test="o2-table-cell-id"]').trigger("mouseenter");
+      vi.advanceTimersByTime(250);
+      await nextTick();
+      expect(document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(
+        0,
+      );
+
+      await wrapper.find('[data-test="o2-table-cell-name"]').trigger("mouseenter");
+      vi.advanceTimersByTime(250);
+      await nextTick();
+      expect(document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(
+        1,
+      );
       vi.useRealTimers();
     });
 
@@ -984,7 +1044,9 @@ describe("OTable", () => {
         },
       });
       expect(wrapper.find('[data-test="col-actions"]').exists()).toBe(true);
-      expect(wrapper.findAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(0);
+      expect(document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(
+        0,
+      );
     });
   });
 
@@ -1659,6 +1721,35 @@ describe("OTable", () => {
       // Should render pivot header instead of standard header
       expect(wrapper.find('[data-test="o2-table-pivot-header"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="o2-table-header"]').exists()).toBe(false);
+    });
+
+    it("merges consecutive same-value cells with a single pivotRowColumns entry", () => {
+      // Single row-field regression: rows of a run share identical row-field
+      // values, so a value-keyed merge map collided and hid the whole run
+      // (including the first row). Keyed by row identity, the first row keeps
+      // its content and only continuation rows blank out.
+      const rows: TestRow[] = [
+        { id: 1, name: "svc-a", email: "a1@example.com", status: "Active" },
+        { id: 2, name: "svc-a", email: "a2@example.com", status: "Active" },
+        { id: 3, name: "svc-b", email: "b1@example.com", status: "Active" },
+      ];
+      wrapper = mount(OTable, {
+        props: {
+          data: rows,
+          columns: makeColumns(),
+          pivotRowColumns: [{ name: "name" }],
+        },
+      });
+
+      const nameCells = wrapper
+        .findAll('[data-test="o2-table-cell-name"]')
+        .map((c) => c.text().trim());
+      expect(nameCells).toEqual(["svc-a", "", "svc-b"]);
+      // Non-merged columns are untouched
+      const emailCells = wrapper
+        .findAll('[data-test="o2-table-cell-email"]')
+        .map((c) => c.text().trim());
+      expect(emailCells).toEqual(["a1@example.com", "a2@example.com", "b1@example.com"]);
     });
 
     it("renders standard header when pivotHeaderLevels is empty", () => {

@@ -22,9 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="show"
         class="charts-wrapper h-40 min-h-[8.5rem] overflow-hidden py-0! will-change-[transform,opacity]"
       >
-        <div
-          class="dark:border-[rgba(255,255,255,0.1)] dark:hover:shadow-[0_2px_8px_rgba(255,255,255,0.08)]"
-        >
+        <div class="dark:border-[rgba(255,255,255,0.1)] dark:hover:shadow-sm">
           <RenderDashboardCharts
             v-if="show"
             ref="dashboardChartsRef"
@@ -111,7 +109,7 @@ const emit = defineEmits<{
 const { showErrorNotification } = useNotifications();
 useStore();
 const { searchObj, tracesParser } = useTraces();
-useI18nTyped();
+const { t } = useI18nTyped();
 
 // Read filter and timeRange directly from the shared composable rather than via props.
 // The props go stale during synchronous call chains (e.g., auto_query_enabled
@@ -335,7 +333,7 @@ const loadDashboard = async () => {
     updateLayout();
   } catch (err: any) {
     console.error("Error loading dashboard:", err);
-    const message: string = err.message || "Failed to load metrics dashboard";
+    const message: string = err.message || t("traces.failedToLoadMetricsDashboard");
     error.value = message;
     showErrorNotification(raw(message));
   }

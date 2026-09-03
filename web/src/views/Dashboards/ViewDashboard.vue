@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           fullscreen: isFullscreen,
           'print-mode-container': store.state.printMode,
         },
+        isFullscreen ? 'bg-surface-base!' : '',
         store.state.printMode === true ? 'pb-6' : '',
       ]"
       class="h-full"
@@ -338,7 +339,6 @@ import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
@@ -427,7 +427,7 @@ export default defineComponent({
 
     // Set/remove this dashboard as the single org-wide home dashboard, shared
     // reactive state with the dashboard list and HomeView via the composable.
-    const { isHome, setHomeDashboard, clearHomeDashboard } = useHomeDashboard();
+    const { isHome, setHomeDashboard, clearHomeDashboard } = useHomeDashboard(t);
     const toggleHomeDashboard = () => {
       const id = dashboardId.value as string | undefined;
       if (!id) return;
@@ -1026,25 +1026,23 @@ export default defineComponent({
     watch(
       () => route.query,
       (newQuery, oldQuery) => {
-        // CRITICAL FIX: Only recompute if relevant params changed
-        // Skip if only panel time params (pt-*) changed - those are handled separately
-        // Check if global time params (period, from, to) or other params changed
+        // Union of old+new keys so removed params (e.g. cell_* on drawer close) count too.
+        const changedKeys = new Set(
+          [...Object.keys(newQuery), ...Object.keys(oldQuery ?? {})].filter(
+            (key) => newQuery[key] !== oldQuery?.[key],
+          ),
+        );
+
         const globalTimeParamsChanged =
-          newQuery.period !== oldQuery.period ||
-          newQuery.from !== oldQuery.from ||
-          newQuery.to !== oldQuery.to;
+          changedKeys.has("period") || changedKeys.has("from") || changedKeys.has("to");
 
-        // Check if only panel time params changed
-        const onlyPanelParamsChanged =
-          Object.keys(newQuery).some(
-            (key) => key.startsWith("pt-") && newQuery[key] !== oldQuery?.[key],
-          ) && !globalTimeParamsChanged;
+        // pt-* (panel time) and cell_* (drawer) never affect panel times — don't refresh.
+        const onlyIgnorableParamsChanged =
+          changedKeys.size > 0 &&
+          [...changedKeys].every((key) => key.startsWith("pt-") || key.startsWith("cell_")) &&
+          !globalTimeParamsChanged;
 
-        // If only panel params changed, don't recompute (panel refresh handles it)
-        // If global time or other params changed, recompute all panel times
-        if (!onlyPanelParamsChanged) {
-          // Re-compute panel times when URL changes (e.g., panel time params updated)
-          // Use forceRefresh=false to preserve existing time references where possible
+        if (!onlyIgnorableParamsChanged) {
           computeAllPanelTimes();
         }
       },
@@ -1231,7 +1229,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
           folder: route.query.folder ?? "default",
-          tab: route.query.tab ?? currentDashboardData.data.tabs[0].tabId,
+          tab: route.query.tab ?? currentDashboardData?.data?.tabs?.[0]?.tabId,
         },
       });
     };
@@ -1862,6 +1860,7 @@ export default defineComponent({
 });
 </script>
 
+<!-- eslint-disable-next-line vue/enforce-style-attribute -- must stay unscoped: the @media print block below targets ancestors outside this component (.o2-app-root, main, .o2-content-scroll, .scroll). `scoped` rewrites selectors to this component's own elements, so those rules would match nothing and dashboard printing would clip at viewport height. -->
 <style>
 /* keep(complex-state): fullscreen / sticky-header / print-mode toggled state
    classes (compound .stickyHeader.fullscreenHeader chain + high z-index stacking)
@@ -1879,6 +1878,9 @@ export default defineComponent({
   z-index: 5100 !important;
 }
 
+/* The fullscreen surface colour is `bg-surface-base!`, applied alongside this
+   class in the template — a background colour has a utility, the viewport-pinning
+   geometry below does not. */
 .fullscreen {
   width: 100vw !important;
   height: 100vh !important;
@@ -1888,7 +1890,6 @@ export default defineComponent({
   z-index: 5000 !important;
   margin: 0 !important;
   padding: 0 !important;
-  background-color: var(--color-surface-base) !important;
 }
 
 .print-mode-container {

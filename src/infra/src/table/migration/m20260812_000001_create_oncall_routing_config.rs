@@ -182,12 +182,22 @@ mod tests {
         .unwrap();
 
         assert!(!manager.has_table("oncall_routing_config").await.unwrap());
-        assert!(!manager.has_column(UNROUTED, "defaulted_team_id").await.unwrap());
+        assert!(
+            !manager
+                .has_column(UNROUTED, "defaulted_team_id")
+                .await
+                .unwrap()
+        );
 
         Migration.up(&manager).await.expect("upgrade must apply");
 
         assert!(manager.has_table("oncall_routing_config").await.unwrap());
-        assert!(manager.has_column(UNROUTED, "defaulted_team_id").await.unwrap());
+        assert!(
+            manager
+                .has_column(UNROUTED, "defaulted_team_id")
+                .await
+                .unwrap()
+        );
 
         // The existing row survives, and reads as "paged nobody" — which is
         // exactly what it meant before the column existed.
@@ -230,7 +240,12 @@ mod tests {
         migrate_to_previous_release(&manager).await;
         Migration.up(&manager).await.expect("first run");
         Migration.up(&manager).await.expect("second run");
-        assert!(manager.has_column(UNROUTED, "defaulted_team_id").await.unwrap());
+        assert!(
+            manager
+                .has_column(UNROUTED, "defaulted_team_id")
+                .await
+                .unwrap()
+        );
     }
 
     /// An upgraded database and a fresh one must end in the same schema, or
@@ -267,7 +282,12 @@ mod tests {
         Migration.up(&manager).await.unwrap();
         Migration.down(&manager).await.unwrap();
         assert!(!manager.has_table("oncall_routing_config").await.unwrap());
-        assert!(!manager.has_column(UNROUTED, "defaulted_team_id").await.unwrap());
+        assert!(
+            !manager
+                .has_column(UNROUTED, "defaulted_team_id")
+                .await
+                .unwrap()
+        );
     }
 
     #[test]

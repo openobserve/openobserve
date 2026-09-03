@@ -1,12 +1,15 @@
 name: Unit tests
 
 on:
+  # Kept as the Rust cache writer on main: caches saved from merge-queue refs are never restored by PRs.
   push:
     branches:
       - "main"
   pull_request:
     branches:
       - "**"
+    # labeled/unlabeled so adding or removing 'e2e' starts or resets CI; drafts never run paid CI.
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   merge_group:
 
 concurrency:
@@ -16,9 +19,13 @@ concurrency:
 env:
   COLUMNS: 150
   ZO_RESULT_CACHE_ENABLED: true
+  # coverage mapping needs no DWARF; dropping debuginfo (test inherits dev) cuts compile and link time
+  CARGO_PROFILE_DEV_DEBUG: "0"
 
 jobs:
   check_changes:
+    # Paid CI runs only on PRs carrying the 'e2e' label; the merge queue runs unit tests on the merged code.
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) }}
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
@@ -27,6 +34,9 @@ jobs:
       has_backend_changes: ${{ steps.check.outputs.has_backend_changes }}
       has_ui_changes: ${{ steps.check.outputs.has_ui_changes }}
     steps:
+      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
+      - if: github.event_name == 'pull_request'
+        run: sleep 60
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -58,6 +68,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -83,7 +94,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Run clippy
-        run: cargo --config net.git-fetch-with-cli=true clippy --workspace --all-targets -- -D warnings
+        run: cargo --config net.git-fetch-with-cli=true clippy --workspace --all-targets -- -W clippy::too_many_lines -W clippy::cognitive_complexity -W clippy::excessive_nesting -D warnings
 
   backend_unit_tests_postgres:
     needs: [check_changes]
@@ -113,13 +124,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@v2.85.5
+      - uses: taiki-e/install-action@v2.87.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           tool: nextest,cargo-llvm-cov
 
@@ -127,7 +141,8 @@ jobs:
         with:
           cache-on-failure: true
           shared-key: unit-tests
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          # merge_group so an evicted cache self-heals from the next queue run, not only main pushes
+          save-if: ${{ github.event_name == 'merge_group' || github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: bash ./.github/protoc.sh
@@ -173,13 +188,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@v2.85.5
+      - uses: taiki-e/install-action@v2.87.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           tool: nextest,cargo-llvm-cov
 
@@ -241,6 +259,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
@@ -285,13 +304,17 @@ jobs:
 
       - name: Type-check (any error fails)
         working-directory: web
+        env:
+          # vue-tsc peaks around 3GB on this project; the runner's default heap
+          # ceiling is ~4GB, which OOMs (exit 134) instead of reporting errors.
+          NODE_OPTIONS: "--max-old-space-size=8192"
         run: npm run type-check:app
 
   unit_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
     needs: [check_changes, backend_unit_tests, ui_unit_tests, ui_code_quality]
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
         run: |

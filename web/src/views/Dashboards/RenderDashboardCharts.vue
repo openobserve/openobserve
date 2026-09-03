@@ -126,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else-if="panels.length > 0"
           ref="gridStackContainer"
           class="grid-stack m-0.5 bg-transparent"
+          :class="{ 'grid-interacting': isGridInteracting }"
         >
           <div
             v-for="item in panels"
@@ -157,6 +158,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      is an anonymous flex item and never picks up the ellipsis. -->
                 <span class="truncate">{{ item.title }}</span>
               </h2>
+              <!-- Off-screen panels render this lightweight placeholder; the
+                   real panel mounts only when it comes near the viewport.
+                   Mounting everything up front froze large dashboards. -->
+              <div
+                v-else-if="!shouldMountPanel(item.id)"
+                class="flex h-full flex-col p-2"
+                :data-test="`dashboard-panel-placeholder-${item.id}`"
+              >
+                <span class="text-text-secondary truncate text-sm" :title="item.title">
+                  {{ item.title }}
+                </span>
+                <div class="bg-surface-subtle rounded-default mt-2 min-h-0 flex-1"></div>
+              </div>
               <!-- Panel with Panel-Level Variables -->
               <div v-else class="panel-with-variables flex h-full flex-col">
                 <!-- Original Panel Container -->
@@ -205,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Panel Time Picker (NEW) -->
                       <div
                         v-if="hasPanelTime(item) && panelTimeValues[item.id]"
-                        class="panel-time-picker-wrapper mb-2"
+                        class="panel-time-picker-wrapper mt-1 mb-2"
                         :data-test="`dashboard-panel-${item.id}-time-picker`"
                       >
                         <DateTimePickerDashboard
@@ -404,6 +418,8 @@ export default defineComponent({
     const router = useRouter();
     const store = useStore();
     const gridStackContainer = ref(null);
+    // True while a panel is being dragged or resized — drives the grid backdrop.
+    const isGridInteracting = ref(false);
 
     // Initialize GridStack instance
     // (not with ref: https://github.com/gridstack/gridstack.js/issues/2115)
@@ -416,19 +432,30 @@ export default defineComponent({
     // Store IntersectionObserver for cleanup
     const panelObserver = ref<IntersectionObserver | null>(null);
 
+    // Panels whose full component tree is mounted; the rest are placeholders.
+    // One-way: scrolling away never unmounts, so queries are never cancelled
+    // by scrolling and scrolling back never refetches.
+    const mountedPanelIds = reactive(new Set<string>());
+
+    // Mounts panels one viewport before they scroll into view.
+    let panelMountObserver: IntersectionObserver | null = null;
+
+    // Print/forceLoad needs every panel; they are fed into mountedPanelIds in
+    // batches (watcher below panels) instead of mounting all in one flush.
+    const mountAllPanels = computed(() => props.forceLoad || store.state.printMode);
+
+    const shouldMountPanel = (panelId: string) => mountedPanelIds.has(panelId);
+
     // inject selected tab, default will be default tab
     const selectedTabId = inject("selectedTabId", ref("default"));
 
     // Helper function to set up panel visibility observers
     const setupPanelObservers = async () => {
-      // Clean up existing observer
-      if (panelObserver.value) {
-        panelObserver.value.disconnect();
-        panelObserver.value = null;
-      }
-
       // Wait for DOM to be ready
       await nextTick();
+
+      // Disconnect right before reassigning; an await in between orphans the old observer.
+      panelObserver.value?.disconnect();
 
       // Create new IntersectionObserver
       const observer = new IntersectionObserver(
@@ -455,11 +482,35 @@ export default defineComponent({
 
       // Store observer for cleanup
       panelObserver.value = observer;
+
+      panelMountObserver?.disconnect();
+      panelMountObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            const panelId = entry.target.getAttribute("gs-id");
+            if (panelId && entry.isIntersecting) {
+              mountedPanelIds.add(panelId);
+              // Mounted for good — stop watching this panel.
+              panelMountObserver?.unobserve(entry.target);
+            }
+          });
+        },
+        {
+          // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
+          rootMargin: "100% 0px 100% 0px",
+          threshold: 0,
+        },
+      );
+      panelElements?.forEach((el: Element) => {
+        const panelId = el.getAttribute("gs-id");
+        if (panelId && mountedPanelIds.has(panelId)) return;
+        panelMountObserver?.observe(el);
+      });
     };
 
     // Create our own variables manager instead of injecting from parent
     // This makes RenderDashboardCharts self-contained and reusable
-    const variablesManager = useVariablesManager();
+    const variablesManager = useVariablesManager(t);
 
     // Provide to child components (VariablesValueSelector, etc.)
     provide("variablesManager", variablesManager);
@@ -535,6 +586,42 @@ export default defineComponent({
         ? (props.dashboardData?.tabs?.find((it: any) => it.tabId === selectedTabId.value)?.panels ??
             [])
         : [];
+    });
+
+    // Print/forceLoad: mount remaining panels a batch per tick. Print capture
+    // waits on the all-panels-loaded flag, so this never truncates a report.
+    let mountAllTimer: any = null;
+    const mountRemainingPanelsInBatches = () => {
+      if (mountAllTimer !== null) return;
+      const BATCH_SIZE = 8;
+      const step = () => {
+        mountAllTimer = null;
+        if (!mountAllPanels.value) return;
+        const pending = panels.value
+          .map((p: any) => p.id)
+          .filter((id: string) => id && !mountedPanelIds.has(id));
+        pending.slice(0, BATCH_SIZE).forEach((id: string) => mountedPanelIds.add(id));
+        if (pending.length > BATCH_SIZE) {
+          mountAllTimer = setTimeout(step, 50);
+        }
+      };
+      step();
+    };
+
+    watch(
+      // re-fill when print mode turns on or the panel list changes
+      () => [mountAllPanels.value, panels.value],
+      () => {
+        if (mountAllPanels.value) mountRemainingPanelsInBatches();
+      },
+      { immediate: true },
+    );
+
+    onBeforeUnmount(() => {
+      if (mountAllTimer !== null) {
+        clearTimeout(mountAllTimer);
+        mountAllTimer = null;
+      }
     });
 
     const {
@@ -753,8 +840,9 @@ export default defineComponent({
       gridStackInstance = GridStack.init(
         {
           column: 192, // 192-column grid for fine-grained positioning
+          // eslint-disable-next-line local/no-hardcoded-px -- GridStack parses this itself and writes it into its own injected stylesheet, where no document root font-size resolves rem
           cellHeight: "17px", // Base cell height
-          margin: 2, // Minimal margin between panels
+          margin: 4,
           draggable: {
             enable:
               !props.viewOnly && !saveDashboardData.isLoading.value && !props.simplifiedPanelView, // Enable dragging unless view-only or saving
@@ -798,8 +886,32 @@ export default defineComponent({
         }
       });
 
+      // Full-resolution grid shown while a panel is being dragged or resized — every
+      // one of the 192 columns and every row. The grid is OPERATION-AWARE so its lines
+      // always sit on the panel edge that is actually moving, i.e. the exact position
+      // the panel will save to (every card is inset by the margin):
+      //   • move   → the top/left edges snap to `k*cell + margin`  (phase = +margin)
+      //   • resize → the bottom/right edges snap to `k*cell - margin` (phase = -margin)
+      // One line per cell at that phase means every line is reachable — no skipping.
+      const beginGridInteraction = (phaseSign) => {
+        const host = gridStackContainer.value;
+        if (host && gridStackInstance) {
+          const margin = gridStackInstance.getMargin();
+          host.style.setProperty("--grid-col-w", `${gridStackInstance.cellWidth()}px`);
+          host.style.setProperty("--grid-row-h", `${gridStackInstance.getCellHeight(true)}px`);
+          host.style.setProperty("--grid-phase", `${phaseSign * margin}px`);
+        }
+        isGridInteracting.value = true;
+      };
+      gridStackInstance.on("dragstart", () => beginGridInteraction(1));
+      gridStackInstance.on("resizestart", () => beginGridInteraction(-1));
+      gridStackInstance.on("dragstop", () => {
+        isGridInteracting.value = false;
+      });
+
       // Trigger window resize after panel resize to update charts
       gridStackInstance.on("resizestop", () => {
+        isGridInteracting.value = false;
         window.dispatchEvent(new Event("resize"));
       });
     }; // Update panel layout data from GridStack items
@@ -1145,10 +1257,15 @@ export default defineComponent({
         panelObserver.value.disconnect();
         panelObserver.value = null;
       }
+      panelMountObserver?.disconnect();
+      panelMountObserver = null;
 
       // Clean up GridStack instance
       if (gridStackInstance) {
         gridStackInstance.off("change");
+        gridStackInstance.off("dragstart");
+        gridStackInstance.off("resizestart");
+        gridStackInstance.off("dragstop");
         gridStackInstance.off("resizestop");
         gridStackInstance.destroy(false);
         gridStackInstance = null;
@@ -1564,6 +1681,7 @@ export default defineComponent({
       addPanelData,
       t,
       getPanelLayout,
+      shouldMountPanel,
       getMinimumHeight,
       getMinimumWidth,
       isSectionHeader,
@@ -1586,6 +1704,7 @@ export default defineComponent({
       currentVariablesDataRef,
       resetGridLayout,
       refreshGridStack,
+      isGridInteracting,
       // New scoped variables properties
       variablesManager,
       globalVariables,
@@ -1638,9 +1757,10 @@ export default defineComponent({
 }
 
 .displayDiv :deep(.grid-stack-item .grid-stack-item-content) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the grid-item border is a 1-device-pixel rule and must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   border-radius: 0.375rem;
-  overflow: visible;
+  overflow: hidden;
   box-shadow: none;
 }
 
@@ -1650,6 +1770,45 @@ export default defineComponent({
 .displayDiv :deep(.grid-stack-item.panel-section-header .grid-stack-item-content) {
   border: none;
   border-radius: 0;
+}
+
+/* Full-resolution grid shown while a panel is being dragged or resized — every one of
+   the 192 columns (--grid-col-w) and every row (--grid-row-h), a single hairline per
+   cell. `background-position` shifts the whole grid by --grid-phase (set in JS): to
+   +margin while moving (lines on the top/left snap edges) or -margin while resizing
+   (lines on the bottom/right snap edges), so the moving panel edge always lands on a
+   line, every line is reachable, and the lines sit where panels actually save. */
+.grid-stack.grid-interacting {
+  --grid-line: color-mix(in srgb, var(--color-border-default) 30%, transparent);
+  background-image:
+    repeating-linear-gradient(
+      to right,
+      var(--grid-line) 0,
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1-device-pixel column rule, must not scale */
+      var(--grid-line) 1px,
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: transparent gap resumes one device-pixel past the line */
+      transparent 1px,
+      transparent var(--grid-col-w, 0.45rem)
+    ),
+    repeating-linear-gradient(
+      to bottom,
+      var(--grid-line) 0,
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1-device-pixel row rule, must not scale */
+      var(--grid-line) 1px,
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: transparent gap resumes one device-pixel past the line */
+      transparent 1px,
+      transparent var(--grid-row-h, 1.0625rem)
+    );
+  /* First value = column layer (x offset), second = row layer (y offset). */
+  background-position:
+    var(--grid-phase, 0) 0,
+    0 var(--grid-phase, 0);
+  border-radius: 0.375rem;
+}
+
+.grid-stack.grid-interacting
+  :deep(.grid-stack-item:not(.panel-section-header) .grid-stack-item-content) {
+  background-color: var(--color-surface-base);
 }
 
 /* GridStack theme overrides */
@@ -1663,7 +1822,7 @@ export default defineComponent({
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease;
-  box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, var(--color-black) 15%, transparent);
+  box-shadow: var(--shadow-glow-drag-geom) color-mix(in srgb, var(--color-black) 15%, transparent);
 }
 
 .displayDiv :deep(.grid-stack .grid-stack-item.ui-resizable-resizing) {
@@ -1738,11 +1897,15 @@ export default defineComponent({
 </style>
 
 <style scoped>
-/* keep(lib-override:vue-grid-layout): the drag placeholder is DOM that
-   vue-grid-layout renders inside its own subtree, so it can only be reached
-   through `:deep()` from the `.displayDiv` grid host this component owns.
-   `!important` beats the library's own `.vue-grid-placeholder` background. */
-.displayDiv :deep(.vue-grid-item.vue-grid-placeholder) {
-  background: var(--color-dashboard-placeholder-bg) !important;
+/* keep(lib-override:gridstack): the drop placeholder is DOM that GridStack
+   injects into its own subtree, so it can only be reached through `:deep()`
+   from the `.displayDiv` grid host this component owns. `!important` beats the
+   library's own placeholder background. The tinted fill + dashed outline read
+   as a clear "panel lands here" target against the grid backdrop. */
+.displayDiv :deep(.grid-stack-placeholder > .placeholder-content) {
+  background: color-mix(in srgb, var(--color-dashboard-placeholder-bg) 35%, transparent) !important;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the placeholder outline is a 1-device-pixel dashed rule and must not scale */
+  border: 1px dashed var(--color-dashboard-placeholder-bg) !important;
+  border-radius: 0.375rem;
 }
 </style>

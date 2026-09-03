@@ -569,15 +569,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center gap-1">
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
-          <TransformSelector
-            v-if="isActionsEnabled"
-            :function-options="functionOptions"
-            :hide-toggle="true"
-            @select:function="populateFunctionImplementation"
-            @save:function="fnSavedFunctionDialog"
-          />
           <FunctionSelector
-            v-else
             :function-options="functionOptions"
             :hide-toggle="true"
             @select:function="populateFunctionImplementation"
@@ -596,7 +588,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-more-options-btn"
-              class="download-logs-btn order-4"
+              class="download-logs-btn hover:bg-interactive-hover-bg! order-4"
               variant="outline"
               size="icon-toolbar"
             >
@@ -665,7 +657,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu bg-dropdown-bg rounded-default absolute top-0 right-full z-9999 mr-1 min-w-40 px-0 py-1 [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] [border:0.063rem_solid_var(--color-card-glass-border)]"
+                class="search-download-submenu bg-dropdown-bg rounded-default shadow-hover-shadow absolute top-0 right-full z-9999 mr-1 min-w-40 px-0 py-1 shadow-lg [border:0.063rem_solid_var(--color-card-glass-border)]"
                 data-test="search-download-submenu"
               >
                 <button
@@ -765,6 +757,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </ODropdownGroup>
 
           <ODropdownSeparator v-if="config.isEnterprise == 'true'" />
+
+          <!-- Alert creation is shared platform machinery: this page contributes
+               its search state through a pure adapter and CreateAlertAction owns
+               the label, confirm dialog, and hand-off. Not enterprise-gated —
+               alerts exist in OSS, unlike scheduled search above. -->
+          <ODropdownGroup :label="t('search.menuGroupAlerts')">
+            <CreateAlertAction
+              variant="menu-item"
+              :source="createAlertSource"
+              :build="buildAlertPrefill"
+              :disabled-reason="createAlertDisabledReason"
+              data-test="logs-create-alert-btn"
+            >
+              <!-- Same icon badge every other item in this menu uses, so the
+                   label column lines up. -->
+              <template #icon-left="{ icon }">
+                <span
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                >
+                  <OIcon :name="icon" size="sm" />
+                </span>
+              </template>
+            </CreateAlertAction>
+          </ODropdownGroup>
+
+          <ODropdownSeparator />
 
           <ODropdownGroup
             v-if="
@@ -931,7 +949,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
-                      : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
                     'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
@@ -958,7 +976,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                           : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                            ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
                             : '',
                         'rounded-e-default! rounded-s-none!',
                       ]"
@@ -1017,7 +1035,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
-                      : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
                     'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
@@ -1044,7 +1062,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                           : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                            ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
                             : '',
                         'rounded-e-default! rounded-s-none!',
                       ]"
@@ -1120,7 +1138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
-                    : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
                   store.state.zoConfig.auto_query_enabled
                     ? 'rounded-s-default! rounded-e-none!'
                     : 'rounded-default',
@@ -1186,7 +1204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         (searchObj.loading == true || searchObj.loadingHistogram == true))
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                         : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                          ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                          ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
                           : '',
                       store.state.zoConfig.auto_query_enabled
                         ? 'rounded-e-default! rounded-s-none!'
@@ -1290,7 +1308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-toolbar"
         @click="toggleEditorFullscreen"
-        class="rounded-default absolute! top-[0.1875rem] right-1 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! [border:1px_solid_var(--color-card-glass-border)]!"
+        class="rounded-default border-card-glass-border! absolute! top-0.75 right-1 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
@@ -1416,17 +1434,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                 </div>
-              </template>
-              <template v-else-if="searchObj.data.transformType === 'action'">
-                <CodeQueryEditor
-                  v-if="router.currentRoute.value.name === 'logs'"
-                  data-test="logs-vrl-function-editor"
-                  ref="fnEditorRef"
-                  editor-id="fnEditor"
-                  :query="actionEditorQuery"
-                  read-only
-                  language="markdown"
-                />
               </template>
             </div>
           </template>
@@ -1628,7 +1635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mb-1 text-left">
           {{ t("search.noOfRecords") }}:
           <OIcon name="info-outline" size="sm" class="ml-1 cursor-pointer" />
-          <OTooltip side="right" align="center" max-width="300px">
+          <OTooltip side="right" align="center" max-width="18.75rem">
             <template #content>
               <span class="text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
             </template>
@@ -1709,7 +1716,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="localSavedViews.length > 0 ? 'border-card-glass-border border-r' : ''"
             :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
           >
-            <div class="flex flex-col" style="max-height: 486px; min-height: 280px">
+            <div class="flex flex-col" style="max-height: 30.375rem; min-height: 17.5rem">
               <OTable
                 data-test="log-search-saved-view-list-fields-table"
                 :data="searchObj.data.savedViews"
@@ -1801,7 +1808,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="ml-0 flex w-[40%] flex-col pl-3" v-if="localSavedViews.length > 0">
-            <div class="flex flex-col" style="max-height: 480px; min-height: 280px">
+            <div class="flex flex-col" style="max-height: 30rem; min-height: 17.5rem">
               <OTable
                 data-test="log-search-saved-view-favorite-list-fields-table"
                 :data="localSavedViews"
@@ -1909,8 +1916,6 @@ import searchService from "@/services/search";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-// Lazy load CodeQueryEditor to avoid loading Monaco Editor eagerly
-const CodeQueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 // Unified QueryEditor for main query editor (with built-in AI bar)
 const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
 
@@ -1934,12 +1939,13 @@ import { debounce } from "lodash-es";
 import savedviewsService from "@/services/saved_views";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import useDashboardPanelData, {
+  getPanelDataForPageKey,
+} from "@/composables/dashboard/useDashboardPanel";
 import { inject, toRef, computed } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
-import TransformSelector from "./TransformSelector.vue";
 import FunctionSelector from "./FunctionSelector.vue";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import useNotifications from "@/composables/useNotifications";
@@ -1954,6 +1960,8 @@ import { searchState } from "@/composables/useLogs/searchState";
 import {
   getVisualizationConfig,
   encodeVisualizationConfig,
+  getBuildConfig,
+  encodeBuildConfig,
 } from "@/composables/useLogs/logsVisualization";
 
 import useSearchBar from "@/composables/useLogs/useSearchBar";
@@ -1981,6 +1989,10 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
+import { buildPrefillFromLogs, logsAlertSnapshot } from "@/utils/alerts/prefill/fromLogs";
+import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
+import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTree from "@/lib/data/Tree/OTree.vue";
 import { makeSavedViewSchema, type SavedViewForm } from "./SearchBar.SavedView.schema";
@@ -2043,6 +2055,7 @@ const replaceExistingFieldCondition = (
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    CreateAlertAction,
     OSeparator,
     OSplitter,
     OButtonGroup,
@@ -2057,9 +2070,7 @@ export default defineComponent({
     SyntaxGuide,
     AutoRefreshInterval,
     ConfirmDialog,
-    TransformSelector,
     FunctionSelector,
-    CodeQueryEditor,
     UnifiedQueryEditor,
     QueryPlanDialog,
     OIcon,
@@ -2220,6 +2231,7 @@ export default defineComponent({
     const regionFilter = ref();
     const regionFilterRef = ref(null);
     const { resetStreamData, searchObj } = searchState();
+    const { buildPatternsAlertPrefill } = usePatternActions();
     const { buildSearch } = useSearchStream(t);
 
     const {
@@ -2228,13 +2240,12 @@ export default defineComponent({
       updatedLocalLogFilterField,
       updateUrlQueryParams,
       generateURLQuery,
-      isActionsEnabled,
       checkTimestampAlias,
     } = logsUtils();
     const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData, cancelQuery } =
       useSearchBar(t);
     const { loadStreamLists, extractFields } = useStreamFields();
-    const { cancelPatterns } = usePatterns();
+    const { cancelPatterns } = usePatterns(t);
 
     const {
       refreshData,
@@ -2277,7 +2288,6 @@ export default defineComponent({
     const { closeSocketWithError } = useSearchWebSocket();
 
     const transformsExpandState = ref({
-      actions: false,
       functions: false,
     });
 
@@ -2293,13 +2303,11 @@ export default defineComponent({
     // The dialog body unmounts on close + remounts on open; the form is created
     // here (owner pattern), so re-seed it to "create" mode on open. The
     // OFormToggleGroup changes the mode within the open session.
-    const savedFunctionDefaults = computed(
-      (): SavedFunctionForm => ({
-        isSavedFunctionAction: "create",
-        savedFunctionName: "",
-        savedFunctionSelectedName: "",
-      }),
-    );
+    const savedFunctionDefaults = computed((): SavedFunctionForm => ({
+      isSavedFunctionAction: "create",
+      savedFunctionName: "",
+      savedFunctionSelectedName: "",
+    }));
 
     // Owner-pattern form (Rule ③): SearchBar OWNS this <OForm> and its dialog
     // body needs the create/update mode to drive a v-if. We create the form here
@@ -2414,13 +2422,11 @@ export default defineComponent({
     // savedViewSchema).
     const savedViewFormRef = ref<any>(null);
     const savedViewSchema = makeSavedViewSchema(t);
-    const savedViewDefaults = computed(
-      (): SavedViewForm => ({
-        isSavedViewAction: isSavedViewAction.value,
-        savedViewName: "",
-        savedViewSelectedName: "",
-      }),
-    );
+    const savedViewDefaults = computed((): SavedViewForm => ({
+      isSavedViewAction: isSavedViewAction.value,
+      savedViewName: "",
+      savedViewSelectedName: "",
+    }));
     const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
@@ -2437,19 +2443,7 @@ export default defineComponent({
       );
     });
 
-    const filteredActionOptions = computed(() => {
-      if (searchObj.data.transformType !== "action") return [];
-      if (!searchTerm.value) return searchObj.data.actions;
-      return searchObj.data.actions.filter((item) =>
-        item.name.toLowerCase().includes(searchTerm.value.toLowerCase()),
-      );
-    });
-
     const filteredTransformOptions = computed(() => {
-      if (!searchObj.data.transformType) return [];
-
-      if (searchObj.data.transformType === "action") return filteredActionOptions.value;
-
       if (searchObj.data.transformType === "function") return filteredFunctionOptions.value;
 
       return [];
@@ -2608,18 +2602,10 @@ export default defineComponent({
     const updateViewObj = ref({});
 
     const transformTypes = computed(() => {
-      return [
-        { label: t("logs.searchBar.transformTypeFunction"), value: "function" },
-        { label: t("logs.searchBar.transformTypeAction"), value: "action" },
-      ];
+      return [{ label: t("logs.searchBar.transformTypeFunction"), value: "function" }];
     });
 
-    const showFunctionEditor = computed(() => {
-      // When actions are disabled, fall back to the transform-editor toggle
-      if (!isActionsEnabled.value) return searchObj.meta.showTransformEditor;
-
-      return searchObj.data.transformType === "function";
-    });
+    const showFunctionEditor = computed(() => searchObj.meta.showTransformEditor);
 
     // Check if VRL editor should be disabled (in visualize mode with non-table chart)
     const isVrlEditorDisabled = computed(() => {
@@ -2732,25 +2718,7 @@ export default defineComponent({
         return searchObj.data.selectedTransform.name;
       }
 
-      return searchObj.data.transformType === "action"
-        ? "Action"
-        : searchObj.data.transformType === "function"
-          ? "Function"
-          : "Transform";
-    });
-
-    const actionEditorQuery = computed(() => {
-      if (
-        searchObj.data.transformType === "action" &&
-        searchObj.data.selectedTransform?.type === "action" &&
-        searchObj.data.selectedTransform?.name
-      ) {
-        return t("logs.searchBar.actionAppliedRunQuery", {
-          name: searchObj.data.selectedTransform?.name,
-        });
-      }
-
-      return t("logs.searchBar.selectActionToApply");
+      return searchObj.data.transformType === "function" ? "Function" : "Transform";
     });
 
     const updateAutoComplete = (value) => {
@@ -2768,8 +2736,6 @@ export default defineComponent({
     const transformIcon = computed(() => {
       if (searchObj.data.transformType === "function")
         return "img:" + getImageURL("images/common/function.svg");
-
-      if (searchObj.data.transformType === "action") return "code";
 
       if (!searchObj.data.transformType) return "img:" + getImageURL("images/common/transform.svg");
 
@@ -3398,10 +3364,6 @@ export default defineComponent({
       }, 100);
     };
 
-    const applyAction = (actionId) => {
-      searchObj.data.actionId = actionId.id;
-    };
-
     const populateFunctionImplementation = (fnValue, flag = false, openEditor = true) => {
       if (flag) {
         toast({
@@ -3549,6 +3511,24 @@ export default defineComponent({
       }
     };
 
+    // Point build_data at the view being applied. Without this the URL keeps the
+    // build_data of whatever was open before, which a later toggle back to the
+    // build tab would restore instead of the view the user opened.
+    const restoreBuildData = async (buildData) => {
+      const currentQuery = { ...router.currentRoute.value.query };
+      const encoded = buildData ? encodeBuildConfig(buildData) : null;
+      if (encoded) {
+        currentQuery.build_data = encoded;
+      } else {
+        delete currentQuery.build_data;
+      }
+
+      await router.replace({
+        name: router.currentRoute.value.name,
+        query: currentQuery,
+      });
+    };
+
     const applySavedView = async (item) => {
       savedViewDropdownModel.value = false;
       await cancelQuery();
@@ -3647,10 +3627,17 @@ export default defineComponent({
               mergeDeep(searchObj, extractedObj);
               searchObj.shouldIgnoreWatcher = true;
 
+              // Hand the saved builder chart to BuildQueryPage. Must be set
+              // synchronously after the merge: the merge flips
+              // logsVisualizeToggle to "build", and the first await below lets
+              // Vue mount BuildQueryPage, which reads this on mount.
+              searchObj.meta.savedBuildConfig = extractedObj.data.buildData ?? null;
+
               // Restore visualization data if available
               if (extractedObj.data.visualizationData) {
                 await restoreVisualizationData(extractedObj.data.visualizationData);
               }
+              await restoreBuildData(extractedObj.data.buildData ?? null);
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
                 populateFunctionImplementation(
@@ -3830,10 +3817,17 @@ export default defineComponent({
               mergeDeep(searchObj, extractedObj);
               searchObj.data.streamResults = {};
 
+              // Hand the saved builder chart to BuildQueryPage. Must be set
+              // synchronously after the merge: the merge flips
+              // logsVisualizeToggle to "build", and the first await below lets
+              // Vue mount BuildQueryPage, which reads this on mount.
+              searchObj.meta.savedBuildConfig = extractedObj.data.buildData ?? null;
+
               // Restore visualization data if available
               if (extractedObj.data.visualizationData) {
                 await restoreVisualizationData(extractedObj.data.visualizationData);
               }
+              await restoreBuildData(extractedObj.data.buildData ?? null);
 
               const streamData = await getStreams(searchObj.data.stream.streamType, true);
               searchObj.data.streamResults = streamData;
@@ -3947,7 +3941,7 @@ export default defineComponent({
             searchObj.shouldIgnoreWatcher = false;
             store.dispatch("setSavedViewFlag", false);
             toast({
-              message: err.message || `Error while applying saved view.`,
+              message: err.message || t("search.errorWhileApplyingSavedView"),
               variant: "error",
             });
           }
@@ -4004,7 +3998,9 @@ export default defineComponent({
               getSavedViews();
             } else {
               toast({
-                message: `${t("search.errorDeletingSavedView")} ${res.data.error_detail}`,
+                message: t("search.errorDeletingSavedViewDetail", {
+                  detail: res.data.error_detail,
+                }),
                 variant: "error",
               });
             }
@@ -4058,6 +4054,19 @@ export default defineComponent({
           }
         }
 
+        // Include the builder chart (stream, fields, joins, chart type, config) when
+        // in build mode — without it the builder is re-derived from the logs query on
+        // restore and loses everything the user configured.
+        if (searchObj.meta.logsVisualizeToggle === "build") {
+          const buildData = getBuildConfig(getPanelDataForPageKey("build"));
+          if (buildData) {
+            savedSearchObj.data.buildData = buildData;
+          }
+        }
+
+        // Transient hand-off to BuildQueryPage, never part of a saved view.
+        delete savedSearchObj.meta.savedBuildConfig;
+
         return savedSearchObj;
         // return b64EncodeUnicode(JSON.stringify(savedSearchObj));
       } catch (e) {
@@ -4104,7 +4113,9 @@ export default defineComponent({
               isSavedViewAction.value = "create";
             } else {
               toast({
-                message: `${t("search.errorCreatingSavedView")} ${res.data.error_detail}`,
+                message: t("search.errorCreatingSavedViewDetail", {
+                  detail: res.data.error_detail,
+                }),
                 variant: "error",
               });
             }
@@ -4163,7 +4174,9 @@ export default defineComponent({
               confirmSavedViewDialogVisible.value = false;
             } else {
               toast({
-                message: `${t("search.errorUpdatingSavedView")} ${res.data.error_detail}`,
+                message: t("search.errorUpdatingSavedViewDetail", {
+                  detail: res.data.error_detail,
+                }),
                 variant: "error",
               });
             }
@@ -4573,7 +4586,9 @@ export default defineComponent({
         // validate that timestamp column is not used as an alias
         if (!checkTimestampAlias(logsPageQuery)) {
           showErrorNotification(
-            `Alias '${store.state.zoConfig.timestamp_column || "_timestamp"}' is not allowed.`,
+            t("search.aliasNotAllowed", {
+              alias: store.state.zoConfig.timestamp_column || "_timestamp",
+            }),
           );
           return;
         }
@@ -4756,6 +4771,42 @@ export default defineComponent({
       searchObj.meta.jobRecords = 100;
     };
 
+    // ── Create alert from this search ────────────────────────────────────
+    // Stated up front rather than as a toast after the click: a control that
+    // explains why it is unavailable beats a dead-end action.
+    const createAlertDisabledReason = computed(() => {
+      if (!searchObj.data.stream.selectedStream?.length) {
+        return t("logs.searchBar.selectStreamBeforeSchedule");
+      }
+      return null;
+    });
+
+    /**
+     * This page's contribution to alert creation: a plain snapshot of searchObj
+     * in, an AlertPrefill out. The resolved SQL comes from buildSearch's
+     * read-only mode — the same query the backend runs, so the alert cannot
+     * drift from what the user is looking at. ignoreQuickMode is on because
+     * quick mode narrows the SELECT list for display, which is meaningless when
+     * only the row count matters.
+     */
+    const buildLogsAlertPrefill = () => {
+      const payload = buildSearch(true, true);
+
+      return buildPrefillFromLogs(
+        logsAlertSnapshot(searchObj, payload?.query?.sql ?? "", store.state.timezone),
+      );
+    };
+
+    // On the patterns tab the alert is about patterns, so the patterns adapter
+    // takes over — which is what surfaces the include/exclude-all control in the
+    // confirm dialog. Same menu item either way; the source just changes.
+    const isPatternsTab = computed(() => searchObj.meta.logsVisualizeToggle === "patterns");
+
+    const createAlertSource = computed(() => (isPatternsTab.value ? "patterns" : "logs"));
+
+    const buildAlertPrefill = (options: AlertBuildOptions = {}) =>
+      isPatternsTab.value ? buildPatternsAlertPrefill(options) : buildLogsAlertPrefill();
+
     const openSearchInspectDialog = () => {
       searchInspectTraceId.value = "";
       searchInspectDialog.value = true;
@@ -4797,23 +4848,11 @@ export default defineComponent({
         populateFunctionImplementation(item, isSelected);
       }
 
-      // If action is selected notify the user
-      if (searchObj.data.transformType === "action") {
-        updateActionSelection(item);
-      }
-
       if (typeof item === "object")
         searchObj.data.selectedTransform = {
           ...item,
           type: searchObj.data.transformType,
         };
-    };
-
-    const updateActionSelection = (item: any) => {
-      toast({
-        message: t("logs.searchBar.actionAppliedSuccess", { name: item?.name }),
-        variant: "success",
-      });
     };
 
     const updateEditorWidth = () => {
@@ -4899,6 +4938,7 @@ export default defineComponent({
       _fieldValues,
       _sqlMode,
       _noStream,
+      t,
     );
     // [END] query editor placeholder overlay
 
@@ -5040,12 +5080,14 @@ export default defineComponent({
       addJobScheduler,
       routeToSearchSchedule,
       createScheduleJob,
+      buildAlertPrefill,
+      createAlertSource,
+      createAlertDisabledReason,
       searchInspectDialog,
       searchInspectTraceId,
       openSearchInspectDialog,
       navigateToSearchInspect,
       searchTerm,
-      filteredActionOptions,
       filteredFunctionOptions,
       confirmUpdate,
       updateViewObj,
@@ -5059,8 +5101,6 @@ export default defineComponent({
       filteredTransformOptions,
       updateTransforms,
       selectTransform,
-      actionEditorQuery,
-      isActionsEnabled,
       showFunctionEditor,
       isVrlEditorDisabled,
       closeSocketWithError,
@@ -5085,10 +5125,8 @@ export default defineComponent({
       // Expose additional functions for testing
       updateAutoComplete,
       handleEscKey,
-      applyAction,
       getFieldList,
       buildStreamQuery,
-      updateActionSelection,
       updateEditorWidth,
       showExplainDialog,
       openExplainDialog,
@@ -5156,90 +5194,62 @@ export default defineComponent({
   watch: {
     addSearchTerm() {
       if (this.searchObj.data.stream.addToFilter != "") {
-        let currentQuery = this.searchObj.data.query.split("|");
-        if (currentQuery.length > 1) {
-          if (currentQuery[1].trim() != "") {
-            currentQuery[1] += " and " + filter;
-          } else {
-            currentQuery[1] = filter;
+        // Never split the query on "|": the legacy "function | where" syntax is gone,
+        // and the split is quote-unaware, so a pipe inside a term such as
+        // match_all('text | error') would corrupt the query when a filter is added.
+        const currentQuery = [this.searchObj.data.query];
+        let unionType: string = "";
+        if (currentQuery[0].replace("union all", "UNION ALL").includes("UNION ALL")) {
+          unionType = "UNION ALL";
+        } else if (currentQuery[0].replace("union", "UNION").includes("UNION")) {
+          unionType = "UNION";
+        }
+
+        // Use regular expression to match "UNION" or "UNION ALL" (case insensitive)
+        const unionRegex = /\bUNION ALL\b|\bUNION\b/i;
+
+        // Split the string by "UNION" or "UNION ALL" if they are present
+        const queries = currentQuery[0].split(unionRegex);
+
+        // Iterate over each part
+        queries.forEach((query, index) => {
+          let filter = this.searchObj.data.stream.addToFilter;
+
+          const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
+
+          if (isFilterValueNull) {
+            filter = filter
+              .replace(/=|!=/, (match) => {
+                return match === "=" ? " is " : " is not ";
+              })
+              .replace(/'null'/, "null");
           }
-          this.searchObj.data.query = currentQuery.join("| ");
-          this.searchObj.data.editorValue = this.searchObj.data.query;
-        } else {
-          let unionType: string = "";
-          if (currentQuery[0].replace("union all", "UNION ALL").includes("UNION ALL")) {
-            unionType = "UNION ALL";
-          } else if (currentQuery[0].replace("union", "UNION").includes("UNION")) {
-            unionType = "UNION";
-          }
 
-          // Use regular expression to match "UNION" or "UNION ALL" (case insensitive)
-          const unionRegex = /\bUNION ALL\b|\bUNION\b/i;
-
-          // Split the string by "UNION" or "UNION ALL" if they are present
-          const queries = currentQuery[0].split(unionRegex);
-
-          // Iterate over each part
-          queries.forEach((query, index) => {
-            let filter = this.searchObj.data.stream.addToFilter;
-
-            const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
-
-            if (isFilterValueNull) {
-              filter = filter
-                .replace(/=|!=/, (match) => {
-                  return match === "=" ? " is " : " is not ";
-                })
-                .replace(/'null'/, "null");
+          if (this.searchObj.meta.sqlMode == true) {
+            if (unionType == "" && this.searchObj.data.stream.selectedStream.length > 1) {
+              const parsedSQL = this.fnParsedSQL();
+              const streamPrefix: string =
+                parsedSQL.from[0].as != null ? parsedSQL.from[0].as : parsedSQL.from[0].table;
+              filter = `"${streamPrefix}".${filter}`;
             }
 
-            if (this.searchObj.meta.sqlMode == true) {
-              if (unionType == "" && this.searchObj.data.stream.selectedStream.length > 1) {
-                const parsedSQL = this.fnParsedSQL();
-                const streamPrefix: string =
-                  parsedSQL.from[0].as != null ? parsedSQL.from[0].as : parsedSQL.from[0].table;
-                filter = `"${streamPrefix}".${filter}`;
-              }
-
-              // if query contains order by clause or limit clause then add where clause before that
-              // if query contains where clause then add filter after that with and operator and keep order by or limit after that
-              // if query does not contain where clause then add where clause before filter
-              if (query.toLowerCase().includes("where")) {
-                // Replace an existing condition for this field, or append if none.
-                // In append mode (SearchResult include/exclude), skip the
-                // field-level replace so multiple values for the same field
-                // coexist with AND.
-                const appendOnlySQL = this.searchObj.data.stream.addToFilterMode === "append";
-                const fieldNameSQL = appendOnlySQL ? null : getFieldFromExpression(filter);
-                if (fieldNameSQL && hasFieldCondition(query, fieldNameSQL)) {
-                  query = replaceExistingFieldCondition(query, fieldNameSQL, filter);
-                } else {
-                  // Find the earliest clause that ends the WHERE conditions.
-                  // Standard SQL clause order: WHERE ? GROUP BY ? HAVING ? ORDER BY ? LIMIT.
-                  // We must insert the new filter before whichever comes first so it
-                  // stays inside the WHERE clause rather than after GROUP BY / ORDER BY.
-                  const terminatingClauses = ["group by", "having", "order by", "limit"];
-                  const lowerQuery = query.toLowerCase();
-                  let firstClause: string | null = null;
-                  let firstIndex = Infinity;
-                  for (const clause of terminatingClauses) {
-                    const idx = lowerQuery.indexOf(clause);
-                    if (idx !== -1 && idx < firstIndex) {
-                      firstIndex = idx;
-                      firstClause = clause;
-                    }
-                  }
-                  if (firstClause) {
-                    const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
-                    query =
-                      beforeClause.trim() + " AND " + filter + " " + firstClause + afterClause;
-                  } else {
-                    query = query + " AND " + filter;
-                  }
-                }
+            // if query contains order by clause or limit clause then add where clause before that
+            // if query contains where clause then add filter after that with and operator and keep order by or limit after that
+            // if query does not contain where clause then add where clause before filter
+            if (query.toLowerCase().includes("where")) {
+              // Replace an existing condition for this field, or append if none.
+              // In append mode (SearchResult include/exclude), skip the
+              // field-level replace so multiple values for the same field
+              // coexist with AND.
+              const appendOnlySQL = this.searchObj.data.stream.addToFilterMode === "append";
+              const fieldNameSQL = appendOnlySQL ? null : getFieldFromExpression(filter);
+              if (fieldNameSQL && hasFieldCondition(query, fieldNameSQL)) {
+                query = replaceExistingFieldCondition(query, fieldNameSQL, filter);
               } else {
-                // Find the earliest clause to insert WHERE before.
-                // SQL clause order: FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT
+                // Find the earliest clause that ends the WHERE conditions.
+                // Standard SQL clause order: WHERE ? GROUP BY ? HAVING ? ORDER BY ? LIMIT.
+                // We must insert the new filter before whichever comes first so it
+                // stays inside the WHERE clause rather than after GROUP BY / ORDER BY.
                 const terminatingClauses = ["group by", "having", "order by", "limit"];
                 const lowerQuery = query.toLowerCase();
                 let firstClause: string | null = null;
@@ -5253,42 +5263,60 @@ export default defineComponent({
                 }
                 if (firstClause) {
                   const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
-                  query =
-                    beforeClause.trim() + " where " + filter + " " + firstClause + afterClause;
+                  query = beforeClause.trim() + " AND " + filter + " " + firstClause + afterClause;
                 } else {
-                  query = query + " where " + filter;
+                  query = query + " AND " + filter;
                 }
               }
-              currentQuery[0] = query;
             } else {
-              const appendOnly = this.searchObj.data.stream.addToFilterMode === "append";
-              const fieldName = appendOnly ? null : getFieldFromExpression(filter);
-              if (fieldName && hasFieldCondition(currentQuery[0], fieldName)) {
-                currentQuery[0] = replaceExistingFieldCondition(currentQuery[0], fieldName, filter);
+              // Find the earliest clause to insert WHERE before.
+              // SQL clause order: FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT
+              const terminatingClauses = ["group by", "having", "order by", "limit"];
+              const lowerQuery = query.toLowerCase();
+              let firstClause: string | null = null;
+              let firstIndex = Infinity;
+              for (const clause of terminatingClauses) {
+                const idx = lowerQuery.indexOf(clause);
+                if (idx !== -1 && idx < firstIndex) {
+                  firstIndex = idx;
+                  firstClause = clause;
+                }
+              }
+              if (firstClause) {
+                const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
+                query = beforeClause.trim() + " where " + filter + " " + firstClause + afterClause;
               } else {
-                currentQuery[0].length == 0
-                  ? (currentQuery[0] = filter)
-                  : (currentQuery[0] += " and " + filter);
+                query = query + " where " + filter;
               }
             }
-
-            // this.searchObj.data.query = currentQuery[0];
-            queries[index] = currentQuery[0];
-          });
-
-          if (unionType == "") {
-            this.searchObj.data.query = queries.join("");
+            currentQuery[0] = query;
           } else {
-            this.searchObj.data.query = queries.join(` ${unionType} `);
+            const appendOnly = this.searchObj.data.stream.addToFilterMode === "append";
+            const fieldName = appendOnly ? null : getFieldFromExpression(filter);
+            if (fieldName && hasFieldCondition(currentQuery[0], fieldName)) {
+              currentQuery[0] = replaceExistingFieldCondition(currentQuery[0], fieldName, filter);
+            } else {
+              currentQuery[0].length == 0
+                ? (currentQuery[0] = filter)
+                : (currentQuery[0] += " and " + filter);
+            }
           }
-          this.searchObj.data.editorValue = this.searchObj.data.query;
-          this.searchObj.data.stream.addToFilter = "";
-          this.searchObj.data.stream.addToFilterMode = "replace";
-          if (this.queryEditorRef?.setValue)
-            this.queryEditorRef.setValue(this.searchObj.data.query);
-          if (this.store.state.zoConfig.auto_query_enabled && this.searchObj.meta.liveMode) {
-            this.$emit("searchdata");
-          }
+
+          // this.searchObj.data.query = currentQuery[0];
+          queries[index] = currentQuery[0];
+        });
+
+        if (unionType == "") {
+          this.searchObj.data.query = queries.join("");
+        } else {
+          this.searchObj.data.query = queries.join(` ${unionType} `);
+        }
+        this.searchObj.data.editorValue = this.searchObj.data.query;
+        this.searchObj.data.stream.addToFilter = "";
+        this.searchObj.data.stream.addToFilterMode = "replace";
+        if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(this.searchObj.data.query);
+        if (this.store.state.zoConfig.auto_query_enabled && this.searchObj.meta.liveMode) {
+          this.$emit("searchdata");
         }
       }
     },
@@ -5393,10 +5421,6 @@ export default defineComponent({
   transition: all 0.2s ease;
 }
 
-.logs-search-bar-component .download-logs-btn:hover {
-  background-color: var(--color-interactive-hover-bg);
-}
-
 .logs-search-bar-component .query-editor-container {
   height: calc(100% - 2.9rem) !important;
 }
@@ -5413,9 +5437,9 @@ export default defineComponent({
   border-radius: var(--radius-default);
 }
 
-/* keep(lib-override:o2): .saved-view-item is rendered by the Function/Transform
-   selector child components, so it needs :deep(). The !important outranks the
-   px-3/py-2 utilities TransformSelector puts on the same node. */
+/* keep(lib-override:o2): .saved-view-item is rendered by the FunctionSelector
+   child component, so it needs :deep(). The !important outranks the
+   px-3/py-2 utilities FunctionSelector puts on the same node. */
 .logs-search-bar-component :deep(.saved-view-item) {
   padding: 0.125rem 0.25rem !important;
 }

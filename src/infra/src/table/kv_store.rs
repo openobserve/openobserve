@@ -15,18 +15,15 @@
 
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 
-use super::{
-    entity::kv_store::{ActiveModel, Column, Entity, Model},
-    get_lock,
-};
+use super::entity::kv_store::{ActiveModel, Column, Entity, Model};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
 /// Gets a KV value by org_id and key
 pub async fn get(org_id: &str, key: &str) -> Result<Option<Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let kv_entry = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Key.eq(key))
@@ -39,9 +36,7 @@ pub async fn get(org_id: &str, key: &str) -> Result<Option<Model>, errors::Error
 pub async fn set(org_id: &str, key: &str, value: &[u8]) -> Result<(), errors::Error> {
     // Get client first, then acquire lock to prevent deadlock
     // (get_or_init may internally acquire locks during connection)
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // make sure only one client is writing to the database (only for sqlite)
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
 
     let active_model = ActiveModel {
@@ -69,9 +64,7 @@ pub async fn set(org_id: &str, key: &str, value: &[u8]) -> Result<(), errors::Er
 pub async fn delete(org_id: &str, key: &str) -> Result<(), errors::Error> {
     // Get client first, then acquire lock to prevent deadlock
     // (get_or_init may internally acquire locks during connection)
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // make sure only one client is writing to the database (only for sqlite)
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Key.eq(key))
@@ -82,7 +75,7 @@ pub async fn delete(org_id: &str, key: &str) -> Result<(), errors::Error> {
 
 /// Lists all keys for an org_id with optional prefix filter
 pub async fn list(org_id: &str, prefix: &str) -> Result<Vec<String>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let mut query = Entity::find()
         .filter(Column::OrgId.eq(org_id))
@@ -102,17 +95,14 @@ pub async fn list(org_id: &str, prefix: &str) -> Result<Vec<String>, errors::Err
 
 /// Clears all KV entries from the table
 pub async fn clear() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // make sure only one client is writing to the database (only for sqlite)
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many().exec(client).await?;
     Ok(())
 }
 
 /// Deletes all KV entries belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
         .exec(client)

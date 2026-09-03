@@ -258,7 +258,10 @@ mod tests {
             "precondition: the upgraded database has no unavailability table yet"
         );
 
-        Migration.up(&manager).await.expect("the upgrade must apply");
+        Migration
+            .up(&manager)
+            .await
+            .expect("the upgrade must apply");
         assert!(manager.has_table(TABLE).await.unwrap());
 
         // And it is actually writable, which the schema check above cannot
@@ -307,7 +310,10 @@ mod tests {
             .unwrap();
         Migration.up(&mgr).await.unwrap();
 
-        assert_eq!(columns(&fresh, TABLE).await, columns(&upgraded, TABLE).await);
+        assert_eq!(
+            columns(&fresh, TABLE).await,
+            columns(&upgraded, TABLE).await
+        );
     }
 
     #[tokio::test]

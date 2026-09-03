@@ -58,6 +58,7 @@
               :loading="loading"
               selectable
               :selected-key="selectedStatKey"
+              default-key="all"
               @select="onStatSelect"
             />
           </div>
@@ -412,9 +413,7 @@ function usedByCount(row: Scorer) {
 }
 
 function usedByText(row: Scorer) {
-  const count = usedByCount(row);
-  if (count === 1) return t("onlineEvals.scorer.usedByJob", { count });
-  return t("onlineEvals.scorer.usedByJobs", { count });
+  return t("onlineEvals.scorer.usedByJob", { count: usedByCount(row) });
 }
 
 useShortcuts([

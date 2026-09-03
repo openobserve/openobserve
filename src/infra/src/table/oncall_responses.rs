@@ -31,7 +31,7 @@ use sea_orm::{
 
 use super::entity::{oncall_response_events, oncall_responses};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::get_orm_client_rw,
     errors::{self, DbError, Error},
 };
 
@@ -99,7 +99,7 @@ pub async fn open(
     role: ResponderRole,
     origin_response_id: Option<&str>,
 ) -> Result<Response, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = oncall_responses::ActiveModel {
         id: Set(ider::uuid()),
         org_id: Set(org_id.to_string()),
@@ -167,7 +167,7 @@ pub async fn open_or_get(
 }
 
 pub async fn get(org_id: &str, id: &str) -> Result<Option<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_responses::Entity::find_by_id(id)
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .one(client)
@@ -179,7 +179,7 @@ pub async fn get_by_subject(
     org_id: &str,
     subject: &SubjectRef,
 ) -> Result<Option<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_responses::Entity::find()
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::SubjectType.eq(subject.subject_type.to_i32()))
@@ -196,7 +196,7 @@ pub async fn firing_count(
     subject_type: SubjectType,
     source_id: &str,
 ) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_responses::Entity::find()
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::SubjectType.eq(subject_type.to_i32()))
@@ -244,7 +244,7 @@ pub async fn list_open(
     limit: u64,
     offset: u64,
 ) -> Result<Vec<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(open_query(org_id, filter)
         // Most urgent first, then newest — and the id as a final tiebreak,
         // without which two records sharing a priority and an open time could
@@ -264,7 +264,7 @@ pub async fn list_open(
 /// How many records the same filter matches, so a paged screen can say what
 /// it is a page of. "Showing 50" is not an answer to "how bad is it".
 pub async fn count_open(org_id: &str, filter: &ResponseFilter<'_>) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(open_query(org_id, filter).count(client).await?)
 }
 
@@ -348,7 +348,7 @@ pub async fn cause_breakdown(
     from: i64,
     to: i64,
 ) -> Result<Vec<CauseCount>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let base = || {
         let mut q = oncall_responses::Entity::find()
@@ -417,7 +417,7 @@ pub async fn runbook_urls(
     if ids.is_empty() {
         return Ok(Default::default());
     }
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_responses::Entity::find()
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::Id.is_in(ids.to_vec()))
@@ -442,7 +442,7 @@ async fn runbook_for(org_id: &str, subject: &SubjectRef) -> Option<String> {
     if subject.subject_type != SubjectType::Alert {
         return None;
     }
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     super::entity::alerts::Entity::find_by_id(subject.source_id.clone())
         .filter(super::entity::alerts::Column::Org.eq(org_id))
         .one(client)
@@ -460,7 +460,7 @@ async fn runbook_for(org_id: &str, subject: &SubjectRef) -> Option<String> {
 /// record abandoned an hour ago matters more than one abandoned a second ago,
 /// and one pass should do a bounded amount of work.
 pub async fn list_escalating(org_id: &str, limit: u64) -> Result<Vec<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_responses::Entity::find()
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::State.is_in(escalating_states()))
@@ -478,7 +478,7 @@ pub async fn list_by_team(
     team_id: &str,
     limit: u64,
 ) -> Result<Vec<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_responses::Entity::find()
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::TeamId.eq(team_id))
@@ -503,7 +503,7 @@ pub async fn mark_exhausted(
     id: &str,
     at: i64,
 ) -> Result<Option<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Some(existing) = oncall_responses::Entity::find_by_id(id)
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .one(client)
@@ -525,7 +525,7 @@ pub async fn snooze(
     from: i64,
     until: i64,
 ) -> Result<Option<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Some(existing) = oncall_responses::Entity::find_by_id(id)
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .one(client)
@@ -562,7 +562,7 @@ pub async fn set_priority(
     id: &str,
     priority: i32,
 ) -> Result<Option<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Some(existing) = oncall_responses::Entity::find_by_id(id)
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .one(client)
@@ -612,7 +612,7 @@ async fn hand_over(
     to_team_id: Option<&str>,
     now: i64,
 ) -> Result<Option<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Some(existing) = oncall_responses::Entity::find_by_id(id)
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .one(client)
@@ -642,7 +642,7 @@ async fn hand_over(
 
 /// Records opened because `origin_id` fired — the impacted teams.
 pub async fn list_impacted(org_id: &str, origin_id: &str) -> Result<Vec<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_responses::Entity::find()
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::OriginResponseId.eq(origin_id))
@@ -663,7 +663,7 @@ pub async fn latest_open_for_source(
     subject_type: SubjectType,
     source_id: &str,
 ) -> Result<Option<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_responses::Entity::find()
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::SubjectType.eq(subject_type.to_i32()))
@@ -687,7 +687,7 @@ pub async fn history_for_source(
     source_id: &str,
     limit: u64,
 ) -> Result<Vec<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_responses::Entity::find()
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::SubjectType.eq(subject_type.to_i32()))
@@ -717,7 +717,7 @@ pub async fn acknowledge(
     id: &str,
     user_email: &str,
 ) -> Result<Option<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     oncall_responses::Entity::update_many()
         .col_expr(
             oncall_responses::Column::State,
@@ -769,7 +769,7 @@ pub async fn resolve(
     cause: Option<ResolutionCause>,
     cause_note: Option<&str>,
 ) -> Result<Option<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Some(existing) = oncall_responses::Entity::find_by_id(id)
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .one(client)
@@ -817,7 +817,7 @@ pub async fn attach_incident(
     id: &str,
     incident_id: &str,
 ) -> Result<Option<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Some(existing) = oncall_responses::Entity::find_by_id(id)
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .one(client)
@@ -838,7 +838,7 @@ pub async fn list_for_incident(
     org_id: &str,
     incident_id: &str,
 ) -> Result<Vec<Response>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_responses::Entity::find()
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_responses::Column::IncidentId.eq(incident_id))
@@ -851,7 +851,7 @@ pub async fn list_for_incident(
 }
 
 pub async fn add_event(response_id: &str, event: &ResponseEvent) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = oncall_response_events::ActiveModel {
         id: Set(ider::uuid()),
         response_id: Set(response_id.to_string()),
@@ -931,7 +931,7 @@ pub async fn list_deliveries(response_id: &str) -> Result<Vec<ResponseEvent>, er
 pub async fn prune_events(cutoff: i64, max_records: u64) -> Result<(u64, u64), errors::Error> {
     use sea_orm::sea_query::Query;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let ids: Vec<String> = oncall_responses::Entity::find()
         .filter(oncall_responses::Column::ClosedAt.is_not_null())
         .filter(oncall_responses::Column::ClosedAt.lt(cutoff))
@@ -966,7 +966,7 @@ pub async fn prune_events(cutoff: i64, max_records: u64) -> Result<(u64, u64), e
 }
 
 async fn all_events(response_id: &str) -> Result<Vec<ResponseEvent>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_response_events::Entity::find()
         .filter(oncall_response_events::Column::ResponseId.eq(response_id))
         .order_by_asc(oncall_response_events::Column::At)
@@ -1072,7 +1072,7 @@ pub async fn team_page_stats(
     night_windows: &[(i64, i64)],
     final_rung_micros: &[(i32, i64)],
 ) -> Result<TeamPageStats, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let pages = team_window(org_id, team_id, from, to).count(client).await? as i64;
     let acknowledged = team_window(org_id, team_id, from, to)
@@ -1162,7 +1162,7 @@ pub async fn acks_by_person(
     from: i64,
     to: i64,
 ) -> Result<Vec<(String, i64)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(team_window(org_id, team_id, from, to)
         .filter(oncall_responses::Column::AckedBy.is_not_null())
         .select_only()
@@ -1204,7 +1204,7 @@ pub async fn delivery_health(
 ) -> Result<std::collections::HashMap<String, (i64, i64)>, errors::Error> {
     use sea_orm::sea_query::Query;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let rows: Vec<DeliveryTally> = oncall_response_events::Entity::find()
         .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Delivery.to_i32()))
         .filter(oncall_response_events::Column::Recipient.is_not_null())
@@ -1229,8 +1229,7 @@ pub async fn delivery_health(
         .all(client)
         .await?;
 
-    let mut out: std::collections::HashMap<String, (i64, i64)> =
-        std::collections::HashMap::new();
+    let mut out: std::collections::HashMap<String, (i64, i64)> = std::collections::HashMap::new();
     for row in rows {
         let entry = out.entry(row.who).or_insert((0, 0));
         // A NULL `delivered` predates the column carrying an outcome. Counted
@@ -1256,7 +1255,7 @@ pub async fn deliveries_by_person(
 
     use sea_orm::sea_query::Query;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let base = || {
         oncall_response_events::Entity::find()
@@ -1344,7 +1343,7 @@ pub async fn routing_sentences(
 ) -> Result<Vec<(String, i64, i64)>, errors::Error> {
     use sea_orm::sea_query::Query;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_response_events::Entity::find()
         .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Sys.to_i32()))
         .filter(oncall_response_events::Column::At.gte(from))
@@ -1390,7 +1389,7 @@ pub async fn deepest_rungs(
     if ids.is_empty() {
         return Ok(Default::default());
     }
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_response_events::Entity::find()
         .filter(oncall_response_events::Column::ResponseId.is_in(ids.to_vec()))
         .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Page.to_i32()))
@@ -1434,6 +1433,7 @@ mod tests {
             closed_at: None,
             incident_id: None,
             runbook_url: None,
+            exhausted_at: None,
         }
     }
 

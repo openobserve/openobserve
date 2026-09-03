@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import type { TranslateFn } from "@/types/i18n";
 import serviceStreamsApi, {
   type CorrelationRequest,
   type CorrelationResponse,
@@ -82,9 +83,18 @@ export interface IncidentAlert {
   detected_source?: string | null;
 }
 
+export interface CompositeAlertSummary {
+  id: string;
+  name: string;
+  alert_type: "composite";
+  enabled: boolean;
+  folder_id: string;
+}
+
 export interface IncidentWithAlerts extends Incident {
   alerts: IncidentAlert[];
   triggers: IncidentAlert[];
+  composite_alerts?: CompositeAlertSummary[];
 }
 
 export interface ExternalAlertPayload {
@@ -263,11 +273,14 @@ const incidents = {
    *
    * @param org_identifier Organization ID
    * @param incident The incident with group_values
+   * @param t Translator, threaded from the calling component — the only
+   *   user-facing string here is the "unknown service" fallback name.
    * @returns Correlated streams grouped by type
    */
   getCorrelatedStreams: async (
     org_identifier: string,
     incident: Incident,
+    t: TranslateFn,
   ): Promise<IncidentCorrelatedStreams> => {
     const allDimensions = incident.group_values ?? {};
 
@@ -304,7 +317,7 @@ const incidents = {
     // Handle null response when no service is found
     if (!correlationData) {
       return {
-        serviceName: "Unknown Service",
+        serviceName: t("traces.unknownService"),
         matchedDimensions: {},
         additionalDimensions: allDimensions,
         logStreams: [],

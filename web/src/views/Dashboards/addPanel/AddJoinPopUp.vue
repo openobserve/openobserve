@@ -47,7 +47,7 @@
               class="rounded-default flex cursor-pointer flex-col items-center gap-0.5 border px-2.5 py-1.5 transition-colors"
               :class="
                 localJoinType === option.type
-                  ? 'border-accent text-accent bg-[color-mix(in_srgb,var(--color-accent)_15%,transparent)]'
+                  ? 'border-accent text-accent bg-accent/15'
                   : 'text-text-secondary hover:bg-surface-subtle border-transparent'
               "
               :aria-pressed="localJoinType === option.type"
@@ -85,7 +85,7 @@
         <div class="text-text-secondary py-2 text-center text-xs" v-if="showJoinSummary">
           {{ t("dashboard.addJoinPopUp.performing") }}
           <span
-            class="rounded-default text-accent inline-flex items-center bg-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] px-1.5 py-0.5 text-xs font-semibold"
+            class="rounded-default text-accent bg-accent/15 inline-flex items-center px-1.5 py-0.5 text-xs font-semibold"
             >{{ joinTypeLabel }} {{ t("dashboard.addJoinPopUp.join") }}</span
           >
           {{ t("dashboard.addJoinPopUp.between") }}
@@ -416,12 +416,10 @@ export default defineComponent({
         };
 
         const previousJoins =
-          currentQuery.joins?.slice(0, props.joinIndex)?.map(
-            (join: any): StreamReference => ({
-              stream: join.stream,
-              streamAlias: join.streamAlias,
-            }),
-          ) ?? [];
+          currentQuery.joins?.slice(0, props.joinIndex)?.map((join: any): StreamReference => ({
+            stream: join.stream,
+            streamAlias: join.streamAlias,
+          })) ?? [];
 
         return [mainStream, ...previousJoins];
       } catch (error) {
@@ -437,12 +435,10 @@ export default defineComponent({
       try {
         const response = (await getStreams(streamType, false)) as GetStreamsResponse;
 
-        streamOptions.value = response.list.map(
-          (stream: StreamListEntry): StreamOption => ({
-            label: raw(stream.name),
-            value: stream.name,
-          }),
-        );
+        streamOptions.value = response.list.map((stream: StreamListEntry): StreamOption => ({
+          label: raw(stream.name),
+          value: stream.name,
+        }));
 
         // Select first stream if no stream is selected or current stream is invalid
         if (streamOptions.value.length > 0) {

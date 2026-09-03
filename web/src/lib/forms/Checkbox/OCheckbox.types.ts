@@ -14,10 +14,7 @@ export type CheckboxColor = "primary" | "negative";
  */
 export type CheckboxPrimitive = string | number;
 export type CheckboxModelValue =
-  | boolean
-  | "indeterminate"
-  | CheckboxPrimitive
-  | CheckboxPrimitive[];
+  boolean | "indeterminate" | CheckboxPrimitive | CheckboxPrimitive[];
 
 export interface CheckboxProps {
   /** Current checked state. Use `true`, `false`, or `'indeterminate'` */
@@ -32,6 +29,8 @@ export interface CheckboxProps {
   val?: CheckboxPrimitive;
   /** Accessible label rendered next to the checkbox */
   label?: I18nText;
+  /** Names the control when it has no visible label — a wrapping <label> cannot. */
+  ariaLabel?: I18nText;
   /** Control size */
   size?: CheckboxSize;
   /** Value to emit when checked in custom-value mode */

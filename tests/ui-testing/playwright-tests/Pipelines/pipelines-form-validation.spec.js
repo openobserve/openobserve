@@ -268,13 +268,15 @@ test.describe(
 
         test.describe.configure({ mode: 'parallel' });
 
-        let nodeOpened = false;
-
         test.beforeEach(async ({ page }, testInfo) => {
             testLogger.testStart(testInfo.title, testInfo.file);
             await navigateToBase(page);
             pm = new PageManager(page);
-            nodeOpened = await pm.pipelinesFormValidation.openFirstAssociateFunctionNode();
+            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+            // Build a fresh Associate Function node so the drawer opens with no function selected.
+            await pm.pipelinesPage.openPipelineMenu();
+            await pm.pipelinesPage.addPipeline();
+            await pm.pipelinesPage.selectAndDragFunction();
         });
 
         // ── Test: open drawer without selecting function => error or save disabled
@@ -283,8 +285,6 @@ test.describe(
             'should show function-required error or disable save when no function is selected in Associate Function drawer',
             { tag: ['@domainFormValidation', '@P0', '@smoke'] },
             async ({ page }) => {
-                test.skip(!nodeOpened, 'No pipeline with Associate Function node found in this environment');
-
                 // Verify drawer is visible
                 await expect(
                     pm.pipelinesFormValidation.getAssociateFunctionDrawerLocator()
@@ -311,8 +311,6 @@ test.describe(
             'should change form mode when create-function toggle is activated',
             { tag: ['@domainFormValidation', '@P0', '@smoke'] },
             async ({ page }) => {
-                test.skip(!nodeOpened, 'No pipeline with Associate Function node found in this environment');
-
                 await expect(
                     pm.pipelinesFormValidation.getAssociateFunctionDrawerLocator()
                 ).toBeVisible({ timeout: 10000 });
@@ -623,7 +621,7 @@ test.describe(
 
                 await pm.pipelinesFormValidation.getImportPipelineImportBtnLocator().click();
 
-                await expect(page.locator('[data-test-variant="error"]')).toBeVisible({ timeout: 5000 });
+                await expect(pm.pipelinesFormValidation.getToastErrorLocator()).toBeVisible({ timeout: 5000 });
             }
         );
 

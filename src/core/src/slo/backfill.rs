@@ -27,9 +27,15 @@
 
 use config::{
     get_config,
-    meta::slo::{Slo, window::align_down},
+    meta::slo::{
+        Slo,
+        window::{align_down, align_up},
+    },
 };
-use infra::table::{slo as slo_table, slo_backfill_jobs as jobs};
+use infra::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    table::{slo as slo_table, slo_backfill_jobs as jobs},
+};
 
 /// Whether the job has more work.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,9 +75,7 @@ pub fn next_chunk(
 /// Fill one chunk for `slo`.
 pub async fn run_chunk(slo: &Slo) -> Result<ChunkOutcome, anyhow::Error> {
     let cfg = get_config();
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let Some(job) = jobs::get(db, &slo.id, slo.definition_generation).await? else {
         return Ok(ChunkOutcome::Done);
@@ -122,11 +126,50 @@ pub fn backfill_range(window_secs: i64, reset_time: i64, slice_interval_secs: i6
     (end - window_secs, end)
 }
 
+/// Pull a backfill range's start forward to the earliest instant the source can
+/// honestly be measured from (S-16 PR 4).
+///
+/// The floor is `max(ledger start, the source alert's last edit)`, and this
+/// takes the later of it and the range's own start. Two reasons it is not
+/// enough to stop at the ledger's earliest row:
+///
+/// * the eligibility rules (§5.1, §5.4) validate the alert's config **as of SLO save**, so history
+///   before the alert's last edit was produced under a config those checks never saw — an alert
+///   with `silence = 10` last month and `silence = 0` today passes §5.4 cleanly while its old
+///   intervals carry exactly §5.4's correlated-missingness bias, and that bias lives in the *gaps*,
+///   where no per-row stamp can reach;
+/// * the same clamp covers pre-SLO condition edits, which D59's generation bump cannot reach
+///   backwards.
+///
+/// Either bound may be absent — a source alert that has never been edited
+/// carries no `updated_at`, and one that has never evaluated has no ledger —
+/// and an absent bound constrains nothing.
+///
+/// Aligned **up**: aligning down would hand the pass a slice that starts before
+/// the floor, which is the one thing the clamp exists to prevent. Clamped to
+/// `range_end` so a floor newer than the whole range yields an empty range
+/// rather than an inverted one.
+pub fn clamp_backfill_start(
+    range_start: i64,
+    range_end: i64,
+    ledger_start_secs: Option<i64>,
+    source_last_edit_secs: Option<i64>,
+    slice_interval_secs: i64,
+) -> i64 {
+    let floor = match (ledger_start_secs, source_last_edit_secs) {
+        (Some(a), Some(b)) => a.max(b),
+        (Some(a), None) => a,
+        (None, Some(b)) => b,
+        (None, None) => return range_start,
+    };
+    align_up(floor, slice_interval_secs)
+        .max(range_start)
+        .min(range_end)
+}
+
 /// Whether a status row still needs its history filled.
 pub async fn is_needed(slo: &Slo) -> Result<bool, anyhow::Error> {
-    let db = infra::db::ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("database not initialized"))?;
+    let db = get_orm_client_ro().await;
     let status = slo_table::load_status(db, &slo.id, "").await?;
     Ok(status.is_some_and(|s| s.definition_generation == slo.definition_generation))
 }
@@ -198,6 +241,108 @@ mod tests {
     fn the_backfill_range_covers_exactly_the_window() {
         let (start, end) = backfill_range(7 * DAY, 7_776_000, 60);
         assert_eq!(end - start, 7 * DAY);
+    }
+
+    // ---- the alert-source clamp (S-16 PR 4) --------------------------------
+
+    const RANGE_START: i64 = 0;
+    const RANGE_END: i64 = 30 * DAY;
+
+    fn clamp(ledger: Option<i64>, edit: Option<i64>) -> i64 {
+        clamp_backfill_start(RANGE_START, RANGE_END, ledger, edit, 300)
+    }
+
+    /// The whole point of PR 4's clamp: the ledger's earliest row is NOT
+    /// enough on its own. History before the source alert's last edit was
+    /// produced under a config the eligibility checks never saw, and §5.4's
+    /// bias lives in the gaps, where no per-row stamp can reach.
+    #[test]
+    fn the_clamp_takes_the_later_of_the_ledger_and_the_last_edit() {
+        // Ledger reaches back 20 days; the alert was edited 5 days ago.
+        assert_eq!(
+            clamp(Some(10 * DAY), Some(25 * DAY)),
+            25 * DAY,
+            "an edit newer than the ledger must win"
+        );
+        // And the other way round: an alert untouched for months whose ledger
+        // only starts a week ago.
+        assert_eq!(
+            clamp(Some(23 * DAY), Some(2 * DAY)),
+            23 * DAY,
+            "a ledger newer than the last edit must win"
+        );
+    }
+
+    /// A missing bound constrains nothing — a source that has never been
+    /// edited carries no `updated_at`, and one that has never evaluated has no
+    /// ledger.
+    #[test]
+    fn an_absent_bound_does_not_clamp() {
+        assert_eq!(clamp(Some(10 * DAY), None), 10 * DAY);
+        assert_eq!(clamp(None, Some(10 * DAY)), 10 * DAY);
+        assert_eq!(clamp(None, None), RANGE_START);
+    }
+
+    /// Both bounds older than the window: there is nothing to clamp, and the
+    /// SLO gets its full window.
+    #[test]
+    fn bounds_older_than_the_range_leave_it_whole() {
+        assert_eq!(clamp(Some(-5 * DAY), Some(-DAY)), RANGE_START);
+    }
+
+    /// An off-grid floor must align UP. Aligning down would hand the pass a
+    /// slice that begins before the floor — measuring exactly the history the
+    /// clamp exists to exclude.
+    ///
+    /// Checked on WHICHEVER bound wins, not just one: a ledger start is a
+    /// persist-time evaluation instant (§5.3) and is essentially never a
+    /// multiple of the slice, so it is the bound most likely to be off-grid.
+    #[test]
+    fn an_off_grid_floor_aligns_up_not_down() {
+        let floor = 10 * DAY + 137;
+        for (ledger, edit) in [
+            (None, Some(floor)),
+            (Some(floor), None),
+            (Some(floor), Some(2 * DAY)),
+            (Some(2 * DAY), Some(floor)),
+        ] {
+            let start = clamp(ledger, edit);
+            assert_eq!(start % 300, 0, "start {start} is off the slice grid");
+            assert!(start >= floor, "start {start} reaches before the floor");
+            assert_eq!(start, 10 * DAY + 300);
+        }
+    }
+
+    /// A floor newer than the whole range leaves nothing to backfill — an
+    /// empty range, never an inverted one, so the walk terminates immediately
+    /// instead of scanning backwards forever.
+    #[test]
+    fn a_floor_past_the_range_end_leaves_nothing_to_fill() {
+        let start = clamp(None, Some(RANGE_END + DAY));
+        assert_eq!(start, RANGE_END);
+        assert_eq!(
+            next_chunk(None, start, RANGE_END, DAY, 300),
+            None,
+            "a clamped-away range must produce no chunk"
+        );
+    }
+
+    /// The clamp feeds `next_chunk` as `range_start`, so the final chunk must
+    /// still land on the slice grid — an off-grid boundary makes the histogram
+    /// emit a `slice_start` that straddles two chunks.
+    #[test]
+    fn a_clamped_range_still_walks_on_the_slice_grid() {
+        let start = clamp(None, Some(10 * DAY + 137));
+        let mut done_through = None;
+        for _ in 0..100 {
+            let Some((s, _)) = next_chunk(done_through, start, RANGE_END, DAY, 300) else {
+                break;
+            };
+            assert_eq!(s % 300, 0, "chunk start {s} is off the grid");
+            assert!(s >= start, "chunk start {s} reaches before the clamp");
+            done_through = Some(s);
+        }
+        assert_eq!(done_through, Some(start), "the walk must reach the clamp");
     }
 
     /// Walking the whole range must terminate, and must cover it exactly once.

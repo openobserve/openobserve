@@ -48,8 +48,13 @@ pub fn render_sns(c: &RenderedContent) -> (String, String) {
             c.links
                 .iter()
                 .map(|(label, url)| {
+                    // Same scheme filter as email's plaintext part: an SNS
+                    // subscription fans out to email/SMS clients that
+                    // linkify bare URLs, so a hostile scheme must not
+                    // survive into the text a human taps.
+                    let url = super::safe_url(url);
                     if label.is_empty() {
-                        url.clone()
+                        url.to_string()
                     } else {
                         format!("{label}: {url}")
                     }

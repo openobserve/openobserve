@@ -48,11 +48,35 @@ vi.mock("@/components/rum/errorTracking/view/ErrorHeader.vue", () => ({
   },
 }));
 
-vi.mock("@/components/rum/errorTracking/view/ErrorTags.vue", () => ({
+vi.mock("@/components/rum/errorTracking/view/ErrorContextCard.vue", () => ({
   default: {
-    name: "ErrorTags",
-    template: "<div data-test='error-tags'>ErrorTags</div>",
+    name: "ErrorContextCard",
+    template: "<div data-test='error-context-card'>ErrorContextCard</div>",
     props: ["error"],
+  },
+}));
+
+vi.mock("@/components/rum/errorTracking/view/ErrorImpactStrip.vue", () => ({
+  default: {
+    name: "ErrorImpactStrip",
+    template: "<div data-test='error-impact-strip'>ErrorImpactStrip</div>",
+    props: ["impact", "loading", "hasSignature"],
+  },
+}));
+
+vi.mock("@/components/rum/errorTracking/view/ErrorOccurrencesChart.vue", () => ({
+  default: {
+    name: "ErrorOccurrencesChart",
+    template: "<div data-test='error-occurrences-chart'>ErrorOccurrencesChart</div>",
+    props: ["buckets", "loading", "currentTimestamp"],
+  },
+}));
+
+vi.mock("@/components/rum/errorTracking/view/ErrorFacetBreakdown.vue", () => ({
+  default: {
+    name: "ErrorFacetBreakdown",
+    template: "<div data-test='error-facet-breakdown'>ErrorFacetBreakdown</div>",
+    props: ["facets", "loading"],
   },
 }));
 
@@ -289,14 +313,16 @@ describe("ErrorViewer.vue", () => {
     it("shows the trace correlation card when the error carries _oo_trace_id", async () => {
       await seedErrorDetails({
         error_id: "err-1",
-        _oo_trace_id: "trace-abc",
+        // Legacy zero-stripped id as SDK 0.4.x stored it (31 hex chars) — the
+        // card must receive the padded 32-char form the traces stream stores.
+        _oo_trace_id: "1a034c1aabc72f78880daf6c9755cff",
         session_id: "session-1",
         _timestamp: 1640995200000000,
       });
 
       const card = wrapper.findComponent({ name: "TraceCorrelationCard" });
       expect(card.exists()).toBe(true);
-      expect(card.props("traceId")).toBe("trace-abc");
+      expect(card.props("traceId")).toBe("01a034c1aabc72f78880daf6c9755cff");
       expect(card.props("timestamp")).toBe(1640995200000000);
     });
 
@@ -306,13 +332,27 @@ describe("ErrorViewer.vue", () => {
         _timestamp: 1640995200000000,
         events: [
           { type: "action", action_type: "click" },
-          { type: "resource", resource_type: "xhr", _oo_trace_id: "trace-xhr" },
+          {
+            type: "resource",
+            resource_type: "xhr",
+            _oo_trace_id: "0badc0ffee0ddf00dd15ea5eba5eba11",
+          },
         ],
       });
 
       const card = wrapper.findComponent({ name: "TraceCorrelationCard" });
       expect(card.exists()).toBe(true);
-      expect(card.props("traceId")).toBe("trace-xhr");
+      expect(card.props("traceId")).toBe("0badc0ffee0ddf00dd15ea5eba5eba11");
+    });
+
+    it("hides the card when the stored trace id is not plausible hex", async () => {
+      await seedErrorDetails({
+        error_id: "err-1",
+        _oo_trace_id: "not-a-trace-id",
+        _timestamp: 1640995200000000,
+      });
+
+      expect(wrapper.findComponent({ name: "TraceCorrelationCard" }).exists()).toBe(false);
     });
 
     it("hides the card when neither the error nor its events carry a trace id", async () => {
@@ -398,7 +438,10 @@ describe("ErrorViewer.vue", () => {
       await nextTick();
 
       expect(wrapper.find('[data-test="error-header"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="error-tags"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-impact-strip"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-occurrences-chart"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-facet-breakdown"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-context-card"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="error-stack-trace"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="error-session-replay"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="error-events"]').exists()).toBe(true);
@@ -437,9 +480,14 @@ describe("ErrorViewer.vue", () => {
       expect(errorHeader.props("error")).toEqual(wrapper.vm.errorDetails);
     });
 
-    it("should pass correct props to ErrorTags", () => {
-      const errorTags = wrapper.findComponent({ name: "ErrorTags" });
-      expect(errorTags.props("error")).toEqual(wrapper.vm.errorDetails);
+    it("should pass correct props to ErrorContextCard", () => {
+      const contextCard = wrapper.findComponent({ name: "ErrorContextCard" });
+      expect(contextCard.props("error")).toEqual(wrapper.vm.errorDetails);
+    });
+
+    it("should anchor the occurrences chart on the viewed event", () => {
+      const chart = wrapper.findComponent({ name: "ErrorOccurrencesChart" });
+      expect(chart.props("currentTimestamp")).toBe(wrapper.vm.errorDetails._timestamp);
     });
 
     it("should pass correct props to ErrorStackTrace", () => {

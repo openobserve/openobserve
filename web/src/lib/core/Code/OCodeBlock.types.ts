@@ -36,6 +36,27 @@ export interface CodeBlockProps {
   revealTooltip?: I18nText;
   hideTooltip?: I18nText;
   /**
+   * Wrap long lines instead of scrolling horizontally. Use when the code is
+   * meant to be READ in place (a query shown for confirmation) rather than
+   * scanned — a horizontal scrollbar hides the end of the statement, which is
+   * usually the part that matters.
+   */
+  wrap?: boolean;
+  /**
+   * Cap the visible height at roughly this many lines and scroll vertically past
+   * it. Keeps a long query from pushing the rest of a dialog off-screen while
+   * still showing enough to read at a glance.
+   */
+  maxLines?: number;
+  /**
+   * Show a line-number gutter, for code the reader needs to talk about or scan
+   * by position — a config file, a diff, an error pointing at a line.
+   *
+   * Ignored when `wrap` is set: a wrapped line occupies more rows than its
+   * number accounts for, so the two columns would drift apart.
+   */
+  lineNumbers?: boolean;
+  /**
    * data-test prefix for the toolbar buttons, e.g. "ai-code" yields
    * "ai-code-copy-btn" / "ai-code-reveal-btn". Default: "code-block".
    */

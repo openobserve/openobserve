@@ -63,9 +63,9 @@ class FunctionsFormValidationPage {
 
     // ==================== FunctionsToolbar locators ====================
 
-    // VRL / JS transform type radios
-    this.vrlRadio = page.locator('[data-test="function-transform-type-vrl-radio"]');
-    this.jsRadio = page.locator('[data-test="function-transform-type-js-radio"]');
+    // VRL / JS language toggle (OToggleGroup items)
+    this.vrlOption = page.locator('[data-test="function-transform-type-vrl-option"]');
+    this.jsOption = page.locator('[data-test="function-transform-type-js-option"]');
 
     // ==================== StreamRouting locators ====================
 
@@ -253,14 +253,11 @@ class FunctionsFormValidationPage {
   // ==================== FunctionsToolbar assertion helpers ====================
 
   async assertVrlRadioSelected() {
-    testLogger.info('Asserting VRL radio is checked');
-    await this.vrlRadio.waitFor({ state: 'visible', timeout: 10000 });
-    // ORadio renders a native input — check aria-checked or checked attribute
-    const checked = await this.vrlRadio.evaluate(el => {
-      const input = el.querySelector('input[type="radio"]') || el.closest('[role="radio"]') || el;
-      return input.checked || el.getAttribute('aria-checked') === 'true' || el.getAttribute('data-state') === 'checked';
-    });
-    expect(checked).toBe(true);
+    testLogger.info('Asserting the VRL language option is selected');
+    await this.vrlOption.waitFor({ state: 'visible', timeout: 10000 });
+    // OToggleGroupItem exposes selection via Reka-UI's `data-state="on|off"`
+    // (and mirrors it on aria-pressed).
+    await expect(this.vrlOption).toHaveAttribute('data-state', 'on');
   }
 
   // ==================== StreamRouting actions ====================

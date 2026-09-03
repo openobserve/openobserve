@@ -35,11 +35,9 @@ use openobserve::{
     telemetry::{enable_tracing, setup_logs},
 };
 use openobserve_api_http::handler::http::router::*;
-use openobserve_core::{bootstrap, metadata};
+use openobserve_core::bootstrap;
 use openobserve_jobs::job;
 use tokio::sync::oneshot;
-#[cfg(feature = "enterprise")]
-use tower_http::trace::TraceLayer;
 use tracing_appender::non_blocking::WorkerGuard;
 use utoipa::OpenApi;
 #[cfg(feature = "enterprise")]
@@ -149,14 +147,6 @@ async fn main() -> Result<(), anyhow::Error> {
             .expect("Failed to install rustls crypto provider");
     }
 
-    // init action server
-    #[cfg(feature = "enterprise")]
-    if config::cluster::LOCAL_NODE.is_action_server() && config::cluster::LOCAL_NODE.is_standalone()
-    {
-        log::info!("Starting action server");
-        return init_action_server().await;
-    }
-
     // init backend jobs
     let (job_init_tx, job_init_rx) = oneshot::channel();
     let (job_shutudown_tx, job_shutdown_rx) = oneshot::channel();
@@ -232,8 +222,6 @@ async fn main() -> Result<(), anyhow::Error> {
             job_shutdown_rx.await.ok();
             job_stopped_tx.send(()).ok();
 
-            // flush distinct values
-            _ = metadata::close().await;
             // flush WAL cache to disk
             _ = ingester::flush_all().await;
             // flush compact offset cache to disk disk
@@ -261,7 +249,6 @@ async fn main() -> Result<(), anyhow::Error> {
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
     let grpc_rt_handle = std::thread::spawn(move || {
         let Ok(rt) = create_grpc_runtime() else {
-            grpc_init_tx.send(()).ok();
             panic!("grpc runtime init failed");
         };
 
@@ -284,7 +271,9 @@ async fn main() -> Result<(), anyhow::Error> {
     });
 
     // wait for gRPC init
-    grpc_init_rx.await.ok();
+    grpc_init_rx
+        .await
+        .map_err(|e| anyhow::anyhow!("gRPC server init failed: {e}"))?;
 
     // Register main HTTP runtime for metrics collection
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
@@ -295,7 +284,7 @@ async fn main() -> Result<(), anyhow::Error> {
     openobserve_node::runtime_metrics::start_metrics_collector().await;
 
     // let node online
-    let _ = cluster::set_online().await;
+    cluster::set_online().await?;
 
     // initialize the jobs are deferred until the gRPC service starts
     job::init_deferred()
@@ -431,92 +420,10 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[cfg(feature = "enterprise")]
-async fn init_action_server() -> Result<(), anyhow::Error> {
-    let cfg = get_config();
-    let haddr = openobserve_api_http::server::server_addr()?;
-
-    // Setup the namespace
-    o2_enterprise::enterprise::actions::action_deployer::init().await?;
-
-    log::info!(
-        "Starting Action Server {} server at: {haddr}",
-        if cfg.http.tls_enabled {
-            "HTTPS"
-        } else {
-            "HTTP"
-        }
-    );
-
-    // Build the router for action server
-    let app = openobserve_api_http::server::apply_common_middlewares(create_action_server_router())
-        .layer(TraceLayer::new_for_http());
-
-    openobserve_api_http::server::serve(haddr, app).await?;
-
-    log::info!("HTTP server stopped");
-
-    // flush usage report
-    flush_reporting().await;
-
-    // stop telemetry
-    if cfg.common.telemetry_enabled {
-        meta::telemetry::Telemetry::new()
-            .send_track_event("OpenObserve - Server stopped", None, true, true)
-            .await;
-    }
-
-    log::info!("server stopped");
-
-    Ok(())
-}
-
-#[cfg(feature = "enterprise")]
-pub fn create_action_server_router() -> axum::Router {
-    use axum::{
-        Router,
-        extract::DefaultBodyLimit,
-        middleware,
-        routing::{get, post},
-    };
-    use openobserve_api_http::handler::http::router::cors_layer;
-    use openobserve_api_management::request::action_server;
-
-    let cfg = get_config();
-
-    // Create action server routes with authentication
-    // Routes match action_manager.rs expected URLs: /api/{org_id}/v1/job[/{id}]
-    let api_routes = Router::new()
-        .route(
-            "/{org_id}/v1/job",
-            post(action_server::create_job).get(action_server::list_deployed_apps),
-        )
-        .route(
-            "/{org_id}/v1/job/{name}",
-            get(action_server::get_app_details)
-                .delete(action_server::delete_job)
-                .put(action_server::patch_action),
-        )
-        .layer(middleware::from_fn(
-            openobserve_api_common::auth::action_server::auth_middleware,
-        ))
-        .layer(cors_layer());
-
-    // Nest under base URI and set request body size limit
-    let router = Router::new().nest(&format!("{}/api", cfg.common.base_uri), api_routes);
-
-    // Set request body size limit (equivalent to actix-web's PayloadConfig)
-    router.layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit))
-}
-
 /// Initializes enterprise features.
 #[cfg(feature = "enterprise")]
 async fn init_enterprise() -> Result<(), anyhow::Error> {
     o2_enterprise::enterprise::search::init().await?;
-
-    if let Err(e) = o2_enterprise::enterprise::actions::action_manager::init_client() {
-        log::warn!("Failed to init action manager client: {e}");
-    }
 
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
@@ -525,6 +432,13 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         log::info!("init super cluster");
         o2_enterprise::enterprise::super_cluster::kv::init().await?;
         super_cluster_queue::init().await?;
+        // Composite alerts are unsupported in super-cluster mode (§18): fail
+        // closed at startup if any definitions or jobs remain, before serving.
+        if let Err(e) = openobserve_core::alerts::composite::startup_preflight().await {
+            return Err(anyhow::anyhow!(
+                "composite alerts super-cluster startup preflight failed: {e:#}"
+            ));
+        }
     }
 
     // Initialize enterprise AI components (agent and evaluation clients).
@@ -539,32 +453,6 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
     let o2cfg = o2_enterprise::enterprise::common::config::get_config();
     if let Err(e) = check_ratelimit_config(&cfg, &o2cfg) {
         panic!("ratelimit config error: {e}");
-    }
-
-    // Push the synthetics limits from enterprise config into the OSS validator.
-    // Synthetics is enterprise-only, so the values live in SyntheticsConfig, but
-    // the check validation they bound lives in `config` — which cannot depend on
-    // o2_enterprise. This is the seam.
-    //
-    // Deliberately NOT fatal, unlike ratelimit above: synthetics is one feature,
-    // and refusing to start the whole application — ingest, search, dashboards —
-    // because a probe ceiling is misconfigured would be the worse outage. On
-    // rejection nothing is installed and validation keeps using the conservative
-    // built-in defaults, so the failure mode is "stricter than intended", not
-    // "accepts checks that get killed mid-run".
-    if let Err(e) =
-        config::meta::synthetics::init_limits(config::meta::synthetics::SyntheticsLimits {
-            job_lease_secs: o2cfg.synthetics.job_lease_secs,
-            max_check_budget_secs: o2cfg.synthetics.max_check_budget_secs,
-            max_net_timeout_ms: o2cfg.synthetics.max_net_timeout_ms,
-        })
-    {
-        log::error!(
-            "synthetics limits config rejected, falling back to defaults \
-             (budget={}s lease={}s): {e}",
-            config::meta::synthetics::DEFAULT_MAX_CHECK_BUDGET_SECS,
-            config::meta::synthetics::DEFAULT_JOB_LEASE_SECS,
-        );
     }
 
     o2_enterprise::enterprise::pipeline::pipeline_file_server::PipelineFileServer::run().await?;

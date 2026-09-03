@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-
 //! Who a level of the ladder pages.
 //!
 //! **Three kinds, and that is the whole vocabulary.** A level names a rotation,
@@ -359,8 +358,14 @@ mod tests {
     /// reach the registry.
     #[test]
     fn test_kind_labels_are_bounded() {
-        assert_eq!(EscalationTarget::rotation("3I96D").kind(), "rotation_on_call");
-        assert_eq!(EscalationTarget::everyone_in("3I96D").kind(), "rotation_all");
+        assert_eq!(
+            EscalationTarget::rotation("3I96D").kind(),
+            "rotation_on_call"
+        );
+        assert_eq!(
+            EscalationTarget::everyone_in("3I96D").kind(),
+            "rotation_all"
+        );
         assert_eq!(EscalationTarget::user("ana@o2.ai").kind(), "user");
         assert_eq!(EscalationTarget::WholeTeam.kind(), "whole_team");
         for t in [

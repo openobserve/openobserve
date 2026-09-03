@@ -406,13 +406,7 @@ export interface StepEvidence {
 // why the panel reads the bundle rather than the index.
 
 export type EvidenceKind =
-  | "console"
-  | "pageerror"
-  | "response"
-  | "requestfailed"
-  | "dialog"
-  | "crash"
-  | "truncation";
+  "console" | "pageerror" | "response" | "requestfailed" | "dialog" | "crash" | "truncation";
 
 export interface EvidenceEvent {
   /** When the event was OBSERVED. */
@@ -530,7 +524,7 @@ export interface EvidenceBundle {
 }
 
 /** Severity order: what to read first, not what there is most of. */
-const EVIDENCE_GROUP_ORDER: EvidenceGroup["kind"][] = [
+export const EVIDENCE_GROUP_ORDER: EvidenceGroup["kind"][] = [
   "pageErrors",
   "requestsFailed",
   "console",

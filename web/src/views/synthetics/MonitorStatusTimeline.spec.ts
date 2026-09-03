@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 import MonitorStatusTimeline from "./MonitorStatusTimeline.vue";
@@ -320,14 +320,6 @@ describe("MonitorStatusTimeline", () => {
       ];
       wrapper = makeWrapper({ segments });
 
-      const bars = wrapper.findAll('[data-test="monitor-status-timeline"] [style]');
-      // Each segment renders a div with `:style="{ width: ... }"` and `:class="seg.color"`
-      // We should have at least 2 bars with style (the timeline segments)
-      // plus potentially more from the legend dots.
-      // Just verify bars exist with color classes
-      const allNodes = wrapper.findAll(
-        '[data-test="monitor-status-timeline"] > div > div > div > div > div > div',
-      );
       // The color class is bound to each segment div inside the scroll area
       const bars_in_scroll = wrapper
         .find('[data-test="monitor-status-timeline"]')

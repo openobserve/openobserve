@@ -113,57 +113,7 @@ import {
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
-import type {
-  BarSeriesOption,
-  LineSeriesOption,
-  CustomSeriesOption,
-  GaugeSeriesOption,
-  PieSeriesOption,
-  ScatterSeriesOption,
-  HeatmapSeriesOption,
-  SankeySeriesOption,
-  TreeSeriesOption,
-} from "echarts/charts";
-import type { ComposeOption } from "echarts/core";
 import { withChartFont } from "@/utils/fonts";
-import type {
-  TitleComponentOption,
-  TooltipComponentOption,
-  GridComponentOption,
-  ToolboxComponentOption,
-  DatasetComponentOption,
-  LegendComponentOption,
-  PolarComponentOption,
-  VisualMapComponentOption,
-  DataZoomComponentOption,
-  MarkLineComponentOption,
-  MarkAreaComponentOption,
-  GraphicComponentOption,
-} from "echarts/components";
-
-type ECOption = ComposeOption<
-  | BarSeriesOption
-  | LineSeriesOption
-  | CustomSeriesOption
-  | GaugeSeriesOption
-  | PieSeriesOption
-  | ScatterSeriesOption
-  | HeatmapSeriesOption
-  | SankeySeriesOption
-  | TreeSeriesOption
-  | TitleComponentOption
-  | TooltipComponentOption
-  | GridComponentOption
-  | ToolboxComponentOption
-  | DatasetComponentOption
-  | LegendComponentOption
-  | PolarComponentOption
-  | VisualMapComponentOption
-  | DataZoomComponentOption
-  | MarkLineComponentOption
-  | MarkAreaComponentOption
-  | GraphicComponentOption
->;
 
 echarts.use([
   TitleComponent,
@@ -728,13 +678,6 @@ export default defineComponent({
       chart?.dispose();
       chart = null;
 
-      // Clean up intersection observer
-      if (chartRef.value && isChartVisibleObserver) {
-        isChartVisibleObserver.unobserve(chartRef.value);
-        isChartVisibleObserver.disconnect();
-        isChartVisibleObserver = null;
-      }
-
       // Clear chart reference
       if (chartRef.value) {
         chartRef.value = null;
@@ -768,11 +711,9 @@ export default defineComponent({
     });
 
     onUnmounted(() => {
-      if (chartRef.value) {
-        // unobserve chart
-        isChartVisibleObserver?.unobserve(chartRef.value);
-        isChartVisibleObserver?.disconnect();
-      }
+      // Never guard on chartRef: Vue nulls template refs before unmounted hooks run.
+      isChartVisibleObserver?.disconnect();
+      isChartVisibleObserver = null;
 
       cleanupChart();
     });

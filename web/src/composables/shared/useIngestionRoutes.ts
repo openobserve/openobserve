@@ -57,6 +57,7 @@ import Redis from "@/components/ingestion/databases/Redis.vue";
 import CouchDB from "@/components/ingestion/databases/CouchDB.vue";
 import Elasticsearch from "@/components/ingestion/databases/Elasticsearch.vue";
 import MySQL from "@/components/ingestion/databases/MySQL.vue";
+import MariaDB from "@/components/ingestion/databases/MariaDB.vue";
 import SAPHana from "@/components/ingestion/databases/SAPHana.vue";
 import Snowflake from "@/components/ingestion/databases/Snowflake.vue";
 import Zookeeper from "@/components/ingestion/databases/Zookeeper.vue";
@@ -140,7 +141,7 @@ const useIngestionRoutes = () => {
       name: "ingestion",
       component: Ingestion,
       meta: {
-        title: "Ingestion",
+        titleKey: "menu.ingestionText",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
@@ -410,22 +411,17 @@ const useIngestionRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
-            // Discoverability pointer → the MCP setup home in IAM. Enterprise/
-            // Cloud only (matches where the tab is shown in Recommended.vue and
-            // where the target "mcpServer" route exists), so an OSS deep-link
-            // can't land here and push to a route that doesn't exist.
-            ...(config.isEnterprise == "true" || config.isCloud == "true"
-              ? [
-                  {
-                    path: "mcp",
-                    name: "recommendedMcp",
-                    component: McpCrossLink,
-                    beforeEnter(to: any, from: any, next: any) {
-                      routeGuard(to, from, next);
-                    },
-                  },
-                ]
-              : []),
+            // Discoverability pointer → the MCP setup home in IAM. Registered on
+            // every edition, matching both the tab in Recommended.vue and the
+            // target "mcpServer" route, which are no longer build-gated.
+            {
+              path: "mcp",
+              name: "recommendedMcp",
+              component: McpCrossLink,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
           ],
         },
         {
@@ -488,6 +484,14 @@ const useIngestionRoutes = () => {
               path: "mysql",
               name: "mysql",
               component: MySQL,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "mariadb",
+              name: "mariadb",
+              component: MariaDB,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },

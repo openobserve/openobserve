@@ -51,6 +51,8 @@ const hasValidPosition = ref(false);
 const transitionOn = ref(false);
 
 let resizeObserver: ResizeObserver | null = null;
+let mutationObserver: MutationObserver | null = null;
+let settleRaf = 0;
 
 /**
  * Place the indicator over the active item.
@@ -63,11 +65,16 @@ const measure = (animated: boolean) => {
   if (!indicator || !track) return;
 
   const active = track.querySelector<HTMLElement>('[data-state="on"]');
+  // A value matching no item: hide the pill rather than leave it on the last choice.
+  if (!active) {
+    indicatorVisible.value = false;
+    return;
+  }
   // Skip while the group (or an ancestor) is hidden / not laid out — e.g. a tab
   // panel that isn't the visible one. Measuring here would store a bogus
   // 0-position, and revealing later would slide the pill in from the corner
   // (the "random animation" bug). Keep the last valid position instead.
-  if (!active || active.offsetParent === null) return;
+  if (active.offsetParent === null) return;
 
   // Position relative to the track's padding box (where an absolute left:0/top:0
   // child originates), subtracting the track border so the bordered variant lines
@@ -95,6 +102,16 @@ const measure = (animated: boolean) => {
   };
 };
 
+/**
+ * Snap-measure now and again on the next frame: a mutation callback can sample
+ * layout mid-update, and a placement taken then would never self-correct.
+ */
+const measureSettled = () => {
+  measure(false);
+  cancelAnimationFrame(settleRaf);
+  settleRaf = requestAnimationFrame(() => measure(false));
+};
+
 // Slide when the selection changes …
 watch(
   () => props.modelValue,
@@ -116,11 +133,25 @@ onMounted(async () => {
     resizeObserver = new ResizeObserver(() => measure(false));
     resizeObserver.observe(track);
   }
+  // A drag-to-reorder (or an item added/removed) moves the active item without
+  // changing the track's size, so the ResizeObserver above never fires and the
+  // pill would keep the previous item's position/width while the active text
+  // colour follows the moved item. Watch the child list for that.
+  // Attributes are deliberately not observed: `data-state` flips on a real
+  // selection change, which the modelValue watcher already handles with a
+  // slide, and snapping here would cancel it.
+  if (track && typeof MutationObserver !== "undefined") {
+    mutationObserver = new MutationObserver(measureSettled);
+    mutationObserver.observe(track, { childList: true });
+  }
 });
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect();
   resizeObserver = null;
+  mutationObserver?.disconnect();
+  mutationObserver = null;
+  cancelAnimationFrame(settleRaf);
 });
 
 const indicatorClasses = computed(() => [

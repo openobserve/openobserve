@@ -27,12 +27,15 @@
 <template>
   <OPageLayout
     :title="t('slos.title')"
-    icon="track-changes"
+    icon="target"
     :subtitle="t('slos.subtitle')"
     title-data-test="slos-slolist-title"
     bleed
   >
     <template #actions>
+      <!-- The provider behind the Terraform export, which is otherwise only
+           discoverable once the export dialog is already open. -->
+      <IacRegistryLinks data-test="slos-slolist-iac-registries" />
       <OButton
         variant="primary"
         size="sm-action"
@@ -81,6 +84,17 @@
           >
             {{ t("slos.moveSelected", { count: selectedIds.length }) }}
           </OButton>
+          <OButton
+            v-if="selectedIds.length"
+            variant="outline"
+            size="sm-action"
+            icon-left="download"
+            :loading="exporting"
+            data-test="slos-slolist-export-selected"
+            @click="openExport(selectedRows)"
+          >
+            {{ t("common.export") }}
+          </OButton>
           <OToggleGroup v-model="typeFilter" data-test="slos-slolist-type-filter">
             <OToggleGroupItem
               v-for="opt in typeOptions"
@@ -122,7 +136,7 @@
           icon-left="refresh"
           :loading="loading"
           data-test="slos-slolist-refresh"
-          @click="load"
+          @click="() => load()"
         >
           <OTooltip side="bottom" :content="t('slos.refresh')" />
         </OButton>
@@ -142,6 +156,7 @@
             :loading="loading"
             selectable
             :selected-key="healthFilter"
+            default-key="total"
             @select="onStatSelect"
           />
         </div>
@@ -262,6 +277,14 @@
           <OButton
             variant="ghost"
             size="icon-sm"
+            icon-left="download"
+            :title="t('common.export')"
+            :data-test="`slos-slolist-export-${row.name}`"
+            @click="openExport([row])"
+          />
+          <OButton
+            variant="ghost"
+            size="icon-sm"
             icon-left="delete"
             :title="t('slos.delete')"
             :data-test="`slos-slolist-delete-${row.name}`"
@@ -272,7 +295,7 @@
 
       <template #empty>
         <OEmptyState
-          icon="track-changes"
+          icon="target"
           :title="t('slos.empty.title')"
           :description="t('slos.empty.description')"
         >
@@ -292,6 +315,35 @@
       data-test="slos-slolist-delete-dialog"
     >
       <p>{{ t("slos.deleteConfirmBody", { name: pendingDelete?.name }) }}</p>
+      <!-- The cascade, which is the irreversible part. Deleting an SLO deletes
+           every alert attached to it, and until this said so the dialog warned
+           only about disk. Three states, all distinct: still checking, a known
+           count, and "we could not find out" — silence is reserved for the one
+           case where it truly means nothing happens (zero attached). -->
+      <OBanner
+        v-if="alertCountState === 'loading'"
+        variant="info"
+        class="mt-3"
+        data-test="slos-slolist-delete-alert-count-loading"
+      >
+        {{ t("slos.deleteAlertsChecking") }}
+      </OBanner>
+      <OBanner
+        v-else-if="alertCountState === 'ready' && alertCount > 0"
+        variant="warning"
+        class="mt-3"
+        data-test="slos-slolist-delete-alert-count"
+      >
+        {{ t("slos.deleteAlertsNote", { count: alertCount }, alertCount) }}
+      </OBanner>
+      <OBanner
+        v-else-if="alertCountState === 'unknown'"
+        variant="warning"
+        class="mt-3"
+        data-test="slos-slolist-delete-alert-count-unknown"
+      >
+        {{ t("slos.deleteAlertsUnknown") }}
+      </OBanner>
       <!-- Not a footnote: deleting an SLO does NOT free the storage its slices
            occupy, and the budget stays charged until they age out (S-14c). -->
       <OBanner variant="info" class="mt-3">
@@ -301,7 +353,12 @@
         <OButton variant="outline" size="sm-action" @click="deleteDialog = false">
           {{ t("common.cancel") }}
         </OButton>
-        <OButton variant="destructive" size="sm-action" @click="doDelete">
+        <OButton
+          variant="destructive"
+          size="sm-action"
+          data-test="slos-slolist-delete-confirm"
+          @click="doDelete"
+        >
           {{ t("slos.delete") }}
         </OButton>
       </template>
@@ -332,16 +389,29 @@
         </OButton>
       </template>
     </ODialog>
+
+    <ExportResourceDialog
+      v-model:open="exportDialog"
+      :items="slosToExport"
+      :terraform="slosTerraform"
+      :title="t('slos.exportTitle', { count: slosToExport.length }, slosToExport.length)"
+      :sub-title="t('slos.exportSubtitle')"
+      file-prefix="slos"
+      data-test="slos-slolist-export-dialog"
+      @download="onExported"
+    />
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import ExportResourceDialog from "@/components/common/ExportResourceDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
+import IacRegistryLinks from "@/components/common/IacRegistryLinks.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -355,6 +425,7 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -363,6 +434,9 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { SloListItem } from "@/ts/interfaces/slo";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import sloService from "@/services/slos";
+import alertsService from "@/services/alerts";
+import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
+import { slosToTerraform } from "@/utils/slos/sloTerraform";
 import {
   ABSENT,
   compareByUrgency,
@@ -403,17 +477,82 @@ const org = computed(() => store.state.selectedOrganization?.identifier);
 
 const selectedRows = computed(() => rows.value.filter((r) => selectedIds.value.includes(r.id)));
 
+// ── Export ──────────────────────────────────────────────────────────────────
+// The list rows carry measurement status rather than the full definition, so an
+// export re-reads each SLO and shows it as JSON or as an openobserve_slo
+// Terraform resource.
+const exportDialog = ref(false);
+const exporting = ref(false);
+const slosToExport = ref<Record<string, unknown>[]>([]);
+const slosTerraform = computed(() =>
+  slosToTerraform(slosToExport.value, { folderId: activeFolderId.value }),
+);
+
+async function fetchSloForExport(id: string): Promise<Record<string, unknown> | null> {
+  const res = await sloService.get(org.value, id);
+  const body = (res.data ?? {}) as Record<string, unknown>;
+  if (!body.name) return null;
+  // The endpoint flattens the definition alongside `status`, its live
+  // measurement, and carries counters the server assigns. None of that describes
+  // the SLO, and the id belongs to the one this was read from rather than the one
+  // a configuration creates, so an export keeps only the definition.
+  const {
+    id: _id,
+    status: _status,
+    definition_generation: _generation,
+    groups_estimate: _estimate,
+    groups_reserved: _reserved,
+    ...definition
+  } = body;
+  return definition;
+}
+
+async function openExport(items: SloListItem[]) {
+  if (exporting.value || !items.length) return;
+  exporting.value = true;
+  try {
+    const fetched = await Promise.all(items.map((item) => fetchSloForExport(item.id)));
+    const usable = fetched.filter((slo): slo is Record<string, unknown> => slo !== null);
+    if (!usable.length) throw new Error("empty export payload");
+    slosToExport.value = usable;
+    exportDialog.value = true;
+
+    // A definition that came back empty is a gap in the export. Dropping it
+    // quietly would leave the success toast reporting the smaller count as
+    // though everything had been exported.
+    const missing = items.filter((_, i) => fetched[i] === null).map((item) => item.name);
+    if (missing.length) {
+      toast({
+        variant: "warning",
+        message: t("slos.exportPartial", { names: missing.join(", ") }),
+      });
+    }
+  } catch (e: any) {
+    toast({
+      variant: "error",
+      message: raw(e?.response?.data?.message) || t("slos.exportFailed"),
+    });
+  } finally {
+    exporting.value = false;
+  }
+}
+
+function onExported({ count }: { format: string; count: number }) {
+  toast({ variant: "success", message: t("slos.exportSucceeded", { count }, count) });
+  selectedIds.value = [];
+}
+
 /** Folder ids are opaque; the rail and this column show the human name. */
 function folderName(folderId: string): string {
   const folders = store.state.organizationData?.foldersByType?.alerts ?? [];
   return folders.find((f: any) => f.folderId === folderId)?.name || folderId;
 }
 
-const typeOptions = computed(() => [
-  { value: "all", label: t("slos.type.all"), icon: "format_list_bulleted" },
+const typeOptions = computed<{ value: string; label: I18nText; icon: IconName }[]>(() => [
+  { value: "all", label: t("slos.type.all"), icon: "format-list-bulleted" },
   { value: "count", label: t("slos.type.count"), icon: "functions" },
-  { value: "time_slice", label: t("slos.type.timeSlice"), icon: "timelapse" },
-  { value: "alert", label: t("slos.type.alert"), icon: "gpp_maybe" },
+  { value: "time_slice", label: t("slos.type.timeSlice"), icon: "timeline" },
+  { value: "alert", label: t("slos.type.alert"), icon: "shield-alert-outline" },
 ]);
 
 const columns = computed<OTableColumnDef<SloListItem>[]>(() => [
@@ -555,6 +694,7 @@ const stats = computed<StatItem[]>(() => {
   return [
     {
       key: "budget_blown",
+      dataTest: "slos-slolist-stat-budget_blown",
       label: t("slos.health.budget_blown"),
       value: counts.budget_blown,
       icon: "local-fire-department",
@@ -563,6 +703,7 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "at_risk",
+      dataTest: "slos-slolist-stat-at_risk",
       label: t("slos.health.at_risk"),
       value: counts.at_risk,
       icon: "trending-down",
@@ -571,6 +712,7 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "meeting",
+      dataTest: "slos-slolist-stat-meeting",
       label: t("slos.health.meeting"),
       value: counts.meeting,
       icon: "check-circle",
@@ -579,13 +721,21 @@ const stats = computed<StatItem[]>(() => {
     },
     {
       key: "no_data",
+      dataTest: "slos-slolist-stat-no_data",
       label: t("slos.health.no_data"),
       value: counts.no_data,
-      icon: "help",
+      icon: "help-outline",
       tone: "neutral",
       max: total,
     },
-    { key: "total", label: t("slos.totalSlos"), value: total, tone: "primary", selectable: false },
+    {
+      key: "total",
+      dataTest: "slos-slolist-stat-total",
+      label: t("slos.totalSlos"),
+      value: total,
+      tone: "primary",
+      selectable: true,
+    },
   ];
 });
 
@@ -607,12 +757,19 @@ function onStatSelect(key: string | null) {
   healthFilter.value = key === "total" ? null : key;
 }
 
-async function load() {
+// Both optional: refresh calls `load()` bare and falls back to the current org
+// and active folder — the folder-change path is the only caller that passes a
+// folder the refs have not caught up with yet.
+async function load(orgId?: string | null, folderId?: string) {
   if (!org.value) return;
   loading.value = true;
   error.value = null;
+  // sometimes the folder id might not be updated so passed via
+  // query params.
+  const currentOrg = orgId ?? org.value;
+  const folder = folderId ?? activeFolderId.value;
   try {
-    const res = await sloService.list(org.value, activeFolderId.value);
+    const res = await sloService.list(currentOrg, folder);
     rows.value = res.data?.list ?? [];
     // Selection is per-folder; carrying ids across a folder switch would let a
     // bulk move act on rows no longer on screen.
@@ -630,7 +787,7 @@ function onFolderChange(folderId: string) {
     name: "sloList",
     query: { ...route.query, org_identifier: org.value, folder: folderId },
   });
-  load();
+  load(org.value, folderId);
 }
 
 function openMove(targets: SloListItem[]) {
@@ -681,11 +838,7 @@ function goToEdit(row: SloListItem) {
 }
 
 function onRowClick(row: SloListItem) {
-  router.push({
-    name: "sloDetail",
-    params: { slo_id: row.id },
-    query: { org_identifier: org.value },
-  });
+  router.push(sloDetailRoute(row.id, org.value));
 }
 
 async function toggleEnabled(row: SloListItem) {
@@ -701,9 +854,38 @@ async function toggleEnabled(row: SloListItem) {
   }
 }
 
+// How many alerts this delete would take with it (B2). Fetched LAZILY, here,
+// rather than per row while building the list: the count matters only at the
+// moment of confirming, and resolving it up front would put an N+1 on a page
+// that renders perfectly well without it.
+const alertCount = ref(0);
+const alertCountState = ref<"loading" | "ready" | "unknown">("loading");
+// Only the newest lookup may write. Without this, a slow answer for the SLO the
+// user opened first can land after they moved on and label THIS delete with
+// that SLO's count — and the number is the entire point of the banner.
+let alertCountToken = 0;
+
 function confirmDelete(row: SloListItem) {
   pendingDelete.value = row;
   deleteDialog.value = true;
+
+  alertCount.value = 0;
+  alertCountState.value = "loading";
+  const token = ++alertCountToken;
+  alertsService
+    .list_by_slo(org.value, row.id)
+    .then((res: any) => {
+      if (token !== alertCountToken) return;
+      alertCount.value = res?.data?.list?.length ?? 0;
+      alertCountState.value = "ready";
+    })
+    .catch(() => {
+      if (token !== alertCountToken) return;
+      // Never fall back to "ready, 0": that reads as "nothing else is
+      // destroyed", which is the one answer that could be catastrophically
+      // wrong here. Say the check failed instead.
+      alertCountState.value = "unknown";
+    });
 }
 
 async function doDelete() {

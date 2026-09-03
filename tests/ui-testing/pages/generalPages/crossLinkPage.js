@@ -80,6 +80,59 @@ export class CrossLinkPage {
         return `[data-test="log-detail-row-${fieldName}"]`;
     }
 
+    // ---- Sentinel POM locator getters (relocated from spec raw selectors) ----
+    getAddCrossLinkBtnLocator() {
+        return this.page.locator('[data-test="add-cross-link-btn"]');
+    }
+
+    getCrossLinkEmptyLocator() {
+        return this.page.locator('[data-test="cross-link-empty"]').first();
+    }
+
+    getCrossLinkListLocator() {
+        return this.page.locator('[data-test="cross-link-list"]').first();
+    }
+
+    getCrossLinkNameInputLocator() {
+        return this.page.locator('[data-test="cross-link-name-input"]');
+    }
+
+    getCrossLinkUrlInputLocator() {
+        return this.page.locator('[data-test="cross-link-url-input"]');
+    }
+
+    getCrossLinkFieldInputLocator() {
+        return this.page.locator('[data-test="cross-link-field-input"]');
+    }
+
+    getCrossLinkCancelBtnLocator() {
+        return this.page.locator('[data-test="cross-link-dialog"] [data-test="o-dialog-secondary-btn"]');
+    }
+
+    getCrossLinkItemLocator(idx) {
+        return this.page.locator(this.crossLinkItem(idx));
+    }
+
+    getCrossLinkEditBtnLocator(idx) {
+        return this.page.locator(this.crossLinkEditBtn(idx));
+    }
+
+    getCrossLinkDeleteBtnLocator(idx) {
+        return this.page.locator(this.crossLinkDeleteBtn(idx));
+    }
+
+    getLogDetailRowLocator(fieldName) {
+        return this.page.locator(this.logDetailRow(fieldName));
+    }
+
+    async getCrossLinkItemNameCount() {
+        return await this.page.locator('[data-test^="cross-link-item-name-"]').count();
+    }
+
+    async getDeletableCrossLinkCount() {
+        return await this.page.locator('[data-test^="cross-link-delete-"]').count();
+    }
+
     logDetailsCrossLinkMenuItem(crossLinkName) {
         return `[data-test="log-details-cross-link-${crossLinkName}"]`;
     }
@@ -269,6 +322,11 @@ export class CrossLinkPage {
         await this.page.locator(this.crossLinkSaveBtn).click();
     }
 
+    async clickSaveAndWait() {
+        await this.clickSave();
+        await this.expectDialogNotVisible();
+    }
+
     async clickCancel() {
         testLogger.debug('Clicking cancel button');
         await this.page.locator(this.crossLinkCancelBtn).click();
@@ -343,7 +401,7 @@ export class CrossLinkPage {
         for (const field of fields) {
             await this.addField(field);
         }
-        await this.clickSave();
+        await this.clickSaveAndWait();
     }
 
     async getCrossLinkItemText(idx) {
@@ -550,15 +608,18 @@ export class CrossLinkPage {
      */
     captureCrossLinkRequests() {
         const captured = [];
+        const payloads = [];
         const handler = (req) => {
             const url = req.url();
             if (url.includes('result_schema') && url.includes('cross_linking=true')) {
                 captured.push(url);
+                payloads.push(req.postData() || '');
             }
         };
         this.page.on('request', handler);
         return {
             getUrls: () => captured.slice(),
+            getPayloads: () => payloads.slice(),
             getCount: () => captured.length,
             stop: () => this.page.off('request', handler),
         };
@@ -567,7 +628,8 @@ export class CrossLinkPage {
     /**
      * Begin capturing `result_schema?cross_linking=true` responses so the
      * caller can later assert how many fired. The cross-link dropdown depends
-     * on these responses landing (one per selected stream) before
+     * on these responses landing (one per query, covering every selected
+     * stream) before
      * `searchObj.data.crossLinks` is fully populated.
      *
      * Returns a small handle with `getCount()` + `waitForAtLeast(n)` helpers,
@@ -699,13 +761,6 @@ export class CrossLinkPage {
         return this.page.locator(this.crossLinkItem(idx));
     }
 
-    async crossLinkItemEditBtnLocatorByIdx(idx) {
-        return this.page.locator(this.crossLinkEditBtn(idx));
-    }
-
-    async crossLinkItemDeleteBtnLocatorByIdx(idx) {
-        return this.page.locator(this.crossLinkDeleteBtn(idx));
-    }
 
     // ── Locator getters for assertions in spec files ──────────────────────────
 

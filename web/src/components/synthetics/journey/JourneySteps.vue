@@ -34,7 +34,7 @@ export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
 </script>
 
 <script setup lang="ts" generic="TData extends Record<string, any>">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -42,9 +42,10 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StepAction } from "@/types/synthetics";
-import { ACTION_LABEL_KEYS, ACTION_ICONS } from "@/constants/synthetics";
+import { ACTION_ICONS, stepActionLabelKey } from "@/constants/synthetics";
 
 const { t } = useI18nTyped();
 
@@ -67,6 +68,20 @@ const props = withDefaults(
     dotStateFn?: (row: TData) => StepDotState | undefined;
     /** When true, hides row action buttons (during replay). */
     locked?: boolean;
+    /**
+     * Step id the recording marker sits above, or null when unanchored.
+     *
+     * The marker answers "where will my steps go" for the whole session, which the
+     * button label alone cannot: the label is gone the moment recording starts.
+     */
+    anchorId?: string | null;
+    /**
+     * Whether the installed extension can restore the journey before recording.
+     *
+     * The row action promises a restore, so without it the button is offered and cannot
+     * be honoured. Defaults true, leaving the results-mode caller unaffected.
+     */
+    canRecordFrom?: boolean;
     /** When true, the step list is read-only (no drag, no selection). */
     readonly?: boolean;
     /** Whether drag reorder is enabled (editor mode, disabled during record/replay/filter). */
@@ -99,6 +114,7 @@ const props = withDefaults(
     nameKey: "name",
     detailKey: "detail",
     iconKey: "icon",
+    canRecordFrom: true,
     enableReorder: false,
     filterActive: false,
     locked: false,
@@ -117,6 +133,14 @@ const emit = defineEmits<{
   expand: [row: TData];
   delete: [row: TData];
   duplicate: [row: TData];
+  /**
+   * Restore the journey up to this row, then record new steps BEFORE it.
+   *
+   * Named for the direction it inserts, not for "here": the two neighbouring row
+   * actions (insert-below, duplicate) both act downward, so an ambiguous name would
+   * be read the wrong way. See design §7.1.
+   */
+  "record-before": [row: TData];
   "insert-below": [row: TData];
   "retry-replay": [];
 }>();
@@ -137,10 +161,13 @@ function actionIcon(row: TData): string {
   return isStepAction(action) ? ACTION_ICONS[action] : "ads-click";
 }
 
+// A right or double click is a `click` carrying `button`/`clickCount`, so the
+// action alone labelled all three "Click". Results rows carry neither field and
+// fall back to exactly that.
 function actionLabel(row: TData): string {
   const action: string = row[props.actionKey] ?? "";
   return isStepAction(action)
-    ? t(ACTION_LABEL_KEYS[action])
+    ? t(stepActionLabelKey(action, row.button, row.clickCount))
     : action.charAt(0).toUpperCase() + action.slice(1);
 }
 
@@ -155,19 +182,19 @@ function stepDetail(row: TData): string {
 // ── Status dot rendering ───────────────────────────────────────────
 function dotClass(state: StepDotState | undefined): string {
   if (!state) {
-    return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-[var(--color-text-muted)] text-text-muted text-xs font-semibold";
+    return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-text-muted text-text-muted text-xs font-semibold";
   }
   switch (state) {
     case "active":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-primary-soft-bg)] text-[var(--color-badge-primary-soft-text)] border border-[var(--color-badge-primary-soft-text)] text-xs font-semibold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-primary-soft-bg text-badge-primary-soft-text border border-badge-primary-soft-text text-xs font-semibold";
     case "pass":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-success-soft-bg)] text-[var(--color-badge-success-soft-text)] border border-[var(--color-badge-success-soft-text)] text-xs font-semibold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-success-soft-bg text-badge-success-soft-text border border-badge-success-soft-text text-xs font-semibold";
     case "fail":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-error-soft-bg)] text-[var(--color-badge-error-soft-text)] border border-[var(--color-badge-error-soft-text)] text-xs font-semibold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-error-soft-bg text-badge-error-soft-text border border-badge-error-soft-text text-xs font-semibold";
     case "skip":
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-[var(--color-badge-default-soft-bg)] text-[var(--color-badge-default-soft-text)] border border-[var(--color-badge-default-soft-text)] text-xs font-semibold opacity-50";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-badge-default-soft-bg text-badge-default-soft-text border border-badge-default-soft-text text-xs font-semibold opacity-50";
     default:
-      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-[var(--color-text-muted)] text-text-muted text-xs font-semibold";
+      return "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border border-text-muted text-text-muted text-xs font-semibold";
   }
 }
 
@@ -208,9 +235,17 @@ const columns = computed<OTableColumnDef<TData>[]>(() => {
         id: "details",
         header: t("synthetics.journey.stepHeader"),
         size: 200,
-        meta: { autoWidth: true },
+        // `relative` so the recording marker positions against the CELL rather
+        // than the truncating wrapper inside it — the marker sits on the row's
+        // top edge, which only the cell's own box can locate.
+        meta: { autoWidth: true, cellClass: "relative" },
       },
-      { id: "actions", header: raw(""), size: 128, isAction: true },
+      // Sized to the buttons it holds, which is now four: record-before, insert,
+      // duplicate, delete. An `xs` button is h-7 with ps-2.5/pe-2.5 around a 1rem
+      // icon — 36px — and they sit in a gap-0.5 row, so four need 150px against the
+      // three that needed 112px. Left at 128 the last button (delete) was clipped
+      // out of the column entirely.
+      { id: "actions", header: raw(""), size: 168, isAction: true },
     ];
   }
   // Results mode. Headers are named here because results mode renders them —
@@ -234,6 +269,103 @@ const columns = computed<OTableColumnDef<TData>[]>(() => {
 const reorderEnabled = computed(() => props.enableReorder && !props.filterActive);
 
 const isLocked = computed(() => props.locked);
+
+/** Whether the recording marker belongs above `row`. */
+function rowId(row: TData): string | null {
+  return (row as { id?: string }).id ?? null;
+}
+
+function isAnchor(row: TData): boolean {
+  return !!props.anchorId && rowId(row) === props.anchorId;
+}
+
+// Pointer and keyboard are tracked apart. Sharing one slot meant whichever left
+// first cleared the preview for both, so tabbing to a control and then moving
+// the mouse across the row lost the marker while the control was still focused.
+const hoverAnchorId = ref<string | null>(null);
+const focusAnchorId = ref<string | null>(null);
+
+/**
+ * One rule for the control's `:disabled` and for whether it may be previewed.
+ *
+ * The button is what gets disabled, but the span around it is what reports the
+ * hover — so a second copy of the condition would preview a click that cannot
+ * happen. The pointer/focus handlers deliberately do NOT consult it: `markerTone`
+ * gates the render, which also covers the case no handler can see.
+ */
+function recordBeforeDisabled(row: TData): boolean {
+  return isLocked.value || isFirstRow(row) || !props.canRecordFrom;
+}
+
+function onRecordBeforeEnter(row: TData) {
+  hoverAnchorId.value = rowId(row);
+}
+
+function onRecordBeforeLeave() {
+  hoverAnchorId.value = null;
+}
+
+function onRecordBeforeFocus(row: TData) {
+  focusAnchorId.value = rowId(row);
+}
+
+function onRecordBeforeBlur() {
+  focusAnchorId.value = null;
+}
+
+/**
+ * Which marker a row shows, if any. Hover is a preview; anchor is committed.
+ *
+ * The single gate on previewing. Checking `recordBeforeDisabled` here rather than
+ * in the handlers covers the case they cannot see: a replay started from the
+ * toolbar locks the table while the pointer rests on a control, and with nothing
+ * moving no `mouseleave` ever arrives to clear it.
+ * Results rows are excluded outright — a finished run has nothing to insert into,
+ * and only the editor's details column is positioned to host the marker.
+ */
+function markerTone(row: TData): "anchor" | "hover" | null {
+  if (!isEditor.value) return null;
+  if (isAnchor(row)) return "anchor";
+  const id = rowId(row);
+  if (!id) return null;
+  const previewed = id === hoverAnchorId.value || id === focusAnchorId.value;
+  return previewed && !recordBeforeDisabled(row) ? "hover" : null;
+}
+
+/**
+ * Let the marker's label overhang the row boundary.
+ *
+ * The cell clips by default so long step names truncate, and the label is the one
+ * thing that has to escape — so the clip is lifted only on the row carrying a
+ * marker, and only on the cell hosting it.
+ */
+function markerCellStyle({ columnId, row }: { columnId: string; row: TData }) {
+  if (columnId !== "details" || !markerTone(row)) return {};
+  return { overflow: "visible" };
+}
+
+/**
+ * Whether `row` is the journey's first step.
+ *
+ * The first step must be the navigation that starts the journey, so there is no
+ * "before" it to record into — `validateJourneySteps` rejects a journey whose first
+ * step is anything else.
+ */
+function isFirstRow(row: TData): boolean {
+  return props.data[0] === row;
+}
+
+/**
+ * What the record-before action does, or why it cannot.
+ *
+ * Only the capability is spelled out: a first-row disable is legible from where the row
+ * sits, but an extension too old to restore looks identical to one that works.
+ */
+const recordBeforeTooltip = computed(() =>
+  props.canRecordFrom
+    ? t("synthetics.journey.recordBeforeStepHint")
+    : t("synthetics.journey.recordBeforeNeedsNewerExtension"),
+);
 
 function handleRowReorder(data: TData[]) {
   emit("update:data", data);
@@ -271,6 +403,7 @@ function handleUpdateExpanded(ids: string[]) {
     :fill-height="false"
     :expand-on-row-click="true"
     :get-row-status-color="getRowStatusColor"
+    :get-cell-style="markerCellStyle"
     @row-reorder="handleRowReorder"
     @update:selected-ids="handleUpdateSelected"
     @update:expanded-ids="handleUpdateExpanded"
@@ -346,6 +479,45 @@ function handleUpdateExpanded(ids: string[]) {
         >
           {{ stepDetail(row) }}
         </span>
+
+        <!-- Insertion marker: recorded steps land ABOVE this row. Absolutely
+             positioned against the cell, so previewing it on hover repaints
+             rather than reflowing — a rule that nudged every row would jitter
+             the whole table as the pointer crossed the action column. Last in
+             the cell so it paints over the step content it straddles. -->
+        <!-- Two segments with the label between them, not one rule behind it:
+             with no background to punch a hole, a continuous rule would run
+             straight through the words. Equal `flex-1` segments centre the
+             label without measuring anything. Tone sits on the container so the
+             segments and the label cannot disagree about it. -->
+        <span
+          v-if="markerTone(row)"
+          :class="[
+            'absolute inset-x-0 top-0 flex -translate-y-1/2 items-center gap-2',
+            markerTone(row) === 'hover' ? 'text-accent/50' : 'text-accent',
+          ]"
+          data-test="synthetics-journey-recording-marker"
+        >
+          <span
+            class="h-0.5 flex-1 bg-current"
+            data-test="synthetics-journey-recording-marker-rule"
+            aria-hidden="true"
+          />
+          <!-- Opts out of the container's tone: only the rule fades for a
+               preview, because a half-opacity word at this size is just hard
+               to read. -->
+          <span
+            class="text-accent text-2xs shrink-0 font-semibold capitalize"
+            data-test="synthetics-journey-recording-marker-label"
+          >
+            {{ t("synthetics.journey.newStepsLandHere") }}
+          </span>
+          <span
+            class="h-0.5 flex-1 bg-current"
+            data-test="synthetics-journey-recording-marker-rule"
+            aria-hidden="true"
+          />
+        </span>
       </div>
     </template>
 
@@ -373,8 +545,45 @@ function handleUpdateExpanded(ids: string[]) {
 
     <!-- ── cell-actions: Row action buttons (editor mode) ──────── -->
     <template v-if="mode === 'editor'" #cell-actions="{ row }">
-      <div class="flex shrink-0 items-center gap-0.5" :class="{ invisible: isLocked }">
+      <!-- Locked leaves these on screen and unavailable, rather than hiding them.
+           Hidden, a running replay or restore looked like the row had lost actions it
+           still has, and the author had nothing to point at to explain why. Each
+           button carries its own `isLocked` disable, so unavailability is stated per
+           control rather than by making the whole cluster vanish. -->
+      <div class="flex shrink-0 items-center gap-0.5">
         <!-- Expand/collapse is handled by OTable's built-in expand button when expansion="multiple" -->
+
+        <!-- Disabled on the first row: inserting before it would leave the journey
+             starting with something other than a navigate, which validation rejects.
+             Disabled without `canRecordFrom` because the action promises a restore the
+             installed extension cannot perform. -->
+        <OTooltip v-if="!readonly" :content="recordBeforeTooltip">
+          <!-- The span is the hover target, not the button: a disabled control
+               dispatches no pointer events, so a tooltip bound straight to it would
+               stay shut in the one state that has something to explain. The marker
+               preview rides the same span for the same reason, and focus is bound
+               alongside hover so the destination is not mouse-only. -->
+          <span
+            class="inline-flex"
+            @mouseenter="onRecordBeforeEnter(row)"
+            @mouseleave="onRecordBeforeLeave"
+            @focusin="onRecordBeforeFocus(row)"
+            @focusout="onRecordBeforeBlur"
+          >
+            <OButton
+              variant="ghost"
+              size="xs"
+              :aria-label="t('synthetics.journey.recordBeforeStep')"
+              data-test="synthetics-journey-step-record-before-btn"
+              :disabled="recordBeforeDisabled(row)"
+              @click="emit('record-before', row)"
+            >
+              <!-- The same icon as the toolbar's Record button: this row action starts a
+                   recording too, just anchored, so the two must read as one action. -->
+              <OIcon name="smart-display" size="sm" aria-hidden="true" />
+            </OButton>
+          </span>
+        </OTooltip>
 
         <OButton
           v-if="!readonly"

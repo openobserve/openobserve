@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             searchable
             creatable
-            style="width: 200px"
+            style="width: 12.5rem"
             class="o2-custom-select-dashboard"
           />
 
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             searchable
             creatable
-            style="width: 200px"
+            style="width: 12.5rem"
             class="o2-custom-select-dashboard"
           />
 
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             clearable
             searchable
             creatable
-            style="width: 200px"
+            style="width: 12.5rem"
             class="o2-custom-select-dashboard"
           />
 
@@ -112,15 +112,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="w-full"
       >
         <template #expansion="{ row }">
-          <div
-            class="bg-surface-base border-t border-(--color-border-default,var(--color-border-default)) p-3"
-          >
+          <div class="bg-surface-base border-border-default border-t p-3">
             <div class="mb-2 text-sm font-medium">
               {{ t("rum.sourceMapFilesCount", { count: row.files.length }) }}
             </div>
             <ul
               class="divide-border rounded-default flex flex-col divide-y overflow-y-auto border"
-              style="max-height: 400px"
+              style="max-height: 25rem"
             >
               <li
                 v-for="(file, index) in row.files"
@@ -462,7 +460,8 @@ const deleteSourceMap = async () => {
     console.error("Error deleting source maps:", error);
     toast({
       variant: "error",
-      message: error?.response?.data?.message || error?.message || "Failed to delete source maps",
+      message:
+        error?.response?.data?.message || error?.message || t("rum.failedToDeleteSourceMaps"),
     });
   }
 };

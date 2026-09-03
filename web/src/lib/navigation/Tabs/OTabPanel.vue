@@ -40,6 +40,7 @@ const panelClasses = computed<string[]>(() => {
   const layout = layoutClasses[props.layout];
   if (layout) classes.push(layout);
   if (props.stretch) classes.push("h-full");
+  if (props.contentClass) classes.push(props.contentClass);
   return classes;
 });
 </script>

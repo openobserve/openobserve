@@ -103,6 +103,36 @@ type Mutation = {
   apply: (sql: string) => { broken: string; expectedFragment: string } | null;
 };
 
+/**
+ * Offset of the first `WHERE` keyword that sits at parenthesis depth 0 and
+ * outside any string literal — i.e. a statement-level filter, not one nested in
+ * `FILTER (WHERE …)`, a subquery, or a CTE body. null when there is none.
+ */
+function findStatementLevelWhere(sql: string): number | null {
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = 0; i < sql.length; i++) {
+    const c = sql[i];
+    if (quote) {
+      if (c === quote) quote = null;
+      continue;
+    }
+    if (c === "'" || c === '"' || c === "`") quote = c;
+    else if (c === "(") depth++;
+    else if (c === ")") depth--;
+    else if (
+      depth === 0 &&
+      (c === "W" || c === "w") &&
+      /^where$/i.test(sql.slice(i, i + 5)) &&
+      !/\w/.test(sql[i - 1] ?? "") &&
+      !/\w/.test(sql[i + 5] ?? "")
+    ) {
+      return i;
+    }
+  }
+  return null;
+}
+
 const mutations: Mutation[] = [
   {
     name: "truncate_after_AND",
@@ -166,8 +196,12 @@ const mutations: Mutation[] = [
   {
     name: "remove_WHERE_keyword",
     apply: (sql) => {
-      if (!/\bWHERE\s+\w/i.test(sql)) return null;
-      const broken = sql.replace(/\bWHERE\s+/, "");
+      const m = findStatementLevelWhere(sql);
+      if (m === null) return null;
+      const rest = sql.slice(m + 5);
+      if (!/^\s+[a-zA-Z_]\w*(\.\w+)?\s*([=<>!]|(IS|IN|LIKE|ILIKE|RLIKE|NOT|BETWEEN)\b)/i.test(rest))
+        return null;
+      const broken = sql.slice(0, m) + rest.replace(/^\s+/, " ");
       if (!parseError(broken)) return null; // mutation produced valid SQL
       return { broken, expectedFragment: "WHERE" };
     },
@@ -175,9 +209,10 @@ const mutations: Mutation[] = [
   {
     name: "unquote_like_pattern",
     apply: (sql) => {
-      const m = sql.match(/\bLIKE\s+'([^'%][^']*%[^']*)'/i);
+      const re = /\bLIKE\s+'([^'%\s][^'\s]*%[^'\s]*)'(?=\s|$)/i;
+      const m = sql.match(re);
       if (!m) return null;
-      const broken = sql.replace(/\bLIKE\s+'([^'%][^']*%[^']*)'/, `LIKE ${m[1]}`);
+      const broken = sql.replace(re, `LIKE ${m[1]}`);
       if (!parseError(broken)) return null;
       return { broken, expectedFragment: "LIKE" };
     },
@@ -259,14 +294,26 @@ const mutations: Mutation[] = [
   },
 ];
 
-function generateBrokenQueries() {
-  const result: { mutation: string; broken: string; expectedFragment: string }[] = [];
+type BrokenQuery = { mutation: string; broken: string; expectedFragment: string };
+
+let brokenQueryCache: BrokenQuery[] | null = null;
+
+/**
+ * Mutate every valid query with every mutation. Deterministic and expensive
+ * (~1,000 queries × 16 mutations, each re-parsed), so the result is computed
+ * once and shared — every caller treats it as read-only.
+ */
+function generateBrokenQueries(): BrokenQuery[] {
+  if (brokenQueryCache) return brokenQueryCache;
+
+  const result: BrokenQuery[] = [];
   for (const sql of allValidSqls()) {
     for (const mut of mutations) {
       const res = mut.apply(sql);
       if (res) result.push({ mutation: mut.name, ...res });
     }
   }
+  brokenQueryCache = result;
   return result;
 }
 
@@ -278,6 +325,21 @@ describe("buildContextualSqlMessage", () => {
     ["AND incomplete", "SELECT * FROM t WHERE x = 1 AND", "AND"],
     ["OR incomplete", "SELECT * FROM t WHERE x = 1 OR", "OR"],
     ["LIKE incomplete", "SELECT * FROM t WHERE x LIKE", "LIKE"],
+    // Unquoted LIKE patterns — the parser stops on the '%' only when the first
+    // pattern character cannot continue an identifier; otherwise it stops later.
+    ["LIKE unquoted, stops on %", "SELECT * FROM t WHERE x LIKE BIN-% AND y = 1", "single quotes"],
+    ["LIKE unquoted, stops later", "SELECT * FROM t WHERE x LIKE E00% ORDER BY y", "single quotes"],
+    ["LIKE unquoted path", "SELECT * FROM t WHERE x LIKE /api/% ORDER BY y", "single quotes"],
+    // Unquoting a pattern that contains a space leaves the wildcard in the
+    // token after the operand: 'GET %' → GET %
+    [
+      "LIKE unquoted, space before %",
+      "SELECT * FROM t WHERE log LIKE GET % AND y = 1",
+      "single quotes",
+    ],
+    ["NOT LIKE unquoted", "SELECT * FROM t WHERE x NOT LIKE Malicious% AND y = 1", "single quotes"],
+    // A quoted pattern is valid — a later error must keep its own message
+    ["AND incomplete after valid LIKE", "SELECT * FROM t WHERE x LIKE '%a%' AND", "AND"],
     ["IN incomplete", "SELECT * FROM t WHERE x IN", "IN"],
     ["BETWEEN incomplete", "SELECT * FROM t WHERE x BETWEEN", "BETWEEN"],
     ["IS incomplete", "SELECT * FROM t WHERE x IS", "IS"],
@@ -295,6 +357,14 @@ describe("buildContextualSqlMessage", () => {
     ["OFFSET incomplete", "SELECT * FROM t LIMIT 10 OFFSET", "OFFSET"],
     ["open paren", "SELECT * FROM t WHERE (", "parenthesis"],
     ["missing WHERE", "SELECT * FROM default service_name='payment'", "WHERE"],
+    // Missing WHERE reported past the condition's start — the parser stops on
+    // the AND / the call's own paren, not on a comparison operator
+    [
+      "missing WHERE before match_all",
+      "SELECT * FROM \"default\" match_all('error') AND x = 1",
+      "WHERE",
+    ],
+    ["missing WHERE after table alias", 'SELECT * FROM "default" a a.latency_ms > 100', "WHERE"],
     ["missing AND/OR", "SELECT * FROM t WHERE x=1 AND y=2 z=3", "operator"],
     ["bad LIKE %", "SELECT * FROM t WHERE x LIKE %foo%", "LIKE"],
     ["unmatched )", "SELECT * FROM t WHERE (x = 1))", "parenthesis"],
@@ -335,7 +405,7 @@ describe("buildContextualSqlMessage", () => {
 // ─── Suite 2: no false positives on valid queries ─────────────────────────────
 
 describe("validateSql — no false positives on valid queries", () => {
-  it("returns null for all 400 query-agent test queries", async () => {
+  it("returns null for all 400 query-agent test queries", { timeout: 30000 }, async () => {
     const sqls = allValidSqls();
     const results = await Promise.all(sqls.map((sql) => validateSql(sql)));
     const falsePositives = sqls.filter((_, i) => results[i] !== null);
@@ -425,28 +495,38 @@ describe("validateSql — mutation detection on broken queries", () => {
     },
   );
 
-  // Per-mutation thresholds
-  const perMutationThresholds: Record<string, number> = {
-    truncate_after_AND: 0.85,
-    truncate_after_OR: 0.99,
-    truncate_after_WHERE: 0.95,
-    truncate_after_ORDER: 0.8,
-    truncate_after_GROUP: 0.99,
-    truncate_after_HAVING: 0.99,
-    truncate_after_LIMIT: 0.97,
-    remove_WHERE_keyword: 0.8, // tightened missingWhere guard: ambiguous patterns suppressed; expanded query set lowers rate
-    unquote_like_pattern: 0.5, // small sample, parser handles some cases
-    drop_AND_between_conditions: 0.9,
+  // Per-mutation expectations. A `rate` is the share of that mutation's queries
+  // that must get a specific message; a `minSpecific` is an absolute floor, for
+  // mutations whose detectable share is a property of the corpus rather than of
+  // the diagnostics.
+  type Expectation = { rate: number } | { minSpecific: number };
+
+  const perMutationExpectations: Record<string, Expectation> = {
+    truncate_after_AND: { rate: 0.85 },
+    truncate_after_OR: { rate: 0.99 },
+    truncate_after_WHERE: { rate: 0.95 },
+    truncate_after_ORDER: { rate: 0.8 },
+    truncate_after_GROUP: { rate: 0.99 },
+    truncate_after_HAVING: { rate: 0.99 },
+    truncate_after_LIMIT: { rate: 0.97 },
+    remove_WHERE_keyword: { rate: 0.85 },
+    unquote_like_pattern: { rate: 0.9 },
+    drop_AND_between_conditions: { rate: 0.9 },
     // Complex-construct mutations
-    truncate_inside_case_when: 0.9,
-    truncate_inside_coalesce: 0.85,
-    truncate_after_UNION: 0.9,
-    truncate_after_OVER_paren: 0.8,
-    truncate_inside_cte: 0.8,
+    truncate_inside_case_when: { rate: 0.9 },
+    truncate_inside_coalesce: { rate: 0.85 },
+    truncate_after_UNION: { rate: 0.9 },
+    truncate_after_OVER_paren: { rate: 0.8 },
+    truncate_inside_cte: { rate: 0.8 },
   };
 
-  for (const [mutName, threshold] of Object.entries(perMutationThresholds)) {
-    it(`${mutName}: ≥ ${Math.round(threshold * 100)}% specific messages`, async () => {
+  for (const [mutName, expectation] of Object.entries(perMutationExpectations)) {
+    const label =
+      "rate" in expectation
+        ? `≥ ${Math.round(expectation.rate * 100)}% specific messages`
+        : `≥ ${expectation.minSpecific} specific messages`;
+
+    it(`${mutName}: ${label}`, { timeout: 30000 }, async () => {
       const broken = generateBrokenQueries().filter((b) => b.mutation === mutName);
       if (broken.length === 0) return; // mutation didn't apply to any query
 
@@ -456,8 +536,13 @@ describe("validateSql — mutation detection on broken queries", () => {
         if (r !== null && isSpecificMessage(r.error)) specific++;
       }
 
-      const rate = specific / broken.length;
-      expect(rate).toBeGreaterThanOrEqual(threshold);
+      // Report the counts, so a corpus change is diagnosable from the failure alone.
+      const detail = `${specific}/${broken.length} specific`;
+      if ("rate" in expectation) {
+        expect(specific / broken.length, detail).toBeGreaterThanOrEqual(expectation.rate);
+      } else {
+        expect(specific, detail).toBeGreaterThanOrEqual(expectation.minSpecific);
+      }
     });
   }
 });

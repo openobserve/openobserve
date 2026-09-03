@@ -18,19 +18,18 @@
 //! Four things arrive together because they are one release of the same
 //! surface — the responder's own view of on-call:
 //!
-//! * `oncall_user_contacts` — `architecture/03` §5. A phone (and later a push
-//!   token) per person, with a `*_verified_at` beside each. `users` has no
-//!   phone column and adding one there would put a paging concern in the
-//!   identity table.
-//! * `oncall_delivery_reads` — "what was I sent, and have I looked at it". Its
-//!   own table rather than a column on `oncall_response_events`, because that
-//!   row is the engine's replay ledger: a responder opening an inbox must not
-//!   write to the record that decides whether they get paged again.
+//! * `oncall_user_contacts` — `architecture/03` §5. A phone (and later a push token) per person,
+//!   with a `*_verified_at` beside each. `users` has no phone column and adding one there would put
+//!   a paging concern in the identity table.
+//! * `oncall_delivery_reads` — "what was I sent, and have I looked at it". Its own table rather
+//!   than a column on `oncall_response_events`, because that row is the engine's replay ledger: a
+//!   responder opening an inbox must not write to the record that decides whether they get paged
+//!   again.
 //! * `alerts.runbook_url` — where the alert says the fix is written down.
-//! * `oncall_responses.runbook_url` — the same link COPIED onto the record at
-//!   the moment it opens. Copied, not joined: the page has to keep saying what
-//!   it said when it fired, and an alert edited or deleted the next morning
-//!   must not silently change what a resolved page claimed to point at.
+//! * `oncall_responses.runbook_url` — the same link COPIED onto the record at the moment it opens.
+//!   Copied, not joined: the page has to keep saying what it said when it fired, and an alert
+//!   edited or deleted the next morning must not silently change what a resolved page claimed to
+//!   point at.
 //!
 //! A new migration rather than an edit to an earlier one, for the reason
 //! `m20260811_000002_repair_oncall_schema_drift` had to exist: SeaORM records a
@@ -180,7 +179,10 @@ impl MigrationTrait for Migration {
             manager,
             "alerts",
             Alerts::RunbookUrl,
-            ColumnDef::new(Alerts::RunbookUrl).string().null().to_owned(),
+            ColumnDef::new(Alerts::RunbookUrl)
+                .string()
+                .null()
+                .to_owned(),
         )
         .await?;
 
@@ -480,7 +482,10 @@ mod tests {
             "precondition: the upgraded database has no runbook column yet"
         );
 
-        Migration.up(&manager).await.expect("the upgrade must apply");
+        Migration
+            .up(&manager)
+            .await
+            .expect("the upgrade must apply");
 
         assert!(manager.has_table(CONTACTS).await.unwrap());
         assert!(manager.has_table(READS).await.unwrap());

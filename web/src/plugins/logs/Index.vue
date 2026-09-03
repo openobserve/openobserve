@@ -29,7 +29,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :horizontal="true"
         unit="px"
         :limits="[85, 400]"
-        :separatorStyle="{ height: '10px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
+        :separatorStyle="{
+          height: '0.625rem',
+          marginTop: '-0.3125rem',
+          marginBottom: '-0.3125rem',
+          zIndex: '10',
+        }"
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
@@ -71,9 +76,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="logs-splitter-smooth h-full max-h-full w-full overflow-hidden"
               separatorClass="field-list-separator"
               :separatorStyle="{
-                width: '10px',
-                marginLeft: '-5px',
-                marginRight: '-5px',
+                width: '0.625rem',
+                marginLeft: '-0.3125rem',
+                marginRight: '-0.3125rem',
                 zIndex: '10',
               }"
               @update:model-value="onSplitterUpdate"
@@ -308,7 +313,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -326,6 +331,7 @@ import {
   extractWhereClause,
 } from "@/utils/query/sqlUtils";
 import { buildColumnIdentifierAst, quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { replaceSelectFieldList } from "@/utils/query/quickModeFieldList";
 import useNotifications from "@/composables/useNotifications";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
 import SearchBar from "@/plugins/logs/SearchBar.vue";
@@ -547,7 +553,7 @@ export default defineComponent({
       useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
-    const { extractPatterns, patternsState } = usePatterns();
+    const { extractPatterns, patternsState } = usePatterns(t);
 
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -1194,9 +1200,9 @@ export default defineComponent({
             const streams = searchObj.data.stream.selectedStream;
 
             streams.forEach((stream: string, index: number) => {
-              // Add UNION for all but the first SELECT statement
+              // BY NAME merges differing columns; ALL keeps events duplicated across streams.
               if (index > 0) {
-                searchObj.data.query += " UNION ";
+                searchObj.data.query += " UNION ALL BY NAME ";
               }
               searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${whereClause}`;
             });
@@ -1303,9 +1309,19 @@ export default defineComponent({
     };
     const showSearchHistoryfn = () => {
       // Search History is now its own route (was an `action=history` overlay).
+      // Forward the active stream type/name so the history shown there matches
+      // whichever telemetry type the user was viewing (logs/traces/metrics).
+      // With more than one stream selected there's no single name to forward
+      // without silently dropping the others, so leave history unscoped by
+      // stream in that case.
+      const selectedStreams = searchObj.data.stream.selectedStream;
       router.push({
         name: "searchHistory",
-        query: { org_identifier: store.state.selectedOrganization.identifier },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          stream_type: searchObj.data.stream.streamType,
+          stream: selectedStreams.length === 1 ? selectedStreams[0] : "",
+        },
       });
     };
 
@@ -1412,15 +1428,21 @@ export default defineComponent({
             return text ? ` Error: ${text}.` : "";
           })()
         : "";
+      // The prompt is model input, not screen copy — it stays English so the
+      // assistant reads the same wording regardless of the user's locale.
       const modeContext = sqlMode
-        ? `I am using SQL mode. Full query: ${queryContext || "(none)"}.`
-        : `I am using filter mode (not SQL). The filter expression is: ${queryContext || "(none)"}. This is a WHERE-clause filter — not a full SQL query.`;
+        ? raw(`I am using SQL mode. Full query: ${queryContext || "(none)"}.`)
+        : raw(
+            `I am using filter mode (not SQL). The filter expression is: ${queryContext || "(none)"}. This is a WHERE-clause filter — not a full SQL query.`,
+          );
       const outcome = errorContext
-        ? `The query produced an error.${errorContext}`
-        : `The query ran successfully but returned no results.`;
+        ? raw(`The query produced an error.${errorContext}`)
+        : raw(`The query ran successfully but returned no results.`);
       emit(
         "sendToAiChat",
-        `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me adjust the filter to get results?`,
+        raw(
+          `${outcome} ${modeContext} Stream: ${searchObj.data.stream.selectedStream?.[0] || "unknown"}. Time range: ${searchObj.data.datetime.relativeTimePeriod || "custom"}. Can you help me adjust the filter to get results?`,
+        ),
         false,
       );
     };
@@ -1549,9 +1571,7 @@ export default defineComponent({
             .join(",");
         }
         if (searchObj.meta.sqlMode == true) {
-          searchObj.data.query = searchObj.data.query.replace(/SELECT\s+(.*?)\s+FROM/gi, () => {
-            return `SELECT ${field_list} FROM`;
-          });
+          searchObj.data.query = replaceSelectFieldList(searchObj.data.query, field_list);
           setQuery(searchObj.meta.quickMode);
           updateUrlQueryParams();
         }
@@ -3207,25 +3227,16 @@ export default defineComponent({
         this.searchObj.data.queryResults.aggs = [];
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
-          this.resetHistogramWithError(
-            this.t("logs.index.histogramUnavailableCtesDistinctJoinLimit"),
-            -1,
-          );
+          this.resetHistogramWithError(this.t("search.histogramUnavailableForQueries"), -1);
           this.searchObj.meta.histogramDirtyFlag = false;
         } else if (
           this.searchObj.meta.sqlMode &&
           (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
         ) {
-          this.resetHistogramWithError(
-            this.t("logs.index.histogramUnavailableCtesDistinctJoinLimit"),
-            -1,
-          );
+          this.resetHistogramWithError(this.t("search.histogramUnavailableForQueries"), -1);
           this.searchObj.meta.histogramDirtyFlag = false;
-        } else if (
-          this.searchObj.data.stream.selectedStream.length > 1 &&
-          this.searchObj.meta.sqlMode == true
-        ) {
-          this.resetHistogramWithError(this.t("logs.index.histogramNotAvailableMultiStream"));
+        } else if (this.searchObj.data.stream.selectedStream.length > 1) {
+          this.resetHistogramWithError(this.t("search.histogramUnavailableForQueries"), -1);
         } else if (this.searchObj.data.queryResults.is_histogram_eligible == false) {
           this.resetHistogramWithError(
             this.t("logs.index.histogramUnavailableCtesDistinctLimit"),

@@ -94,6 +94,17 @@ export default class DashboardMultiSQL {
     return this.page.locator('[data-test="panel-x-alias-inconsistency-warning"]');
   }
 
+  /**
+   * Locator for the x-alias-inconsistency warning nested inside a given axis
+   * layout section (used to assert the warning is NOT rendered inside a layout).
+   * @param {string} layoutDataTest - data-test of the layout wrapper
+   */
+  xAliasWarningInLayout(layoutDataTest) {
+    return this.page.locator(
+      `[data-test="${layoutDataTest}"] [data-test="panel-x-alias-inconsistency-warning"]`,
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------

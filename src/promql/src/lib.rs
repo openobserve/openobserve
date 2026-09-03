@@ -37,12 +37,10 @@ pub mod common;
 pub mod engine;
 pub mod exec;
 mod functions;
-mod label_usage;
-pub mod name_visitor;
-mod rewrite;
-mod selector_loader;
-pub mod selector_visitor;
-mod series_labels;
+mod fused;
+pub mod load_series;
+pub mod promql;
+mod series_stream;
 pub mod utils;
 
 pub const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m

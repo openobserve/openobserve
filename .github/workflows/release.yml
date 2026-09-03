@@ -3,6 +3,11 @@ on:
     tags:
       - "v*.*.*"
 name: Release
+
+# Default for every job; the `release` job widens this for itself below.
+permissions:
+  contents: read
+
 env:
   RUST_TOOLCHAIN: nightly-2026-05-20
 jobs:
@@ -37,12 +42,12 @@ jobs:
             file_name: openobserve-${{ github.ref_name }}-linux-arm64
             file_ext: .tar.gz
           - arch: x86_64-apple-darwin
-            os: macos-latest
+            os: macos-latest-xlarge
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-darwin-amd64
             file_ext: .tar.gz
           - arch: aarch64-apple-darwin
-            os: macos-latest
+            os: macos-latest-xlarge
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-darwin-arm64
             file_ext: .tar.gz
@@ -58,6 +63,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Install Node
         uses: actions/setup-node@v7
         with:

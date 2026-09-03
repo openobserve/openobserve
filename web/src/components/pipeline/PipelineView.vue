@@ -8,12 +8,7 @@
       :min-zoom="0.1"
       @nodes-initialized="onNodesReady"
     >
-      <DropzoneBackground
-        :style="{
-          backgroundColor: 'var(--color-surface-panel)',
-          transition: 'background-color 0.2s ease',
-        }"
-      >
+      <DropzoneBackground class="bg-surface-panel [transition:background-color_0.2s_ease]">
       </DropzoneBackground>
       <template #edge-custom="customEdgeProps">
         <FlowEdge
@@ -45,7 +40,7 @@
 
 <script lang="ts">
 import { getImageURL } from "@/utils/zincutils";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
 import { defineComponent, computed, watch, type PropType } from "vue";
 import { VueFlow, type Node, type Edge } from "@vue-flow/core";

@@ -31,8 +31,9 @@ use openobserve_api_management::request::cloud;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, authz, dashboards, folders, kv, model_pricing, organization, service_accounts,
-    short_url, slos, sourcemaps, status, stream, users,
+    alerts, announcements, authz, dashboards, db_monitoring, folders, kv, model_pricing,
+    organization, service_accounts, short_url, slos, sourcemaps, status, status_pages, stream,
+    synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{promql, search, traces};
@@ -54,8 +55,9 @@ use {
         config::get_config as get_o2_config,
     },
     openobserve_api_management::request::{
-        actions, ai, anomaly_detection, domain_management, eval_jobs, gen_ai, keys, license,
-        oncall, providers, score_configs, scorers, service_streams, synthetics, workflows,
+        ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
+        domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall, playground,
+        providers, remote_tasks, score_configs, scorers, service_streams, synthetics, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -378,6 +380,28 @@ pub async fn proxy_auth_middleware(request: Request, next: Next) -> Response {
     }
 }
 
+/// Whether this request's body carries a Remote Task secret in plaintext.
+///
+/// `audit_middleware` records request bodies verbatim, so the create call and
+/// every write under `auth`, `headers`, or `signing` has to be redacted —
+/// otherwise the audit trail becomes a second, unencrypted copy of the secret
+/// store.
+#[cfg(feature = "enterprise")]
+fn is_remote_task_secret_write(method: &Method, path: &str) -> bool {
+    if matches!(method, &Method::GET | &Method::HEAD | &Method::OPTIONS) {
+        return false;
+    }
+    let segments = path.split('/').collect::<Vec<_>>();
+    let Some(tasks) = segments.iter().position(|segment| *segment == "tasks") else {
+        return false;
+    };
+    let task_path = &segments[tasks + 1..];
+    (method == Method::POST && (task_path.is_empty() || task_path == &["test"]))
+        || task_path
+            .iter()
+            .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
@@ -439,7 +463,9 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
         let mut response = next.run(request).await;
 
         if response.status().is_success() || response.status().is_redirection() {
-            let body = if path.ends_with("/settings/logo") {
+            let body = if is_remote_task_secret_write(&http_method, &path) {
+                "[REDACTED: remote task secret write]".to_string()
+            } else if path.ends_with("/settings/logo") {
                 general_purpose::STANDARD.encode(&request_body)
             } else {
                 String::from_utf8(request_body).unwrap_or_default()
@@ -697,16 +723,45 @@ pub fn basic_routes() -> Router {
             alerts::external_events::MAX_BODY_BYTES,
         ));
 
+    // Public status pages — unauthenticated by design, like chart_render
+    // above: existence and visibility are checked inside the handler, and the
+    // handlers are pure meta-store point-reads (no search, storage, or
+    // cross-node calls on this plane).
+    if get_config().synthetics.enabled {
+        router = router
+            .route(
+                "/api/status_pages_public/{slug}",
+                get(status_pages::public::snapshot),
+            )
+            // Password unlock — unauthenticated by design (in-handler crypto +
+            // rate-limit), same plane as the read routes.
+            .route(
+                "/api/status_pages_public/{slug}/auth",
+                post(status_pages::public::auth),
+            )
+            .route(
+                "/api/status_pages_public/{slug}/badge.svg",
+                get(status_pages::public::badge),
+            )
+            .route(
+                "/api/status_pages_public/{slug}/feed.xml",
+                get(status_pages::public::feed),
+            )
+            .route("/status/{slug}", get(status_pages::public::page));
+    }
+
     router
 }
 
-/// Create config routes
+/// Create config routes. `/` is served WITHOUT auth (the login page bootstraps
+/// from it), so it must expose only [`status::zo_config_bootstrap`]'s minimal
+/// payload — the full config lives at the authenticated `/api/{org_id}/config`.
 #[cfg(not(feature = "enterprise"))]
 pub fn config_routes() -> Router {
     Router::new()
         .route("/reload", get(status::config_reload))
         .route_layer(middleware::from_fn(auth_middleware))
-        .route("/", get(status::zo_config))
+        .route("/", get(status::zo_config_bootstrap))
         .route("/logout", get(status::logout))
 }
 
@@ -715,7 +770,7 @@ pub fn config_routes() -> Router {
     Router::new()
         .route("/reload", get(status::config_reload))
         .route_layer(middleware::from_fn(auth_middleware))
-        .route("/", get(status::zo_config))
+        .route("/", get(status::zo_config_bootstrap))
         .route("/logout", get(status::logout))
         .route("/redirect", get(status::redirect))
         .route("/dex_login", get(status::dex_login))
@@ -738,6 +793,9 @@ pub fn service_routes() -> Router {
     let server = cfg.common.instance_name_short.to_string();
 
     let mut router = Router::new();
+    // Full UI configuration — authenticated counterpart of the unauthenticated
+    // `/config` bootstrap in config_routes()
+    router = router.route("/{org_id}/config", get(status::zo_config));
     // Users
     router = router.route("/{org_id}/users", get(users::list).post(users::save))
         .route("/{org_id}/users/{email_id}", post(users::add_user_to_org).put(users::update).delete(users::delete))
@@ -763,6 +821,10 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/settings/v2/{key}", get(organization::system_settings::get_setting).delete(organization::system_settings::delete_org_setting))
         .route("/{org_id}/settings/v2/user/{user_id}", post(organization::system_settings::set_user_setting))
         .route("/{org_id}/settings/v2/user/{user_id}/{key}", delete(organization::system_settings::delete_user_setting))
+
+        // Announcement banners: read by every org, authored on the meta org
+        .route("/{org_id}/announcements", get(announcements::get_announcements))
+        .route("/{org_id}/announcements/config", get(announcements::get_announcements_config).put(announcements::set_announcements_config))
 
         // Org info
         .route("/{org_id}/summary", get(organization::org::org_summary))
@@ -807,12 +869,52 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/otel/v1/traces", post(traces::traces_write))
 
         // Traces
+        .route("/{org_id}/traces/time_range", get(traces::time_index::get_org_trace_time_range))
         .route("/{org_id}/{stream_name}/traces/latest", get(traces::get_latest_traces))
         .route("/{org_id}/{stream_name}/traces/latest_stream", get(traces::get_latest_traces_stream))
         .route("/{org_id}/{stream_name}/traces/session", get(traces::session::get_latest_sessions))
         .route("/{org_id}/{stream_name}/traces/session/details", get(traces::session::get_session_details))
         .route("/{org_id}/{stream_name}/traces/user", get(traces::user::get_latest_users))
+        .route("/{org_id}/{stream_name}/traces/time_range", get(traces::time_index::get_trace_time_range))
+        .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
         .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
+
+        // Database Monitoring — its own top-level module, not under /traces.
+        // The path segment must stay `db_monitoring` to match the OFGA resource
+        // these routes authorize against (`db_monitoring:{org}`, see o2_openfga
+        // ROUTE_PERMISSIONS).
+        //
+        // Every route below is registered in both builds; the build-type gate
+        // lives in the handlers, three of which (deadlocks/blocking/
+        // table_health) are dual-implemented and answer 403 on OSS. Registering
+        // them in the enterprise-gated block instead would 404 them, losing the
+        // distinction between "not licensed" and "no such endpoint". Runtime
+        // off-switch is ZO_DB_MONITORING_ENABLED.
+        .route("/{org_id}/db_monitoring/databases", get(db_monitoring::handler::get_dbm_databases))
+        .route("/{org_id}/db_monitoring/queries", get(db_monitoring::handler::get_dbm_queries))
+        .route("/{org_id}/db_monitoring/query/history", get(db_monitoring::handler::get_dbm_query_history))
+        .route("/{org_id}/db_monitoring/query/endpoints", get(db_monitoring::handler::get_dbm_query_endpoints))
+        .route("/{org_id}/db_monitoring/samples", get(db_monitoring::handler::get_dbm_samples))
+        // Server-vantage events (read the canonical o2_dbm_* columns)
+        .route("/{org_id}/db_monitoring/deadlocks", get(db_monitoring::handler::get_dbm_deadlocks))
+        .route("/{org_id}/db_monitoring/blocking", get(db_monitoring::handler::get_dbm_blocking))
+        .route("/{org_id}/db_monitoring/activity", get(db_monitoring::handler::get_dbm_activity))
+        // `query/insights` returns the query-detail page's Logs-side pair in one
+        // round trip; `query/plans` and `query/server_metrics` are superseded by
+        // it (same sections, same envelopes) and stay registered for
+        // compatibility.
+        .route("/{org_id}/db_monitoring/query/insights", get(db_monitoring::handler::get_dbm_query_insights))
+        .route("/{org_id}/db_monitoring/query/plans", get(db_monitoring::handler::get_dbm_query_plans))
+        .route("/{org_id}/db_monitoring/query/server_metrics", get(db_monitoring::handler::get_dbm_query_server_metrics))
+        .route("/{org_id}/db_monitoring/server_queries", get(db_monitoring::handler::get_dbm_server_queries))
+        .route("/{org_id}/db_monitoring/server_samples", get(db_monitoring::handler::get_dbm_server_samples))
+        .route("/{org_id}/db_monitoring/table_health", get(db_monitoring::handler::get_dbm_table_health))
+        .route("/{org_id}/db_monitoring/instances", get(db_monitoring::handler::get_dbm_instances))
+        .route(
+            "/{org_id}/db_monitoring/instance_metrics",
+            get(db_monitoring::handler::get_dbm_instance_metrics),
+        )
+        .route("/{org_id}/db_monitoring/badges", get(db_monitoring::handler::get_dbm_badges))
 
         // LLM Model Pricing
         .route("/{org_id}/llm/models", get(model_pricing::list).post(model_pricing::create))
@@ -895,8 +997,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
 
         // SLOs. Deliberately NOT enterprise-gated: nothing about SLO
-        // measurement is an enterprise capability, and the handlers already
-        // return 501 when ZO_SLO_ENABLED is false. Literal segments are
+        // measurement is an enterprise capability. Literal segments are
         // registered before the {slo_id} catch-all, per the router's ordering
         // rule.
         .route(
@@ -921,8 +1022,14 @@ pub fn service_routes() -> Router {
 
         // Alerts (v2)
         .route("/v2/{org_id}/alerts", get(alerts::list_alerts).post(alerts::create_alert))
+        .route("/v2/{org_id}/alerts/composites/validate", post(alerts::validate_composite_alert))
+        .route("/v2/{org_id}/alerts/{alert_id}/composite-references", get(alerts::get_composite_references))
+        .route("/v2/{org_id}/alerts/{alert_id}/composite-timeline", get(alerts::get_composite_timeline))
         .route("/v2/{org_id}/alerts/{alert_id}", get(alerts::get_alert).put(alerts::update_alert).delete(alerts::delete_alert))
         .route("/v2/{org_id}/alerts/{alert_id}/groups", get(alerts::list_alert_groups))
+        // The uptime this alert would produce as an SLI source. Sits with the
+        // other per-alert sub-resources because it reads this alert's history.
+        .route("/v2/{org_id}/alerts/{alert_id}/slo-preview", get(slos::preview_alert_sli))
         .route("/v2/{org_id}/alerts/{alert_id}/groups/transitions", get(alerts::list_alert_group_transitions))
         .route("/v2/{org_id}/alerts/{alert_id}/export", post(alerts::export_alert))
         .route("/v2/{org_id}/alerts/bulk", delete(alerts::delete_alert_bulk))
@@ -952,6 +1059,9 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/enable", patch(alerts::incident_integrations::set_integration_enabled))
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/rotate", post(alerts::incident_integrations::rotate_integration_token))
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/senders", get(alerts::incident_integrations::list_integration_senders))
+
+        // Which alerts can be an SLI source, and why the rest cannot.
+        .route("/{org_id}/alerts/slo-eligible", get(slos::list_slo_eligible_alerts))
 
         // Alert templates
         .route("/{org_id}/alerts/templates", get(alerts::templates::list_templates).post(alerts::templates::save_template))
@@ -1056,6 +1166,138 @@ pub fn service_routes() -> Router {
 
         if get_o2_config().llm_eval_config.enabled {
             router = router
+                // Annotation Queues and Datasets (LLM Observability Phase 2.5a)
+                .route(
+                    "/{org_id}/annotation_queues",
+                    get(annotation_queues::list_annotation_queues)
+                        .post(annotation_queues::create_annotation_queue),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/items",
+                    get(annotation_queues::list_annotation_queue_items),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items",
+                    post(annotation_queues::enqueue_annotation_queue_item)
+                        .delete(annotation_queues::clear_annotation_queue_items),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}",
+                    get(annotation_queues::get_annotation_queue_item),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/reviews",
+                    get(annotation_queues::list_annotation_queue_item_reviews)
+                        .post(annotation_queues::review_annotation_queue_item),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/push_to_dataset",
+                    post(datasets::push_annotation_queue_item_to_dataset),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/archive",
+                    post(annotation_queues::archive_annotation_queue_items),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}",
+                    get(annotation_queues::get_annotation_queue)
+                        .put(annotation_queues::update_annotation_queue)
+                        .delete(annotation_queues::delete_annotation_queue),
+                )
+                .route(
+                    "/{org_id}/datasets",
+                    get(datasets::list_datasets).post(datasets::create_dataset),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/items/import",
+                    post(datasets::import_dataset_items),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/items",
+                    get(datasets::list_dataset_items)
+                        .post(datasets::push_dataset_item)
+                        .put(datasets::upsert_dataset_items),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/rows",
+                    get(datasets::get_dataset_snapshot_rows),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}/items/{item_id}",
+                    get(datasets::get_dataset_item_versions)
+                        .put(datasets::update_dataset_item)
+                        .delete(datasets::delete_dataset_item),
+                )
+                .route(
+                    "/{org_id}/datasets/{dataset_id}",
+                    get(datasets::get_dataset)
+                        .put(datasets::update_dataset)
+                        .delete(datasets::delete_dataset),
+                )
+                .route(
+                    "/{org_id}/experiments/preview",
+                    post(experiments::preview_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments",
+                    get(experiments::list_experiments).post(experiments::create_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments/compare",
+                    get(experiments::compare_experiments),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}",
+                    get(experiments::get_experiment).delete(experiments::delete_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/baseline",
+                    put(experiments::set_experiment_baseline)
+                        .delete(experiments::clear_experiment_baseline),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/rows",
+                    get(experiments::list_experiment_result_rows),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/rows/{row_id}",
+                    get(experiments::get_experiment_row),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/rows/{row_id}/trials/{trial_index}/retry",
+                    post(experiments::retry_experiment_slot),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/slots",
+                    get(experiments::list_experiment_slots),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/records",
+                    post(experiments::submit_experiment_records),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/finalize",
+                    post(experiments::finalize_experiment),
+                )
+                .route(
+                    "/{org_id}/experiments/{experiment_id}/cancel",
+                    post(experiments::cancel_experiment),
+                )
+                    .route(
+                        "/{org_id}/experiments/{experiment_id}/retry",
+                        post(experiments::retry_experiment),
+                    )
+                    .route(
+                        "/{org_id}/experiments/{experiment_id}/clone",
+                        post(experiments::clone_experiment),
+                    )
+
+                // On-demand human annotation from Discovery
+                .route("/{org_id}/annotations", post(annotations::annotate_target))
+
+                // LLM score-based Discovery
+                .route("/{org_id}/discovery", get(discovery::list_discovery_items))
+
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
                 .route("/{org_id}/providers/{provider_id}", get(providers::get_provider).put(providers::update_provider).delete(providers::delete_provider))
@@ -1063,7 +1305,22 @@ pub fn service_routes() -> Router {
 
                 // Score Configs (Online Eval Phase 2)
                 // NOTE: /{entity_id}/versions must precede /{entity_id} for routing correctness
-                .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config))
+                .route("/{org_id}/tasks", get(remote_tasks::list_remote_tasks).post(remote_tasks::create_remote_task))
+                .route("/{org_id}/tasks/test", post(remote_tasks::test_remote_task))
+                .route("/{org_id}/tasks/{entity_id}/auth", put(remote_tasks::replace_remote_task_auth_secret).delete(remote_tasks::revoke_remote_task_auth_secret))
+                .route("/{org_id}/tasks/{entity_id}/headers/{header_name}/secret", put(remote_tasks::replace_remote_task_header_secret).delete(remote_tasks::revoke_remote_task_header_secret))
+                .route("/{org_id}/tasks/{entity_id}/signing/rotate", post(remote_tasks::rotate_remote_task_signing_secret))
+                .route("/{org_id}/tasks/{entity_id}/signing/test", post(remote_tasks::test_remote_task_signing_candidate))
+                .route("/{org_id}/tasks/{entity_id}/signing/activate", post(remote_tasks::activate_remote_task_signing_candidate))
+                .route("/{org_id}/tasks/{entity_id}/signing/end_grace", post(remote_tasks::end_remote_task_signing_grace))
+                .route("/{org_id}/tasks/{entity_id}/signing", get(remote_tasks::get_remote_task_signing_status).delete(remote_tasks::revoke_remote_task_signing_secret))
+                .route("/{org_id}/tasks/{entity_id}/versions", get(remote_tasks::list_remote_task_versions))
+                .route("/{org_id}/tasks/{entity_id}/stats", get(remote_tasks::get_remote_task_stats))
+                .route("/{org_id}/tasks/{entity_id}/draft", get(remote_tasks::get_remote_task_draft).delete(remote_tasks::discard_remote_task_draft))
+                .route("/{org_id}/tasks/{entity_id}/test_connection", post(remote_tasks::publish_remote_task))
+                .route("/{org_id}/tasks/{entity_id}/test_run", post(remote_tasks::test_run_remote_task))
+                .route("/{org_id}/tasks/{entity_id}", get(remote_tasks::get_remote_task).put(remote_tasks::save_remote_task_draft).delete(remote_tasks::delete_remote_task))
+                .route("/{org_id}/score_configs", get(score_configs::list_score_configs).post(score_configs::create_score_config).put(score_configs::ensure_score_config))
                 .route("/{org_id}/score_configs/{entity_id}/versions", get(score_configs::list_score_config_versions))
                 .route("/{org_id}/score_configs/{entity_id}", get(score_configs::get_score_config).put(score_configs::update_score_config).delete(score_configs::delete_score_config))
 
@@ -1074,6 +1331,12 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/scorers/llm_judge/output_schema", post(scorers::preview_llm_judge_output_schema))
                 .route("/{org_id}/scorers/{entity_id}/versions", get(scorers::list_scorer_versions))
                 .route("/{org_id}/scorers/{entity_id}", get(scorers::get_scorer).put(scorers::update_scorer).delete(scorers::delete_scorer))
+
+                // Playground (Phase 3.1)
+                .route("/{org_id}/playground/run", post(playground::run_playground_cell))
+                .route("/{org_id}/playground/score", post(playground::score_playground_cell))
+                .route("/{org_id}/playground/snapshots", post(playground::share_playground_snapshot))
+                .route("/{org_id}/playground/snapshots/{snapshot_id}", get(playground::get_playground_snapshot))
 
                 // Online Eval Jobs (Online Eval Phase 2)
                 // NOTE: /activate, /pause, /resume, /archive must precede /{job_id}
@@ -1110,16 +1373,6 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/cipher_keys", get(keys::list).post(keys::save))
             .route("/{org_id}/cipher_keys/bulk", delete(keys::delete_bulk))
             .route("/{org_id}/cipher_keys/{key_name}", get(keys::get).put(keys::update).delete(keys::delete))
-
-            // Actions
-            .route("/{org_id}/actions", get(actions::action::list_actions))
-            .route("/{org_id}/actions/upload", post(actions::action::upload_zipped_action))
-            .route("/{org_id}/actions/bulk", delete(actions::action::delete_action_bulk))
-            .route("/{org_id}/actions/{action_id}", get(actions::action::get_action_from_id).put(actions::action::update_action_details).delete(actions::action::delete_action))
-            .route("/{org_id}/actions/download/{action_id}", get(actions::action::serve_action_zip))
-            .route("/{org_id}/actions/pause/{action_id}", get(actions::operations::pause_action))
-            .route("/{org_id}/actions/resume/{action_id}", get(actions::operations::resume_action))
-            .route("/{org_id}/actions/test/{action_id}", post(actions::operations::test_action))
 
             // Rate limits
             .route("/{org_id}/ratelimit/api_modules", get(ratelimit::api_modules))
@@ -1198,41 +1451,122 @@ pub fn service_routes() -> Router {
                 .route(
                     "/{org_id}/workflows/{id}/enable",
                     put(workflows::enable_workflow),
+                )
+                .route(
+                    "/{org_id}/workflows/promote/{id}",
+                    post(workflows::promote_draft),
                 );
         }
+    }
 
-        // Synthetics — all routes gated behind O2_SYNTHETICS_ENABLED. When off,
-        // nothing is registered and every synthetics path 404s.
-        if get_o2_config().synthetics.enabled {
+    // Synthetics — all routes gated behind ZO_SYNTHETICS_ENABLED. When off,
+    // nothing is registered and every synthetics path 404s.
+    if config::get_config().synthetics.enabled {
+        router = router
+            // Synthetics — CRUD + locations
+            .route("/{org_id}/synthetics", get(synthetics::list_synthetics).post(synthetics::create_synthetic).delete(synthetics::delete_synthetics_bulk))
+            .route("/{org_id}/synthetics/locations", get(synthetics::list_locations).post(synthetics::create_location))
+            .route("/{org_id}/synthetics/agent-tokens", get(synthetics::list_agent_tokens).post(synthetics::create_agent_token))
+            .route("/{org_id}/synthetics/agent-tokens/rotate", post(synthetics::rotate_agent_token))
+            .route("/{org_id}/synthetics/agent-tokens/{name}", patch(synthetics::set_agent_token_enabled))
+            .route("/{org_id}/synthetics/locations/{id}", get(synthetics::get_location).put(synthetics::update_location).delete(synthetics::delete_location))
+            .route("/{org_id}/synthetics/{id}", get(synthetics::get_synthetic).put(synthetics::update_synthetic).delete(synthetics::delete_synthetic))
+            .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
+            .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
+            .route("/{org_id}/synthetics/{id}/artifact", get(synthetics::get_artifact))
+            .route("/{org_id}/synthetics/{id}/artifacts/presign", post(synthetics::presign_artifacts))
+            .route("/{org_id}/synthetics/{id}/runs", get(synthetics::list_runs))
+            .route("/{org_id}/synthetics/{id}/runs/{run_id}", get(synthetics::get_run_detail))
+            // Synthetics — folder move (v2 prefix to match the shared MoveAcrossFolders utility)
+            .route("/v2/{org_id}/synthetics/move", patch(synthetics::move_synthetics))
+            // Synthetics — job API (org-scoped path; authenticated via the
+            // o2syn_ token, whose org must match {org_id} in the path)
+            .route("/{org_id}/synthetics/jobs/resolve", post(synthetics::job_resolve))
+            .route("/{org_id}/synthetics/jobs/ack", post(synthetics::job_ack))
+            .route(
+                "/{org_id}/synthetics/jobs/artifact-urls",
+                post(synthetics::job_artifact_urls),
+            )
+            .route("/{org_id}/synthetics/jobs/upload", post(synthetics::job_upload));
+
+        // Status pages — authenticated admin CRUD (the public read plane lives
+        // in basic_routes, not here). Ships with synthetics, no separate
+        // toggle. RBAC is enforced by the OpenFGA route-permission middleware
+        // (resource "status_page"); the per-mapped-check folder-authz is
+        // in-handler (R-1).
+        router = router
+            .route(
+                "/{org_id}/status_pages",
+                get(status_pages::admin::list_pages).post(status_pages::admin::create_page),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}",
+                get(status_pages::admin::get_page)
+                    .put(status_pages::admin::update_page)
+                    .delete(status_pages::admin::delete_page),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/components",
+                put(status_pages::admin::set_components),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/rotate_slug",
+                post(status_pages::admin::rotate_slug),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/preview",
+                get(status_pages::admin::preview),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/notices",
+                get(status_pages::admin::list_page_notices)
+                    .post(status_pages::admin::create_notice),
+            )
+            .route(
+                "/{org_id}/status_pages/notices/{nid}",
+                put(status_pages::admin::update_notice).delete(status_pages::admin::delete_notice),
+            )
+            .route(
+                "/{org_id}/status_pages/notices/{nid}/updates",
+                get(status_pages::admin::list_notice_updates)
+                    .post(status_pages::admin::add_notice_update),
+            )
+            .route(
+                "/{org_id}/status_pages/notices/{nid}/mark_false_positive",
+                post(status_pages::admin::mark_false_positive),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/domains",
+                get(status_pages::admin::list_domains).post(status_pages::admin::create_domain),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/{did}",
+                delete(status_pages::admin::delete_domain),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/{did}/verify",
+                post(status_pages::admin::verify_domain),
+            );
+
+        // The private-VPC-agent path, and the only part of synthetics that
+        // is enterprise. Not registered at all in an OSS build, so these
+        // 404 rather than 403 — the endpoints do not exist there.
+        //
+        // `lease` is the whole of the job API that is gated: a Lambda probe
+        // calls `resolve` and `ack` and is handed its work by the
+        // dispatcher, which leases in-process. Only a long-running agent
+        // inside a customer VPC pulls work by leasing.
+        #[cfg(feature = "enterprise")]
+        {
             router = router
-                // Synthetics — CRUD + locations
-                .route("/{org_id}/synthetics", get(synthetics::list_synthetics).post(synthetics::create_synthetic).delete(synthetics::delete_synthetics_bulk))
-                .route("/{org_id}/synthetics/locations", get(synthetics::list_locations).post(synthetics::create_location))
-                .route("/{org_id}/synthetics/agent-setup", get(synthetics::agent_setup))
-                .route("/{org_id}/synthetics/agent-tokens", get(synthetics::list_agent_tokens).post(synthetics::create_agent_token))
-                .route("/{org_id}/synthetics/agent-tokens/rotate", post(synthetics::rotate_agent_token))
-                .route("/{org_id}/synthetics/agent-tokens/{name}", patch(synthetics::set_agent_token_enabled))
-                .route("/{org_id}/synthetics/locations/{id}", get(synthetics::get_location).put(synthetics::update_location).delete(synthetics::delete_location))
-                .route("/{org_id}/synthetics/{id}", get(synthetics::get_synthetic).put(synthetics::update_synthetic).delete(synthetics::delete_synthetic))
-                .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
-                .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
-                .route("/{org_id}/synthetics/{id}/artifact", get(synthetics::get_artifact))
-                .route("/{org_id}/synthetics/{id}/artifacts/presign", post(synthetics::presign_artifacts))
-                .route("/{org_id}/synthetics/{id}/runs", get(synthetics::list_runs))
-                .route("/{org_id}/synthetics/{id}/runs/{run_id}", get(synthetics::get_run_detail))
-                // Synthetics — folder move (v2 prefix to match the shared MoveAcrossFolders utility)
-                .route("/v2/{org_id}/synthetics/move", patch(synthetics::move_synthetics))
-                // Synthetics — job API (org-scoped path; authenticated via the
-                // o2syn_ token, whose org must match {org_id} in the path)
-                .route("/{org_id}/synthetics/jobs/resolve", post(synthetics::job_resolve))
-                .route("/{org_id}/synthetics/jobs/lease", post(synthetics::job_lease))
-                .route("/{org_id}/synthetics/jobs/ack", post(synthetics::job_ack))
                 .route(
-                    "/{org_id}/synthetics/jobs/artifact-urls",
-                    post(synthetics::job_artifact_urls),
+                    "/{org_id}/synthetics/jobs/lease",
+                    post(synthetics::job_lease),
                 )
-                .route("/{org_id}/synthetics/jobs/upload", post(synthetics::job_upload))
-                // Synthetics — agent liveness API (org-scoped; o2syn_ token)
+                .route(
+                    "/{org_id}/synthetics/agent-setup",
+                    get(synthetics::agent_setup),
+                )
                 .route(
                     "/{org_id}/synthetics/agent/register",
                     post(synthetics::agent_register),
@@ -1242,247 +1576,257 @@ pub fn service_routes() -> Router {
                     post(synthetics::agent_heartbeat),
                 );
         }
+    }
 
-        // On-call — all routes gated behind O2_ONCALL_ENABLED. When off,
-        // nothing is registered and every on-call path 404s.
-        if get_o2_config().oncall.enabled {
-            router = router
-                .route(
-                    "/{org_id}/oncall/teams",
-                    get(oncall::list_teams).post(oncall::create_team),
-                )
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}",
-                    get(oncall::get_team)
-                        .put(oncall::update_team)
-                        .delete(oncall::delete_team),
-                )
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/members",
-                    get(oncall::list_members)
-                        .post(oncall::add_member)
-                        .delete(oncall::remove_member),
-                )
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/schedule",
-                    get(oncall::get_schedule).put(oncall::set_schedule),
-                )
-                // §3b's four starting points. The catalogue is org-scoped
-                // only because everything under /oncall is — it is a compiled
-                // constant, and applying one is a full replace that goes out
-                // through the same write as PUT /schedule.
-                .route(
-                    "/{org_id}/oncall/schedule-presets",
-                    get(oncall::list_schedule_presets),
-                )
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/schedule/from-preset",
-                    post(oncall::apply_schedule_preset),
-                )
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/on-call",
-                    get(oncall::who_is_on_call),
-                )
-                // §5: "cover for me". A cover outranks every layer for its
-                // window, so it lives beside the schedule it stands over.
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/overrides",
-                    get(oncall::list_overrides).post(oncall::create_override),
-                )
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/overrides/{override_id}",
-                    delete(oncall::delete_override),
-                )
-                // §5a: "Ana is away 20 Aug – 3 Sep". Org-scoped rather than
-                // hung off a team, because being away is a fact about a
-                // person: somebody on two teams is away from both, and a
-                // per-team window is one somebody forgets to write twice.
-                .route(
-                    "/{org_id}/oncall/unavailability",
-                    get(oncall::list_unavailability).post(oncall::create_unavailability),
-                )
-                .route(
-                    "/{org_id}/oncall/unavailability/{unavailability_id}",
-                    delete(oncall::delete_unavailability),
-                )
-                // §3b: the resolved schedule, which is what a human reads
-                // instead of running the precedence rules in their head.
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/resolved-schedule",
-                    get(oncall::get_resolved_schedule),
-                )
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/policy",
-                    get(oncall::get_policy).put(oncall::set_policy),
-                )
-                // Where the team is talked to, as opposed to where its ladder
-                // pages. Its own route rather than a field on the policy: a
-                // team's chat room is not a property of its escalation ladder,
-                // and changing one should never mean opening the other.
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/channel",
-                    get(oncall::get_team_channel).put(oncall::set_team_channel),
-                )
-                // The four derived team reads the screens are built on.
-                // Nothing here is stored: a saved risk list argues with the
-                // configuration beside it the moment somebody fixes something.
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/reachability",
-                    get(oncall::get_team_reachability),
-                )
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/config-risks",
-                    get(oncall::list_team_config_risks),
-                )
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/overview",
-                    get(oncall::get_team_overview),
-                )
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/load",
-                    get(oncall::get_team_load),
-                )
-                // "If a P1 fired right now" — a dry run, and free of side
-                // effects. `test-page` is the one that actually delivers.
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/escalation-preview",
-                    get(oncall::get_escalation_preview),
-                )
-                .route("/{org_id}/oncall/responses", get(oncall::list_responses))
-                .route(
-                    "/{org_id}/oncall/responses/{response_id}",
-                    get(oncall::get_response),
-                )
-                .route(
-                    "/{org_id}/oncall/responses/{response_id}/resolve",
-                    post(oncall::resolve_response),
-                )
-                .route(
-                    "/{org_id}/oncall/ownership",
-                    get(oncall::list_ownership_rules).post(oncall::create_ownership_rule),
-                )
-                // A sibling of the list rather than a widening of it: the
-                // counts cost a grouped read of the timeline, and the routing
-                // path's own list has to stay the cheap read it is.
-                .route(
-                    "/{org_id}/oncall/ownership/stats",
-                    get(oncall::list_ownership_rule_stats),
-                )
-                .route(
-                    "/{org_id}/oncall/ownership/{rule_id}",
-                    put(oncall::update_ownership_rule).delete(oncall::delete_ownership_rule),
-                )
-                .route(
-                    "/{org_id}/oncall/responses/{response_id}/notes",
-                    post(oncall::add_note),
-                )
-                .route(
-                    "/{org_id}/oncall/incidents/{incident_id}/responses",
-                    get(oncall::list_responses_for_incident),
-                )
-                .route(
-                    "/{org_id}/oncall/responses/{response_id}/escalation",
-                    get(oncall::get_escalation_progress),
-                )
-                .route(
-                    "/{org_id}/oncall/responses/{response_id}/prior-causes",
-                    get(oncall::get_prior_causes),
-                )
-                .route(
-                    "/{org_id}/oncall/responses/{response_id}/acknowledge",
-                    post(oncall::acknowledge_response),
-                )
-                .route(
-                    "/{org_id}/oncall/responses/{response_id}/snooze",
-                    post(oncall::snooze_response),
-                )
-                .route(
-                    "/{org_id}/oncall/responses/{response_id}/handoff",
-                    post(oncall::handoff_response),
-                )
-                .route(
-                    "/{org_id}/oncall/responses/{response_id}/history",
-                    get(oncall::get_response_history),
-                )
-                .route(
-                    "/{org_id}/oncall/responses/{response_id}/deliveries",
-                    get(oncall::list_deliveries),
-                )
-                .route(
-                    "/{org_id}/oncall/routing/config",
-                    get(oncall::get_routing_config).put(oncall::set_routing_config),
-                )
-                .route(
-                    "/{org_id}/oncall/routing/preview",
-                    post(oncall::preview_routing),
-                )
-                // The unrouted queue and the coverage banner: the two places
-                // the product admits it would page nobody.
-                .route(
-                    "/{org_id}/oncall/unrouted",
-                    get(oncall::list_unrouted_signals),
-                )
-                .route(
-                    "/{org_id}/oncall/unrouted/{signal_id}",
-                    delete(oncall::dismiss_unrouted_signal),
-                )
-                .route(
-                    "/{org_id}/oncall/coverage-gaps",
-                    get(oncall::list_coverage_gaps),
-                )
-                // A firing that turned out to be bigger than an alert.
-                .route(
-                    "/{org_id}/oncall/responses/{response_id}/promote",
-                    post(oncall::promote_to_incident),
-                )
-                // How to reach one person (§5). Storage and API only — no SMS
-                // or voice transport exists yet, so everything saved here is
-                // marked unverified and nothing can page it.
-                .route(
-                    "/{org_id}/oncall/contacts/{user_email}",
-                    get(oncall::get_contact)
-                        .put(oncall::set_contact)
-                        .delete(oncall::delete_contact),
-                )
-                // The responder's own view: what was sent to me, and which
-                // teams am I on.
-                .route(
-                    "/{org_id}/oncall/my/deliveries",
-                    get(oncall::list_my_deliveries),
-                )
-                .route(
-                    "/{org_id}/oncall/my/deliveries/read",
-                    post(oncall::mark_deliveries_read),
-                )
-                .route("/{org_id}/oncall/my/teams", get(oncall::list_my_teams))
-                .route(
-                    "/{org_id}/oncall/analytics/causes",
-                    get(oncall::cause_analytics),
-                )
-                // Ordered recovery (`00-simplified-flow` §4): the dependent's
-                // own verb. Without it the owner's record waits forever.
-                .route(
-                    "/{org_id}/oncall/responses/{response_id}/confirm-recovery",
-                    post(oncall::confirm_recovery),
-                )
-                // "This needs more people, now" — the ladder advances a rung
-                // without waiting for its timer.
-                .route(
-                    "/{org_id}/oncall/responses/{response_id}/escalate",
-                    post(oncall::escalate_response),
-                )
-                // Proves a team's paging configuration reaches a human, down
-                // the real dispatch path, leaving no record behind.
-                .route(
-                    "/{org_id}/oncall/teams/{team_id}/test-page",
-                    post(oncall::send_test_page),
-                );
-        }
+    // On-call — all routes gated behind O2_ONCALL_ENABLED. When off,
+    // nothing is registered and every on-call path 404s.
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().oncall.enabled {
+        router = router
+            .route(
+                "/{org_id}/oncall/teams",
+                get(oncall::list_teams).post(oncall::create_team),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}",
+                get(oncall::get_team)
+                    .put(oncall::update_team)
+                    .delete(oncall::delete_team),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/members",
+                get(oncall::list_members)
+                    .post(oncall::add_member)
+                    .delete(oncall::remove_member),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/schedule",
+                get(oncall::get_schedule).put(oncall::set_schedule),
+            )
+            // §3b's four starting points. The catalogue is org-scoped
+            // only because everything under /oncall is — it is a compiled
+            // constant, and applying one is a full replace that goes out
+            // through the same write as PUT /schedule.
+            .route(
+                "/{org_id}/oncall/schedule-presets",
+                get(oncall::list_schedule_presets),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/schedule/from-preset",
+                post(oncall::apply_schedule_preset),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/on-call",
+                get(oncall::who_is_on_call),
+            )
+            // §5: "cover for me". A cover outranks every layer for its
+            // window, so it lives beside the schedule it stands over.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/overrides",
+                get(oncall::list_overrides).post(oncall::create_override),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/overrides/{override_id}",
+                delete(oncall::delete_override),
+            )
+            // §5a: "Ana is away 20 Aug – 3 Sep". Org-scoped rather than
+            // hung off a team, because being away is a fact about a
+            // person: somebody on two teams is away from both, and a
+            // per-team window is one somebody forgets to write twice.
+            .route(
+                "/{org_id}/oncall/unavailability",
+                get(oncall::list_unavailability).post(oncall::create_unavailability),
+            )
+            .route(
+                "/{org_id}/oncall/unavailability/{unavailability_id}",
+                delete(oncall::delete_unavailability),
+            )
+            // §3b: the resolved schedule, which is what a human reads
+            // instead of running the precedence rules in their head.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/resolved-schedule",
+                get(oncall::get_resolved_schedule),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/policy",
+                get(oncall::get_policy).put(oncall::set_policy),
+            )
+            // Where the team is talked to, as opposed to where its ladder
+            // pages. Its own route rather than a field on the policy: a
+            // team's chat room is not a property of its escalation ladder,
+            // and changing one should never mean opening the other.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/channel",
+                get(oncall::get_team_channel).put(oncall::set_team_channel),
+            )
+            // The four derived team reads the screens are built on.
+            // Nothing here is stored: a saved risk list argues with the
+            // configuration beside it the moment somebody fixes something.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/reachability",
+                get(oncall::get_team_reachability),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/config-risks",
+                get(oncall::list_team_config_risks),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/overview",
+                get(oncall::get_team_overview),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/load",
+                get(oncall::get_team_load),
+            )
+            // "If a P1 fired right now" — a dry run, and free of side
+            // effects. `test-page` is the one that actually delivers.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/escalation-preview",
+                get(oncall::get_escalation_preview),
+            )
+            .route("/{org_id}/oncall/responses", get(oncall::list_responses))
+            .route(
+                "/{org_id}/oncall/responses/{response_id}",
+                get(oncall::get_response),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/resolve",
+                post(oncall::resolve_response),
+            )
+            .route(
+                "/{org_id}/oncall/ownership",
+                get(oncall::list_ownership_rules).post(oncall::create_ownership_rule),
+            )
+            // A sibling of the list rather than a widening of it: the
+            // counts cost a grouped read of the timeline, and the routing
+            // path's own list has to stay the cheap read it is.
+            .route(
+                "/{org_id}/oncall/ownership/stats",
+                get(oncall::list_ownership_rule_stats),
+            )
+            .route(
+                "/{org_id}/oncall/ownership/{rule_id}",
+                put(oncall::update_ownership_rule).delete(oncall::delete_ownership_rule),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/notes",
+                post(oncall::add_note),
+            )
+            .route(
+                "/{org_id}/oncall/incidents/{incident_id}/responses",
+                get(oncall::list_responses_for_incident),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/escalation",
+                get(oncall::get_escalation_progress),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/prior-causes",
+                get(oncall::get_prior_causes),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/acknowledge",
+                post(oncall::acknowledge_response),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/snooze",
+                post(oncall::snooze_response),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/handoff",
+                post(oncall::handoff_response),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/history",
+                get(oncall::get_response_history),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/deliveries",
+                get(oncall::list_deliveries),
+            )
+            .route(
+                "/{org_id}/oncall/routing/config",
+                get(oncall::get_routing_config).put(oncall::set_routing_config),
+            )
+            .route(
+                "/{org_id}/oncall/routing/preview",
+                post(oncall::preview_routing),
+            )
+            // The unrouted queue and the coverage banner: the two places
+            // the product admits it would page nobody.
+            .route(
+                "/{org_id}/oncall/unrouted",
+                get(oncall::list_unrouted_signals),
+            )
+            .route(
+                "/{org_id}/oncall/unrouted/{signal_id}",
+                delete(oncall::dismiss_unrouted_signal),
+            )
+            .route(
+                "/{org_id}/oncall/coverage-gaps",
+                get(oncall::list_coverage_gaps),
+            )
+            // A firing that turned out to be bigger than an alert.
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/promote",
+                post(oncall::promote_to_incident),
+            )
+            // How to reach one person (§5). Storage and API only — no SMS
+            // or voice transport exists yet, so everything saved here is
+            // marked unverified and nothing can page it.
+            .route(
+                "/{org_id}/oncall/contacts/{user_email}",
+                get(oncall::get_contact)
+                    .put(oncall::set_contact)
+                    .delete(oncall::delete_contact),
+            )
+            // The responder's own view: what was sent to me, and which
+            // teams am I on.
+            .route(
+                "/{org_id}/oncall/my/deliveries",
+                get(oncall::list_my_deliveries),
+            )
+            .route(
+                "/{org_id}/oncall/my/deliveries/read",
+                post(oncall::mark_deliveries_read),
+            )
+            .route("/{org_id}/oncall/my/teams", get(oncall::list_my_teams))
+            .route(
+                "/{org_id}/oncall/analytics/causes",
+                get(oncall::cause_analytics),
+            )
+            // Ordered recovery (`00-simplified-flow` §4): the dependent's
+            // own verb. Without it the owner's record waits forever.
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/confirm-recovery",
+                post(oncall::confirm_recovery),
+            )
+            // "This needs more people, now" — the ladder advances a rung
+            // without waiting for its timer.
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/escalate",
+                post(oncall::escalate_response),
+            )
+            // Proves a team's paging configuration reaches a human, down
+            // the real dispatch path, leaving no record behind.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/test-page",
+                post(oncall::send_test_page),
+            );
     }
 
     #[cfg(feature = "cloud")]
     {
         router = router
+            // Authorized by ROUTE_PERMISSIONS in o2-enterprise; without those rows enterprise auth 403s these for non-root users.
+            .route(
+                "/{org_id}/alerts/destinations/slack/oauth/start",
+                post(alerts::slack_oauth::start),
+            )
+            .route(
+                "/{org_id}/alerts/destinations/slack/oauth/exchange",
+                post(alerts::slack_oauth::exchange),
+            )
             .route(
                 "/{org_id}/invites",
                 get(organization::org::get_org_invites)
@@ -1521,9 +1865,12 @@ pub fn service_routes() -> Router {
                 get(cloud::billings::create_billing_portal_session),
             )
             .route("/{org_id}/ai/usage", get(cloud::billings::get_ai_usage))
+            // Pool-generic limit route. Replaced `/ai/usage_limit`, which was
+            // removed with it: one route, one ROUTE_PERMISSIONS entry, and no
+            // endpoint left that resolve_permission cannot authorize.
             .route(
-                "/{org_id}/ai/usage_limit",
-                put(organization::org::set_ai_usage_limit),
+                "/{org_id}/quota/{pool}/usage_limit",
+                put(organization::org::set_quota_usage_limit),
             )
             .route(
                 "/{org_id}/billings/data_usage/{usage_date}",
@@ -1594,7 +1941,7 @@ pub fn service_routes() -> Router {
     // -> audit -> blocked orgs NOTE: Preprocessing middleware removes Content-Encoding: snappy
     // header before tower_http sees it. This prevents 415 errors while allowing handlers to
     // manually decompress snappy data. tower_http's RequestDecompressionLayer handles gzip,
-    // deflate, and brotli.
+    // deflate, brotli, and zstd.
     router
         .layer(middleware::from_fn(blocked_orgs_middleware))
         .layer(middleware::from_fn(audit_middleware))
@@ -1719,7 +2066,7 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
         .layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit));
 
     // Apply base_uri if configured
-    if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {
+    let mut outer = if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {
         app
     } else {
         // In axum 0.8, nest("/abc", app) maps the inner "/" route to exactly "/abc",
@@ -1734,7 +2081,18 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
             );
         }
         outer
+    };
+
+    // Must be the LAST `.layer()` call in this function: `Router::layer` only
+    // wraps routes that exist at call time, so this has to come after the
+    // "/" redirect, "/web" mount, and base_uri trailing-slash redirect above
+    // or a custom domain's Host falls through to those unchecked.
+    if config::get_config().synthetics.enabled {
+        outer = outer.layer(middleware::from_fn(
+            status_pages::public::host_route_middleware,
+        ));
     }
+    outer
 }
 
 #[cfg(test)]
@@ -1783,6 +2141,28 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn audit_redacts_every_remote_task_secret_write_body() {
+        for (method, path) in [
+            (Method::POST, "api/org/tasks"),
+            (Method::POST, "api/org/tasks/test"),
+            (Method::PUT, "api/org/tasks/task-1/auth"),
+            (Method::PUT, "api/org/tasks/task-1/headers/x-api-key/secret"),
+            (Method::POST, "api/org/tasks/task-1/signing/rotate"),
+        ] {
+            assert!(is_remote_task_secret_write(&method, path));
+        }
+        assert!(!is_remote_task_secret_write(
+            &Method::GET,
+            "api/org/tasks/task-1"
+        ));
+        assert!(!is_remote_task_secret_write(
+            &Method::POST,
+            "api/org/tasks/task-1/test_run"
+        ));
+    }
+
     #[tokio::test]
     async fn test_proxy_routes() {
         let app = proxy_routes(false);
@@ -1801,8 +2181,15 @@ mod tests {
         );
     }
 
+    // ── unauthenticated /config bootstrap ─────────────────────────────────
+    //
+    // GET /config is served WITHOUT auth so the login page can render. Its
+    // response is therefore a security surface: this exact-key-set assertion is
+    // the contract that keeps deployment details (version, license, billing
+    // orgs, storage region, …) from leaking to anonymous clients. Adding a key
+    // here needs the same scrutiny as removing auth from an endpoint.
     #[tokio::test]
-    async fn test_config_routes_include_sql_reserved_keywords() {
+    async fn config_bootstrap_exposes_only_login_page_fields() {
         let app = config_routes();
 
         let req = Request::builder().uri("/").body(Body::empty()).unwrap();
@@ -1815,12 +2202,112 @@ mod tests {
             .unwrap();
         let payload: Value = serde_json::from_slice(&body).unwrap();
 
+        let mut keys: Vec<&str> = payload
+            .as_object()
+            .expect("bootstrap config is a JSON object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            vec![
+                "build_type",
+                "commit_hash",
+                "custom_hide_self_logo",
+                "custom_logo_dark_img",
+                "custom_logo_img",
+                "custom_logo_text",
+                "native_login_enabled",
+                "rum",
+                "sso_enabled",
+                "telemetry_enabled",
+            ],
+            "unauthenticated /config must expose exactly the login-page bootstrap fields"
+        );
+
+        // build_type (enterprise/cloud/opensource) is not sensitive and the o2
+        // CLI + o2-operator read it from this unauthenticated endpoint to gate
+        // enterprise commands — it must stay a real build-type token.
+        assert_eq!(
+            payload.get("build_type").and_then(Value::as_str),
+            Some("opensource"),
+            "bootstrap build_type must carry the real build kind"
+        );
+
+        assert_eq!(
+            payload.get("commit_hash").and_then(Value::as_str),
+            Some(config::COMMIT_HASH),
+            "bootstrap commit_hash must carry the real commit for stale-build detection"
+        );
+    }
+
+    #[tokio::test]
+    async fn config_reload_still_requires_auth() {
+        let app = config_routes();
+
+        let req = Request::builder()
+            .uri("/reload")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(
+            response.status(),
+            StatusCode::UNAUTHORIZED,
+            "/config/reload must stay behind auth_middleware"
+        );
+    }
+
+    // Same testability constraint as query_functions above: service_routes()
+    // answers 401 for every path, so registration of /{org_id}/config is pinned
+    // via a minimal router carrying only this route.
+    #[tokio::test]
+    async fn config_full_route_dispatches_get_and_rejects_other_methods() {
+        let app = Router::new().route("/{org_id}/config", get(status::zo_config));
+
+        let ok = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/myorg/config")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(ok.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(ok.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let payload: Value = serde_json::from_slice(&body).unwrap();
         assert!(
             payload
                 .get("sql_reserved_keywords")
                 .and_then(Value::as_array)
                 .is_some_and(|keywords| !keywords.is_empty())
         );
+        assert!(
+            payload.get("version").is_some(),
+            "authenticated config carries the version"
+        );
+        assert!(
+            payload.get("instance").is_none(),
+            "the instance id is a fingerprinting handle no UI consumer reads; it must not be served"
+        );
+
+        let wrong_method = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/myorg/config")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(wrong_method.status(), StatusCode::METHOD_NOT_ALLOWED);
     }
 
     // NOTE ON WHAT IS TESTABLE HERE.
@@ -1880,6 +2367,37 @@ mod tests {
             json.contains("/{org_id}/query_functions"),
             "query_functions is missing from the OpenAPI surface"
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn experiment_lifecycle_actions_are_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let paths = spec.paths.paths;
+
+        for path in [
+            "/api/{org_id}/experiments/{experiment_id}/cancel",
+            "/api/{org_id}/experiments/{experiment_id}/retry",
+            "/api/{org_id}/experiments/{experiment_id}/clone",
+        ] {
+            let action = paths
+                .get(path)
+                .unwrap_or_else(|| panic!("missing OpenAPI path {path}"));
+            assert!(action.post.is_some(), "{path} must publish POST metadata");
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "enterprise")]
+    fn experiment_row_detail_is_published_in_the_openapi_surface() {
+        let spec = super::openapi::ApiDoc::openapi();
+        let path = spec
+            .paths
+            .paths
+            .get("/api/{org_id}/experiments/{experiment_id}/rows/{row_id}")
+            .expect("missing Experiment row-detail OpenAPI path");
+
+        assert!(path.get.is_some());
     }
 
     // ── tmp/code.md B4 — the query-function catalog route ─────────────────────
@@ -2093,5 +2611,49 @@ mod tests {
                 "unexpected challenge: {v}"
             );
         }
+    }
+
+    // Pins the half of the a36fcfc537 layer ordering that custom domains must not break.
+    #[tokio::test]
+    async fn root_still_redirects_to_web_on_an_unclaimed_host() {
+        let app = create_app_router(|_| Router::new());
+
+        let req = Request::builder()
+            .uri("/")
+            .header(header::HOST, "localhost")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(
+            response
+                .headers()
+                .get(header::LOCATION)
+                .and_then(|v| v.to_str().ok()),
+            Some("/web/")
+        );
+    }
+
+    // The a36fcfc537 ordering is what lets a claimed Host serve `/` instead of 308ing to /web/.
+    #[tokio::test]
+    async fn the_outermost_layer_intercepts_root_ahead_of_the_web_redirect() {
+        let app = create_app_router(|_| Router::new()).layer(middleware::from_fn(
+            |req: axum::extract::Request, next: middleware::Next| async move {
+                if req.uri().path() == "/" {
+                    return (StatusCode::OK, "intercepted").into_response();
+                }
+                next.run(req).await
+            },
+        ));
+
+        let req = Request::builder()
+            .uri("/")
+            .header(header::HOST, "claimed.example.com")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
     }
 }

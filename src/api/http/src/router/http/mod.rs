@@ -721,6 +721,7 @@ const STREAMING_ENDPOINTS: &[&str] = &[
     "/_values_stream",
     "/_search_multi_stream",
     "/ai/chat_stream",
+    "/playground/run",
     "/prometheus/api/v1/query_range",
 ];
 
@@ -773,6 +774,7 @@ mod tests {
         assert!(!is_querier_route("/api/config/_bulk"));
         assert!(!is_querier_route("/api/clusters/_bulk"));
         assert!(!is_querier_route("/api/clusters/ws/_multi"));
+        assert!(is_querier_route("/api/default/config"));
         assert!(!is_querier_route("/api/default/config/_json"));
         assert!(is_querier_route("/api/default/ai/chat_stream"));
     }

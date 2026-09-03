@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { raw } from "@/types/i18n";
 import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
@@ -123,6 +124,7 @@ export const discordConfig: PrebuiltConfig = {
       type: "text",
       required: false,
       hintKey: "alerts.prebuiltDestinations.discordUsernameHint",
+      persistInMetadata: true,
     },
   ],
 };
@@ -131,7 +133,7 @@ import discordLogo from "@/assets/images/alerts/destinations/discord.png";
 
 export const discordDestinationType: PrebuiltType = {
   id: "discord",
-  name: "Discord",
+  name: raw("Discord"),
   descriptionKey: "alert_destinations.prebuilt.discordDescription",
   icon: "discord",
   image: discordLogo,

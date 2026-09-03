@@ -70,7 +70,7 @@ const subs = computed<CardSubstitutions>(() => {
 // Rich, stepped setup card for integrations that have it (registry-driven, keyed
 // by content slug — e.g. "anthropic"). Falls back to the markdown card otherwise.
 const richContent = computed(() =>
-  getRichCardContent(integration.value?.contentSlug ?? integration.value?.slug, subs.value),
+  getRichCardContent(integration.value?.contentSlug ?? integration.value?.slug, subs.value, t),
 );
 </script>
 

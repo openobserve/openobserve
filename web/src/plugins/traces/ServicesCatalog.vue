@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template v-if="statusCounts.critical > 0">
             <div
-              class="rounded-default text-service-health-critical inline-flex items-center gap-1.5 bg-[color-mix(in_srgb,var(--color-service-health-critical)_12%,transparent)] px-2.5 py-1 text-xs font-medium"
+              class="rounded-default text-service-health-critical bg-service-health-critical/12 inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium"
               data-test="services-catalog-pill-critical"
             >
               <span>{{ statusCounts.critical }}</span>
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-if="statusCounts.warning > 0">
             <div
-              class="rounded-default text-service-health-warning inline-flex items-center gap-1.5 bg-[color-mix(in_srgb,var(--color-service-health-warning)_12%,transparent)] px-2.5 py-1 text-xs font-medium"
+              class="rounded-default text-service-health-warning bg-service-health-warning/12 inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium"
               data-test="services-catalog-pill-warning"
             >
               <span>{{ statusCounts.warning }}</span>
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template v-if="statusCounts.degraded > 0">
             <div
-              class="rounded-default text-service-health-degraded inline-flex items-center gap-1.5 bg-[color-mix(in_srgb,var(--color-service-health-degraded)_12%,transparent)] px-2.5 py-1 text-xs font-medium"
+              class="rounded-default text-service-health-degraded bg-service-health-degraded/12 inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium"
               data-test="services-catalog-pill-degraded"
             >
               <span>{{ statusCounts.degraded }}</span>
@@ -294,7 +294,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data="sortedServices"
             :columns="tableColumns"
             :column-visibility="columnVisibility"
-            row-key="service_name"
+            row-key="id"
             :loading="isLoading"
             :frame="false"
             :default-columns="false"
@@ -482,6 +482,7 @@ const streamFilter = ref(tracesStream || storedStreamFilter || "default");
 const availableStreams = ref<string[]>([]);
 
 interface ServiceRow {
+  id: string;
   service_name: string;
   status: "healthy" | "degraded" | "warning" | "critical";
   total_requests: number;
@@ -521,6 +522,20 @@ const TYPE_FILTER_ORDER: TypeFilter[] = ["all", ...CATEGORY_ORDER];
  */
 function categoryOf(row: ServiceRow): EntityCategory {
   return classifyEntity(Boolean(row.is_real_service), row.infer_service_type) as EntityCategory;
+}
+
+function serviceRowId(row: {
+  service_name: string;
+  infer_service_name?: string;
+  infer_service_system?: string;
+  infer_service_type?: string;
+}): string {
+  return JSON.stringify([
+    row.service_name,
+    row.infer_service_name ?? null,
+    row.infer_service_type ?? null,
+    row.infer_service_system ?? null,
+  ]);
 }
 
 const isLoading = ref(false);
@@ -577,9 +592,10 @@ const showSidePanel = ref(false);
 const selectedServiceNode = computed(() =>
   selectedServiceRow.value
     ? {
-        id: selectedServiceRow.value.service_name,
+        id: selectedServiceRow.value.id,
         name: selectedServiceRow.value.service_name,
         service_type: selectedServiceRow.value.infer_service_type,
+        service_system: selectedServiceRow.value.infer_service_system,
       }
     : null,
 );
@@ -652,7 +668,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
   {
     id: "p50_latency_ns",
     hideable: true,
-    header: t("traces.servicesCatalog.columns.p50Latency"),
+    header: raw("P50"),
     accessorKey: "p50_latency_ns",
     sortable: true,
     resizable: true,
@@ -662,7 +678,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
   {
     id: "p95_latency_ns",
     hideable: true,
-    header: t("traces.servicesCatalog.columns.p95Latency"),
+    header: raw("P95"),
     accessorKey: "p95_latency_ns",
     sortable: true,
     resizable: true,
@@ -672,7 +688,7 @@ const tableColumns = computed<OTableColumnDef<ServiceRow>[]>(() => [
   {
     id: "p99_latency_ns",
     hideable: true,
-    header: t("traces.servicesCatalog.columns.p99Latency"),
+    header: raw("P99"),
     accessorKey: "p99_latency_ns",
     sortable: true,
     resizable: true,
@@ -877,20 +893,6 @@ function deriveStatus(errorRate: number): "healthy" | "degraded" | "warning" | "
   return "healthy";
 }
 
-function statusBadgeClass(status: string): string {
-  if (status === "critical") return "text-service-health-critical";
-  if (status === "warning") return "text-service-health-warning";
-  if (status === "degraded") return "text-service-health-degraded";
-  return "text-service-health-healthy";
-}
-
-function errorRateClass(rate: number): string {
-  if (rate > 10) return "text-service-health-critical font-medium";
-  if (rate > 5) return "text-service-health-degraded";
-  if (rate > 1) return "text-service-health-warning";
-  return "";
-}
-
 function formatPercent(value: number): string {
   return value.toFixed(2) + "%";
 }
@@ -900,7 +902,7 @@ function formatLat(us: number): string {
 }
 
 function handleRowClick(row: ServiceRow) {
-  if (selectedServiceRow.value?.service_name === row.service_name) {
+  if (selectedServiceRow.value?.id === row.id) {
     showSidePanel.value = false;
     selectedServiceRow.value = null;
   } else {
@@ -978,9 +980,9 @@ async function loadServicesCatalog() {
   const sql = useInfer
     ? `SELECT
   COALESCE(NULLIF(infer_service_name, ''), service_name) AS service_name,
-  MAX(infer_service_name) AS _infer_service_name,
-  MAX(infer_service_system) AS _infer_service_system,
-  MAX(infer_service_type) AS _infer_service_type,
+  NULLIF(infer_service_name, '') AS _infer_service_name,
+  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_system, '') END AS _infer_service_system,
+  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_type, '') END AS _infer_service_type,
   MAX(CASE WHEN service_name IS NOT NULL AND (infer_service_name IS NULL OR infer_service_name = '') THEN 1 ELSE 0 END) AS _is_real_service,
   COUNT(*) AS total_requests,
   SUM(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count,
@@ -991,7 +993,11 @@ async function loadServicesCatalog() {
   approx_percentile_cont(duration, 0.95) AS p95_latency_ns,
   approx_percentile_cont(duration, 0.99) AS p99_latency_ns
 FROM "${streamName}"
-GROUP BY COALESCE(NULLIF(infer_service_name, ''), service_name)
+GROUP BY
+  COALESCE(NULLIF(infer_service_name, ''), service_name),
+  NULLIF(infer_service_name, ''),
+  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_system, '') END,
+  CASE WHEN NULLIF(infer_service_name, '') IS NULL THEN NULL ELSE NULLIF(infer_service_type, '') END
 ORDER BY total_requests DESC`
     : `SELECT
   service_name,
@@ -1034,10 +1040,20 @@ ORDER BY total_requests DESC`;
           response.type === "search_response_metadata"
         ) {
           const hits: any[] = response.content?.results?.hits ?? [];
-          const serviceMap = new Map(services.value.map((s) => [s.service_name, s]));
+          const serviceMap = new Map(services.value.map((s) => [s.id, s]));
           for (const hit of hits) {
             const name = hit.service_name ?? "";
-            serviceMap.set(name, {
+            const inferredName = hit._infer_service_name ?? undefined;
+            const inferredSystem = hit._infer_service_system ?? undefined;
+            const inferredType = hit._infer_service_type ?? undefined;
+            const id = serviceRowId({
+              service_name: name,
+              infer_service_name: inferredName,
+              infer_service_system: inferredSystem,
+              infer_service_type: inferredType,
+            });
+            serviceMap.set(id, {
+              id,
               service_name: name,
               total_requests: hit.total_requests ?? 0,
               error_count: hit.error_count ?? 0,
@@ -1049,9 +1065,9 @@ ORDER BY total_requests DESC`;
               p99_latency_ns: hit.p99_latency_ns ?? 0,
               status: deriveStatus(hit.error_rate ?? 0),
               is_real_service: hit._is_real_service ?? 0,
-              infer_service_name: hit._infer_service_name ?? undefined,
-              infer_service_system: hit._infer_service_system ?? undefined,
-              infer_service_type: hit._infer_service_type ?? undefined,
+              infer_service_name: inferredName,
+              infer_service_system: inferredSystem,
+              infer_service_type: inferredType,
             });
           }
           // RPC entities are kept as their own category (matching the Service

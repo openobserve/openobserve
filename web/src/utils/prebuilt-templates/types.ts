@@ -17,13 +17,7 @@ import type { I18nKey, I18nText } from "@/types/i18n";
  * Prebuilt destination types
  */
 export type PrebuiltTypeId =
-  | "slack"
-  | "discord"
-  | "msteams"
-  | "pagerduty"
-  | "servicenow"
-  | "email"
-  | "opsgenie";
+  "slack" | "discord" | "msteams" | "pagerduty" | "servicenow" | "email" | "opsgenie";
 
 /**
  * A user-facing validation message, expressed as an i18n KEY (+ optional
@@ -64,6 +58,8 @@ export interface CredentialField {
   hintKey?: I18nKey;
   options?: Array<{ label: string; value: string; description?: string }>;
   validator?: (value: string) => CredentialValidatorResult;
+  /** Explicitly opts a non-secret value into `credential_*` metadata. */
+  persistInMetadata?: boolean;
 }
 
 /**

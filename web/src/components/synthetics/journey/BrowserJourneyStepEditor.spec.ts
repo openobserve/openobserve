@@ -502,3 +502,63 @@ describe("BrowserJourneyStepEditor action-change notice", () => {
     );
   });
 });
+
+// Which button and how many clicks reached storage and the replay wire, and
+// stopped one layer short of the author: the editor rendered a recorded right or
+// double click as a plain "Click" with no control to see or change it.
+describe("BrowserJourneyStepEditor click type", () => {
+  const clickTypeSelect = (wrapper: ReturnType<typeof render>) =>
+    wrapper.findComponent(test("synthetics-journey-step-click-type-select"));
+
+  const pickClickType = async (wrapper: ReturnType<typeof render>, type: string) => {
+    await clickTypeSelect(wrapper).vm.$emit("update:modelValue", type);
+  };
+
+  const lastStep = (wrapper: ReturnType<typeof render>) => {
+    const emitted = wrapper.emitted("update:step");
+    return emitted?.[emitted.length - 1]?.[0] as BrowserStep;
+  };
+
+  it("renders the control on a click step and nowhere else", () => {
+    expect(clickTypeSelect(render({ action: "click" })).exists()).toBe(true);
+    expect(clickTypeSelect(render({ action: "hover" })).exists()).toBe(false);
+    expect(clickTypeSelect(render({ action: "navigate" })).exists()).toBe(false);
+  });
+
+  it("shows the type a recorded step actually carries", () => {
+    expect(clickTypeSelect(render({ button: "right" })).props("modelValue")).toBe("right");
+    expect(clickTypeSelect(render({ clickCount: 2 })).props("modelValue")).toBe("double");
+    expect(clickTypeSelect(render()).props("modelValue")).toBe("left");
+  });
+
+  it("writes both fields when the author picks a type", async () => {
+    const wrapper = render();
+    await pickClickType(wrapper, "double");
+    expect(lastStep(wrapper)).toMatchObject({ button: "left", clickCount: 2 });
+  });
+
+  // Left/1 is the absent-field default, so returning to a plain click serialises
+  // exactly as a step that never left one.
+  it("returns to the default pair rather than clearing the fields", async () => {
+    const wrapper = render({ button: "right" });
+    await pickClickType(wrapper, "left");
+    expect(lastStep(wrapper)).toMatchObject({ button: "left", clickCount: 1 });
+  });
+
+  // journeyToWireSteps prefers `wire`, so an edit that misses it is discarded at
+  // replay time — the same trap every other field in `update()` is wired for.
+  it("keeps a live recording's wire in step with the edit", async () => {
+    const wrapper = render({ wire: { id: "w1", action: "click" } as never });
+    await pickClickType(wrapper, "right");
+    expect(lastStep(wrapper).wire).toMatchObject({ button: "right", clickCount: 1 });
+  });
+
+  it("drops both fields when the action stops being a click", async () => {
+    const wrapper = render({ button: "right", clickCount: 1 });
+    await wrapper.findComponent({ name: "OSelect" }).vm.$emit("update:modelValue", "hover");
+    const step = lastStep(wrapper);
+    expect(step.action).toBe("hover");
+    expect(step.button).toBeUndefined();
+    expect(step.clickCount).toBeUndefined();
+  });
+});

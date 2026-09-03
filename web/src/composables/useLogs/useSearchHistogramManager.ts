@@ -14,12 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { searchState } from "@/composables/useLogs/searchState";
+import type { TranslateFn } from "@/types/i18n";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import { SearchRequestPayload } from "@/ts/interfaces/query";
 import { convertDateToTimestamp } from "@/utils/date";
 
-export const useSearchHistogramManager = () => {
+export const useSearchHistogramManager = (t: TranslateFn) => {
   let histogramResults: any = [];
 
   const {
@@ -31,12 +32,7 @@ export const useSearchHistogramManager = () => {
     isNonAggregatedSQLMode,
   } = logsUtils();
 
-  const {
-    resetHistogramWithError,
-    generateHistogramSkeleton,
-    setMultiStreamHistogramQuery,
-    isHistogramEnabled,
-  } = useHistogram();
+  const { resetHistogramWithError, generateHistogramSkeleton, isHistogramEnabled } = useHistogram();
 
   const { searchObj, searchObjDebug, resetHistogramError } = searchState();
 
@@ -46,8 +42,7 @@ export const useSearchHistogramManager = () => {
         isHistogramEnabled(searchObj) &&
         (!searchObj.meta.sqlMode || isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
         (isHistogramEnabled(searchObj) && !searchObj.meta.sqlMode)) &&
-      (searchObj.data.stream.selectedStream.length === 1 ||
-        (searchObj.data.stream.selectedStream.length > 1 && !searchObj.meta.sqlMode))
+      searchObj.data.stream.selectedStream.length === 1
     );
   };
 
@@ -67,9 +62,9 @@ export const useSearchHistogramManager = () => {
   ) => {
     const parsedSQL: any = fnParsedSQL();
 
-    if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == true) {
-      const errMsg = "Histogram is not available for multi-stream SQL mode search.";
-      resetHistogramWithError(errMsg, 0);
+    if (searchObj.data.stream.selectedStream.length > 1) {
+      const errMsg = t("search.histogramUnavailableForQueries");
+      resetHistogramWithError(errMsg, -1);
     }
 
     if (!searchObj.data.queryResults?.hits?.length) {
@@ -111,16 +106,10 @@ export const useSearchHistogramManager = () => {
           payload.onReset = callbacks.onReset;
         }
 
-        if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false) {
-          payload.queryReq.query.sql = setMultiStreamHistogramQuery(
-            searchObj.data.histogramQuery.query,
-          );
-        } else {
-          payload.queryReq.query.sql = searchObj.data.histogramQuery.query.sql.replace(
-            "[INTERVAL]",
-            searchObj.meta.resultGrid.chartInterval,
-          );
-        }
+        payload.queryReq.query.sql = searchObj.data.histogramQuery.query.sql.replace(
+          "[INTERVAL]",
+          searchObj.meta.resultGrid.chartInterval,
+        );
 
         payload.meta = {
           isHistogramOnly: searchObj.meta.histogramDirtyFlag,
@@ -132,10 +121,7 @@ export const useSearchHistogramManager = () => {
         addTraceId(payload.traceId);
       }
     } else if (searchObj.meta.sqlMode && isLimitQuery(parsedSQL)) {
-      resetHistogramWithError(
-        "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
-        -1,
-      );
+      resetHistogramWithError(t("search.histogramUnavailableForQueries"), -1);
       searchObj.meta.histogramDirtyFlag = false;
     } else if (
       searchObj.meta.sqlMode &&
@@ -156,16 +142,10 @@ export const useSearchHistogramManager = () => {
         }, 0);
       }
       if (isWithQuery(parsedSQL) || !searchObj.data.queryResults.is_histogram_eligible) {
-        resetHistogramWithError(
-          "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
-          -1,
-        );
+        resetHistogramWithError(t("search.histogramUnavailableForQueries"), -1);
         searchObj.meta.histogramDirtyFlag = false;
       } else {
-        resetHistogramWithError(
-          "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.",
-          -1,
-        );
+        resetHistogramWithError(t("search.histogramUnavailableForQueries"), -1);
       }
       searchObj.meta.histogramDirtyFlag = false;
     } else {

@@ -25,7 +25,10 @@ use config::{
     utils::time::now_micros,
 };
 use db::authz::{remove_ownership, set_ownership};
-use infra::{db::ORM_CLIENT, table::anomaly_detection::config as anomaly_config_table};
+use infra::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    table::anomaly_detection::config as anomaly_config_table,
+};
 use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
 use search_service as search;
 use serde::{Deserialize, Serialize};
@@ -153,6 +156,7 @@ async fn resolve_folder_pk(org_id: &str, name: &str) -> Option<String> {
             folder_id: DEFAULT_FOLDER.to_owned(),
             name: "default".to_owned(),
             description: "default".to_owned(),
+            icon: None,
         };
         if crate::folders::save_folder(org_id, folder, FolderType::Alerts, true)
             .await
@@ -202,6 +206,34 @@ fn model_to_api_json(mut val: serde_json::Value) -> serde_json::Value {
     val
 }
 
+/// Merge the run state the scheduler recorded on the trigger into a config row.
+///
+/// These key names are the contract `anomaly_config_to_list_item` reads; the
+/// alert list has no other source for an anomaly's outcome.
+fn merge_trigger_run_state(obj: &mut serde_json::Map<String, serde_json::Value>, data: &str) {
+    let Ok(td) = ScheduledTriggerData::from_json_string(data) else {
+        return;
+    };
+    if let Some(sat) = td.last_satisfied_at {
+        obj.insert(
+            "last_anomaly_detected_at".to_string(),
+            serde_json::Value::Number(sat.into()),
+        );
+    }
+    if let Some(outcome) = td.last_outcome {
+        obj.insert(
+            "last_outcome".to_string(),
+            serde_json::Value::String(outcome),
+        );
+    }
+    if let Some(at) = td.last_outcome_at {
+        obj.insert(
+            "last_outcome_at".to_string(),
+            serde_json::Value::Number(at.into()),
+        );
+    }
+}
+
 /// List all anomaly detection configurations for an organization.
 ///
 /// Mirrors the alerts list pattern: enriches each config with live trigger state
@@ -216,9 +248,7 @@ pub async fn list_configs(
     folder_name: Option<&str>,
     name_substring: Option<&str>,
 ) -> Result<Vec<serde_json::Value>> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let configs = anomaly_config_table::list_by_org(db, org_id)
         .await
@@ -313,15 +343,7 @@ pub async fn list_configs(
                         serde_json::Value::Number(start_time.into()),
                     );
                 }
-                // last_anomaly_detected_at: from trigger.data JSON
-                if let Ok(td) = ScheduledTriggerData::from_json_string(&trigger.data)
-                    && let Some(sat) = td.last_satisfied_at
-                {
-                    obj.insert(
-                        "last_anomaly_detected_at".to_string(),
-                        serde_json::Value::Number(sat.into()),
-                    );
-                }
+                merge_trigger_run_state(obj, &trigger.data);
             }
             val
         })
@@ -332,9 +354,7 @@ pub async fn list_configs(
 
 /// Get a specific anomaly detection configuration
 pub async fn get_config(org_id: &str, anomaly_id: &str) -> Result<Option<serde_json::Value>> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
@@ -367,9 +387,7 @@ pub async fn create_config(
     let normalized_tags =
         config::meta::alerts::tags::normalize_tags(&req.tags).map_err(anyhow::Error::new)?;
 
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let anomaly_id = svix_ksuid::Ksuid::new(None, None).to_string();
     let now_us = Utc::now().timestamp_micros();
@@ -548,9 +566,7 @@ pub async fn update_config(
     anomaly_id: &str,
     req: UpdateAnomalyConfigRequest,
 ) -> Result<serde_json::Value> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     // Fetch existing config — into_active_model() on a DB-fetched model sets the PK as
     // Unchanged, which is required for SeaORM to generate UPDATE … WHERE anomaly_id = ?
@@ -705,7 +721,7 @@ pub async fn update_config(
     // runs AFTER invalidate_config so the fresh re-cache inside recompute wins. If the model is
     // legacy (no sidecar) or recompute fails, fall back to forcing a one-time retrain so the
     // change is never silently dropped. Training/detection (and thus the model + sidecar) live
-    // only on the alert_manager node, so this recompute happens where the model is; other
+    // only on the scheduler node, so this recompute happens where the model is; other
     // super-cluster regions hold no model and only sync the config row for API reads.
     // Skip while a (re)train is in flight (status == Training): the running trainer already
     // reads `config.threshold` live and will bake the new percentile into the model it is about
@@ -843,9 +859,7 @@ pub async fn update_config(
 
 /// Delete an anomaly detection configuration
 pub async fn delete_config(org_id: &str, anomaly_id: &str) -> Result<()> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     // Verify the config exists before deleting (returns 404 if missing).
     let existing = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
@@ -919,9 +933,7 @@ pub async fn clone_config(
     new_name: Option<String>,
     folder_id: Option<String>,
 ) -> Result<serde_json::Value> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let src = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
@@ -1052,9 +1064,7 @@ pub async fn clone_config(
 /// threshold changes are recomputed in place with no retrain.
 #[cfg(feature = "enterprise")]
 async fn force_retrain_for_threshold(org_id: &str, anomaly_id: &str) -> Result<()> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
@@ -1096,9 +1106,7 @@ async fn force_retrain_for_threshold(org_id: &str, anomaly_id: &str) -> Result<(
 /// which the user can then re-cancel if needed.  In practice the task will notice the
 /// status change and bail early on the next DB write.
 pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_rw().await;
 
     let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
@@ -1120,9 +1128,7 @@ pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
 /// Train a model for a configuration
 pub async fn train_model(org_id: &str, anomaly_id: &str) -> Result<serde_json::Value> {
     // Verify the config exists and belongs to this org before delegating.
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_ro().await;
     anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
@@ -1145,9 +1151,7 @@ pub async fn train_model(org_id: &str, anomaly_id: &str) -> Result<serde_json::V
 
 /// Run detection for a configuration
 pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_json::Value> {
-    let db = ORM_CLIENT
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("Database not initialized"))?;
+    let db = get_orm_client_ro().await;
 
     // Fetch config
     let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
@@ -1352,13 +1356,7 @@ pub struct DetectionHistoryItem {
 /// scheduler's `watch_timeout()` job already resets any `Processing` rows whose
 /// `end_time` has passed, exactly as it does for alert triggers.
 pub async fn recover_detection_triggers_on_startup() {
-    let db = match ORM_CLIENT.get() {
-        Some(db) => db,
-        None => {
-            log::warn!("[anomaly_detection] DB not available for startup trigger recovery");
-            return;
-        }
-    };
+    let db = get_orm_client_ro().await;
 
     let configs = match anomaly_config_table::list_all_enabled(db).await {
         Ok(c) => c,
@@ -1737,7 +1735,7 @@ fn extract_value_from_hit(hit: &serde_json::Value) -> Result<f64> {
 /// Write anomaly events to the _anomalies stream.
 ///
 /// Uses HTTP POST to an ingester node so this works from any node role
-/// (including alert_manager which is not an ingester and cannot call
+/// (including scheduler nodes, which are not ingesters and cannot call
 /// service::logs::ingest::ingest() directly).
 #[cfg(feature = "enterprise")]
 pub async fn write_anomalies_to_stream(
@@ -2279,5 +2277,50 @@ mod tests {
     fn test_extract_value_from_hit_non_numeric_value_field_returns_error() {
         let hit = serde_json::json!({"value": "not_a_number"});
         assert!(extract_value_from_hit(&hit).is_err());
+    }
+
+    /// The key names here are a cross-crate contract:
+    /// `anomaly_config_to_list_item` reads them by these exact strings, and a
+    /// rename on either side silently blanks the list's Last Outcome column.
+    mod merge_trigger_run_state_tests {
+        use config::meta::triggers::ScheduledTriggerData;
+
+        use super::*;
+
+        #[test]
+        fn emits_the_keys_the_api_layer_reads() {
+            let td = ScheduledTriggerData {
+                last_satisfied_at: Some(900),
+                last_outcome: Some("firing".to_string()),
+                last_outcome_at: Some(1_000),
+                ..Default::default()
+            };
+
+            let mut obj = serde_json::Map::new();
+            merge_trigger_run_state(&mut obj, &td.to_json_string());
+
+            assert_eq!(obj["last_anomaly_detected_at"], serde_json::json!(900));
+            assert_eq!(obj["last_outcome"], serde_json::json!("firing"));
+            assert_eq!(obj["last_outcome_at"], serde_json::json!(1_000));
+        }
+
+        /// A config that has not run since the upgrade has no recorded outcome;
+        /// absent keys are what make the list render an em dash.
+        #[test]
+        fn omits_what_was_never_recorded() {
+            let mut obj = serde_json::Map::new();
+            merge_trigger_run_state(&mut obj, "{}");
+
+            assert!(!obj.contains_key("last_outcome"));
+            assert!(!obj.contains_key("last_outcome_at"));
+        }
+
+        #[test]
+        fn ignores_an_unparseable_blob() {
+            let mut obj = serde_json::Map::new();
+            merge_trigger_run_state(&mut obj, "{not json");
+
+            assert!(obj.is_empty());
+        }
     }
 }

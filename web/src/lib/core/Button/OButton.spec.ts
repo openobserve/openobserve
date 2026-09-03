@@ -258,11 +258,14 @@ describe("OButton", () => {
     expect(wrapper.classes()).not.toContain("transition-colors");
   });
 
-  it("applies unified focus glow (ring-[0.125rem]! ring-accent/25!) as base", () => {
+  it("applies the unified focus ring at full opacity, never a translucent accent", () => {
     const wrapper = mount(OButton);
     const classes = wrapper.classes().join(" ");
     expect(classes).toContain("focus-visible:ring-[0.125rem]!");
-    expect(classes).toContain("focus-visible:ring-accent/25!");
+    expect(classes).toContain("focus-visible:ring-focus-ring-accent!");
+    // accent/25 measured 1.38:1 light and 1.50:1 dark against the 3:1 SC 1.4.11 floor;
+    // an alpha here is a contrast regression, not a styling preference.
+    expect(classes).not.toContain("focus-visible:ring-accent/25!");
   });
 
   it("retains outline-none as part of base classes", () => {
@@ -281,9 +284,9 @@ describe("OButton", () => {
     expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-button-secondary-focus-ring");
   });
 
-  it("applies focus-visible:ring-[3px] on every styled variant", () => {
+  it("applies focus-visible:ring-3 on every styled variant", () => {
     const wrapper = mount(OButton, { props: { variant: "destructive" } });
-    expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-[3px]");
+    expect(wrapper.classes().join(" ")).toContain("focus-visible:ring-3");
   });
 
   // --- data attributes ---

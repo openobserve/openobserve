@@ -232,5 +232,8 @@ class PromqlRendererImpl implements PromqlRenderer {
   }
 }
 
-// Export singleton instance
+// The constructor resolves the catalog's strings through gt() at IMPORT TIME.
+// Safe only while every importer is reached via a lazy route (i.e. after
+// main.ts has awaited loadLocaleMessages) — eager-import this module and the
+// docs render as raw keys.
 export const promqlRenderer = new PromqlRendererImpl();

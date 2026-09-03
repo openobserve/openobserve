@@ -31,10 +31,7 @@ use sea_orm::{
 };
 
 use super::entity::oncall_unavailability;
-use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors,
-};
+use crate::{db::get_orm_client_rw, errors};
 
 /// How far back a resolution load reaches.
 ///
@@ -78,7 +75,7 @@ pub async fn create(
     reason: Option<String>,
     created_by: &str,
 ) -> Result<Unavailability, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let record = Unavailability {
         id: ider::uuid(),
         org_id: org_id.to_string(),
@@ -110,7 +107,7 @@ pub async fn create(
 }
 
 pub async fn get(org_id: &str, id: &str) -> Result<Option<Unavailability>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_unavailability::Entity::find_by_id(id)
         .filter(oncall_unavailability::Column::OrgId.eq(org_id))
         .one(client)
@@ -123,7 +120,7 @@ pub async fn list_by_user(
     org_id: &str,
     user_email: &str,
 ) -> Result<Vec<Unavailability>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_unavailability::Entity::find()
         .filter(oncall_unavailability::Column::OrgId.eq(org_id))
         .filter(oncall_unavailability::Column::UserEmail.eq(user_email))
@@ -148,7 +145,7 @@ pub async fn list_in_window(
     from: i64,
     to: i64,
 ) -> Result<Vec<Unavailability>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let mut query = oncall_unavailability::Entity::find()
         .filter(oncall_unavailability::Column::OrgId.eq(org_id))
         .filter(oncall_unavailability::Column::StartAt.lt(to))
@@ -183,7 +180,7 @@ pub async fn list_for_resolution(
     org_id: &str,
     at: i64,
 ) -> Result<Vec<Unavailability>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_unavailability::Entity::find()
         .filter(oncall_unavailability::Column::OrgId.eq(org_id))
         .filter(oncall_unavailability::Column::EndAt.gt(at - RESOLUTION_LOOKBACK_MICROS))
@@ -198,7 +195,7 @@ pub async fn list_for_resolution(
 }
 
 pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let deleted = oncall_unavailability::Entity::delete_many()
         .filter(oncall_unavailability::Column::OrgId.eq(org_id))
         .filter(oncall_unavailability::Column::Id.eq(id))
@@ -214,7 +211,7 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
 /// Drops one person's absences. Called when they leave the org, so their
 /// windows do not outlive them as rows quietly excusing a name nothing pages.
 pub async fn delete_by_user(org_id: &str, user_email: &str) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let dropped = oncall_unavailability::Entity::delete_many()
         .filter(oncall_unavailability::Column::OrgId.eq(org_id))
         .filter(oncall_unavailability::Column::UserEmail.eq(user_email))

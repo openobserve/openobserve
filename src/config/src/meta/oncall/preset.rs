@@ -634,11 +634,13 @@ fn everyone<'a>(groups: impl Iterator<Item = &'a [String]>) -> Vec<String> {
 fn week_start(at: i64, tz: chrono_tz::Tz) -> i64 {
     use chrono::{Datelike, LocalResult, TimeZone};
 
-    let Some(local) = chrono::DateTime::from_timestamp_micros(at).map(|utc| tz.from_utc_datetime(&utc.naive_utc()))
+    let Some(local) = chrono::DateTime::from_timestamp_micros(at)
+        .map(|utc| tz.from_utc_datetime(&utc.naive_utc()))
     else {
         return at;
     };
-    let monday = local.date_naive() - chrono::Duration::days(local.weekday().num_days_from_monday() as i64);
+    let monday =
+        local.date_naive() - chrono::Duration::days(local.weekday().num_days_from_monday() as i64);
     let Some(midnight) = monday.and_hms_opt(0, 0, 0) else {
         return at;
     };
@@ -1328,7 +1330,13 @@ mod tests {
     fn test_business_hours_stay_at_nine_across_a_dst_transition() {
         use chrono::TimeZone;
         let tz = chrono_tz::America::New_York;
-        let rotations = build(&business_hours(), tz, 1_772_600_400_000_000, DEFAULT_HANDOVER_MICROS).unwrap();
+        let rotations = build(
+            &business_hours(),
+            tz,
+            1_772_600_400_000_000,
+            DEFAULT_HANDOVER_MICROS,
+        )
+        .unwrap();
         // The Friday before the transition and the Monday after it.
         for (y, m, d) in [(2026, 3, 6), (2026, 3, 9)] {
             let at = |h, min| {
@@ -1402,7 +1410,13 @@ mod tests {
             let id = spec.id();
             let rotations = build(&spec, tz, MONDAY, DEFAULT_HANDOVER_MICROS).unwrap();
             for (hour, expected) in samples {
-                let slots = resolve_on_call(&[of(&rotations)], &[], &[], MONDAY + hour * MICROS_PER_HOUR, tz);
+                let slots = resolve_on_call(
+                    &[of(&rotations)],
+                    &[],
+                    &[],
+                    MONDAY + hour * MICROS_PER_HOUR,
+                    tz,
+                );
                 assert_eq!(
                     slots.first().map(|s| s.rule.as_str()),
                     Some(*expected),
@@ -1416,8 +1430,13 @@ mod tests {
     /// named above in the order they were named.
     #[test]
     fn test_follow_the_sun_catch_all_defaults_to_everybody() {
-        let rotations = build(&follow_the_sun(), chrono_tz::UTC, MONDAY, DEFAULT_HANDOVER_MICROS)
-            .unwrap();
+        let rotations = build(
+            &follow_the_sun(),
+            chrono_tz::UTC,
+            MONDAY,
+            DEFAULT_HANDOVER_MICROS,
+        )
+        .unwrap();
         let catch_all = rotations.last().unwrap();
         assert_eq!(catch_all.restrictions, Vec::new());
         assert_eq!(catch_all.priority, CATCH_ALL_PRIORITY);
@@ -1492,8 +1511,12 @@ mod tests {
             for r in &rotations {
                 r.validate().unwrap_or_else(|e| panic!("{id}: {e}"));
                 let json = serde_json::to_value(r).unwrap();
-                let mut keys: Vec<&str> =
-                    json.as_object().unwrap().keys().map(|k| k.as_str()).collect();
+                let mut keys: Vec<&str> = json
+                    .as_object()
+                    .unwrap()
+                    .keys()
+                    .map(|k| k.as_str())
+                    .collect();
                 keys.sort_unstable();
                 assert_eq!(
                     keys,
@@ -1762,7 +1785,10 @@ mod tests {
             }
         }
         // The one bound §C.3 says the UI must not hardcode.
-        let fts = entries.iter().find(|e| e.id == PresetId::FollowTheSun).unwrap();
+        let fts = entries
+            .iter()
+            .find(|e| e.id == PresetId::FollowTheSun)
+            .unwrap();
         let groups = fts.inputs.iter().find(|i| i.field == "groups").unwrap();
         assert_eq!(groups.min, Some(MIN_FOLLOW_THE_SUN_GROUPS as i64));
         assert_eq!(groups.max, Some(MAX_FOLLOW_THE_SUN_GROUPS as i64));

@@ -9,7 +9,9 @@ import {
   onMounted,
   provide,
   ref,
+  shallowRef,
   watch,
+  watchEffect,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
@@ -56,6 +58,7 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pageSizeOptions: () => [20, 50, 100, 250, 500],
   sorting: "client",
   selection: "none",
+  showSelectAll: true,
   expansion: "none",
   virtualScroll: false,
   virtualScrollItemSize: 48,
@@ -73,13 +76,15 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
   // content, and CRUD listing tables sit flush to the edges. Row dividers (the
   // `bordered` row-bottom hairlines) stay; only the surrounding border is gone.
   frame: false,
+  toolbarBordered: true,
   striped: false,
   stickyHeader: true,
   wrap: false,
   rowKey: "id",
   rowHeight: undefined,
   showGlobalFilter: true,
-  globalFilterPlaceholder: "Search...",
+  // no default here: a literal would ship untranslated. Resolved at render below.
+  globalFilterPlaceholder: undefined,
   filterMode: "client",
   defaultColumns: true,
   footerTitle: raw(""),
@@ -321,58 +326,100 @@ const tableData = computed<TData[]>(() => {
   return source ? source.slice() : [];
 });
 
+// ── Windowed row model ──────────────────────────────────────────
+// TanStack builds a Row object per data row independent of virtual scroll,
+// which only bounds DOM nodes — 100k+ rows freeze the tab and ~1M rows OOM it.
+// When `windowRowModel` applies, only the virtualizer's visible slice enters
+// the row model; the watcher further down keeps the bounds in step with the
+// virtualizer. `activeClientFilters` is synced after the table exists because
+// filter state lives inside useTableCore.
+const ROW_WINDOW_FALLBACK = 200;
+const rowWindowStart = shallowRef(0);
+const rowWindowEnd = shallowRef(ROW_WINDOW_FALLBACK);
+const activeClientFilters = shallowRef(false);
+
+const rowModelWindowed = computed(
+  () =>
+    !!props.windowRowModel &&
+    !!props.virtualScroll &&
+    props.pagination === "none" &&
+    props.sorting !== "client" &&
+    props.expansion === "none" &&
+    !props.wrap &&
+    !tree.enabled.value &&
+    !activeClientFilters.value,
+);
+
+// Cached so repeated reads of the table's `data` option see a stable array
+// identity; a fresh slice per read would re-trigger TanStack's reactive
+// options merge on every access.
+const windowedTableData = computed<TData[]>(() => {
+  const data = tableData.value;
+  if (rowModelWindowed.value) {
+    return data.slice(rowWindowStart.value, rowWindowEnd.value);
+  }
+  return data;
+});
+
 // ── Core table instance ─────────────────────────────────────────
-const { table, effectiveColumns, columnOrder, userReorderedColumns, columnSizing, columnSizeVars } =
-  useTableCore<TData>(
-    {
-      get data() {
-        return tableData.value;
-      },
-      get columns() {
-        return props.columns;
-      },
-      get pageSize() {
-        return props.pageSize;
-      },
-      get currentPage() {
-        return props.currentPage;
-      },
-      showIndex: props.showIndex,
-      sortBy: props.sortBy,
-      sortOrder: props.sortOrder,
-      sortFieldMap: props.sortFieldMap,
-      get globalFilter() {
-        return globalFilterLocal.value;
-      },
-      rowKey: props.rowKey,
-      // Getters, not snapshots: TanStack reads `enableColumnResizing` off these,
-      // so a snapshot freezes resize at whatever the flag was on first mount.
-      get enableColumnResize() {
-        return props.enableColumnResize;
-      },
-      get enableColumnReorder() {
-        return props.enableColumnReorder;
-      },
-      enableColumnPin: props.enableColumnPin,
-      get columnVisibility() {
-        return internalColumnVisibility.value;
-      },
-      defaultColumns: props.defaultColumns,
-      initialColumnSizes: persistence.loadColumnSizes(),
-      getSubRows: props.getSubRows,
-      pagination: props.pagination,
-      sorting: props.sorting,
-      rowHeight: props.rowHeight,
-      filterMode: props.filterMode,
-      get horizontalScroll() {
-        return props.horizontalScroll;
-      },
-      get keepPageOnDataChange() {
-        return props.keepPageOnDataChange;
-      },
+const {
+  table,
+  effectiveColumns,
+  columnOrder,
+  userReorderedColumns,
+  columnSizing,
+  columnSizeVars,
+  columnFilters,
+} = useTableCore<TData>(
+  {
+    get data() {
+      return windowedTableData.value;
     },
-    emit,
-  );
+    get columns() {
+      return props.columns;
+    },
+    get pageSize() {
+      return props.pageSize;
+    },
+    get currentPage() {
+      return props.currentPage;
+    },
+    showIndex: props.showIndex,
+    sortBy: props.sortBy,
+    sortOrder: props.sortOrder,
+    sortFieldMap: props.sortFieldMap,
+    get globalFilter() {
+      return globalFilterLocal.value;
+    },
+    rowKey: props.rowKey,
+    // Getters, not snapshots: TanStack reads `enableColumnResizing` off these,
+    // so a snapshot freezes resize at whatever the flag was on first mount.
+    get enableColumnResize() {
+      return props.enableColumnResize;
+    },
+    get enableColumnReorder() {
+      return props.enableColumnReorder;
+    },
+    enableColumnPin: props.enableColumnPin,
+    get columnVisibility() {
+      return internalColumnVisibility.value;
+    },
+    defaultColumns: props.defaultColumns,
+    initialColumnSizes: persistence.loadColumnSizes(),
+    getSubRows: props.getSubRows,
+    pagination: props.pagination,
+    sorting: props.sorting,
+    rowHeight: props.rowHeight,
+    filterMode: props.filterMode,
+    get horizontalScroll() {
+      return props.horizontalScroll;
+    },
+    get keepPageOnDataChange() {
+      return props.keepPageOnDataChange;
+    },
+  },
+  emit,
+);
 
 // ── Column resize reset ─────────────────────────────────────────
 const hasResizedColumns = computed(() => Object.keys(table.getState().columnSizing).length > 0);
@@ -552,16 +599,16 @@ const bodyRows = computed<Row<TData>[]>(() =>
 // ── Pivot: row-field cell merge (fake rowspan) ──────────────────
 // Consecutive rows sharing the same leading row-field values collapse into one
 // visual cell: the first row shows the value, the rest hide their content and
-// the group's inner borders. Keyed by each row-field column's `name`.
-const PIVOT_ROW_KEY_SEP = "\u0000";
+// the group's inner borders. Keyed by row object identity — a value-based key
+// collides across every row of a run when only one row field is configured
+// (all rows in the run share the same values), which made the last row's
+// hideContent overwrite the first row's and blank the whole run.
 const pivotMergeMap = computed(() => {
-  const map = new Map<string, Record<string, { hideContent: boolean; hideBorder: boolean }>>();
+  const map = new Map<any, Record<string, { hideContent: boolean; hideBorder: boolean }>>();
   const rowCols = (props.pivotRowColumns ?? []) as any[];
   if (!rowCols.length) return map;
   const rows = displayRows.value.map((r) => r.original as any).filter((r: any) => !r.__isTotalRow);
   if (!rows.length) return map;
-  const rowKey = (row: any) =>
-    rowCols.map((c: any) => String(row[c.name] ?? "")).join(PIVOT_ROW_KEY_SEP);
   for (let colIdx = 0; colIdx < rowCols.length; colIdx++) {
     const col = rowCols[colIdx];
     let groupStart = 0;
@@ -578,9 +625,9 @@ const pivotMergeMap = computed(() => {
       if (!sameGroup) {
         if (i - groupStart > 1) {
           for (let r = groupStart; r < i; r++) {
-            const key = rowKey(rows[r]);
-            if (!map.has(key)) map.set(key, {});
-            map.get(key)![col.name] = {
+            const rowObj = rows[r];
+            if (!map.has(rowObj)) map.set(rowObj, {});
+            map.get(rowObj)![col.name] = {
               hideContent: r !== groupStart,
               hideBorder: r < i - 1,
             };
@@ -596,10 +643,8 @@ function getPivotMerge(
   row: any,
   columnId: string,
 ): { hideContent: boolean; hideBorder: boolean } | null {
-  const rowCols = (props.pivotRowColumns ?? []) as any[];
-  if (!rowCols.length) return null;
-  const key = rowCols.map((c: any) => String(row[c.name] ?? "")).join(PIVOT_ROW_KEY_SEP);
-  return pivotMergeMap.value.get(key)?.[columnId] ?? null;
+  if (!(props.pivotRowColumns ?? []).length) return null;
+  return pivotMergeMap.value.get(row)?.[columnId] ?? null;
 }
 
 function pivotTotalCell(col: OTableColumnDef<TData>): any {
@@ -633,7 +678,7 @@ function pivotTotalColumnStyle(col: OTableColumnDef<TData>): Record<string, any>
     width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
-    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+    boxShadow: "var(--shadow-sticky-right)",
   };
 }
 
@@ -660,7 +705,40 @@ const {
   rowHeight: props.rowHeight ?? (props.dense ? 38 : 54),
   overscan: props.overscan ?? 100,
   dynamicRowHeight: () => useDynamicRowHeight.value,
+  // A delegated scroller can contain a histogram or other content before this
+  // table. Keep its raw offset stable when wrapped rows are remeasured so a
+  // query refresh cannot move the owning page's scrollbar.
+  preserveScrollOffsetOnRowResize: () => !!props.scrollEl && useDynamicRowHeight.value,
+  // Windowed row model: scrollbar and spacers span the full dataset even though
+  // only the visible slice is materialized.
+  totalCount: () => (rowModelWindowed.value ? tableData.value.length : undefined),
 });
+
+watchEffect(() => {
+  activeClientFilters.value = columnFilters.value.length > 0 || !!globalFilterLocal.value;
+});
+
+// Keep the row-model window in step with the virtualizer. A sync watcher (not a
+// computed) keeps the model out of the virtualizer's own dependency chain:
+// its count reads tableData, never the windowed model.
+watch(
+  [virtualRows, rowModelWindowed],
+  ([items, windowed]) => {
+    if (!windowed) {
+      rowWindowStart.value = 0;
+      rowWindowEnd.value = ROW_WINDOW_FALLBACK;
+      return;
+    }
+    if (!items.length) {
+      rowWindowStart.value = 0;
+      rowWindowEnd.value = ROW_WINDOW_FALLBACK;
+      return;
+    }
+    rowWindowStart.value = items[0].index;
+    rowWindowEnd.value = items[items.length - 1].index + 1;
+  },
+  { immediate: true },
+);
 
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
 
@@ -1102,6 +1180,8 @@ defineExpose({
     }
   },
   getRows: () => {
+    // Windowed model only holds the visible slice; the full dataset lives in tableData.
+    if (rowModelWindowed.value) return [...tableData.value];
     return table.getRowModel().rows.map((r) => r.original);
   },
 });
@@ -1129,7 +1209,10 @@ defineExpose({
       <!-- ── Custom toolbar slot (rendered INSIDE the frame, above the table) ── -->
       <div
         v-if="slots.toolbar || slots['toolbar-trailing']"
-        class="px-page-edge border-table-row-divider flex items-center gap-2 border-b py-2"
+        :class="[
+          'px-page-edge flex items-center gap-2 py-2',
+          props.toolbarBordered ? 'border-table-row-divider border-b' : '',
+        ]"
         data-test="o2-table-toolbar"
       >
         <slot name="toolbar" />
@@ -1167,7 +1250,7 @@ defineExpose({
           <input
             :value="globalFilterLocal"
             type="text"
-            :placeholder="props.globalFilterPlaceholder"
+            :placeholder="props.globalFilterPlaceholder ?? t('common.searchEllipsis')"
             class="text-primary placeholder-text-disabled w-full border-none bg-transparent py-1 pr-2 pl-7 text-sm outline-none"
             data-test="o2-table-global-filter-input"
             @input="handleGlobalFilterChange(($event.target as HTMLInputElement).value)"
@@ -1289,6 +1372,7 @@ defineExpose({
             :table="table"
             :column-order="columnOrder"
             :selection-multiple="selection.isMultiple.value"
+            :show-select-all="showSelectAll"
             :is-all-selected="selection.isAllSelected()"
             :is-indeterminate="selection.isIndeterminate()"
             :expansion-enabled="expansion.isEnabled.value"
@@ -1298,6 +1382,7 @@ defineExpose({
             :pinned-first-column="props.pinnedFirstColumn"
             :enable-column-resize="props.enableColumnResize"
             :enable-column-filter="props.enableColumnFilter"
+            :enable-column-format="props.enableColumnFormat"
             :is-resizing="columnMgmt.isResizing.value"
             :sorting-enabled="sorting.isEnabled.value"
             :sort-by="sorting.activeSortBy.value ?? undefined"
@@ -1323,6 +1408,7 @@ defineExpose({
             @drag-end="columnMgmt.onDragEnd"
             @resize-start="freezeFlexColumns"
             @close-column="(col: any) => emit('close-column', col)"
+            @format-column="(colId: string) => emit('format-column', colId)"
           />
 
           <!-- ── Skeleton Body (loading with no existing data) ───── -->
@@ -1345,6 +1431,7 @@ defineExpose({
             :clickable="isRowClickable"
             :selection-enabled="selection.isEnabled.value"
             :selection-multiple="selection.isMultiple.value"
+            :show-select-all="showSelectAll"
             :is-row-selected-fn="(row: TData) => selection.isRowSelected(row)"
             :is-row-selectable="props.isRowSelectable"
             :expansion-enabled="expansion.isEnabled.value"
@@ -1371,6 +1458,7 @@ defineExpose({
             :global-filter-active="!!globalFilterLocal"
             :row-key="props.rowKey"
             :virtual-rows="isVirtual ? virtualRows : undefined"
+            :row-index-offset="rowModelWindowed ? rowWindowStart : 0"
             :total-size="isVirtual ? totalSize : undefined"
             :base-offset="isVirtual ? baseOffset : undefined"
             :measure-element="isVirtual ? measureElement : undefined"
@@ -1439,6 +1527,16 @@ defineExpose({
                 :active="caProps.active"
               />
             </template>
+
+            <!-- Inline actions beside the copy button -->
+            <template v-if="slots['copy-actions']" #copy-actions="ccaProps">
+              <slot
+                name="copy-actions"
+                :column-id="ccaProps.columnId"
+                :row="ccaProps.row"
+                :value="ccaProps.value"
+              />
+            </template>
           </OTableBody>
 
           <!-- ── Footer (sticky totals row) ─────────────────────── -->
@@ -1480,7 +1578,7 @@ defineExpose({
                         position: 'sticky',
                         right: `${header.column.getAfter?.('right') ?? 0}px`,
                         zIndex: 20,
-                        boxShadow: '-2px 0 4px -2px var(--color-border-default)',
+                        boxShadow: 'var(--shadow-sticky-right)',
                       }
                     : {}),
                 }"
@@ -1677,6 +1775,7 @@ defineExpose({
 }
 
 .o2-table :deep(tr td) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel row divider must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--color-card-glass-border) !important;
 }
 

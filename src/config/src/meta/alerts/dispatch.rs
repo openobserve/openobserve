@@ -29,6 +29,8 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+use serde::{Deserialize, Serialize};
+
 use super::{
     TriggerCondition,
     grouping::{GroupClassification, group_key},
@@ -49,7 +51,9 @@ use crate::{
 /// through one evaluation cycle would fail its own version check, skip both
 /// success and failure accounting, and page the steadily-firing group again
 /// every window.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Serializable because the delivery advance replicates by re-running its
+/// guarded write on every other region, and the episode IS that guard.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeliveryEpisode {
     pub level: AlertLevel,
     pub level_since: i64,
@@ -96,6 +100,8 @@ pub struct DispatchPlan {
     pub items: Vec<DispatchItem>,
     /// Groups `delivery_decision` suppressed (silence / warning policy).
     pub suppressed: usize,
+    /// Groups in pending state
+    pub pending: usize,
     /// Qualifying groups dropped by the MN-8 knob — reported so the caller
     /// can log them; silent truncation is not acceptable here either.
     pub dropped_by_knob: Vec<String>,
@@ -136,6 +142,7 @@ pub fn plan_dispatch(
 ) -> DispatchPlan {
     let mut items = Vec::new();
     let mut suppressed = 0usize;
+    let mut pending = 0;
     let mut dropped_by_knob = Vec::new();
     let mut inconsistent = Vec::new();
 
@@ -181,13 +188,23 @@ pub fn plan_dispatch(
             continue;
         };
 
-        let decision = delivery_decision(
-            level,
-            state.last_notified_level,
-            state.silenced_until,
-            now,
-            tc.notify_on_warning,
-        );
+        // the states here are the recent/updated states, so we need to check the last outcome
+        // and decide based on that
+        let decision = if state
+            .last_outcome
+            .as_ref()
+            .is_some_and(|last| matches!(last, RunOutcome::Pending))
+        {
+            DeliveryDecision::SuppressedByPending
+        } else {
+            delivery_decision(
+                level,
+                state.last_notified_level,
+                state.silenced_until,
+                now,
+                tc.notify_on_warning,
+            )
+        };
         match decision {
             DeliveryDecision::Deliver | DeliveryDecision::DeliverEscalation => {
                 // The knob counts QUALIFYING sends, so a silenced group never
@@ -209,6 +226,7 @@ pub fn plan_dispatch(
             DeliveryDecision::SuppressedBySilence | DeliveryDecision::SuppressedByWarningPolicy => {
                 suppressed += 1
             }
+            DeliveryDecision::SuppressedByPending => pending += 1,
             DeliveryDecision::NotFiring => {}
         }
     }
@@ -216,6 +234,7 @@ pub fn plan_dispatch(
     DispatchPlan {
         items,
         suppressed,
+        pending,
         dropped_by_knob,
         inconsistent,
     }
@@ -1955,5 +1974,38 @@ mod tests {
         let mut row = state(&key_of("a"), AlertLevel::Ok, 1_000 * SEC, None, None);
         row.level = None;
         assert_eq!(DeliveryEpisode::of(&row), None);
+    }
+
+    // ── Super-cluster replication (PR 0) ────────────────────────────────────
+    // The delivery-state advance replicates by re-running the same guarded
+    // write on the receiving cluster, so the episode it carries IS the guard.
+    // A field lost in transit turns into a `WHERE` that matches nothing and
+    // the advance is silently dropped everywhere but the job cluster.
+
+    #[test]
+    fn a_delivery_episode_survives_the_super_cluster_round_trip() {
+        let episode = DeliveryEpisode {
+            level: AlertLevel::Critical,
+            level_since: 1_749_000_000_000_003,
+            notified_at_enqueue: (Some(AlertLevel::Warning), Some(1_750_000_600_000_006)),
+        };
+        let bytes = crate::utils::json::to_vec(&episode).unwrap();
+        let back: DeliveryEpisode = crate::utils::json::from_slice(&bytes).unwrap();
+        assert_eq!(back, episode);
+    }
+
+    /// The never-delivered anchor. `None` here is matched with `IS NULL` by the
+    /// guarded write, so it must not come back as `Some(Ok)` or `Some(0)`.
+    #[test]
+    fn a_never_delivered_anchor_round_trips_as_none() {
+        let episode = DeliveryEpisode {
+            level: AlertLevel::Warning,
+            level_since: 1_749_000_000_000_003,
+            notified_at_enqueue: (None, None),
+        };
+        let bytes = crate::utils::json::to_vec(&episode).unwrap();
+        let back: DeliveryEpisode = crate::utils::json::from_slice(&bytes).unwrap();
+        assert_eq!(back, episode);
+        assert_eq!(back.notified_at_enqueue, (None, None));
     }
 }

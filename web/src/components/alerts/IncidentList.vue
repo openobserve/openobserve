@@ -93,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loading"
               selectable
               :selected-key="severityFilter"
+              default-key="total"
               @select="onSeveritySelect"
             />
           </div>
@@ -543,7 +544,7 @@ export default defineComponent({
                 : s === "P4"
                   ? "var(--color-blue-500)"
                   : "var(--color-grey-400)";
-      return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+      return { boxShadow: `var(--shadow-rail-geom) ${color}` };
     };
 
     const loadIncidents = async () => {
@@ -686,7 +687,7 @@ export default defineComponent({
 
     const formatDimensions = (dimensions: Record<string, string> | undefined) => {
       if (!dimensions || Object.keys(dimensions).length === 0) {
-        return "Unknown";
+        return t("common.unknown");
       }
       return Object.entries(dimensions)
         .map(([k, v]) => `${k}=${v}`)

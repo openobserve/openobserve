@@ -57,6 +57,14 @@ vi.mock("@/composables/useStreamingSearch", () => ({
   }),
 }));
 
+// Stream discovery: default resolves nothing so every row falls back to the
+// default stream and the pre-discovery tests keep their single-call shape;
+// individual tests override with per-id locations.
+const mockResolveTraceLocationsBulk = vi.fn().mockResolvedValue({});
+vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
+  default: () => ({ resolveTraceLocationsBulk: mockResolveTraceLocationsBulk }),
+}));
+
 // ---------------------------------------------------------------------------
 // Test data factories
 // ---------------------------------------------------------------------------
@@ -295,6 +303,152 @@ describe("PlayerTracesTab", () => {
 
     it("should display the route path in the table row", () => {
       expect(wrapper.text()).toContain("/products");
+    });
+
+    it("gives each row its own stream and fetches metadata per distinct stream", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff"; // → payments_traces
+      const C1 = "01a038ddccc770b9bba3b2df20c12415"; // → checkout_traces
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({
+        [P1]: { stream: "payments_traces" },
+        [C1]: { stream: "checkout_traces" },
+      });
+
+      // RUM hits for both ids; metadata mock answers per queried stream.
+      mockSearch.mockReset();
+      mockFetchQueryDataWithHttpStream.mockReset();
+      mockSearch.mockImplementation((_params: any, source: string) =>
+        Promise.resolve(
+          source === "RUM"
+            ? {
+                data: {
+                  hits: [
+                    createRumHit({ _trace_id: P1, _view_url: "https://example.com/pay" }),
+                    createRumHit({ _trace_id: C1, _view_url: "https://example.com/checkout" }),
+                  ],
+                },
+              }
+            : { data: { hits: [] } },
+        ),
+      );
+      mockFetchQueryDataWithHttpStream.mockImplementation((args: any, handlers: any) => {
+        const stream = args.queryReq.stream_name;
+        const id = stream === "payments_traces" ? P1 : C1;
+        handlers.data(null, {
+          content: { results: { hits: [createTraceMetadata({ trace_id: id })] } },
+        });
+        handlers.complete();
+      });
+
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // metadata fetched once per distinct stream
+      const streamsQueried = mockFetchQueryDataWithHttpStream.mock.calls.map(
+        ([args]: any[]) => args.queryReq.stream_name,
+      );
+      expect(streamsQueried.sort()).toEqual(["checkout_traces", "payments_traces"]);
+
+      // both rows render, each carrying its own stream context
+      expect(wrapper.text()).toContain("/pay");
+      expect(wrapper.text()).toContain("/checkout");
+
+      // clicking the checkout row opens the embedded view against ITS stream
+      const rows = wrapper.findAll('[data-test^="table-row-"]');
+      const checkoutRow = rows.find((r: any) => r.text().includes("/checkout"));
+      expect(checkoutRow).toBeDefined();
+      await checkoutRow!.trigger("click");
+      await flushPromises();
+
+      const traceDetails = wrapper.findComponent({ name: "TraceDetails" });
+      expect(traceDetails.exists()).toBe(true);
+      expect(traceDetails.props("streamNameProp")).toBe("checkout_traces");
+      expect(traceDetails.props("traceIdProp")).toBe(C1);
+    });
+
+    it("bounds the metadata query by the indexed ranges instead of the session window", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff";
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({
+        [P1]: {
+          stream: "default",
+          range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_090_000_000 },
+        },
+      });
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: P1 })],
+        [createTraceMetadata({ trace_id: P1 })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      expect(queryReq.start_time).toBe(1_700_000_000_000_000 - 60_000_000);
+      expect(queryReq.end_time).toBe(1_700_000_090_000_000 + 60_000_000);
+    });
+
+    it("keeps the session window when a trace has no indexed range", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff";
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({ [P1]: { stream: "default" } });
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: P1 })],
+        [createTraceMetadata({ trace_id: P1 })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      // the component's default props: startTime 1000 ms, endTime 2000 ms
+      expect(queryReq.start_time).toBe(1000 * 1000);
+      expect(queryReq.end_time).toBe(2000 * 1000);
+    });
+
+    it("opens a row over its indexed range when the metadata carries no timings", async () => {
+      const P1 = "01a034c1aabc72f78880daf6c9755cff";
+      mockResolveTraceLocationsBulk.mockResolvedValueOnce({
+        [P1]: {
+          stream: "default",
+          range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_090_000_000 },
+        },
+      });
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: P1 })],
+        [createTraceMetadata({ trace_id: P1, start_time: undefined, end_time: undefined })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const rows = wrapper.findAll('[data-test^="table-row-"]');
+      await rows[0].trigger("click");
+      await flushPromises();
+
+      const traceDetails = wrapper.findComponent({ name: "TraceDetails" });
+      expect(traceDetails.props("startTimeProp")).toBe(1_700_000_000_000_000 - 60_000_000);
+      expect(traceDetails.props("endTimeProp")).toBe(1_700_000_090_000_000 + 60_000_000);
+    });
+
+    it("joins legacy zero-stripped RUM ids with padded traces-stream metadata", async () => {
+      // SDK 0.4.x stored the id zero-stripped (31 hex chars) in _rumdata while
+      // the traces stream stores the padded 32-char form — the join must still hit.
+      setupSuccessfulMocks(
+        [createRumHit({ _trace_id: "1a034c1aabc72f78880daf6c9755cff" })],
+        [createTraceMetadata({ trace_id: "01a034c1aabc72f78880daf6c9755cff" })],
+      );
+      wrapper.unmount();
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Row survives the metadata filter (previously dropped: raw 31-char key
+      // never matched the 32-char metadata key)
+      expect(wrapper.find('[data-test="rum-player-traces-tab-table"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("/products");
+
+      // The traces-stream metadata query was filtered on the padded id
+      const queryReq = mockFetchQueryDataWithHttpStream.mock.calls[0][0].queryReq;
+      expect(queryReq.filter).toContain("01a034c1aabc72f78880daf6c9755cff");
+      expect(queryReq.stream_name).toBe("default");
     });
 
     it("should display trace count badge in filter bar", () => {

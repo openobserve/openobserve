@@ -185,6 +185,21 @@ describe("DateTime Component", () => {
       expect(lastPayload.userChangedValue).toBe(true);
     });
 
+    it("should stamp userChangedValue=false on the mount replay", async () => {
+      // The picker replays its resolved window from its own `onMounted`. Nobody
+      // picked it, so it must be tagged programmatic: a parent that fetches on
+      // date-change ALSO fetches from its own `onMounted` (child mount hooks run
+      // first), so a `true` here doubles every request on first paint.
+      store.state.savedViewFlag = false;
+      wrapper = createWrapper();
+      await wrapper.vm.$nextTick();
+
+      const events = wrapper.emitted("on:date-change");
+      expect(events).toBeTruthy();
+      // The FIRST emit is the mount replay — later ones may be user-initiated.
+      expect(events[0][0].userChangedValue).toBe(false);
+    });
+
     it("should stamp userChangedValue=false when a programmatic setter precedes the emit", async () => {
       wrapper = createWrapper();
       await wrapper.vm.$nextTick();

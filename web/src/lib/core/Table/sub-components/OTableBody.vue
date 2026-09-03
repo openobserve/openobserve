@@ -8,6 +8,9 @@ import { VueDraggableNext } from "vue-draggable-next";
 
 const props = defineProps<{
   rows: Row<any>[];
+  /** Global index of rows[0] when the parent windows the row model to the
+   *  virtualizer's range; virtualRow.index stays global. */
+  rowIndexOffset?: number;
   table: Table<any>;
   clickable?: boolean;
   selectionEnabled?: boolean;
@@ -145,7 +148,7 @@ function getVirtualRowKey(virtualRow: { key: number | string | bigint }): string
 const isVirtual = () => !!(props.virtualRows && props.virtualRows.length > 0);
 
 function getRowForIndex(index: number) {
-  return props.rows[index];
+  return props.rows[index - (props.rowIndexOffset ?? 0)];
 }
 
 /** Get the TanStack Row from a draggable model item (plain data). */
@@ -207,8 +210,8 @@ const headingColspan = computed(
     tag="tbody"
     handle="[data-test='o2-table-row-drag-handle']"
     :animation="200"
-    ghost-class="o2-table-drag-ghost"
-    drag-class="o2-table-drag-dragging"
+    ghost-class="table-drag-ghost"
+    drag-class="table-drag-dragging"
     data-test="o2-table-body"
     @start="onDragStart"
     @end="onDragEnd"
@@ -398,19 +401,3 @@ const headingColspan = computed(
     </tr>
   </tbody>
 </template>
-
-<style scoped>
-/* keep(third-party): VueDraggableNext applies these classes to row clones at
-   RUNTIME (ghost / dragging); no template ever writes them, so they cannot be
-   utilities. Scoped still matches — the clones keep the row's data-v attr. */
-.o2-table-drag-ghost {
-  opacity: 0.3;
-  background: var(--color-primary-50);
-  border: 1px dashed var(--color-accent);
-  border-radius: 0.375rem;
-}
-.o2-table-drag-dragging {
-  opacity: 0.5;
-  box-shadow: var(--shadow-lg);
-}
-</style>

@@ -30,12 +30,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ]"
   >
     <header class="o2-app-header shrink-0" :class="store.state.printMode === true ? 'hidden' : ''">
-      <!-- Webinar announcement bar: shown above toolbar for cloud users -->
-      <div
-        v-if="config.isCloud === 'true'"
-        class="bg-button-primary text-button-primary-foreground text-center"
-      >
-        <WebinarBanner variant="header" />
+      <!-- Every bar that sits above the toolbar, in one measured wrapper so
+           `--navbar-height` accounts for whichever of them is actually showing.
+           The wrapper always renders — an unconditional ref keeps the observer
+           attached even when nothing is on screen yet. -->
+      <div ref="announcementBarRef">
+        <!-- Webinar announcement bar: shown above toolbar for cloud users -->
+        <div
+          v-if="config.isCloud === 'true'"
+          class="bg-button-primary text-button-primary-foreground text-center"
+        >
+          <WebinarBanner variant="header" />
+        </div>
+
+        <!-- Operator-authored announcement bars (enterprise) -->
+        <AnnouncementBanner v-if="config.isEnterprise === 'true'" />
       </div>
 
       <!-- Header component containing logo, navigation, and user controls -->
@@ -94,13 +103,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="main-content"
           class="bg-surface-chrome-deeper flex min-h-0 flex-col pr-2 pb-2"
           :style="{
-            width: store.state.isAiChatEnabled && !store.state.isAiChatExpanded ? '75%' : '100%',
+            width: !store.state.isAiChatEnabled
+              ? '100%'
+              : store.state.isAiChatExpanded
+                ? '50%'
+                : '75%',
           }"
         >
           <!-- Content card — all pages render inside this. The border stays present in both
                themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
           <div
-            class="bg-surface-base rounded-surface flex min-h-0 flex-1 flex-col overflow-hidden border shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
+            class="bg-surface-base rounded-surface flex min-h-0 flex-1 flex-col overflow-hidden border shadow-md"
             :class="isDark ? 'border-border-default' : 'border-transparent'"
           >
             <div
@@ -118,35 +131,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
           v-show="store.state.isAiChatEnabled && isLoading"
-          class="o2-sidebar o2-sidebar-right sticky top-[var(--navbar-height,2.25rem)] shrink-0 self-start overflow-y-auto"
+          class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper sticky top-[var(--navbar-height,2.25rem)] shrink-0 self-start overflow-y-auto"
           :class="[
             isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
             { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
+            // The chat is a floating card in both modes — match the main content
+            // card's right/bottom gap (+ rounded-surface corners) so they read as
+            // the same card. Expanding only widens it; it never overlays the header.
+            'pr-2 pb-2',
           ]"
           :style="[
             {
               height: 'calc(100vh - var(--navbar-height, 2.25rem))',
+              maxWidth: '100%',
             },
+            // Full-screen just widens the panel (25% → 50%) beside the content —
+            // same top position + height, so the main header stays visible.
             store.state.isAiChatExpanded
-              ? {
-                  position: 'fixed',
-                  top: 0,
-                  right: 0,
-                  width: '50%',
-                  maxWidth: '100%',
-                  minWidth: '18.75rem',
-                  height: '100vh',
-                  zIndex: 200,
-                }
-              : {
-                  width: '25%',
-                  maxWidth: '100%',
-                  minWidth: '4.688rem',
-                },
+              ? { width: '50%', minWidth: '18.75rem' }
+              : { width: '25%', minWidth: '4.688rem' },
           ]"
         >
           <O2AIChat
-            :header-height="42.5"
+            :header-height="40"
             :is-open="store.state.isAiChatEnabled"
             @close="closeChat"
             :aiChatInputContext="aiChatInputContext"
@@ -175,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import AppHeader from "../components/Header.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import {
   useLocalCurrentUser,
   useLocalOrganization,
@@ -193,6 +200,7 @@ import {
   KeepAlive,
   computed,
   onMounted,
+  onUnmounted,
   watch,
   markRaw,
   nextTick,
@@ -225,6 +233,7 @@ import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
+import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -244,6 +253,7 @@ export default defineComponent({
   components: {
     AppHeader,
     WebinarBanner,
+    AnnouncementBanner,
     "keep-alive": KeepAlive,
     ONavbar,
     "router-view": RouterView,
@@ -361,13 +371,6 @@ export default defineComponent({
       : undefined;
     const selectedOrg = ref(store.state.selectedOrganization);
     const userClickedOrg = ref(store.state.selectedOrganization);
-    const isActionsEnabled = computed(() => {
-      return (
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        store.state.zoConfig.actions_enabled
-      );
-    });
-
     const isIncidentsEnabled = computed(() => {
       return (
         (config.isEnterprise == "true" || config.isCloud == "true") &&
@@ -398,35 +401,13 @@ export default defineComponent({
       );
     });
 
-    // Backend `/config` flag `synthetics_enabled` — controlled by enterprise
-    // `O2_SYNTHETICS_ENABLED`. Reactive so the menu picks it up regardless of
-    // whether the config response arrived before or after mount.
+    // Backend `/config` flag `synthetics_enabled` — `ZO_SYNTHETICS_ENABLED`, and
+    // no longer an enterprise build check: synthetics ships in OSS, and only the
+    // private-agent path behind it is enterprise. Reactive so the menu picks it
+    // up regardless of whether the config response arrived before or after mount.
     const isSyntheticsEnabled = computed(() => {
-      return (
-        (config.isEnterprise == "true" || config.isCloud == "true") &&
-        Boolean(store.state.zoConfig?.synthetics_enabled)
-      );
+      return Boolean(store.state.zoConfig?.synthetics_enabled);
     });
-
-    // Backend `/config` flag `slo_enabled` — controlled by `ZO_SLO_ENABLED`.
-    // NOT build-gated: SLO measurement is an OSS capability, so unlike
-    // Synthetics/Incidents this deliberately has no enterprise/cloud check.
-    // `=== true`, not truthy: /config is fetched without await, so the flag is
-    // briefly undefined and the entry must stay hidden rather than flash in
-    // and then navigate to a page the API answers with 501.
-    // TEMPORARY, for the release: SLOs are hidden from the nav whatever
-    // `slo_enabled` says. To restore, set this to false (or delete it and the
-    // `!SLO_HIDDEN_FOR_RELEASE &&` below). Nothing else is touched — the flag,
-    // the routes, the pages and the Reliability group's `sloList` child are all
-    // still there, so the entry returns exactly as it was, and /slos remains
-    // reachable by typing the URL.
-    //
-    // Typed as boolean rather than left to literal inference so the `&&` below
-    // is not a constant expression.
-    const SLO_HIDDEN_FOR_RELEASE: boolean = true;
-    const isSloEnabled = computed(
-      () => !SLO_HIDDEN_FOR_RELEASE && store.state.zoConfig?.slo_enabled === true,
-    );
 
     // Real entries carry `identifier`; the placeholder literal only sets label/value.
     const orgOptions = ref<Array<{ identifier?: string; [key: string]: unknown }>>([
@@ -466,7 +447,7 @@ export default defineComponent({
         name: "traces",
       },
       {
-        title: t("menu.rum"),
+        title: raw("RUM"),
         icon: "devices",
         link: "/rum",
         name: "rum",
@@ -489,8 +470,13 @@ export default defineComponent({
         link: "/alerts",
         name: "alertList",
       },
-      // SLOs are spliced in by updateSloMenu() when `slo_enabled` is on —
-      // directly after Alerts, since an SLO is what an SLO alert burns against.
+      // Directly after Alerts, since an SLO is what an SLO alert burns against.
+      {
+        title: t("menu.slos"),
+        icon: "target",
+        link: "/slos",
+        name: "sloList",
+      },
       {
         title: t("menu.ingestion"),
         icon: "data-plus-line",
@@ -526,63 +512,63 @@ export default defineComponent({
 
     const langList = [
       {
-        label: "English",
+        label: raw("English"),
         code: "en-us",
       },
       {
-        label: "Türkçe",
+        label: raw("Türkçe"),
         code: "tr-turk",
       },
       {
-        label: "简体中文",
+        label: raw("简体中文"),
         code: "zh-cn",
       },
       {
-        label: "繁體中文",
+        label: raw("繁體中文"),
         code: "zh-tw",
       },
       {
-        label: "Français",
+        label: raw("Français"),
         code: "fr",
       },
       {
-        label: "Español",
+        label: raw("Español"),
         code: "es",
       },
       {
-        label: "Deutsch",
+        label: raw("Deutsch"),
         code: "de",
       },
       {
-        label: "Italiano",
+        label: raw("Italiano"),
         code: "it",
       },
       {
-        label: "日本語",
+        label: raw("日本語"),
         code: "ja",
       },
       {
-        label: "한국어",
+        label: raw("한국어"),
         code: "ko",
       },
       {
-        label: "Nederlands",
+        label: raw("Nederlands"),
         code: "nl",
       },
       {
-        label: "Português",
+        label: raw("Português"),
         code: "pt",
       },
       {
-        label: "Русский",
+        label: raw("Русский"),
         code: "ru",
       },
       {
-        label: "Polski",
+        label: raw("Polski"),
         code: "pl",
       },
       {
-        label: "Tiếng Việt",
+        label: raw("Tiếng Việt"),
         code: "vi",
       },
     ];
@@ -609,23 +595,61 @@ export default defineComponent({
       }
     });
 
+    // Measured rather than assumed. The strip now holds two independent bars
+    // (the cloud webinar promo and any number of operator-authored banners),
+    // each of which wraps its own text, so no fixed value can describe it — the
+    // old `isWebinarBannerVisible` two-value calc only ever fit one bar of one
+    // line. WebinarBanner still dispatches that flag; nothing reads it for
+    // height any more.
+    const announcementBarRef = ref<HTMLElement | null>(null);
+    let announcementBarObserver: ResizeObserver | null = null;
+
+    const setNavbarHeight = (barHeightPx: number) => {
+      const barHeightRem = barHeightPx / 16;
+      document.documentElement.style.setProperty("--navbar-height", `${2.5 + barHeightRem}rem`);
+    };
+
+    onMounted(() => {
+      setNavbarHeight(announcementBarRef.value?.offsetHeight ?? 0);
+
+      if (announcementBarRef.value && typeof ResizeObserver !== "undefined") {
+        announcementBarObserver = new ResizeObserver(([entry]) => {
+          setNavbarHeight(entry.contentRect.height);
+        });
+        announcementBarObserver.observe(announcementBarRef.value);
+      }
+    });
+
+    onUnmounted(() => {
+      announcementBarObserver?.disconnect();
+      announcementBarObserver = null;
+    });
+
+    const needsFullConfig = () =>
+      !Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") ||
+      store.state.zoConfig.version == "";
+
+    // Which org the full config was fetched for — the response carries
+    // org-scoped fields (e.g. per-user permission flags), so an org switch
+    // must refetch even when a config is already loaded.
+    let fullConfigOrg = "";
+
+    // The full config endpoint is authenticated and org-scoped; on a fresh
+    // session the org can resolve after this component mounts.
     watch(
-      () => store.state.isWebinarBannerVisible,
-      (visible) => {
-        const navbarHeight = visible ? "calc(2.5rem + 1.688rem)" : "2.5rem";
-        document.documentElement.style.setProperty("--navbar-height", navbarHeight);
+      () => store.state.selectedOrganization?.identifier,
+      (identifier) => {
+        if (identifier && (needsFullConfig() || identifier !== fullConfigOrg)) {
+          getConfig();
+        }
       },
-      { immediate: true },
     );
 
     onMounted(async () => {
       filterMenus();
 
       // TODO OK : Clean get config functions which sets rum user and functions menu. Move it to common method.
-      if (
-        !Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") ||
-        store.state.zoConfig.version == ""
-      ) {
+      if (needsFullConfig()) {
         getConfig();
       } else {
         if (config.isCloud == "false") {
@@ -658,60 +682,14 @@ export default defineComponent({
       }
     };
 
-    // Insert / remove the SLOs entry directly after Alerts. Like Workflows and
-    // Synthetics this REMOVES when the flag is off rather than merely skipping:
-    // the menu is rebuilt on org switch and `slo_enabled` can differ per
-    // deployment, so an add-only guard would leave a stale entry behind.
-    const updateSloMenu = () => {
-      const existingIndex = linksList.value.findIndex((l: any) => l.name === "sloList");
-
-      if (!isSloEnabled.value) {
-        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
-        return;
-      }
-      if (existingIndex !== -1) return;
-
-      const alertIndex = linksList.value.findIndex((l: any) => l.name === "alertList");
-      if (alertIndex === -1) return;
-
-      linksList.value.splice(alertIndex + 1, 0, {
-        title: t("menu.slos"),
-        icon: "target",
-        link: "/slos",
-        name: "sloList",
-      });
-    };
-
-    // Keep the menu in sync if /config resolves after mount.
-    watch(isSloEnabled, () => updateSloMenu(), { immediate: false });
-
-    const updateActionsMenu = () => {
-      if (isActionsEnabled.value) {
-        const incidentIndex = linksList.value.findIndex((link) => link.name === "incidentList");
-
-        const actionExists = linksList.value.some((link) => link.name === "actionScripts");
-
-        if (incidentIndex !== -1 && !actionExists) {
-          linksList.value.splice(incidentIndex + 1, 0, {
-            title: t("menu.actions"),
-            icon: "code",
-            link: "/actions",
-            name: "actionScripts",
-          });
-        }
-      }
-    };
-
-    // Insert the Workflows entry after Actions (fallback: Alerts). Idempotent.
+    // Insert the Workflows entry after Alerts. Idempotent.
     const updateWorkflowsMenu = () => {
       const existingIndex = linksList.value.findIndex((link) => link.name === "workflows");
 
       if (isWorkflowsEnabled.value) {
         if (existingIndex !== -1) return;
 
-        const actionIndex = linksList.value.findIndex((link) => link.name === "actionScripts");
-        const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
-        const anchor = actionIndex !== -1 ? actionIndex : alertIndex;
+        const anchor = linksList.value.findIndex((link) => link.name === "alertList");
         if (anchor === -1) return;
 
         linksList.value.splice(anchor + 1, 0, {
@@ -798,9 +776,6 @@ export default defineComponent({
     // sync.
     const filterMenus = () => {
       updateIncidentsMenu();
-      // After Incidents, so the flat order reads Alerts → SLOs → Incidents.
-      updateSloMenu();
-      updateActionsMenu();
       updateWorkflowsMenu();
       updateSyntheticMenu();
       updateAIObservabilityMenu();
@@ -1158,7 +1133,7 @@ export default defineComponent({
 
         // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
         // settings so it's available on boot and every org switch.
-        await useHomeDashboard().load(store.state?.selectedOrganization?.identifier);
+        await useHomeDashboard(t).load(store.state?.selectedOrganization?.identifier);
 
         if (
           orgSettings?.data?.data?.free_trial_expiry != null &&
@@ -1193,19 +1168,32 @@ export default defineComponent({
     };
 
     /**
-     * Get configuration from the backend.
-     * @return {"version":"","instance":"","commit_hash":"","build_date":"","default_fts_keys":["field1","field2"],"telemetry_enabled":true,"default_functions":[{"name":"function name","text":"match_all('v')"}}
+     * Get the full authenticated configuration from the backend. The
+     * unauthenticated bootstrap fetched in main.ts carries only the login-page
+     * fields; everything menu- and feature-related arrives here.
      * @throws {Error} If the request fails.
      */
-    const getConfig = async () => {
+    const FULL_CONFIG_RETRY_DELAYS_MS = [2000, 5000, 15000];
+
+    const getConfig = async (attempt = 0) => {
+      const orgIdentifier = store.state.selectedOrganization?.identifier;
+      if (!orgIdentifier) {
+        // No org yet on a fresh session — the selectedOrganization watcher
+        // retries as soon as one is resolved. Fail open meanwhile: a user whose
+        // org never resolves (org-list failure, zero orgs) must still see the
+        // base menu, not a blank shell.
+        menuReady.value = true;
+        return;
+      }
       await configService
-        .get_config()
+        .get_config_full(orgIdentifier)
         .then(async (res: any) => {
           if (config.isCloud == "false") {
             linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
           }
 
           store.dispatch("setConfig", res.data);
+          fullConfigOrg = orgIdentifier;
           await nextTick();
 
           filterMenus();
@@ -1214,11 +1202,34 @@ export default defineComponent({
           if (res.data.rum.enabled) {
             setRumUser();
           }
+          // The empty-data → /ingestion redirect depends on
+          // restricted_routes_on_empty_data, which only arrives with the full
+          // config — the first navigation ran before it landed, so re-check now.
+          if (
+            res.data.restricted_routes_on_empty_data === true &&
+            store.state.organizationData.isDataIngested === false
+          ) {
+            await verifyStreamExist(store.state.selectedOrganization);
+          }
         })
         .catch((error) => {
-          console.log(error);
-          // Fail open: reveal the base menu even if /config never resolves.
+          console.error("Failed to load the full configuration:", error);
+          // Fail open: reveal the base menu even if the config never resolves.
           menuReady.value = true;
+          // Session replay must not be lost to a failed config fetch — the rum
+          // settings already arrived with the unauthenticated bootstrap.
+          if (store.state.zoConfig?.rum?.enabled) {
+            setRumUser();
+          }
+          // A transient failure (expired session being refreshed, rolling
+          // deploy) would otherwise strand the session on the bootstrap subset.
+          if (attempt < FULL_CONFIG_RETRY_DELAYS_MS.length) {
+            setTimeout(() => {
+              if (needsFullConfig()) {
+                getConfig(attempt + 1);
+              }
+            }, FULL_CONFIG_RETRY_DELAYS_MS[attempt]);
+          }
         });
     };
 
@@ -1393,6 +1404,7 @@ export default defineComponent({
       router,
       store,
       config,
+      announcementBarRef,
       langList,
       selectedLanguage,
       linksList,
@@ -1431,7 +1443,6 @@ export default defineComponent({
       userClickedOrg,
       verifyStreamExist,
       filterMenus,
-      updateActionsMenu,
       getConfig,
       setRumUser,
       openPredefinedThemes,

@@ -39,6 +39,9 @@ vi.mock("@/services/alerts", () => ({
     getHistory: vi.fn(),
     export_by_id: vi.fn(),
     retrain_by_id: vi.fn(),
+    bulkDelete: vi.fn(),
+    bulkToggleState: vi.fn(),
+    getCompositeReferences: vi.fn(),
   },
 }));
 vi.mock("@/services/alert_templates", () => ({
@@ -133,6 +136,9 @@ type AlertV2 = {
   stream_type: string;
   enabled: boolean;
   condition: any;
+  child_count?: number;
+  referenced_by_composite_count?: number;
+  expression_summary?: string;
   description?: string;
   owner?: string;
   trigger_condition?: {
@@ -171,6 +177,8 @@ const makeAlert = (idx: number, overrides: Partial<AlertV2> = {}): AlertV2 => ({
 
 let alertsDB: AlertV2[] = [];
 
+let mountedWrappers: ReturnType<typeof mount>[] = [];
+
 async function mountAlertList() {
   const wrapper = mount(AlertList, {
     attachTo: node,
@@ -203,13 +211,17 @@ async function mountAlertList() {
           emits: ["update:ok", "update:cancel", "update:modelValue"],
           template: '<div class="confirm-dialog-stub" :data-open="modelValue"></div>',
         },
-        AppTabs: {
-          props: ["tabs", "activeTab"],
-          emits: ["update:active-tab"],
-          template:
-            '<div class="app-tabs-stub">' +
-            '<button v-for="tab in tabs" :key="tab.value" :class="`tab-${tab.value}`" @click="$emit(\'update:active-tab\', tab.value)">{{tab.label}}</button>' +
-            "</div>",
+        // Real reka-ui toggle groups slow every mount, and this file mounts 70 times — enough to push borderline tests past their timeouts.
+        OToggleGroup: {
+          name: "OToggleGroup",
+          props: ["modelValue"],
+          emits: ["update:modelValue"],
+          template: '<div class="toggle-group-stub"><slot /></div>',
+        },
+        OToggleGroupItem: {
+          name: "OToggleGroupItem",
+          props: ["value"],
+          template: '<button type="button"><slot /></button>',
         },
         SelectFolderDropDown: true,
       },
@@ -218,6 +230,10 @@ async function mountAlertList() {
   // emulate current route
   wrapper.vm.router.currentRoute.value.name = "alertList";
   wrapper.vm.router.currentRoute.value.query = {} as any;
+  // Tracked so afterEach can tear it down: every mount here attaches to the one
+  // shared `node`, so an un-unmounted tree keeps its watchers and observers
+  // alive for the rest of the file and each later test pays for all of them.
+  mountedWrappers.push(wrapper);
   return wrapper;
 }
 
@@ -232,6 +248,16 @@ const destinationsSvc = vi.mocked(DestinationService);
 
 beforeEach(() => {
   vi.clearAllMocks();
+
+  // Reset the shared router singleton before mounting. The component's
+  // immediate watcher on query.action (and the activeTab init read of
+  // query.tab) run during mount(), before mountAlertList can blank the query —
+  // so a leftover action/tab from an earlier test (e.g. "when action=add"
+  // pushes {action:"add"}) would asynchronously re-open the add/import dialog
+  // and hide the list (and its type filter), breaking every later assertion.
+  router.currentRoute.value.query = {};
+  router.currentRoute.value.params = {};
+  router.currentRoute.value.name = "alertList";
 
   // align store shape expected by component watchers
   // ensure foldersByType has 'alerts' key and alerts map exists
@@ -310,6 +336,14 @@ beforeEach(() => {
     return Promise.resolve({ data: { code: 200 } } as any);
   });
 
+  (alertsSvc.bulkDelete as any) = vi.fn().mockResolvedValue({
+    data: { successful: [], unsuccessful: [] },
+  });
+  (alertsSvc.bulkToggleState as any) = vi.fn().mockResolvedValue({ data: {} });
+  (alertsSvc.getCompositeReferences as any) = vi.fn().mockResolvedValue({
+    data: { references: [], hidden_reference_count: 0 },
+  });
+
   (alertsSvc.create_by_alert_id as any) = vi
     .fn()
     .mockImplementation(async (_org: any, body: any, folder?: string) => {
@@ -327,6 +361,18 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  for (const wrapper of mountedWrappers) {
+    try {
+      wrapper.unmount();
+    } catch {
+      // A test that already unmounted its own wrapper must not fail teardown.
+    }
+  }
+  mountedWrappers = [];
+  // VTU's unmount() removes the attachTo target from the document; without
+  // re-attaching it every later mount renders into a detached tree.
+  node.innerHTML = "";
+  if (!node.isConnected) document.body.appendChild(node);
   vi.restoreAllMocks();
 });
 
@@ -418,6 +464,15 @@ describe("AlertList - basic rendering", () => {
     expect(wrapper.find('[data-test="alert-list-page"]').exists()).toBe(true);
   });
 
+  it("titles itself with the SECTION, so the peer tabs never move", async () => {
+    // Identical on all four alerting pages — see TemplateList.spec.ts. Note it
+    // is NOT "Alerts": a per-page title sizes the title block and shifts the
+    // tab strip horizontally on every navigation.
+    const wrapper = await mountAlertList();
+    await waitData(wrapper);
+    expect(wrapper.find(".app-page-header h1").text()).toBe("Alerts");
+  });
+
   it("renders search input and toggle", async () => {
     const wrapper = await mountAlertList();
     await waitData(wrapper);
@@ -449,10 +504,9 @@ describe("AlertList - data fetching and columns", () => {
     expect(wrapper.vm.filteredResults.length).toBe(alertsDB.length);
   });
 
-  // period ("Look back window"), frequency ("Check every"), state, level and
-  // last_trained_at were removed from the list: they are configuration detail
-  // or duplicate a neighbouring column, and the row was too wide to scan.
-  // They remain on the alert detail/edit views.
+  // period, state, level, last_trained_at are intentionally absent (config
+  // detail, or duplicate a neighbouring column); frequency remains — it is
+  // the list's only visible cadence signal for non-realtime alerts.
   it("no longer renders the removed configuration columns on any tab", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -464,10 +518,58 @@ describe("AlertList - data fetching and columns", () => {
       wrapper.vm.activeTab = tab;
       await flushPromises();
       const ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
-      for (const removed of ["period", "frequency", "state", "level", "last_trained_at"]) {
+      for (const removed of ["period", "state", "level", "last_trained_at"]) {
         expect(ids, `tab=${tab} must not show "${removed}"`).not.toContain(removed);
       }
     }
+  });
+
+  it("shows the frequency column on every tab except realTime", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    for (const tab of ["all", "scheduled", "anomalyDetection"]) {
+      wrapper.vm.activeTab = tab;
+      await flushPromises();
+      const ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
+      expect(ids, `tab=${tab} must show "frequency"`).toContain("frequency");
+    }
+
+    wrapper.vm.activeTab = "realTime";
+    await flushPromises();
+    const realTimeIds = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
+    expect(realTimeIds, 'realTime tab must not show "frequency"').not.toContain("frequency");
+  });
+
+  it("renders cadence in the frequency cell: raw cron for cron alerts, minutes for interval alerts, a dash for real-time alerts", async () => {
+    alertsDB = [
+      makeAlert(1, {
+        is_real_time: false,
+        name: "Interval Alert",
+        trigger_condition: { period: 5, frequency: 15, frequency_type: "interval", cron: "" },
+      }),
+      makeAlert(2, {
+        is_real_time: false,
+        name: "Cron Alert",
+        trigger_condition: {
+          period: 0,
+          frequency: 0,
+          frequency_type: "cron",
+          cron: "*/10 * * * *",
+        },
+      }),
+      makeAlert(3, { is_real_time: true, name: "RealTime Alert" }),
+    ];
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    wrapper.vm.activeTab = "all";
+    await flushPromises();
+
+    const texts = wrapper
+      .findAll('[data-test="o2-table-cell-frequency"]')
+      .map((c: any) => c.text());
+    expect(texts).toEqual(["15 Mins", "*/10 * * * *", "--"]);
   });
 
   // Feature 2 (PT-3/PT-6): the columns that REPLACED them.
@@ -652,12 +754,22 @@ describe("AlertList - row actions", () => {
     await wrapper.vm.showDeleteDialogFn({ row });
     expect(wrapper.vm.confirmDelete).toBe(true);
 
+    (alertsSvc.listByFolderId as any).mockClear();
     await wrapper.vm.deleteAlertByAlertId();
     await flushPromises();
 
     expect(
       wrapper.vm.filteredResults.find((r: any) => r.alert_id === row.alert_id),
     ).toBeUndefined();
+    // No refetch: reloading the folder would blank the table behind its skeleton
+    // and a loading toast for a row the server already confirmed gone.
+    expect(alertsSvc.listByFolderId).not.toHaveBeenCalled();
+    // The store cache backs a folder revisit, so the row must leave it too or it
+    // reappears the moment the user navigates away and back.
+    const cached = store.state.organizationData.allAlertsListByFolderId[wrapper.vm.activeFolderId];
+    if (Array.isArray(cached)) {
+      expect(cached.find((r: any) => r.alert_id === row.alert_id)).toBeUndefined();
+    }
   });
 
   it("edit action navigates to update route (sets query action=update)", async () => {
@@ -675,28 +787,47 @@ describe("AlertList - row actions", () => {
     expect(call).toBeTruthy();
   });
 
-  it("exports a single alert to JSON (creates object URL)", async () => {
+  // Export fetches the definition and opens the format dialog; the file is
+  // written from there, once the user has picked JSON or Terraform.
+  it("opens the export dialog with the fetched alert definition", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     const row = wrapper.vm.filteredResults[0];
 
-    const createURLSpy = vi.spyOn(global.URL, "createObjectURL");
     // Trigger export through method to avoid menu interaction
     await wrapper.vm.exportAlert(row);
-    expect(createURLSpy).toHaveBeenCalled();
+    await flushPromises();
+
+    expect(wrapper.vm.showExportDialog).toBe(true);
+    expect(wrapper.vm.alertsToExport).toHaveLength(1);
+    expect(wrapper.vm.alertsToExport[0].name).toBe(row.name);
+    // The exported id belongs to the source alert, not to what this creates.
+    expect(wrapper.vm.alertsToExport[0]).not.toHaveProperty("id");
   });
 
-  it("exports multiple selected alerts to JSON", async () => {
+  it("opens the export dialog with every selected alert", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    // Select two alerts
-    wrapper.vm.selectedAlerts = [wrapper.vm.filteredResults[0], wrapper.vm.filteredResults[1]];
+    // Select two alerts. selectedAlerts is a computed over selectedAlertIds whose
+    // setter only handles clearing, so selection has to go through the ids.
+    wrapper.vm.selectedAlertIds = [
+      wrapper.vm.filteredResults[0].alert_id,
+      wrapper.vm.filteredResults[1].alert_id,
+    ];
+    await flushPromises();
+    expect(wrapper.vm.selectedAlerts).toHaveLength(2);
+
+    await wrapper.vm.multipleExportAlert();
     await flushPromises();
 
-    const createURLSpy = vi.spyOn(global.URL, "createObjectURL");
-    await wrapper.vm.multipleExportAlert();
-    expect(createURLSpy).toHaveBeenCalled();
+    expect(wrapper.vm.showExportDialog).toBe(true);
+    expect(wrapper.vm.alertsToExport).toHaveLength(2);
+
+    // The selection clears once the download actually happens.
+    expect(wrapper.vm.selectedAlerts.length).toBe(2);
+    wrapper.vm.onExportDownloaded({ format: "terraform", count: 2 });
+    await flushPromises();
     expect(wrapper.vm.selectedAlerts.length).toBe(0);
   });
 });
@@ -1015,12 +1146,31 @@ describe("AlertList - micro validations", () => {
 
 // 11. isAnomalyDetectionEnabled computed
 describe("AlertList - isAnomalyDetectionEnabled", () => {
+  // `config` and `store` are module singletons shared by the whole file, so
+  // whatever the last test here sets is inherited by every describe below it.
+  const original = {
+    isEnterprise: (config as any).isEnterprise,
+    isCloud: (config as any).isCloud,
+    buildType: (store.state as any).zoConfig.build_type,
+    anomalyEnabled: (store.state as any).zoConfig.anomaly_detection_enabled,
+  };
+
   beforeEach(() => {
     // Reset to defaults: non-enterprise frontend, no build_type
     (config as any).isEnterprise = "false";
     (config as any).isCloud = "false";
     delete (store.state as any).zoConfig.build_type;
     delete (store.state as any).zoConfig.anomaly_detection_enabled;
+  });
+
+  afterEach(() => {
+    (config as any).isEnterprise = original.isEnterprise;
+    (config as any).isCloud = original.isCloud;
+    const zoConfig = (store.state as any).zoConfig;
+    if (original.buildType === undefined) delete zoConfig.build_type;
+    else zoConfig.build_type = original.buildType;
+    if (original.anomalyEnabled === undefined) delete zoConfig.anomaly_detection_enabled;
+    else zoConfig.anomaly_detection_enabled = original.anomalyEnabled;
   });
 
   it("should enable anomalyDetection tab when isEnterprise=true, isCloud=false, and build_type is not opensource", async () => {
@@ -1280,6 +1430,196 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(wrapper.vm.formatGroupCount(3, true)).toBe("\u22653");
     expect(wrapper.vm.formatGroupCount(0, undefined)).toBe("0");
   });
+
+  describe("composite alert list integration", () => {
+    it("maps a composite without query fields to its badge, expression, and counts", async () => {
+      alertsDB = [
+        {
+          ...makeAlert(1),
+          alert_id: "composite-1",
+          alert_type: "composite",
+          name: "Checkout degraded",
+          is_real_time: false,
+          stream_name: undefined,
+          stream_type: "",
+          condition: null,
+          child_count: 3,
+          referenced_by_composite_count: 2,
+          expression_summary: "High error rate AND High latency",
+        },
+      ];
+      const wrapper: any = await mountAlertList();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      await flushPromises();
+
+      const row = wrapper.vm.filteredResults[0];
+      expect(row.alert_type).toBe("Composite");
+      expect(row.conditions).toBe("High error rate AND High latency");
+      expect(row.child_count).toBe(3);
+      expect(row.referenced_by_composite_count).toBe(2);
+      // The row-level badge/count elements live inside OTable's row rendering,
+      // which this harness does not reach; the mapping above is the unit here.
+      expect(row.alert_id).toBe("composite-1");
+    });
+
+    it("exposes Composite as a distinct list filter", async () => {
+      const wrapper: any = await mountAlertList();
+      await waitData(wrapper);
+
+      expect(wrapper.vm.tabs).toEqual(
+        expect.arrayContaining([expect.objectContaining({ value: "composite" })]),
+      );
+      // OTable's #toolbar slot does not render in this harness, so the tab
+      // control has no DOM here; drive the handler the toggle is bound to.
+      wrapper.vm.onAlertTabChange("composite");
+      await flushPromises();
+
+      expect(AlertService.listByFolderId).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        "composite",
+      );
+    });
+
+    it("keeps mixed bulk-delete successes while opening reference conflicts", async () => {
+      const wrapper: any = await mountAlertList();
+      await waitData(wrapper);
+      wrapper.vm.filteredResults[0].selected = true;
+      wrapper.vm.filteredResults[1].selected = true;
+      await wrapper.vm.$nextTick();
+      const selectedIds = wrapper.vm.selectedAlerts.map((alert: AlertV2) => alert.alert_id);
+      alertsSvc.bulkDelete.mockResolvedValueOnce({
+        data: {
+          successful: [{ alert_id: wrapper.vm.filteredResults[0].alert_id }],
+          unsuccessful: [
+            {
+              alert_id: wrapper.vm.filteredResults[1].alert_id,
+              code: "child_referenced",
+              references: [{ alert_id: "parent-1", name: "Checkout degraded" }],
+              hidden_reference_count: 1,
+            },
+          ],
+        },
+      });
+
+      await wrapper.vm.bulkDeleteAlerts();
+      await flushPromises();
+
+      expect(alertsSvc.bulkDelete).toHaveBeenCalledWith(
+        expect.any(String),
+        { ids: selectedIds },
+        "default",
+      );
+      expect(wrapper.find('[data-test="alerts-composite-reference-conflict"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="alerts-composite-reference-parent-parent-1"]').exists(),
+      ).toBe(true);
+    });
+  }, 15000);
+
+  /**
+   * The anomaly row is built field by field by `normalizeAnomalyToAlertRow`,
+   * so anything it does not list is invisible to the table however faithfully
+   * the list API sends it — the same trap the generic mapper warns about.
+   */
+  describe("anomaly detection list rows", () => {
+    /** One merged list item, in the shape `anomaly_config_to_list_item` emits. */
+    const anomalyItem = (extra: Record<string, any> = {}) => ({
+      ...makeAlert(1),
+      alert_id: "anomaly-1",
+      alert_type: "anomaly_detection",
+      name: "checkout-latency-anomaly",
+      is_real_time: false,
+      condition: null,
+      stream_name: "default",
+      stream_type: "logs",
+      enabled: true,
+      status: "ready",
+      priority: 2,
+      tags: ["prod", "team:checkout"],
+      last_outcome: "firing",
+      last_outcome_at: 1_700_000_000_000_000,
+      last_triggered_at: 1_700_000_000_000_000,
+      trigger_condition: { period: 60, frequency: 60, frequency_type: "minutes" },
+      ...extra,
+    });
+
+    const anomalyRow = async (extra: Record<string, any> = {}) => {
+      alertsDB = [anomalyItem(extra) as any];
+      const wrapper: any = await mountAlertList();
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      await flushPromises();
+      return { wrapper, row: wrapper.vm.filteredResults[0] };
+    };
+
+    it("carries the run state the Last Outcome column reads", async () => {
+      const { wrapper, row } = await anomalyRow();
+
+      expect(row.alert_type).toBe("anomaly_detection");
+      expect(row.last_outcome).toBe("firing");
+      // The badge is only rendered when the outcome is present AND the row is
+      // running, so carrying the field is what actually lights the column.
+      expect(wrapper.vm.showRunOutcome(row)).toBe(true);
+      // The outcome is never presented as live state — always "as of <time>".
+      expect(row.last_outcome_at).toBe(1_700_000_000_000_000);
+      expect(String(wrapper.vm.runOutcomeTooltip(row))).toContain(
+        i18n.global.t("alerts.asOf") as string,
+      );
+    });
+
+    it("carries the priority and tags the API already sends", async () => {
+      const { row } = await anomalyRow();
+
+      expect(row.priority).toBe(2);
+      expect(row.tags).toEqual(["prod", "team:checkout"]);
+    });
+
+    it("leaves the badge off an anomaly that has never run", async () => {
+      const { wrapper, row } = await anomalyRow({ last_outcome: null, last_outcome_at: null });
+
+      expect(row.last_outcome).toBeNull();
+      expect(wrapper.vm.showRunOutcome(row)).toBe(false);
+    });
+
+    // A disabled config freezes whatever it last recorded; showing it would
+    // advertise "Firing" on something that is not running.
+    it("leaves the badge off a disabled anomaly that last fired", async () => {
+      const { wrapper, row } = await anomalyRow({ enabled: false });
+
+      expect(row.last_outcome).toBe("firing");
+      expect(wrapper.vm.showRunOutcome(row)).toBe(false);
+    });
+
+    // The columns that were already correct — pinned so the normalizer cannot
+    // lose them while gaining the ones above.
+    it("keeps the columns that already worked", async () => {
+      const { row } = await anomalyRow({ owner: "sre@example.com" });
+
+      expect(row.name).toBe("checkout-latency-anomaly");
+      expect(row.owner).toBe("sre@example.com");
+      expect(row.status).toBe("ready");
+      expect(row.enabled).toBe(true);
+      expect(row.last_triggered_at_raw).toBe(1_700_000_000_000_000);
+      expect(row.is_real_time).toBe("anomaly");
+    });
+
+    // Anomaly detection has no per-group fan-out, so the Groups cell must stay
+    // an em dash rather than claiming it observed zero groups.
+    it("claims no group fan-out", async () => {
+      const { row } = await anomalyRow();
+
+      expect(row.multi_alert).toBeUndefined();
+      expect(row.groups_observed).toBeUndefined();
+    });
+  }, 15000);
 });
 
 /// The payoff of ownership routing is being able to see, from the alerts list,

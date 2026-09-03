@@ -28,10 +28,7 @@ use config::{
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 
 use super::entity::oncall_policies;
-use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors,
-};
+use crate::{db::get_orm_client_rw, errors};
 
 /// The team's escalation policy, for the paging path (`06` §3).
 ///
@@ -148,7 +145,12 @@ pub async fn get_or_create(org_id: &str, team_id: &str) -> Result<EscalationPoli
     let schedule = super::oncall_schedules::get_by_team(org_id, team_id).await?;
     let rotations: Vec<&config::meta::oncall::Rotation> = schedule
         .as_ref()
-        .map(|s| s.rotations.iter().filter(|r| r.validate().is_ok()).collect())
+        .map(|s| {
+            s.rotations
+                .iter()
+                .filter(|r| r.validate().is_ok())
+                .collect()
+        })
         .unwrap_or_default();
     let defaults = match rotations.first() {
         Some(primary) => EscalationPolicy::default_for_team(
@@ -194,7 +196,7 @@ pub async fn get_or_create_cached(
 }
 
 async fn insert(policy: &EscalationPolicy) -> Result<EscalationPolicy, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = now_micros();
     let model = oncall_policies::ActiveModel {
         id: Set(policy.id.clone()),
@@ -215,7 +217,7 @@ pub async fn get_by_team(
     org_id: &str,
     team_id: &str,
 ) -> Result<Option<EscalationPolicy>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_policies::Entity::find()
         .filter(oncall_policies::Column::OrgId.eq(org_id))
         .filter(oncall_policies::Column::TeamId.eq(team_id))
@@ -238,7 +240,7 @@ pub async fn update_rungs(
     // happens when the ladder runs out.
     repeats: Option<(i32, config::meta::oncall::FinalAction)>,
 ) -> Result<Option<EscalationPolicy>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Some(existing) = oncall_policies::Entity::find()
         .filter(oncall_policies::Column::OrgId.eq(org_id))
         .filter(oncall_policies::Column::TeamId.eq(team_id))
@@ -266,7 +268,7 @@ pub async fn update_rungs(
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<EscalationPolicy>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_policies::Entity::find()
         .filter(oncall_policies::Column::OrgId.eq(org_id))
         .order_by_asc(oncall_policies::Column::Id)
@@ -278,7 +280,7 @@ pub async fn list(org_id: &str) -> Result<Vec<EscalationPolicy>, errors::Error> 
 }
 
 pub async fn delete_by_team(org_id: &str, team_id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let deleted = oncall_policies::Entity::delete_many()
         .filter(oncall_policies::Column::OrgId.eq(org_id))
         .filter(oncall_policies::Column::TeamId.eq(team_id))
@@ -318,7 +320,13 @@ mod tests {
     /// engine has always run.
     #[test]
     fn test_the_default_columns_read_back_as_todays_ladder() {
-        let defaults = EscalationPolicy::default_for_team("pol_1", "default", "team_1", "rot_primary", Some("rot_secondary".into()));
+        let defaults = EscalationPolicy::default_for_team(
+            "pol_1",
+            "default",
+            "team_1",
+            "rot_primary",
+            Some("rot_secondary".into()),
+        );
         let encoded = serde_json::to_string(&defaults.rungs).unwrap();
         let p = to_policy(model(&encoded));
         assert_eq!(p.repeat_count, config::meta::oncall::DEFAULT_REPEAT_COUNT);
@@ -358,7 +366,13 @@ mod tests {
 
     #[test]
     fn test_rungs_round_trip_through_the_json_column() {
-        let defaults = EscalationPolicy::default_for_team("pol_1", "default", "team_1", "rot_primary", Some("rot_secondary".into()));
+        let defaults = EscalationPolicy::default_for_team(
+            "pol_1",
+            "default",
+            "team_1",
+            "rot_primary",
+            Some("rot_secondary".into()),
+        );
         let encoded = serde_json::to_string(&defaults.rungs).unwrap();
         let p = to_policy(model(&encoded));
         assert_eq!(p, defaults);
@@ -370,7 +384,13 @@ mod tests {
     /// tell.
     #[test]
     fn test_the_l0_block_round_trips_through_its_own_column() {
-        let defaults = EscalationPolicy::default_for_team("pol_1", "default", "team_1", "rot_primary", Some("rot_secondary".into()));
+        let defaults = EscalationPolicy::default_for_team(
+            "pol_1",
+            "default",
+            "team_1",
+            "rot_primary",
+            Some("rot_secondary".into()),
+        );
         let encoded = serde_json::to_string(&defaults.rungs).unwrap();
 
         let mut stored = model(&encoded);
@@ -435,7 +455,13 @@ mod tests {
 
     #[test]
     fn test_edited_rungs_survive_the_round_trip() {
-        let mut edited = EscalationPolicy::default_for_team("pol_1", "default", "team_1", "rot_primary", Some("rot_secondary".into()));
+        let mut edited = EscalationPolicy::default_for_team(
+            "pol_1",
+            "default",
+            "team_1",
+            "rot_primary",
+            Some("rot_secondary".into()),
+        );
         let idx = edited
             .rungs
             .iter()

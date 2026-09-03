@@ -27,17 +27,12 @@
       >
         <OToggleGroupItem
           v-for="option in scopeOptions"
-          :key="option.id"
-          :value="option.id"
+          :key="option"
+          :value="option"
           size="sm"
-          :data-test="`quality-detail-scope-${option.id}`"
+          :data-test="`quality-detail-scope-${option}`"
         >
-          <span>{{ t(`onlineEvals.quality.scopes.${option.id}`) }}</span>
-          <span
-            class="bg-surface-subtle text-3xs text-text-secondary ml-1 rounded-full px-1.5 py-0.5 leading-none [font-variant-numeric:tabular-nums]"
-          >
-            {{ compactCount(option.count) }}
-          </span>
+          {{ t(`onlineEvals.quality.scopes.${option}`) }}
         </OToggleGroupItem>
       </OToggleGroup>
     </div>
@@ -128,7 +123,7 @@
               :y-min="numericRange?.min ?? null"
               :y-max="numericRange?.max ?? null"
               :legend-avg="t('onlineEvals.quality.detail.legendAvg')"
-              :legend-p95="t('onlineEvals.quality.detail.legendP95')"
+              :legend-p95="raw('p95')"
               :legend-threshold-fmt="t('onlineEvals.quality.detail.legendThreshold')"
             />
             <p
@@ -254,7 +249,6 @@
       <QualityRunsTable
         :config="config"
         :rows="runs"
-        :counts="runsCounts"
         :active-filter="runsFilter"
         :current-page="runsCurrentPage"
         :page-size="runsPageSize"
@@ -271,7 +265,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -289,7 +283,7 @@ import type {
   DistributionBucket,
   TrendPoint,
 } from "../composables/useQualityDetailCharts";
-import type { QualityScope, ScopeCounts } from "../utils/qualityScope";
+import type { QualityScope } from "../utils/qualityScope";
 import { healthyBooleanValue } from "../utils/qualitySummary";
 import { thresholdForConfig } from "../utils/scoreThreshold";
 import type {
@@ -320,7 +314,6 @@ const props = defineProps<{
   booleanTrendSeries: BooleanTrendSeries[];
   categoricalRows: CategoricalAggRow[];
   scope: QualityScope;
-  scopeCounts: ScopeCounts;
   runs: QualityRunRow[];
   runsCounts: QualityRunCounts;
   runsFilter: QualityRunFilter;
@@ -333,7 +326,7 @@ const props = defineProps<{
 
 // NOTE: the binding is required — the template calls emit() directly for
 // update:scope, open-run, runs-filter-change and runs-pagination-change.
-// main's lint pass (#13174) dropped `const emit =` here; on this branch the
+// a lint pass on main dropped `const emit =` here; on this branch the
 // OToggleGroup scope filter uses it, so removing it silently stops the panel
 // emitting.
 const emit = defineEmits<{
@@ -371,15 +364,7 @@ const healthSummary = computed(() => {
   });
 });
 
-const scopeOptions = computed(() => [
-  {
-    id: "all" as const,
-    count: props.scopeCounts.span + props.scopeCounts.trace + props.scopeCounts.session,
-  },
-  { id: "span" as const, count: props.scopeCounts.span },
-  { id: "trace" as const, count: props.scopeCounts.trace },
-  { id: "session" as const, count: props.scopeCounts.session },
-]);
+const scopeOptions = ["all", "span", "trace", "session"] as const;
 
 const emptyDescription = computed(() => {
   if (props.scope === "all") {
@@ -421,12 +406,6 @@ function toNumber(v: unknown): number {
   if (v == null) return 0;
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : 0;
-}
-
-function compactCount(value: number): string {
-  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-  return String(Math.round(value));
 }
 
 const booleanCounts = computed(() => ({

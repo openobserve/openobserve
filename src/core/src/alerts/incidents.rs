@@ -23,8 +23,9 @@ use config::{
     meta::alerts::{
         alert::Alert,
         incidents::{
-            AlertEdge, AlertKind, AlertNode, CorrelationReason, EdgeType, Incident, IncidentAlert,
-            IncidentCorrelationOutcome, IncidentEvent, IncidentTopology, IncidentWithAlerts,
+            AlertEdge, AlertKind, AlertNode, CompositeAlertSummary, CorrelationReason, EdgeType,
+            Incident, IncidentAlert, IncidentCorrelationOutcome, IncidentEvent, IncidentTopology,
+            IncidentWithAlerts,
         },
     },
     utils::json::{Map, Value},
@@ -747,9 +748,11 @@ pub async fn correlate_alert_to_incident(
                     log::error!("[incidents] could not link on-call record for {incident_id}: {e}");
                 }
 
-                let impacted =
-                    crate::alerts::scheduler::handlers::impacted_services(&alert.org_id, &dimensions)
-                        .await;
+                let impacted = crate::alerts::scheduler::handlers::impacted_services(
+                    &alert.org_id,
+                    &dimensions,
+                )
+                .await;
                 if !impacted.is_empty()
                     && let Err(e) = o2_enterprise::enterprise::oncall::escalation::page_impacted(
                         &alert.org_id,
@@ -1788,6 +1791,7 @@ pub async fn get_incident_with_alerts(
 
     // Fetch full alert details for each unique alert name
     let mut alerts = Vec::new();
+    let mut composite_alerts = Vec::new();
     for alert_name in unique_alert_names {
         // We need to fetch by name, but we don't have stream_type and stream_name
         // We'll need to get these from the alert record itself
@@ -1798,11 +1802,35 @@ pub async fn get_incident_with_alerts(
                 match super::alert::get_by_id_db(&incident_org_id, alert_ksuid).await {
                     Ok(alert) => alerts.push(alert),
                     Err(e) => {
-                        log::warn!(
-                            "Failed to fetch alert details for {}: {}",
-                            trigger.alert_id,
-                            e
-                        );
+                        // Not an ordinary alert — a composite has no `alerts`
+                        // row, so fall back to the composite graph (§9.6).
+                        match super::composite::get_composite(&incident_org_id, &trigger.alert_id)
+                            .await
+                        {
+                            Ok(Some(composite)) => {
+                                composite_alerts.push(CompositeAlertSummary {
+                                    id: composite.definition.id,
+                                    name: composite.definition.name,
+                                    alert_type: "composite".to_string(),
+                                    enabled: composite.definition.enabled,
+                                    folder_id: composite.definition.folder_id,
+                                });
+                            }
+                            Ok(None) => {
+                                log::warn!(
+                                    "Failed to fetch alert details for {}: {}",
+                                    trigger.alert_id,
+                                    e
+                                );
+                            }
+                            Err(composite_error) => {
+                                log::warn!(
+                                    "Failed to fetch composite details for {}: {}",
+                                    trigger.alert_id,
+                                    composite_error
+                                );
+                            }
+                        }
                     }
                 }
             }
@@ -1813,6 +1841,7 @@ pub async fn get_incident_with_alerts(
         incident: incident_data,
         triggers,
         alerts,
+        composite_alerts,
     }))
 }
 
@@ -2015,7 +2044,7 @@ pub async fn enrich_with_topology(
 /// Trigger RCA for a single incident immediately after creation
 ///
 /// Called asynchronously via tokio::spawn to avoid blocking incident creation.
-/// Reuses RcaAgentClient configuration from enterprise crate.
+/// Reuses AiAgentClient configuration from enterprise crate.
 ///
 /// # Arguments
 /// * `org_id` - Organization ID
@@ -2255,12 +2284,12 @@ pub async fn trigger_rca_for_incident(
         if is_analysis_in_flight(&events, stale_threshold) {
             log::debug!("[INCIDENTS::RCA] Analysis already in-flight for {incident_id}, skipping");
             // §6: no verdict is coming, so nothing may go on holding a page for
-        // one. Every guard below reaches this same state.
-        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-            &org_id,
-            &incident_id,
-        )
-        .await;
+            // one. Every guard below reaches this same state.
+            o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+                &org_id,
+                &incident_id,
+            )
+            .await;
             return Ok(());
         }
 
@@ -2268,12 +2297,12 @@ pub async fn trigger_rca_for_incident(
         if !reanalysis && !cooldown_elapsed(&events, cooldown) {
             log::debug!("[INCIDENTS::RCA] Cooldown not elapsed for {incident_id}, skipping");
             // §6: no verdict is coming, so nothing may go on holding a page for
-        // one. Every guard below reaches this same state.
-        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
-            &org_id,
-            &incident_id,
-        )
-        .await;
+            // one. Every guard below reaches this same state.
+            o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+                &org_id,
+                &incident_id,
+            )
+            .await;
             return Ok(());
         }
     }
@@ -2374,14 +2403,19 @@ pub async fn trigger_rca_for_incident(
     .await;
     // §7: what this same subject turned out to be the last few times, which is
     // the cross-incident memory the agent otherwise has none of.
-    let past_causes =
-        o2_enterprise::enterprise::alerts::rca_service::past_causes_for_incident(
-            &org_id,
-            &incident_id,
-        )
-        .await;
+    let past_causes = o2_enterprise::enterprise::alerts::rca_service::past_causes_for_incident(
+        &org_id,
+        &incident_id,
+    )
+    .await;
     match client
-        .analyze_incident(&incident, &auth_header, build_on_previous, severity, past_causes)
+        .analyze_incident(
+            &incident,
+            &auth_header,
+            build_on_previous,
+            severity,
+            past_causes,
+        )
         .await
     {
         Ok(rca_result) => {

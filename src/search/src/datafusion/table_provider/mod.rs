@@ -36,4 +36,5 @@ pub mod enrich_table;
 mod helpers;
 pub mod listing_adapter;
 pub mod memtable;
+mod metrics;
 pub mod uniontable;

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :key="store.state.selectedOrganization.identifier"
     data-test="rum-performance-page"
     :title="t('rum.performanceSummaryLabel')"
-    :subtitle="t('rum.performanceSummarySubtitle')"
+    :subtitle="t('rum.performanceSummarySubtitle', { product: raw('Core Web Vitals') })"
     title-data-test="rum-performance-title"
     icon="speed"
     bleed
@@ -55,6 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
       </OButton>
+      <ShareButton
+        data-test="rum-performance-share-link-btn"
+        :url="shareUrl"
+        variant="outline"
+        size="icon-toolbar"
+      />
     </template>
     <OTabs
       class="px-page-edge border-border-default shrink-0 border-b"
@@ -88,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // @ts-nocheck
 import { defineComponent, ref, watch, onMounted, nextTick, computed, onActivated } from "vue";
 import { useStore } from "vuex";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { getDashboard } from "@/utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "@/utils/date";
@@ -104,6 +110,7 @@ import useRum from "@/composables/rum/useRum";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -115,6 +122,7 @@ export default defineComponent({
     OButton,
     OTooltip,
     OPageLayout,
+    ShareButton,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -122,7 +130,7 @@ export default defineComponent({
     const activePerformanceTab = ref("overview");
     const activePerformanceComponent = ref(null);
     const { performanceState } = usePerformance();
-    useRum();
+    const { shareUrl } = useRum();
 
     // Variables manager will be initialized by RenderDashboardCharts in child components
     const variablesManager = ref(null);
@@ -191,9 +199,9 @@ export default defineComponent({
       currentDashboardData.data = overviewDashboard;
 
       // if variables data is null, set it to empty list
-      if (
-        !(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)
-      ) {
+      if (!(
+        currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length
+      )) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
@@ -385,6 +393,7 @@ export default defineComponent({
     return {
       currentDashboardData,
       t,
+      raw,
       getDashboard,
       store,
       // date variables
@@ -405,6 +414,7 @@ export default defineComponent({
       activePerformanceTab,
       activePerformanceComponent,
       isVariablesChanged,
+      shareUrl,
     };
   },
 });

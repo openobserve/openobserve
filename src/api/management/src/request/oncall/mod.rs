@@ -136,7 +136,10 @@ impl AddMembersRequest {
     #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
     fn names_nobody(&self) -> bool {
         self.user_emails.iter().all(|e| e.trim().is_empty())
-            && self.user_email.as_deref().is_none_or(|e| e.trim().is_empty())
+            && self
+                .user_email
+                .as_deref()
+                .is_none_or(|e| e.trim().is_empty())
     }
 }
 
@@ -1509,12 +1512,11 @@ pub async fn get_team_channel(
         // Read whole rather than reported as "unset": the caller wants to know
         // where the team is actually talked to, and answering with an empty
         // list while pages go to the policy's room would be a lie of omission.
-        let policy = match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id)
-            .await
-        {
-            Ok(p) => p.destinations,
-            Err(e) => return to_response(e),
-        };
+        let policy =
+            match o2_enterprise::enterprise::oncall::service::get_policy(&org_id, &team_id).await {
+                Ok(p) => p.destinations,
+                Err(e) => return to_response(e),
+            };
         let source = if team.is_some() { "team" } else { "policy" };
         MetaHttpResponse::json(TeamChannelResponse {
             team_id,
@@ -1572,7 +1574,11 @@ pub async fn set_team_channel(
                         Ok(p) => p.destinations,
                         Err(e) => return to_response(e),
                     };
-                let source = if requested.is_some() { "team" } else { "policy" };
+                let source = if requested.is_some() {
+                    "team"
+                } else {
+                    "policy"
+                };
                 MetaHttpResponse::json(TeamChannelResponse {
                     team_id,
                     destinations: config::meta::oncall::policy::team_channel(
@@ -2824,10 +2830,8 @@ pub async fn update_ownership_rule(
         .await
         {
             Ok(Some(rule)) => MetaHttpResponse::json(rule),
-            Ok(None) => {
-                MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Rule not found")
-                    .into_response()
-            }
+            Ok(None) => MetaHttpResponse::error(StatusCode::NOT_FOUND.as_u16(), "Rule not found")
+                .into_response(),
             Err(e) => {
                 // Same unique-index shape as create: repointing a rule onto a
                 // path another team already claims is a conflict, not a fault.
@@ -3890,13 +3894,8 @@ pub async fn delete_unavailability(
             Ok(None) => return MetaHttpResponse::not_found("unavailability not found"),
             Err(e) => return to_response(e),
         };
-        if !may_touch_unavailability(
-            &org_id,
-            &user_email.user_id,
-            &existing.user_email,
-            "DELETE",
-        )
-        .await
+        if !may_touch_unavailability(&org_id, &user_email.user_id, &existing.user_email, "DELETE")
+            .await
         {
             return MetaHttpResponse::forbidden("Forbidden");
         }
@@ -4542,8 +4541,7 @@ async fn carry_page_history_into_incident(
     incident_id: &str,
     record: &config::meta::oncall::Response,
 ) {
-    use config::meta::alerts::incidents::IncidentEvent;
-    use config::meta::oncall::ResponseEventKind;
+    use config::meta::{alerts::incidents::IncidentEvent, oncall::ResponseEventKind};
 
     // One line naming the things a reader of the incident would otherwise have
     // to open the page to learn. Written first so it heads the timeline.
@@ -4566,8 +4564,12 @@ async fn carry_page_history_into_incident(
     if let Some(cause) = record.cause.as_ref() {
         summary.push_str(&format!(", cause recorded as {}", cause.as_str()));
     }
-    if let Err(e) =
-        infra::table::incident_events::append(org_id, incident_id, IncidentEvent::comment("o2-engine", summary)).await
+    if let Err(e) = infra::table::incident_events::append(
+        org_id,
+        incident_id,
+        IncidentEvent::comment("o2-engine", summary),
+    )
+    .await
     {
         tracing::warn!("[oncall] promote summary onto {incident_id}: {e}");
     }
@@ -4590,8 +4592,10 @@ async fn carry_page_history_into_incident(
     // unreachable: notes carried, findings never did, and the prefix below was
     // dead code.
     for event in timeline.iter().filter(|e| {
-        matches!(e.kind, ResponseEventKind::Note | ResponseEventKind::AiVerdict)
-            && !e.body.trim().is_empty()
+        matches!(
+            e.kind,
+            ResponseEventKind::Note | ResponseEventKind::AiVerdict
+        ) && !e.body.trim().is_empty()
     }) {
         let prefix = match event.kind {
             ResponseEventKind::AiVerdict => "AI SRE (from the page): ",
@@ -4859,9 +4863,7 @@ mod tests {
     /// of the four.
     #[test]
     fn test_an_unknown_preset_is_refused() {
-        assert!(
-            serde_json::from_str::<FromPresetRequest>(r#"{"preset":"round_robin"}"#).is_err()
-        );
+        assert!(serde_json::from_str::<FromPresetRequest>(r#"{"preset":"round_robin"}"#).is_err());
     }
 
     /// Every session-authenticated handler must gate itself.
@@ -5276,9 +5278,8 @@ mod tests {
     fn test_only_what_a_human_wrote_carries_into_the_incident() {
         use config::meta::oncall::ResponseEventKind as K;
 
-        let carries = |kind: K, body: &str| {
-            matches!(kind, K::Note | K::AiVerdict) && !body.trim().is_empty()
-        };
+        let carries =
+            |kind: K, body: &str| matches!(kind, K::Note | K::AiVerdict) && !body.trim().is_empty();
 
         assert!(carries(K::Note, "rolled back checkout 4.2.1"));
         // `AiVerdict` is the kind the agent actually writes. This test named
@@ -5451,13 +5452,13 @@ mod tests {
     #[test]
     fn test_every_new_read_is_bounded() {
         // config-risks: coverage look-ahead, and the page of risks.
-        assert_eq!(Some(7i64).unwrap_or(7).clamp(1, 31), 7);
-        assert_eq!(Some(365i64).unwrap_or(7).clamp(1, 31), 31);
-        assert_eq!(Some(0i64).unwrap_or(7).clamp(1, 31), 1);
+        assert_eq!(7i64.clamp(1, 31), 7);
+        assert_eq!(365i64.clamp(1, 31), 31);
+        assert_eq!(0i64.clamp(1, 31), 1);
         // limits, shared by config-risks and ownership/stats.
-        assert_eq!(Some(50u64).unwrap_or(50).clamp(1, 200), 50);
-        assert_eq!(Some(10_000u64).unwrap_or(50).clamp(1, 200), 200);
-        assert_eq!(Some(0u64).unwrap_or(50).clamp(1, 200), 1);
+        assert_eq!(50u64.clamp(1, 200), 50);
+        assert_eq!(10_000u64.clamp(1, 200), 200);
+        assert_eq!(0u64.clamp(1, 200), 1);
     }
 
     /// The pages table has to render five things per row without a second
@@ -5518,10 +5519,8 @@ mod tests {
     /// than one pool.
     #[test]
     fn test_a_cover_body_without_a_rotation_still_parses() {
-        let body: CreateOverrideRequest = serde_json::from_str(
-            r#"{"user_email":"sam@o2.ai","start_at":1,"end_at":2}"#,
-        )
-        .unwrap();
+        let body: CreateOverrideRequest =
+            serde_json::from_str(r#"{"user_email":"sam@o2.ai","start_at":1,"end_at":2}"#).unwrap();
         assert_eq!(body.rotation_id, None, "absent means the team's primary");
         assert_eq!(body.covering_for, None);
 
@@ -5590,5 +5589,4 @@ mod tests {
         let q: UnavailabilityQuery = serde_json::from_str("{}").unwrap();
         assert!(q.user_email.is_none() && q.from.is_none() && q.to.is_none());
     }
-
 }

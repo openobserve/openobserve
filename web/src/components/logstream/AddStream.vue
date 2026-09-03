@@ -118,8 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { watch } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import StreamFieldInputs from "./StreamFieldInputs.vue";
 import streamService from "@/services/stream";
 import { useStore } from "vuex";
@@ -253,7 +253,7 @@ const saveStream = async (value: AddStreamForm) => {
     .catch((err) => {
       if (err.response.status != 403) {
         toast({
-          message: err.response?.data?.message || "Failed to create stream",
+          message: err.response?.data?.message || t("logStream.createStreamFailed"),
           variant: "error",
         });
       }

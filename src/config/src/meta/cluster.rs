@@ -123,17 +123,8 @@ impl Node {
     pub fn is_flatten_compactor(&self) -> bool {
         self.role.contains(&Role::FlattenCompactor)
     }
-    pub fn is_alert_manager(&self) -> bool {
-        self.role.contains(&Role::AlertManager) || self.role.contains(&Role::All)
-    }
-    pub fn is_action_server(&self) -> bool {
-        self.role.contains(&Role::ActionServer) || self.role.contains(&Role::All)
-    }
-    pub fn is_standalone(&self) -> bool {
-        // standalone implies there is no external dependency required
-        // for this node. All role will always have DB dep.
-        // currently only action server has no external dep
-        !self.role.contains(&Role::All) && self.role.contains(&Role::ActionServer)
+    pub fn is_scheduler(&self) -> bool {
+        self.role.contains(&Role::Scheduler) || self.role.contains(&Role::All)
     }
 }
 
@@ -204,9 +195,9 @@ pub enum Role {
     Querier,
     Compactor,
     Router,
-    AlertManager,
+    #[serde(alias = "AlertManager")]
+    Scheduler,
     FlattenCompactor,
-    ActionServer,
 }
 
 impl FromStr for Role {
@@ -219,11 +210,8 @@ impl FromStr for Role {
             "querier" => Ok(Role::Querier),
             "compactor" => Ok(Role::Compactor),
             "router" => Ok(Role::Router),
-            "alertmanager" | "alert_manager" => Ok(Role::AlertManager),
+            "scheduler" | "alertmanager" | "alert_manager" => Ok(Role::Scheduler),
             "flatten_compactor" => Ok(Role::FlattenCompactor),
-            "action_server" | "actionserver" | "script_server" | "scriptserver" => {
-                Ok(Role::ActionServer)
-            }
             _ => Err(format!("Invalid cluster role: {s}")),
         }
     }
@@ -237,9 +225,8 @@ impl std::fmt::Display for Role {
             Role::Querier => write!(f, "querier"),
             Role::Compactor => write!(f, "compactor"),
             Role::Router => write!(f, "router"),
-            Role::AlertManager => write!(f, "alert_manager"),
+            Role::Scheduler => write!(f, "scheduler"),
             Role::FlattenCompactor => write!(f, "flatten_compactor"),
-            Role::ActionServer => write!(f, "action_server"),
         }
     }
 }
@@ -373,13 +360,9 @@ mod tests {
         assert!(node.is_compactor());
         assert!(!node.is_router());
 
-        // Test alert manager
-        node.role = vec![Role::AlertManager];
-        assert!(node.is_alert_manager());
-
-        // Test action server
-        node.role = vec![Role::ActionServer];
-        assert!(node.is_action_server());
+        // Test scheduler
+        node.role = vec![Role::Scheduler];
+        assert!(node.is_scheduler());
 
         // Test flatten compactor
         node.role = vec![Role::FlattenCompactor];
@@ -464,29 +447,6 @@ mod tests {
     }
 
     #[test]
-    fn test_node_is_standalone() {
-        let mut node = Node {
-            role: vec![Role::ActionServer],
-            ..Default::default()
-        };
-
-        // ActionServer alone → standalone
-        assert!(node.is_standalone());
-
-        // All role → NOT standalone (has external deps)
-        node.role = vec![Role::All];
-        assert!(!node.is_standalone());
-
-        // All + ActionServer → NOT standalone
-        node.role = vec![Role::All, Role::ActionServer];
-        assert!(!node.is_standalone());
-
-        // Ingester → not standalone
-        node.role = vec![Role::Ingester];
-        assert!(!node.is_standalone());
-    }
-
-    #[test]
     fn test_node_is_same() {
         let a = Node {
             id: 1,
@@ -521,16 +481,13 @@ mod tests {
         assert_eq!("querier".parse::<Role>().unwrap(), Role::Querier);
         assert_eq!("compactor".parse::<Role>().unwrap(), Role::Compactor);
         assert_eq!("router".parse::<Role>().unwrap(), Role::Router);
-        assert_eq!("alertmanager".parse::<Role>().unwrap(), Role::AlertManager);
-        assert_eq!("alert_manager".parse::<Role>().unwrap(), Role::AlertManager);
+        assert_eq!("scheduler".parse::<Role>().unwrap(), Role::Scheduler);
+        assert_eq!("alertmanager".parse::<Role>().unwrap(), Role::Scheduler);
+        assert_eq!("alert_manager".parse::<Role>().unwrap(), Role::Scheduler);
         assert_eq!(
             "flatten_compactor".parse::<Role>().unwrap(),
             Role::FlattenCompactor
         );
-        assert_eq!("action_server".parse::<Role>().unwrap(), Role::ActionServer);
-        assert_eq!("actionserver".parse::<Role>().unwrap(), Role::ActionServer);
-        assert_eq!("script_server".parse::<Role>().unwrap(), Role::ActionServer);
-        assert_eq!("scriptserver".parse::<Role>().unwrap(), Role::ActionServer);
         // unknown → Err
         assert!("unknown_role".parse::<Role>().is_err());
     }
@@ -542,9 +499,20 @@ mod tests {
         assert_eq!(Role::Querier.to_string(), "querier");
         assert_eq!(Role::Compactor.to_string(), "compactor");
         assert_eq!(Role::Router.to_string(), "router");
-        assert_eq!(Role::AlertManager.to_string(), "alert_manager");
+        assert_eq!(Role::Scheduler.to_string(), "scheduler");
         assert_eq!(Role::FlattenCompactor.to_string(), "flatten_compactor");
-        assert_eq!(Role::ActionServer.to_string(), "action_server");
+    }
+
+    #[test]
+    fn test_role_deserializes_legacy_alert_manager() {
+        assert_eq!(
+            serde_json::from_str::<Role>(r#""AlertManager""#).unwrap(),
+            Role::Scheduler
+        );
+        assert_eq!(
+            serde_json::to_string(&Role::Scheduler).unwrap(),
+            r#""Scheduler""#
+        );
     }
 
     #[test]

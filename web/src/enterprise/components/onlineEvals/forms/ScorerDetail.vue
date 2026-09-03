@@ -121,7 +121,7 @@
                names this block, so an in-panel "Configuration" title (and its
                separator) would just duplicate it. -->
           <section class="flex flex-col gap-2 px-5">
-            <dl class="sd-kv">
+            <dl class="sd-kv [&_dd]:text-text-heading [&_dt]:text-text-secondary">
               <dt>{{ t("onlineEvals.scorer.detail.scorerTypeLabel") }}</dt>
               <dd class="flex flex-wrap items-center gap-1.5">
                 <OTag type="scorerType" :value="scorerType" />
@@ -154,7 +154,7 @@
 
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scorer.detail.producesSection") }}
             </h4>
@@ -183,7 +183,7 @@
 
           <section v-if="row.template" class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
             >
               {{
                 scorerType === "llm_judge"
@@ -202,7 +202,7 @@
 
           <section v-if="outputSchemaPretty" class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scorer.detail.outputSchemaSection") }}
             </h4>
@@ -211,11 +211,11 @@
 
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-normal font-semibold"
+              class="text-compact text-text-heading border-b-text-secondary/12 m-0 inline-flex items-center gap-1.5 border-b pb-1.5 leading-normal font-semibold"
             >
               {{ t("onlineEvals.scorer.detail.metadataSection") }}
             </h4>
-            <dl class="sd-kv">
+            <dl class="sd-kv [&_dd]:text-text-heading [&_dt]:text-text-secondary">
               <dt v-if="createdAt">
                 {{ t("onlineEvals.scorer.detail.createdLabel") }}
               </dt>
@@ -235,11 +235,11 @@
         <!-- Versions -->
         <template v-else-if="activeTab === 'versions'">
           <div class="sd__tab-pad">
-            <p class="sd__tab-intro">
+            <p class="sd__tab-intro text-text-secondary">
               {{ t("onlineEvals.scorer.detail.versionsIntro") }}
             </p>
             <ul class="sd-versions">
-              <li class="sd-versions__item sd-versions__item--active">
+              <li class="sd-versions__item sd-versions__item--active bg-card-bg">
                 <div class="sd-versions__head">
                   <span class="sd-versions__label text-text-heading"
                     >{{ t("onlineEvals.versionPrefix") }}{{ row.version }}</span
@@ -309,7 +309,7 @@
         <!-- Used by -->
         <template v-else-if="activeTab === 'usedBy'">
           <div class="sd__tab-pad">
-            <p class="sd__tab-intro">
+            <p class="sd__tab-intro text-text-secondary">
               {{ t("onlineEvals.scorer.detail.usedByIntro") }}
             </p>
             <OEmptyState
@@ -322,7 +322,7 @@
               <li v-for="job in usedByJobs" :key="job.id">
                 <OButton
                   variant="ghost"
-                  class="sd-used-list__item"
+                  class="sd-used-list__item group"
                   :data-test="`scorer-detail-used-by-item-${job.name}`"
                   @click="emit('view-job', job)"
                 >
@@ -332,7 +332,7 @@
                   <OIcon
                     name="chevron-right"
                     size="xs"
-                    class="sd-used-list__chevron text-text-secondary"
+                    class="sd-used-list__chevron text-text-secondary group-hover:text-accent group-hover:opacity-100"
                   />
                 </OButton>
               </li>
@@ -712,35 +712,34 @@ function relativeTime(timestampMs: number): string {
   const diff = Date.now() - timestampMs;
   if (diff < 0 || !Number.isFinite(diff)) return "—";
   const sec = Math.floor(diff / 1000);
-  if (sec < 60) return `${sec}s ago`;
+  if (sec < 60) return t("refreshButton.secondsAgo", { sec });
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return t("refreshButton.minutesAgo", { min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t("refreshButton.hoursAgo", { h: hr });
   const day = Math.floor(hr / 24);
-  return `${day}d ago`;
+  return t("onlineEvals.quality.overview.relativeTime.daysAgo", { day });
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(complex-state): The <dl>/<dt>/<dd> element-selector grid, the used-by list's hover/:deep(button)
    overrides, and the status-cell dot variants — descendant and pseudo-class
    selectors with no element of their own to carry a utility. */
-// Page layout, spacing, colors, and text styling are Tailwind utilities in the
-// template (matching SessionDetails.vue). Only cohesive blocks that rely on
-// descendant/element selectors or hover state remain here. Font-family is never
-// set per component — it inherits the global --font-sans.
+/* Page layout, spacing, colors, and text styling are Tailwind utilities in the
+   template (matching SessionDetails.vue). Only cohesive blocks that rely on
+   descendant/element selectors or hover state remain here. Font-family is never
+   set per component — it inherits the global --font-sans. */
 
 .sd__tab-intro {
   margin: 0;
   font-size: var(--text-xs);
   line-height: 1.5;
-  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
-// Versions / Used By tab content sits directly in the body (not in a
-// .sd-section), so it needs its own horizontal inset. The Runs tab keeps its
-// full-bleed table and is not wrapped here.
+/* Versions / Used By tab content sits directly in the body (not in a
+   .sd-section), so it needs its own horizontal inset. The Runs tab keeps its
+   full-bleed table and is not wrapped here. */
 .sd__tab-pad {
   display: flex;
   flex-direction: column;
@@ -759,13 +758,11 @@ function relativeTime(timestampMs: number): string {
 .sd-kv dt {
   font-size: var(--text-xs);
   font-weight: 600;
-  color: var(--color-text-secondary, var(--color-text-secondary));
 }
 
 .sd-kv dd {
   margin: 0;
   font-size: var(--text-compact);
-  color: var(--color-text-heading, currentColor);
 }
 
 .sd-produces {
@@ -773,8 +770,8 @@ function relativeTime(timestampMs: number): string {
   align-items: center;
   gap: 0.375rem;
   padding: 0.625rem 0.75rem;
-  background: color-mix(in srgb, var(--color-primary-600) 8%, transparent);
-  border: 0.0625rem solid color-mix(in srgb, var(--color-primary-600) 30%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  border: 0.0625rem solid color-mix(in srgb, var(--color-accent) 30%, transparent);
   border-radius: 0.3125rem;
   font-size: var(--text-xs);
 }
@@ -820,14 +817,13 @@ function relativeTime(timestampMs: number): string {
 
 .sd-versions__item {
   padding: 0.75rem 0.875rem;
-  background: var(--color-card-bg);
   border: 0.0625rem solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
   border-radius: 0.375rem;
 }
 
 .sd-versions__item--active {
-  border-color: color-mix(in srgb, var(--color-primary-600) 30%, transparent);
-  background: color-mix(in srgb, var(--color-primary-600) 5%, var(--color-card-bg));
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-card-bg));
 }
 
 .sd-versions__head {
@@ -867,8 +863,8 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-used-list__item:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600) 35%, transparent) !important;
-  background: color-mix(in srgb, var(--color-primary-600) 5%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent) !important;
+  background: color-mix(in srgb, var(--color-accent) 5%, transparent) !important;
 }
 
 .sd-used-list__item:deep(button) {
@@ -889,10 +885,5 @@ function relativeTime(timestampMs: number): string {
 
 .sd-used-list__chevron {
   opacity: 0.5;
-}
-
-.sd-used-list__item:hover .sd-used-list__chevron {
-  color: var(--color-primary-600);
-  opacity: 1;
 }
 </style>

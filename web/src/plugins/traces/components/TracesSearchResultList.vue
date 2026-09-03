@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="contents" @contextmenu.capture="handleTableContextMenu">
               <OTable
                 class="h-auto!"
+                :wrap="wrap"
                 :columns="searchObj.data.resultGrid.columns"
                 :data="hits"
                 :loading="loading"
@@ -103,8 +104,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #cell-operation_name="{ row }">
+                  <!-- The cell clips on its own, so the table-level `wrap`
+                       is not enough: without dropping `truncate` here the name
+                       stays cut off no matter what the table does. -->
                   <span
-                    class="text-text-body truncate text-xs"
+                    class="text-text-body text-xs"
+                    :class="wrap ? '' : 'truncate'"
                     data-test="trace-row-operation-name"
                   >
                     {{ row.operation_name }}
@@ -294,6 +299,8 @@ interface Props {
   searchMode?: TraceSearchMode;
   /** Whether to show CellActions overlay on table cells. Default: true */
   showCellActions?: boolean;
+  /** Wrap long cell content instead of clipping it. Default: false. */
+  wrap?: boolean;
   /** Whether the AI copilot is enabled — gates the "Ask AI" empty-state button. */
   aiEnabled?: boolean;
   /** Authoritative stream doc time range (µs) for the empty-state jump card. */
@@ -320,6 +327,7 @@ const props = withDefaults(defineProps<Props>(), {
   sortOrder: undefined,
   searchMode: "traces",
   showCellActions: true,
+  wrap: false,
   aiEnabled: false,
   streamDocTimeRange: undefined,
   queryWindowUs: undefined,
@@ -546,6 +554,6 @@ const hasResults = computed(() => props.searchPerformed && props.hits.length > 0
    `oz-table__row--error` on table-rendered <tr>s and the rule reaches their
    <td>, hence :deep. Mirrors PlayerTracesTab's `trace-row--error`. */
 .traces-table-container :deep(.oz-table__row--error td:first-child) {
-  box-shadow: inset 0.125rem 0 0 0 var(--color-status-error-text);
+  box-shadow: var(--shadow-rail-thin-geom) var(--color-status-error-text);
 }
 </style>

@@ -25,7 +25,7 @@ jobs:
           ORG: ${{ github.repository_owner }}
           CREATOR: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.user.login || github.event.issue.user.login }}
         run: |
-          ALLOWLIST=" bjp232004 hengfeiyang prabhatsharma uddhavdave oasisk haohuaijin Subhra264 Loaki07 007harshmahajan chaitanya-sistla ktx-kirtan omkarK06 ktx-vaidehi ktx-abhay neha00290 ktx-akshay ktx-sadhna nikhilsaikethe YashodhanJoshi1 ktx-riya mmosarafO2 Shrinath-O2 ktx-mihir vamsikarthikr "
+          ALLOWLIST=" bjp232004 hengfeiyang prabhatsharma uddhavdave oasisk haohuaijin Subhra264 Loaki07 007harshmahajan chaitanya-sistla ktx-kirtan omkarK06 ktx-vaidehi ktx-abhay neha00290 ktx-akshay ktx-sadhna nikhilsaikethe YashodhanJoshi1 ktx-riya mmosarafO2 Shrinath-O2 ktx-mihir vamsikarthikr pr1sm8 "
           CREATOR_LOWER=$(echo "$CREATOR" | tr '[:upper:]' '[:lower:]')
           ALLOWLIST_LOWER=$(echo "$ALLOWLIST" | tr '[:upper:]' '[:lower:]')
           if echo "$ALLOWLIST_LOWER" | grep -q " $CREATOR_LOWER "; then
@@ -233,14 +233,38 @@ jobs:
             && echo "Assigned simranquirky to stranger issue #$NUMBER" \
             || echo "::warning::Could not assign to stranger issue #$NUMBER"
 
-      # ── Stranger: assign PR to oasisk + hengfeiyang ──
-      - name: Assign stranger PR
+      # ── Stranger: assign PR to hengfeiyang + label as community (label skips bots) ──
+      - name: Assign and label stranger PR
         if: github.event_name == 'pull_request_target' && steps.classify.outputs.category == 'stranger'
         env:
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ github.event.pull_request.number }}
+          USER_TYPE: ${{ github.event.pull_request.user.type }}
         run: |
-          gh pr edit "$NUMBER" --add-assignee "oasisk" --add-assignee "hengfeiyang" \
-            && echo "Assigned oasisk and hengfeiyang to stranger PR #$NUMBER" \
+          gh pr edit "$NUMBER" --add-assignee "hengfeiyang" \
+            && echo "Assigned hengfeiyang to stranger PR #$NUMBER" \
             || echo "::warning::Could not assign to stranger PR #$NUMBER"
+          if [ "$USER_TYPE" != "Bot" ]; then
+            gh pr edit "$NUMBER" --add-label "community" \
+              && echo "Labeled stranger PR #$NUMBER as community" \
+              || echo "::warning::Could not label stranger PR #$NUMBER"
+          fi
+
+      # ── Dependabot: label e2e to unlock gated CI, approve any held runs ──
+      - name: Enable CI for dependabot PR
+        if: github.event_name == 'pull_request_target' && github.event.pull_request.user.login == 'dependabot[bot]'
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh pr edit "$NUMBER" --add-label "e2e" \
+            && echo "Labeled dependabot PR #$NUMBER with e2e" \
+            || echo "::warning::Could not label dependabot PR #$NUMBER"
+          for id in $(gh api "repos/$GH_REPO/actions/runs?head_sha=$HEAD_SHA&status=action_required" --jq '.workflow_runs[].id'); do
+            gh api -X POST "repos/$GH_REPO/actions/runs/$id/approve" \
+              && echo "Approved held run $id" \
+              || echo "::warning::Could not approve run $id"
+          done

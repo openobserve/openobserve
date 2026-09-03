@@ -15,9 +15,9 @@
 
 import { createRouter, createWebHistory } from "vue-router";
 import { getDecodedUserInfo, getPath, mergeRoutes } from "@/utils/zincutils";
+import { gt } from "@/types/i18n";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
-import { gt } from "@/types/i18n";
 
 import userCloudRoutes from "@/enterprise/composables/router";
 import userRoutes from "@/composables/shared/router";
@@ -77,11 +77,17 @@ export default function (store: any) {
   const router = createRouter(routerMap);
 
   router.beforeEach((to: any, from: any, next: any) => {
-    // Set page title with OpenObserve prefix. `titleKey` is the translated
-    // form and wins where a route declares one; `title` is the English literal
-    // the older routes still carry.
+    // Set page title with OpenObserve prefix.
+    //
+    // Routes carry an i18n KEY (`meta.titleKey`), not the text: the route tables
+    // are module-scope, so translating where a route is declared would freeze the
+    // tab title at whatever locale happened to be active at import time. Resolving
+    // here — per navigation — keeps it in the current locale. `gt` (not `t`)
+    // because a navigation guard runs outside any component setup. `title` is the
+    // English literal fallback the routes not yet migrated to `titleKey` still carry.
     const routeTitle = to.meta?.titleKey ? gt(to.meta.titleKey) : to.meta?.title;
     if (routeTitle) {
+      // The brand prefix is a product noun, never translated; the page name is.
       document.title = `OpenObserve - ${routeTitle}`;
     } else {
       document.title = "OpenObserve";
@@ -89,7 +95,13 @@ export default function (store: any) {
 
     const isAuthenticated = store.state.loggedIn;
 
-    if (!isAuthenticated && (to.path == "/cb" || to.path == "/web/cb")) {
+    if (
+      !isAuthenticated &&
+      (to.path === "/cb" ||
+        to.path === "/web/cb" ||
+        to.path === "/slack/oauth/callback" ||
+        to.path === "/web/slack/oauth/callback")
+    ) {
       next();
     } else if (!isAuthenticated) {
       const sessionUserInfo = getDecodedUserInfo();

@@ -149,6 +149,14 @@ export interface OTableColumnMeta {
   align?: "left" | "center" | "right" | (string & {});
   /** Additional class applied to the <th> */
   headerClass?: string;
+  /**
+   * A second, smaller line under the header label — for the technical name of a
+   * column whose label is plain English ("Slow calls" / `p95`). Non-translatable
+   * identifiers go through `raw()`.
+   */
+  headerSubLabel?: I18nText;
+  /** Hover tooltip on the header, explaining what the column measures. */
+  headerTooltip?: I18nText;
   /** Additional class applied to the <td> */
   cellClass?: string;
   /**
@@ -171,6 +179,8 @@ export interface OTableColumnMeta {
    * inside the container and ellipsis-truncates. Set alongside `autoWidth`.
    */
   fillRemaining?: boolean;
+  /** Show the per-column "format this column" icon (requires `enableColumnFormat` on OTable) */
+  formattable?: boolean;
   /** Arbitrary metadata for custom cell renderers */
   [key: string]: any;
 }
@@ -292,7 +302,7 @@ export interface OTableProps<TData = any> {
   /** Global search/filter text */
   globalFilter?: string;
   /** Placeholder for global filter input */
-  globalFilterPlaceholder?: string;
+  globalFilterPlaceholder?: I18nText;
   /** Show built-in global filter search bar (default: true) */
   showGlobalFilter?: boolean;
   filterMode?: OTableFilterMode;
@@ -359,6 +369,16 @@ export interface OTableProps<TData = any> {
 
   // ── Virtual Scroll ──
   virtualScroll?: boolean;
+  /**
+   * Build the TanStack row model only for the virtualizer's visible window
+   * instead of every data row. TanStack materializes a Row object per data row
+   * regardless of virtual scroll (which only bounds DOM nodes), so very large
+   * datasets (100k+ rows) freeze or OOM the tab without this. Applies only
+   * while no client-side row transform needs the full model: requires
+   * virtualScroll, pagination "none", non-client sorting, expansion "none",
+   * no wrap, no tree, and deactivates while a column/global filter is set.
+   */
+  windowRowModel?: boolean;
   /** Fixed row height for virtual scroll calculations (default 48) */
   virtualScrollItemSize?: number;
   /**
@@ -380,6 +400,13 @@ export interface OTableProps<TData = any> {
    * a column with id `"#"`.
    */
   showIndex?: boolean;
+  /**
+   * Render the header's select-all checkbox. Set false when selection is
+   * bounded (e.g. a comparison that accepts exactly two rows), where
+   * "select all" cannot mean anything. The header cell itself is still
+   * rendered so the body's selection gutter stays aligned.
+   */
+  showSelectAll?: boolean;
   enableColumnResize?: boolean;
   enableColumnReorder?: boolean;
   /**
@@ -391,6 +418,8 @@ export interface OTableProps<TData = any> {
   enableColumnPin?: boolean;
   /** Show the per-column value-filter dropdown on `filterable` columns (client-side) */
   enableColumnFilter?: boolean;
+  /** Show the per-column "format this column" icon on `formattable` columns */
+  enableColumnFormat?: boolean;
   /** Initial column visibility */
   columnVisibility?: Record<string, boolean>;
   /**
@@ -419,6 +448,8 @@ export interface OTableProps<TData = any> {
    * (e.g. a page card) so it renders flush without a double border.
    */
   frame?: boolean;
+  /** Draws the hairline divider under the toolbar row (default true); set false when a subheader below would read as a double line. */
+  toolbarBordered?: boolean;
   striped?: boolean;
   stickyHeader?: boolean;
   showHeader?: boolean;
@@ -539,6 +570,8 @@ export interface OTableEmits<TData = any> {
   "column-visibility-change": [visibility: Record<string, boolean>];
   /** A column's close ("x") affordance was clicked; the consumer decides how to remove it. */
   "close-column": [column: OTableColumnDef<TData>];
+  /** A `formattable` column's format icon was clicked (requires `enableColumnFormat`). */
+  "format-column": [columnId: string];
   "update:columnSizes": [sizes: Record<string, number>, idMap: Record<string, string>];
 
   // Row reorder
@@ -573,6 +606,8 @@ export interface OTableSlots<TData = any> {
     value: any;
     active?: boolean;
   }) => any;
+  /** Inline actions right of the built-in copy button (requires `enable-cell-copy`). */
+  "copy-actions"?: (props: { columnId: string; row: TData; value: any }) => any;
   /** Per-column cell slot (`#cell-<columnId>`) — scoped to the plain row data
    *  (`row.original`) + row index. `active` is only ever passed to the reserved
    *  `cell-hover-actions` key, which this signature has to admit. */

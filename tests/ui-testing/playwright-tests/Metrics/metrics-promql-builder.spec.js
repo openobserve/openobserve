@@ -5,6 +5,15 @@ const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 const { waitForDashboardPage, deleteDashboard } = require('../Dashboards/utils/dashCreation.js');
 
 
+/**
+ * A metric ensureMetricsIngested() seeds, so it always has points in the last
+ * 15 minutes and label values to filter on. The tests that assert the chart
+ * renders DATA pin themselves to it: the metric the page auto-selects is
+ * whichever stream sorts first in the org, which is routinely one another suite
+ * left behind — present in the schema, empty in the window.
+ */
+const SEEDED_METRIC = 'cpu_usage';
+
 test.describe("Metrics PromQL Builder Mode testcases", () => {
   test.beforeAll(async () => {
     await ensureMetricsIngested();
@@ -764,10 +773,14 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
-    // 1. Verify builder mode active with metric pre-selected
+    // 1. Verify builder mode, then pin to the seeded metric — see SEEDED_METRIC.
     expect(await builder.isModeSelected('builder')).toBe(true);
+    expect(await builder.selectMetric(SEEDED_METRIC)).toBe(true);
+    // Picking a metric re-seeds its default operations; start from an empty list
+    // again, exactly as setupTest does.
+    expect(await builder.clearOperations()).toBe(0);
     const metricName = await builder.getStreamSelectedValue();
-    expect(metricName.length).toBeGreaterThan(0);
+    expect(metricName).toBe(SEEDED_METRIC);
     testLogger.info(`Metric: ${metricName}`);
 
     // 2. Set time range
@@ -803,19 +816,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       selectedOperator = operatorText.trim();
       testLogger.info(`Operator: ${selectedOperator}`);
 
-      // Select a value
-      const isDisabled = await builder.isValueSelectDisabled();
-      if (!isDisabled) {
-        await builder.valueSelectLast.click();
-        await builder.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
-
-        const valueCount = await builder.valueOptions.count();
-        if (valueCount > 0) {
-          selectedValue = (await builder.valueOptions.first().textContent()).trim();
-          await builder.valueOptions.first().click();
-          await builder.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-          testLogger.info(`Selected value: ${selectedValue}`);
-        }
+      // Select a value (gates on the async values fetch so the filter isn't left empty)
+      selectedValue = await builder.selectFirstLabelValue();
+      if (selectedValue) {
+        testLogger.info(`Selected value: ${selectedValue}`);
       }
 
       // Close the filter menu — LabelFilterEditor chip menu is ODropdown post-migration
@@ -968,10 +972,14 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     const pm = await setupTest(page, testInfo);
     const builder = pm.metricsBuilderPage;
 
-    // 1. Verify builder mode and pre-selected metric
+    // 1. Verify builder mode, then pin to the seeded metric — see SEEDED_METRIC.
     expect(await builder.isModeSelected('builder')).toBe(true);
+    expect(await builder.selectMetric(SEEDED_METRIC)).toBe(true);
+    // Picking a metric re-seeds its default operations; start from an empty list
+    // again, exactly as setupTest does.
+    expect(await builder.clearOperations()).toBe(0);
     const metricName = await builder.getStreamSelectedValue();
-    expect(metricName.length).toBeGreaterThan(0);
+    expect(metricName).toBe(SEEDED_METRIC);
     testLogger.info(`Metric: ${metricName}`);
 
     // 2. Set time range
@@ -1001,17 +1009,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       const operatorText = await builder.operatorSelectLast.textContent().catch(() => '');
       expect(operatorText).toContain('=');
 
-      // Select value
-      const isDisabled = await builder.isValueSelectDisabled();
-      if (!isDisabled) {
-        await builder.valueSelectLast.click();
-        await builder.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
-        if (await builder.valueOptions.count() > 0) {
-          selectedValue = (await builder.valueOptions.first().textContent()).trim();
-          await builder.valueOptions.first().click();
-          await builder.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-          testLogger.info(`Value: ${selectedValue}`);
-        }
+      // Select value (gates on the async values fetch so the filter isn't left empty)
+      selectedValue = await builder.selectFirstLabelValue();
+      if (selectedValue) {
+        testLogger.info(`Value: ${selectedValue}`);
       }
 
       await page.keyboard.press('Escape');
@@ -1180,17 +1181,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       await builder.labelPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
       testLogger.info(`Label: ${selectedLabel}`);
 
-      // Select value
-      const isDisabled = await builder.isValueSelectDisabled();
-      if (!isDisabled) {
-        await builder.valueSelectLast.click();
-        await builder.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
-        if (await builder.valueOptions.count() > 0) {
-          selectedValue = (await builder.valueOptions.first().textContent()).trim();
-          await builder.valueOptions.first().click();
-          await builder.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-          testLogger.info(`Value: ${selectedValue}`);
-        }
+      // Select value (gates on the async values fetch so the filter isn't left empty)
+      selectedValue = await builder.selectFirstLabelValue();
+      if (selectedValue) {
+        testLogger.info(`Value: ${selectedValue}`);
       }
       await page.keyboard.press('Escape');
       // LabelFilterEditor chip menu = ODropdown post-migration

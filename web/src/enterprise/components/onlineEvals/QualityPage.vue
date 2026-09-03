@@ -34,6 +34,7 @@
     <QualityKpiSkeleton v-if="showKpiSkeleton" :count="visibleKpis.length" class="px-page-edge" />
     <KpiCardRow
       v-else
+      gap="gap-2"
       class="quality-page__kpis px-page-edge"
       :aria-label="t('onlineEvals.quality.kpisAriaLabel')"
     >
@@ -50,10 +51,7 @@
     <!-- Tier 2: the configs table is the persistent view; selecting a
          row opens the detail in a right-side ODrawer (70% width). The user
          keeps full context of the list behind the drawer. -->
-    <div
-      class="quality-page__tier2 grid min-h-0 flex-1 gap-3"
-      style="grid-template-columns: minmax(0, 1fr)"
-    >
+    <div class="quality-page__tier2 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3">
       <QualityScoreConfigsTable
         :rows="configRows"
         :is-loading="isConfigsLoading || !!configsLoading || !!agentsLoading"
@@ -110,7 +108,6 @@
         :boolean-trend-series="booleanTrendSeries"
         :categorical-rows="categoricalRows"
         :scope="detailScope"
-        :scope-counts="selectedConfigScopeCounts"
         :runs="qualityRuns"
         :runs-counts="runsCounts"
         :runs-filter="runsFilter"
@@ -153,7 +150,7 @@ import {
   combineWhere,
   type AgentFilterSelection,
 } from "./utils/agentFilterSql";
-import type { QualityScope, ScopeCounts } from "./utils/qualityScope";
+import type { QualityScope } from "./utils/qualityScope";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
 const props = defineProps<{
@@ -212,7 +209,7 @@ const {
   rows: configRows,
   isLoading: isConfigsLoading,
   refresh: refreshConfigs,
-} = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef, agentFilterRef);
+} = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef, t, agentFilterRef);
 
 const selectedConfigId = ref<string | null>(routeConfigId());
 const detailScope = ref<QualityScope>("all");
@@ -223,16 +220,6 @@ const selectedConfig = computed<ScoreConfig | null>(() => {
   return props.scoreConfigs.find((c) => String(c.id) === id) ?? null;
 });
 
-const EMPTY_SCOPE_COUNTS: ScopeCounts = { span: 0, trace: 0, session: 0 };
-const selectedConfigScopeCounts = computed<ScopeCounts>(() => {
-  const id = selectedConfigId.value;
-  if (!id) return EMPTY_SCOPE_COUNTS;
-  return (
-    configRows.value.find((row) => String(row.config.id) === id || String(row.configId) === id)
-      ?.scopeCounts ?? EMPTY_SCOPE_COUNTS
-  );
-});
-
 const {
   isLoading: isDetailLoading,
   dataType: detailDataType,
@@ -241,7 +228,7 @@ const {
   booleanAgg,
   categoricalRows,
   refresh: refreshDetail,
-} = useQualityConfigDetail(selectedConfig, dateWindowRef, agentFilterRef, detailScope);
+} = useQualityConfigDetail(selectedConfig, dateWindowRef, agentFilterRef, detailScope, t);
 
 const {
   isLoading: isChartsLoading,

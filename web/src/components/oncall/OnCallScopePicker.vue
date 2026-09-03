@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="platforms.length > 1"
           :model-value="platform"
           :options="platformOptions"
-          size="xs"
+          size="sm"
           width="xs"
           data-test="oncall-scope-platform"
           @update:model-value="(v: unknown) => selectPlatform(String(v))"
@@ -262,7 +262,7 @@ const segments = computed(() =>
       label: displayOf(dimension),
       value,
       options: [
-        { label: String(t("oncall.scopeAny")), value: ANY },
+        { label: raw(t("oncall.scopeAny")), value: ANY },
         ...values.map((candidate) => ({ label: raw(candidate.value), value: candidate.value })),
       ],
       // Under an `Any`, how much it is letting through; under a value, how much

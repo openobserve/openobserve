@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-toolbar"
           @click="toggleAIChat"
           data-test="add-regex-pattern-open-close-ai-btn"
-          class="group text-ai-accent! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
+          class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
@@ -220,10 +220,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OForm>
       </div>
+      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
         class="ml-2 max-w-full"
         v-if="store.state.isAiChatEnabled"
-        style="width: 35%; min-width: 75px; height: calc(100vh - 90px) !important"
+        style="width: 35%; min-width: 4.6875rem; height: calc(100vh - 90px) !important"
       >
         <O2AIChat
           :aiChatInputContext="inputContext"
@@ -231,6 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-open="store.state.isAiChatEnabled"
           @close="store.state.isAiChatEnabled = false"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
   </ODrawer>

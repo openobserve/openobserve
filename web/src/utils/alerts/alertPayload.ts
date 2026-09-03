@@ -13,12 +13,25 @@ export interface PayloadFormData {
   name: string;
   description: I18nText;
   is_real_time: boolean | string;
+  /** Minutes on the form; getAlertPayload converts to seconds on the wire. */
+  pending_period_sec: number | string;
   trigger_condition: {
     threshold: number | string;
     operator: string;
     period: number | string;
     frequency: number | string;
     silence: number | string;
+    /**
+     * The second, lower rung of the count gate (T-5 multi-level thresholds).
+     * Optional because the field is only rendered for the alert families that
+     * have a count axis — `QueryConfig.vue` registers it as
+     * `trigger_condition.warning_threshold` and the schema types it
+     * `z.unknown().optional()`, so it arrives as the raw input string, as a
+     * number, or not at all. An SLO alert has no count axis and this key is
+     * DELETED from its payload (SA-4), which is why the type has to admit its
+     * absence rather than the builder casting around it.
+     */
+    warning_threshold?: number | string | null;
   };
   context_attributes: Array<{ key: string; value: string }>;
   query_condition: {
@@ -28,6 +41,14 @@ export interface PayloadFormData {
     promql_condition?: any;
     sql: string;
     vrl_function?: string | null;
+    /**
+     * The SLO burn/budget condition. The backend enforces
+     * `query_type == "slo"` IFF this is present, in BOTH directions, so a
+     * non-SLO alert must ship it as an explicit `null` rather than leaving a
+     * stale one behind — which is exactly what the builder below does, and
+     * what it could not express while this key was undeclared.
+     */
+    slo_condition?: any;
   };
   stream_name: string;
   stream_type: string;
@@ -107,6 +128,17 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
     if (attr.key?.trim() && attr.value?.trim()) payload.context_attributes[attr.key] = attr.value;
   });
 
+  // SQL tab's Simple/Multi choice (no group-by picker): QueryConfig.vue
+  // already builds `aggregation` via the same having.operator/.value fields
+  // Custom's Measure mode uses, plus a value-column dropdown sourced from the
+  // query's resolved output columns (sql_simple_multi_alert_fe_prd.md §11) —
+  // this flag decides whether that object survives the tab-based null below,
+  // and gates the field-pinning required by the backend's SQL multi-alert
+  // schema contract (group_by: [], function: "count"; having.column is
+  // whatever column the user picked).
+  const isSqlMultiAlert =
+    getSelectedTab.value === "sql" && !!formData.query_condition.aggregation?.multi_alert;
+
   payload.trigger_condition.threshold = parseInt(formData.trigger_condition.threshold as any);
 
   // If aggregation is enabled in custom (builder) mode but no group-by fields are set,
@@ -120,16 +152,39 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
     payload.trigger_condition.operator = ">=";
   }
 
+  // SQL Multi Alert: the any-group-count gate is always "at least 1" (M-10),
+  // same rule as the Custom group-by case above.
+  if (isSqlMultiAlert) {
+    payload.trigger_condition.threshold = 1;
+    payload.trigger_condition.operator = ">=";
+  }
+
   payload.trigger_condition.period = parseInt(formData.trigger_condition.period as any);
 
   payload.trigger_condition.frequency = parseInt(formData.trigger_condition.frequency as any);
 
   payload.trigger_condition.silence = parseInt(formData.trigger_condition.silence as any);
 
+  // Minutes on the form, seconds on the wire. Forced to 0 for realtime even
+  // though the field is unreachable in that template — same belt-and-suspenders
+  // as the warning_threshold strip below, in case a stale value survives a
+  // realtime<->scheduled toggle without a full remount.
+  payload.pending_period_sec = payload.is_real_time
+    ? 0
+    : Math.round((parseInt(formData.pending_period_sec as any, 10) || 0) * 60);
+
   payload.description = raw(formData.description.trim());
 
-  if (!isAggregationEnabled.value || getSelectedTab.value !== "custom") {
+  if (!isSqlMultiAlert && (!isAggregationEnabled.value || getSelectedTab.value !== "custom")) {
     payload.query_condition.aggregation = null;
+  } else if (isSqlMultiAlert) {
+    // Pin the fields this simple flow has no picker for (src/core/src/alerts/alert.rs,
+    // prepare_alert) — group_by is always empty, function is fixed. The value
+    // column is NOT pinned: it's user-chosen via a dropdown sourced from the
+    // query's resolved output columns (sql_simple_multi_alert_fe_prd.md §11),
+    // so `having.column` already carries the user's selection from form state.
+    payload.query_condition.aggregation.group_by = [];
+    payload.query_condition.aggregation.function = "count";
   }
 
   if (getSelectedTab.value === "sql" || getSelectedTab.value === "promql")
@@ -141,6 +196,37 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 
   if (getSelectedTab.value === "promql") {
     payload.query_condition.sql = "";
+  }
+
+  // Feature 5 (§6b.6). The backend enforces `query_type == slo` IFF
+  // `slo_condition` is present, in BOTH directions, so the two must be kept in
+  // lockstep here:
+  //
+  //  * a non-SLO alert must not carry a condition left over from a mode switch — it is rejected
+  //    outright, not ignored;
+  //  * an SLO alert runs NO query, so any SQL, builder condition, aggregation or PromQL condition
+  //    it picked up on the way would be stored and then never read.
+  if (getSelectedTab.value === "slo") {
+    payload.query_condition.sql = "";
+    payload.query_condition.conditions = [];
+    payload.query_condition.promql_condition = null;
+    payload.query_condition.aggregation = null;
+
+    // SA-4: an SLO alert has no count axis, and the backend REJECTS a
+    // non-default count gate rather than ignoring it. The SLO tab renders no
+    // count-gate field, but the form still holds whatever the Builder tab
+    // defaulted to (">=" / 3) — so without this reset the save fails with
+    // "SLO alerts have no count gate", naming a control the user cannot see.
+    //
+    // The values must match `TriggerCondition::default()` on the backend:
+    // `Operator::EqualTo` serializes to "=" and `threshold` is 0.
+    payload.trigger_condition.operator = "=";
+    payload.trigger_condition.threshold = 0;
+    // Part of the same gate: a warning on a count gate has no meaning for a
+    // family that has no gate, and is rejected alongside the other two.
+    delete payload.trigger_condition.warning_threshold;
+  } else {
+    payload.query_condition.slo_condition = null;
   }
 
   // `having.value` and `promql_condition.value` arrive here as the RAW STRING the
@@ -199,7 +285,8 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   // promql_warning_value is meaningless off the promql tab.
   if (
     getSelectedTab.value === "promql" ||
-    (isAggregationEnabled.value && getSelectedTab.value === "custom")
+    (isAggregationEnabled.value && getSelectedTab.value === "custom") ||
+    isSqlMultiAlert
   ) {
     delete (payload.trigger_condition as any).warning_threshold;
   }

@@ -32,8 +32,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use super::{
-    target::{EscalationTarget, TargetError},
     rotation::MICROS_PER_MINUTE,
+    target::{EscalationTarget, TargetError},
 };
 use crate::meta::alerts::priority::AlertPriority;
 
@@ -252,12 +252,11 @@ pub fn channel_plan(channels: &[Channel]) -> ChannelPlan {
 ///
 /// Precedence, deliberately explicit:
 ///
-/// - `None` — the team has never set one. The policy's list is used, so every
-///   policy stored before the field existed keeps working exactly as it did.
-/// - `Some(list)` — the team's list wins, **including when it is empty**. An
-///   empty list is somebody saying "this team has no channel"; falling back to
-///   the policy there would make the field impossible to turn off, and would
-///   silently resurrect a destination they had removed.
+/// - `None` — the team has never set one. The policy's list is used, so every policy stored before
+///   the field existed keeps working exactly as it did.
+/// - `Some(list)` — the team's list wins, **including when it is empty**. An empty list is somebody
+///   saying "this team has no channel"; falling back to the policy there would make the field
+///   impossible to turn off, and would silently resurrect a destination they had removed.
 pub fn team_channel<'a>(team: Option<&'a [String]>, policy: &'a [String]) -> &'a [String] {
     match team {
         Some(list) => list,
@@ -662,7 +661,10 @@ impl EscalationPolicy {
                         // wake the backup has spent the minutes that mattered.
                         LadderStep::new(
                             0,
-                            primary().into_iter().chain(secondary().unwrap_or_default()).collect(),
+                            primary()
+                                .into_iter()
+                                .chain(secondary().unwrap_or_default())
+                                .collect(),
                         ),
                         LadderStep::new(5 * m, deeper()),
                         LadderStep::new(15 * m, deeper()),
@@ -853,11 +855,7 @@ impl EscalationPolicy {
 /// the ledger in — rather than tracking a cursor — is what makes replays,
 /// retries and a promoted severity safe: re-running with the same inputs
 /// notifies nobody twice.
-pub fn plan(
-    steps: &[LadderStep],
-    elapsed_micros: i64,
-    already_notified: &[i64],
-) -> LadderAction {
+pub fn plan(steps: &[LadderStep], elapsed_micros: i64, already_notified: &[i64]) -> LadderAction {
     let mut due: Vec<LadderStep> = Vec::new();
     let mut next: Option<i64> = None;
 
@@ -1113,10 +1111,16 @@ mod tests {
     #[test]
     fn test_the_default_ladder_needs_only_one_rotation() {
         let action = plan(&steps(AlertPriority::P2), 0, &[]);
-        assert_eq!(targets_of(&action), vec![EscalationTarget::rotation("rot_primary")]);
+        assert_eq!(
+            targets_of(&action),
+            vec![EscalationTarget::rotation("rot_primary")]
+        );
 
         let later = plan(&steps(AlertPriority::P2), 5 * MIN, &[0]);
-        assert_eq!(targets_of(&later), vec![EscalationTarget::rotation("rot_secondary")]);
+        assert_eq!(
+            targets_of(&later),
+            vec![EscalationTarget::rotation("rot_secondary")]
+        );
 
         // The whole team, once, and then the ladder is done. It used to say
         // this twice more; repeating the same twelve phones at 30 and 60
@@ -1141,13 +1145,20 @@ mod tests {
     /// the product promised. This pins every cell, so the next edit that walks
     /// away from the doc fails here rather than at 3am.
     #[test]
+    #[allow(clippy::type_complexity)]
     fn test_default_ladders_match_the_published_timing_table() {
         let expected: &[(AlertPriority, &[(i64, &[EscalationTarget])])] = &[
             (
                 AlertPriority::P1,
                 &[
                     // §2: primary + secondary + L1, in parallel, at t=0.
-                    (0, &[EscalationTarget::rotation("rot_primary"), EscalationTarget::rotation("rot_secondary")]),
+                    (
+                        0,
+                        &[
+                            EscalationTarget::rotation("rot_primary"),
+                            EscalationTarget::rotation("rot_secondary"),
+                        ],
+                    ),
                     (5 * MIN, &[EscalationTarget::WholeTeam]),
                     (15 * MIN, &[EscalationTarget::WholeTeam]),
                 ],
@@ -1179,7 +1190,9 @@ mod tests {
             "every priority is configured explicitly, and only once"
         );
         for (priority, rows) in expected {
-            let rung = p.rung(*priority).unwrap_or_else(|| panic!("{priority} missing"));
+            let rung = p
+                .rung(*priority)
+                .unwrap_or_else(|| panic!("{priority} missing"));
             let got: Vec<(i64, Vec<EscalationTarget>)> = rung
                 .steps
                 .iter()
@@ -1228,12 +1241,19 @@ mod tests {
             AlertPriority::P4,
             AlertPriority::P5,
         ];
-        assert_eq!(p.rungs.len(), all.len(), "no priority may fall to a default");
+        assert_eq!(
+            p.rungs.len(),
+            all.len(),
+            "no priority may fall to a default"
+        );
         for pr in all {
             assert!(p.rung(pr).is_some(), "{pr} is not configured");
         }
         for pr in [AlertPriority::P4, AlertPriority::P5] {
-            assert!(p.rung(pr).unwrap().steps.is_empty(), "{pr} must page nobody");
+            assert!(
+                p.rung(pr).unwrap().steps.is_empty(),
+                "{pr} must page nobody"
+            );
             assert!(!p.pages_anyone(pr));
             for elapsed in [0, 60 * MIN, 24 * MICROS_PER_HOUR] {
                 assert_eq!(
@@ -1484,7 +1504,10 @@ mod tests {
             )
         );
         let message = err.to_string();
-        assert!(message.contains("sms") && message.contains("voice"), "{message}");
+        assert!(
+            message.contains("sms") && message.contains("voice"),
+            "{message}"
+        );
         assert!(
             message.contains("email"),
             "the message has to say what CAN be used: {message}"
@@ -1683,7 +1706,11 @@ mod tests {
         // And a success is the end of it.
         b.record(probe + BREAKER_OPEN_MICROS, true);
         assert!(b.allows(probe + BREAKER_OPEN_MICROS));
-        assert_eq!(b, ChannelBreaker::new(), "a working channel carries no history");
+        assert_eq!(
+            b,
+            ChannelBreaker::new(),
+            "a working channel carries no history"
+        );
     }
 
     /// The ratio is measured over a window, so failures spread across an hour
@@ -1694,7 +1721,10 @@ mod tests {
         for i in 0..10 {
             let at = i * BREAKER_WINDOW_MICROS * 2;
             b.record(at, false);
-            assert!(b.allows(at), "an hourly failure is not a hard-down provider");
+            assert!(
+                b.allows(at),
+                "an hourly failure is not a hard-down provider"
+            );
         }
     }
 
@@ -1881,7 +1911,7 @@ mod tests {
         // plans from: the same list with the rung the transport lost taken back
         // out, because it was attempted rather than sent.
         let timeline = vec![0];
-        let unreached = vec![0];
+        let unreached = [0];
         let ledger: Vec<i64> = timeline
             .iter()
             .copied()
@@ -1987,7 +2017,11 @@ mod tests {
     #[test]
     fn test_chat_fires_alongside_email_rather_than_only_on_its_failure() {
         let plan = channel_plan(&[Channel::Email, Channel::Webhook]);
-        assert_eq!(plan.chain, vec![Channel::Email], "the person is reached once");
+        assert_eq!(
+            plan.chain,
+            vec![Channel::Email],
+            "the person is reached once"
+        );
         assert_eq!(
             plan.broadcast,
             vec![Channel::Webhook],
@@ -2094,9 +2128,14 @@ mod tests {
 
         assert_eq!(cut.len(), IMPACTED_RUNGS);
         assert_eq!(cut[0].after_micros, 0);
-        assert_eq!(cut[1].after_micros, 5 * m, "one chase, at the team's own delay");
+        assert_eq!(
+            cut[1].after_micros,
+            5 * m,
+            "one chase, at the team's own delay"
+        );
         assert!(
-            !cut.iter().any(|s| s.targets.contains(&EscalationTarget::WholeTeam)),
+            !cut.iter()
+                .any(|s| s.targets.contains(&EscalationTarget::WholeTeam)),
             "an impacted team is never walked up to everybody"
         );
     }
@@ -2122,7 +2161,10 @@ mod tests {
     /// would page somebody their own policy never names.
     #[test]
     fn test_a_one_rung_policy_gives_an_impacted_team_one_rung() {
-        let one = vec![LadderStep::new(0, vec![EscalationTarget::rotation("rot_primary")])];
+        let one = vec![LadderStep::new(
+            0,
+            vec![EscalationTarget::rotation("rot_primary")],
+        )];
         assert_eq!(impacted_ladder(&one).len(), 1);
         assert!(impacted_ladder(&[]).is_empty());
     }

@@ -46,6 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("dashboard.tableRowsWillBeDisplayed") }}</span
             >
             <OIcon name="info-outline" class="shrink-0 cursor-pointer" size="xs" />
+            <!-- Prose, not a style: the grid unit is a fixed unitless 30 below, so it never
+                 scales with font-size — px is the truthful unit in this copy. -->
             <OTooltip :content="t('dashboard.unitPixelHint')" />
           </div>
         </div>

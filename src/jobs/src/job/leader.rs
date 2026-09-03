@@ -16,7 +16,7 @@
 //! Which alert-manager node does a whole-deployment sweep this pass.
 //!
 //! Shared because the bug it fixes was shared. Both maintenance jobs gate on
-//! `LOCAL_NODE.is_alert_manager()` and then elected their leader from
+//! `LOCAL_NODE.is_scheduler()` and then elected their leader from
 //! `get_cached_online_query_nodes`, which is a different set of machines: where
 //! `alert_manager` is a role of its own the node running the job is not a
 //! querier, so it is never in the list it is comparing itself against, and
@@ -90,7 +90,7 @@ mod tests {
             node("bbb", vec![Role::Querier]),
             node("ccc", vec![Role::Ingester]),
         ];
-        let alert_managers = vec![node("zzz", vec![Role::AlertManager])];
+        let alert_managers = vec![node("zzz", vec![Role::Scheduler])];
 
         assert!(
             leads(&alert_managers, "zzz"),
@@ -108,13 +108,16 @@ mod tests {
     #[test]
     fn test_exactly_one_of_two_alert_managers_sweeps() {
         let mut nodes = vec![
-            node("m2", vec![Role::AlertManager]),
-            node("m1", vec![Role::AlertManager]),
+            node("m2", vec![Role::Scheduler]),
+            node("m1", vec![Role::Scheduler]),
         ];
         assert!(leads(&nodes, "m1"));
         assert!(!leads(&nodes, "m2"));
         nodes.reverse();
-        assert!(leads(&nodes, "m1"), "the order the cache returns is not a vote");
+        assert!(
+            leads(&nodes, "m1"),
+            "the order the cache returns is not a vote"
+        );
         assert!(!leads(&nodes, "m2"));
     }
 
@@ -123,7 +126,7 @@ mod tests {
     #[test]
     fn test_a_single_all_role_node_still_sweeps() {
         let all = vec![node("solo", vec![Role::All])];
-        assert!(all[0].is_alert_manager());
+        assert!(all[0].is_scheduler());
         assert!(leads(&all, "solo"));
     }
 

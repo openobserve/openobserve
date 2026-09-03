@@ -184,19 +184,19 @@ const sizeClasses = computed(() => {
   }
   switch (props.size) {
     case "xs":
-      return "max-w-[min(320px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(20rem,calc(100vw-2rem))] w-full";
     case "sm":
-      return "max-w-[min(480px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(30rem,calc(100vw-2rem))] w-full";
     case "md":
-      return "max-w-[min(640px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(40rem,calc(100vw-2rem))] w-full";
     case "lg":
-      return "max-w-[min(800px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(50rem,calc(100vw-2rem))] w-full";
     case "xl":
-      return "max-w-[min(1024px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(64rem,calc(100vw-2rem))] w-full";
     case "full":
       return "w-screen h-screen max-w-none rounded-none";
     default:
-      return "max-w-[min(640px,calc(100vw-2rem))] w-full";
+      return "max-w-[min(40rem,calc(100vw-2rem))] w-full";
   }
 });
 
@@ -528,12 +528,9 @@ watch(internalOpen, (open) => {
             isFullSize ? 'flex-1 overflow-hidden p-0' : 'overflow-y-auto',
             !isFullSize && 'px-dialog-content-px py-dialog-content-py',
             'text-dialog-content-text',
-            !isFullSize && canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
-            !isFullSize && canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
-            !isFullSize &&
-              canScrollUp &&
-              canScrollDown &&
-              '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+            !isFullSize && canScrollUp && 'shadow-scroll-top',
+            !isFullSize && canScrollDown && 'shadow-scroll-bottom',
+            !isFullSize && canScrollUp && canScrollDown && 'shadow-scroll-both',
           ]"
         >
           <slot />

@@ -340,7 +340,7 @@ describe("CorrelatedLogsTable.vue", () => {
       const sourceColumn = columns.find((col: any) => col.id === "source");
 
       expect(sourceColumn).toBeDefined();
-      expect(sourceColumn.header).toBe("Source");
+      expect(sourceColumn.header).toBe("_source");
     });
 
     it("should not show source column when other fields are visible", () => {
@@ -542,20 +542,6 @@ describe("CorrelatedLogsTable.vue", () => {
   });
 
   describe("Computed Properties", () => {
-    it("should compute showingDefaultColumns correctly when only timestamp is visible", () => {
-      wrapper = createWrapper();
-      wrapper.vm.visibleColumns = new Set(["_timestamp"]);
-
-      expect(wrapper.vm.showingDefaultColumns).toBe(true);
-    });
-
-    it("should compute showingDefaultColumns correctly when multiple fields are visible", () => {
-      wrapper = createWrapper();
-      wrapper.vm.visibleColumns = new Set(["_timestamp", "field1"]);
-
-      expect(wrapper.vm.showingDefaultColumns).toBe(false);
-    });
-
     it("should compute availableFields from search results", async () => {
       const mockResults = [
         { _timestamp: 123, field1: "a", field2: "b" },

@@ -103,16 +103,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelDataModel.data.config.step_value"
           type="text"
           :label="t('dashboard.stepValue')"
-          :placeholder="t('dashboard.intervalInputPlaceholder')"
+          :placeholder="
+            t('dashboard.intervalInputPlaceholder', {
+              example: raw('30s, 1m, 5m, 1h'),
+            })
+          "
           data-test="dashboard-config-step-value"
         >
           <template #tooltip>
-            <OTooltip max-width="250px">
+            <OTooltip max-width="15.625rem">
               <template #content>
                 <b>{{ t("dashboard.stepPrefix") }}</b>
                 {{ t("dashboard.stepValueTooltip") }}
                 <br />
-                {{ t("dashboard.stepValueExample") }}
+                {{ t("dashboard.stepValueExample", { example: raw("10s, 1h") }) }}
               </template>
             </OTooltip>
           </template>
@@ -129,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @change="onToggleDefaultTime"
             />
             <OButton variant="ghost" size="icon" class="mt-1" @click.stop icon-left="info-outline">
-              <OTooltip :content="t('dashboard.useDefaultTimeTooltip')" max-width="250px" />
+              <OTooltip :content="t('dashboard.useDefaultTimeTooltip')" max-width="15.625rem" />
             </OButton>
           </div>
 
@@ -151,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="dashboard-config-panel-time-picker"
                   class="w-fit max-w-full min-w-0 overflow-hidden"
                 />
-                <OTooltip :content="raw(formattedPickerValue)" max-width="320px" />
+                <OTooltip :content="raw(formattedPickerValue)" max-width="20rem" />
               </div>
               <OIcon
                 class="mr-1 ml-2 flex-shrink-0 shrink-0 cursor-pointer"
@@ -440,7 +444,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
-              :label="raw(`${t('dashboard.queryLabel')} ${Number(index) + 1}`)"
+              :label="t('common.queryNumber', { index: Number(index) + 1 })"
               :data-test="`dashboard-config-query-tab-${index}`"
             >
             </OTab>
@@ -573,7 +577,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(tab, index) in dashboardPanelData.data.queries"
               :key="index"
               :name="index"
-              :label="tab.tabName || t('dashboard.queryLabel') + ' ' + (Number(index) + 1)"
+              :label="
+                tab.tabName
+                  ? raw(tab.tabName)
+                  : t('common.queryNumber', { index: Number(index) + 1 })
+              "
               :data-test="`dashboard-config-query-tab-${index}`"
             >
             </OTab>
@@ -598,7 +606,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip
               side="top"
               align="center"
-              max-width="250px"
+              max-width="15.625rem"
               :content="t('dashboard.multiSqlQueryLabelHint')"
             />
           </div>
@@ -675,7 +683,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-top_results"
         >
           <template #tooltip>
-            <OTooltip max-width="250px">
+            <OTooltip max-width="15.625rem">
               <template #content>
                 <b>{{ t("dashboard.topNTooltipTitle") }}</b>
                 <br /><br />
@@ -698,7 +706,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #tooltip>
-            <OTooltip :content="t('dashboard.addOthersSeriesTooltip')" max-width="250px" />
+            <OTooltip :content="t('dashboard.addOthersSeriesTooltip')" max-width="15.625rem" />
           </template>
         </OSwitch>
 
@@ -711,7 +719,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         >
           <template #tooltip>
-            <OTooltip :content="t('dashboard.connectNullValuesTooltip')" max-width="250px" />
+            <OTooltip :content="t('dashboard.connectNullValuesTooltip')" max-width="15.625rem" />
           </template>
         </OSwitch>
 
@@ -1075,7 +1083,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-config-rows-per-page"
         >
           <template #tooltip>
-            <OTooltip :content="t('dashboard.rowsPerPageTooltip')" max-width="250px" />
+            <OTooltip :content="t('dashboard.rowsPerPageTooltip')" max-width="15.625rem" />
           </template>
         </OInput>
       </div>
@@ -1106,7 +1114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #label>
             {{ t("dashboard.pivotShowRowTotals") }}
             <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
-              <OTooltip :content="t('dashboard.pivotShowRowTotalsTooltip')" max-width="250px" />
+              <OTooltip :content="t('dashboard.pivotShowRowTotalsTooltip')" max-width="15.625rem" />
             </OButton>
           </template>
         </OSwitch>
@@ -1123,7 +1131,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #label>
             {{ t("dashboard.pivotStickyColTotals") }}
             <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
-              <OTooltip :content="t('dashboard.pivotStickyColTotalsTooltip')" max-width="250px" />
+              <OTooltip
+                :content="t('dashboard.pivotStickyColTotalsTooltip')"
+                max-width="15.625rem"
+              />
             </OButton>
           </template>
         </OSwitch>
@@ -1138,7 +1149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #label>
             {{ t("dashboard.pivotShowColTotals") }}
             <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
-              <OTooltip :content="t('dashboard.pivotShowColTotalsTooltip')" max-width="250px" />
+              <OTooltip :content="t('dashboard.pivotShowColTotalsTooltip')" max-width="15.625rem" />
             </OButton>
           </template>
         </OSwitch>
@@ -1155,7 +1166,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #label>
             {{ t("dashboard.pivotStickyRowTotals") }}
             <OButton variant="ghost" size="icon" @click.stop icon-left="info-outline">
-              <OTooltip :content="t('dashboard.pivotStickyRowTotalsTooltip')" max-width="250px" />
+              <OTooltip
+                :content="t('dashboard.pivotStickyRowTotalsTooltip')"
+                max-width="15.625rem"
+              />
             </OButton>
           </template>
         </OSwitch>
@@ -1184,7 +1198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="info-outline" size="sm" />
         <OTooltip
           :content="t('dashboard.configSectionValueTransformationsTooltip')"
-          max-width="250px"
+          max-width="15.625rem"
         />
       </template>
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
@@ -1212,10 +1226,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t("dashboard.configSectionFieldOverrides") }}</span
         >
         <OIcon name="info-outline" size="sm" />
-        <OTooltip :content="t('dashboard.configSectionFieldOverridesTooltip')" max-width="250px" />
+        <OTooltip
+          :content="t('dashboard.configSectionFieldOverridesTooltip')"
+          max-width="15.625rem"
+        />
       </template>
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
-        <OverrideConfig :dashboardPanelData="dashboardPanelData" :panelData="panelData" />
+        <OButton
+          variant="outline"
+          size="sm"
+          @click="$emit('open-field-overrides')"
+          data-test="dashboard-addpanel-config-override-config-add-btn"
+        >
+          {{ t("dashboard.addFieldOverride") }}
+        </OButton>
       </div>
     </OCollapsible>
 
@@ -1245,7 +1269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-config-map-type"
           >
             <template #tooltip>
-              <OTooltip :content="t('dashboard.mapsMapTypeTooltip')" max-width="250px" />
+              <OTooltip :content="t('dashboard.mapsMapTypeTooltip')" max-width="15.625rem" />
             </template>
           </OSelect>
         </div>
@@ -1475,12 +1499,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="isBreakdownFieldEmpty || hasTimeShifts"
           >
             <template #tooltip>
-              <OTooltip max-width="250px">
+              <OTooltip max-width="15.625rem">
                 <template #content>
                   <b>{{
                     hasTimeShifts
                       ? t("dashboard.trellisTimeShiftTooltip")
-                      : t("dashboard.trellisTooltip")
+                      : t("dashboard.trellisTooltip", { product: raw("Trellis") })
                   }}</b>
                 </template>
               </OTooltip>
@@ -1509,12 +1533,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
           >
             <template #tooltip>
-              <OTooltip max-width="250px">
+              <OTooltip max-width="15.625rem">
                 <template #content>
                   <b>{{
                     hasTimeShifts
                       ? t("dashboard.trellisTimeShiftTooltip")
-                      : t("dashboard.trellisTooltip")
+                      : t("dashboard.trellisTooltip", { product: raw("Trellis") })
                   }}</b>
                 </template>
               </OTooltip>
@@ -1603,7 +1627,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t("dashboard.drilldown") }}</span
         >
         <OIcon name="info-outline" size="sm" data-test="dashboard-addpanel-config-drilldown-info" />
-        <OTooltip :content="t('dashboard.drilldownTooltip')" max-width="250px" />
+        <OTooltip :content="t('dashboard.drilldownTooltip')" max-width="15.625rem" />
       </template>
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <Drilldown :variablesData="variablesData" />
@@ -1634,7 +1658,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-addpanel-config-time-shift-info"
         />
-        <OTooltip :content="t('dashboard.comparisonAgainstTooltip')" max-width="250px" />
+        <OTooltip :content="t('dashboard.comparisonAgainstTooltip')" max-width="15.625rem" />
       </template>
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <CustomDateTimePicker modelValue="0m" :isFirstEntry="true" :disable="true" />
@@ -1687,7 +1711,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t("dashboard.markLines") }}</span
         >
         <OIcon name="info-outline" size="sm" data-test="dashboard-addpanel-config-markline-info" />
-        <OTooltip :content="t('dashboard.markLinesTooltip')" max-width="250px" />
+        <OTooltip :content="t('dashboard.markLinesTooltip')" max-width="15.625rem" />
       </template>
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
         <MarkLineConfig />
@@ -1760,7 +1784,6 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import SparklineConfig from "./SparklineConfig.vue";
-import OverrideConfig from "./OverrideConfig.vue";
 import ConfigPanelSearch from "./ConfigPanelSearch.vue";
 import { useConfigPanel } from "../../../composables/dashboard/useConfigPanel";
 import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
@@ -1824,15 +1847,15 @@ export default defineComponent({
     ColorPaletteDropDown,
     BackGroundColorConfig,
     SparklineConfig,
-    OverrideConfig,
     PromQLChartConfig,
     OButton,
     OTooltip,
     OIcon,
     OCollapsible,
   },
-  props: ["dashboardPanelData", "variablesData", "panelData"],
-  setup(props) {
+  props: ["variablesData", "panelData"],
+  emits: ["open-field-overrides"],
+  setup() {
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { t } = useI18nTyped();
     const { dashboardPanelData, promqlMode, isPivotMode } = useDashboardPanelData(
@@ -1866,7 +1889,7 @@ export default defineComponent({
 
     const basemapTypeOptions = [
       {
-        label: t("dashboard.openStreetMap"),
+        label: raw("OpenStreetMap"),
         value: "osm",
       },
     ];
@@ -2315,13 +2338,13 @@ export default defineComponent({
     const dashboardSelectfieldPromQlList = computed(() => {
       // Get fields from groupedFields based on current query's stream
       const currentQuery =
-        props.dashboardPanelData.data.queries[props.dashboardPanelData.layout.currentQueryIndex];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
       const currentStream = currentQuery?.fields?.stream;
 
       if (!currentStream) return [];
 
       // Find the current stream in groupedFields
-      const streamFields = props.dashboardPanelData.meta.streamFields.groupedFields.find(
+      const streamFields = dashboardPanelData.meta.streamFields.groupedFields.find(
         (group: any) => group.name === currentStream,
       );
 

@@ -25,10 +25,7 @@ use config::{meta::oncall::RoutingConfig, utils::time::now_micros};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
 use super::entity::oncall_routing_config;
-use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors,
-};
+use crate::{db::get_orm_client_rw, errors};
 
 fn to_config(m: oncall_routing_config::Model) -> RoutingConfig {
     RoutingConfig {
@@ -42,7 +39,7 @@ fn to_config(m: oncall_routing_config::Model) -> RoutingConfig {
 
 /// The org's configuration, or the unset one if it has never set any.
 pub async fn get(org_id: &str) -> Result<RoutingConfig, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_routing_config::Entity::find_by_id(org_id)
         .one(client)
         .await?
@@ -65,7 +62,7 @@ pub async fn set_default_team(
     org_id: &str,
     team_id: Option<&str>,
 ) -> Result<RoutingConfig, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let team_id = team_id
         .map(str::trim)
         .filter(|t| !t.is_empty())
@@ -98,7 +95,7 @@ pub async fn set_default_team(
 /// The super-cluster door: a replica must end up with exactly what the source
 /// region has, including the `updated_at` that says when it was decided.
 pub async fn put(config: &RoutingConfig) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let team_id = config
         .default_team_id
         .as_deref()
@@ -143,7 +140,7 @@ pub async fn is_default_team(org_id: &str, team_id: &str) -> Result<bool, errors
 /// consumer applies a team delete it did not originate, and a replica must not
 /// be left pointing at a team it no longer has.
 pub async fn clear_if_default_team(org_id: &str, team_id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Some(existing) = oncall_routing_config::Entity::find_by_id(org_id)
         .one(client)
         .await?
@@ -162,7 +159,7 @@ pub async fn clear_if_default_team(org_id: &str, team_id: &str) -> Result<bool, 
 
 /// Drops the org's configuration. Called when the org itself goes.
 pub async fn delete(org_id: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     oncall_routing_config::Entity::delete_many()
         .filter(oncall_routing_config::Column::OrgId.eq(org_id))
         .exec(client)

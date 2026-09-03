@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center gap-2.5">
         <div
           data-test="add-alert-back-btn"
-          class="flex size-5 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border-[1.5px] opacity-60 transition-opacity hover:opacity-100"
+          class="flex size-5 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border opacity-60 transition-opacity hover:opacity-100"
           :title="t('common.goBack')"
           @click="closeDialog"
         >
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-2">
           <div
             v-if="streamType"
-            class="rounded-default inline-flex flex-row items-center gap-1.25 border border-[color-mix(in_srgb,var(--color-info)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-info)_10%,transparent)] px-2.5 py-0.75"
+            class="rounded-default border-info/28 bg-info/10 inline-flex flex-row items-center gap-1.25 border px-2.5 py-0.75"
           >
             <span class="text-2xs text-text-label font-semibold">{{ t("alerts.streamType") }}</span>
             <span class="text-2xs text-text-label opacity-30">:</span>
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <span v-if="streamType && streamName" class="opacity-20 select-none">|</span>
           <div
-            class="rounded-default inline-flex flex-row items-center gap-1.25 border border-[color-mix(in_srgb,var(--color-sql-accent)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-sql-accent)_10%,transparent)] px-2.5 py-0.75"
+            class="rounded-default border-sql-accent/28 bg-sql-accent/10 inline-flex flex-row items-center gap-1.25 border px-2.5 py-0.75"
           >
             <span class="text-2xs text-text-label font-semibold">{{
               t("alerts.stream_name")
@@ -80,14 +80,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="menu-link-ai-item"
           variant="ghost"
           size="icon-toolbar"
-          class="group transition-[background,box-shadow] duration-300 ease-[ease] [background:var(--color-gradient-ai-subtle)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] hover:[background:var(--color-gradient-ai)]!"
+          class="group hover:shadow-ai-accent/35 transition-[background,box-shadow] duration-300 ease-[ease] [background:var(--color-gradient-ai-subtle)]! hover:shadow-md hover:[background:var(--color-gradient-ai)]!"
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
           <img
             :src="getBtnLogo"
             class="transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180"
-            style="width: 18px; height: 18px"
+            style="width: 1.125rem; height: 1.125rem"
           />
         </OButton>
       </div>
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="sqlStatusState === 'sql-status-bar--error'"
                       side="top"
                       align="center"
-                      :max-width="'520px'"
+                      :max-width="'32.5rem'"
                       :content="raw(localSqlQueryErrorMsg || sqlQueryErrorMsg)"
                     />
                   </div>
@@ -634,8 +634,7 @@ const sqlStatusBarClasses = computed(() => {
   const map: Record<string, string> = {
     "sql-status-bar--hint": neutralBg,
     "sql-status-bar--idle": neutralBg,
-    "sql-status-bar--loading":
-      "bg-[color-mix(in_srgb,var(--color-sql-accent)_6%,transparent)] text-sql-accent",
+    "sql-status-bar--loading": "bg-sql-accent/6 text-sql-accent",
     "sql-status-bar--error": "bg-status-error-bg text-status-error-text cursor-pointer",
     "sql-status-bar--empty": "bg-status-warning-bg text-status-warning-text",
     "sql-status-bar--success": "bg-status-success-bg text-status-positive",
@@ -662,6 +661,7 @@ const getParser = (sqlQuery: string) => {
   const sqlUtilsContext: SqlUtilsContext = {
     parser: parser.value,
     sqlQueryErrorMsg: localSqlQueryErrorMsg,
+    t,
   };
   return getParserUtil(sqlQuery, sqlUtilsContext);
 };
@@ -726,6 +726,7 @@ const { placeholder: fullEditorPlaceholder } = useQueryPlaceholder(
   ref({}),
   isSqlModeForPlaceholder,
   noStreamForPlaceholder,
+  t,
   { noStreamText: t("pipeline.queryEditorPlaceholder") },
 );
 
@@ -1104,8 +1105,6 @@ const onQueryEditorFocus = () => {
 // ── Autocomplete ──────────────────────────────────────────────────────────
 const {
   autoCompleteData,
-  autoCompleteKeywords,
-  autoCompleteSuggestions,
   // Context-aware views: these swap in stream names after FROM and field VALUES
   // after an operator. Binding the raw lists above meant the value popup showed
   // field names exactly where values belong.

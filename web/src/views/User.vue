@@ -8,8 +8,6 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import Users from "@/components/iam/users/User.vue";
 
-import config from "@/aws-exports";
-
 export default defineComponent({
   name: "UserPage",
   components: {

@@ -31,7 +31,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </template>
     <template #title-trail>
-      <OBadge v-if="detail" :variant="statusVariant(detail.status)" :dot="true" size="sm">
+      <!-- "unknown" is the limit of what this region can see, not a state of
+           the location, so it carries the explanation with it. -->
+      <OTooltip
+        v-if="detail && liveStatus(detail) === 'unknown'"
+        :content="t('synthetics.privateLocations.status.unknownHint')"
+      >
+        <OBadge variant="default-outline" :dot="true" size="sm">
+          {{ t("synthetics.privateLocations.status.unknown") }}
+        </OBadge>
+      </OTooltip>
+      <OBadge v-else-if="detail" :variant="statusVariant(detail.status)" :dot="true" size="sm">
         {{ t(`synthetics.privateLocations.status.${detail.status}`) }}
       </OBadge>
     </template>
@@ -67,7 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-muted text-xs">{{
               t("synthetics.privateLocations.table.agents")
             }}</span>
-            <span class="font-medium">{{ detail.live_agents }}/{{ detail.agents_total }}</span>
+            <!-- 0/0 would read as "no agents installed"; this region simply has
+                 no count to give. -->
+            <span v-if="liveStatus(detail) === 'unknown'" class="text-text-muted">—</span>
+            <span v-else class="font-medium"
+              >{{ detail.live_agents }}/{{ detail.agents_total }}</span
+            >
           </div>
           <div class="flex flex-col">
             <span class="text-text-muted text-xs">{{
@@ -116,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             pagination="client"
             :page-size="10"
             :show-global-filter="false"
-            :empty-message="t('synthetics.privateLocations.detail.noAgents')"
+            :empty-message="agentsEmptyMessage"
             data-test="synthetics-private-location-agents-table"
           >
             <template #cell-live="{ row }">
@@ -189,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :dot="true"
                 size="sm"
               >
-                {{ resolveBadge("serviceStatus", (row as any).last_check_status).label }}
+                {{ resolveBadgeLabel("serviceStatus", (row as any).last_check_status) }}
               </OBadge>
             </template>
           </OTable>
@@ -230,13 +245,15 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
+import { resolveBadge, resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import syntheticsService from "@/services/synthetics";
 import type { AgentSetup, SyntheticLocationDetail } from "@/types/synthetics";
 import { formatTimeAgoUs, formatIntervalSecs } from "@/utils/synthetics/format";
+import { locationLiveStatus as liveStatus } from "@/utils/synthetics/locationLiveStatus";
 import { syntheticsListRoute, syntheticsResultsRoute } from "@/utils/synthetics/routes";
 
 const { t } = useI18nTyped();
@@ -288,6 +305,14 @@ const orgIdentifier = computed(() => store.state.selectedOrganization.identifier
 
 const statusVariant = (status: string) =>
   status === "online" ? "success" : status === "offline" ? "error" : "default";
+
+/** "No agents registered" is only true where agents would have registered —
+ *  elsewhere the table is empty because the rows live in another region. */
+const agentsEmptyMessage = computed(() =>
+  detail.value && liveStatus(detail.value) === "unknown"
+    ? t("synthetics.privateLocations.detail.agentsUnavailable")
+    : t("synthetics.privateLocations.detail.noAgents"),
+);
 
 async function load() {
   loading.value = true;

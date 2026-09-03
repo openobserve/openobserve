@@ -1,5 +1,7 @@
 // methods: createDashboard, searchDashboard, AddPanel, applyButton
 
+import testLogger from "../../playwright-tests/utils/test-logger.js";
+
 export default class DashboardCreate {
   /**
    * Constructor for the DashboardCreate object
@@ -25,6 +27,31 @@ export default class DashboardCreate {
     this.defaultFolderTab = this.page.locator(
       'button[data-test="dashboard-folder-tab-default"]'
     );
+    this.defaultDashboardTab = this.page.locator(
+      '[data-test="dashboard-tab-default"]'
+    );
+  }
+
+  // Wait for the default tab inside an opened dashboard to be visible
+  async waitForDefaultDashboardTabVisible() {
+    await this.defaultDashboardTab.waitFor({ state: "visible" });
+  }
+
+  // Wait for the "add panel" button on an empty dashboard to be visible
+  async waitForAddPanelIfEmptyVisible(timeout) {
+    await this.addPanelIfEmptyBtn.waitFor({ state: "visible", timeout });
+  }
+
+  // Wait for the dashboard search input to be visible
+  async waitForSearchVisible(timeout = 30000) {
+    await this.searchDash.waitFor({ state: "visible", timeout });
+  }
+
+  // Wait for the dashboard list table to be visible
+  async waitForDashboardTableVisible(timeout = 10000) {
+    await this.page
+      .locator('[data-test="dashboard-table"]')
+      .waitFor({ state: "visible", timeout });
   }
 
   // Wait for the default folder tab on the dashboard list to be visible
@@ -32,23 +59,155 @@ export default class DashboardCreate {
     await this.defaultFolderTab.waitFor({ state: "visible" });
   }
 
-  // Wait for dashboard UI to be fully stable before any interaction
+  /**
+   * A one-line snapshot of what the dashboards list actually rendered, for failure
+   * messages. A bare `locator.waitFor` timeout says only "the search box never
+   * showed" — this says what was on screen instead.
+   */
+  async describeDashboardList() {
+    const state = await this.page
+      .evaluate(() => ({
+        url: location.href,
+        table: !!document.querySelector('[data-test="dashboard-table"]'),
+        importBtn: !!document.querySelector('[data-test="dashboard-import"]'),
+        createBtn: !!document.querySelector('[data-test="dashboard-new"]'),
+        rows: document.querySelectorAll('[data-test^="dashboard-name-cell-"]').length,
+        toast:
+          document.querySelector("[data-test-variant]")?.getAttribute("data-test-message") ?? null,
+      }))
+      .catch((e) => ({ evaluateFailed: e.message }));
+    return JSON.stringify(state);
+  }
+
+  /**
+   * Wait for the dashboards list to be fully interactive.
+   *
+   * `dashboard-search` lives in the toolbar slot of the dashboard TABLE, so this is
+   * really a wait for the list data to have loaded. When that load fails on the
+   * shared alpha deployment (a transient on a busy environment) the table never
+   * mounts and no amount of extra waiting helps — waitForDashboardPage() upstream
+   * only warns and continues when the URL looks right, so a failed load reaches
+   * here and then dies on an opaque 30s timeout. That accounted for every failure
+   * in a 21-run baseline of the axis spec: 10 of them, all at this one line.
+   *
+   * Re-navigating re-runs the list fetch and clears it. Fail with what was actually
+   * on screen if it still doesn't come up.
+   */
   async waitForDashboardUIStable() {
-    // Wait for search input to be stable
-    await this.searchDash.waitFor({ state: "visible", timeout: 30000 });
-    await this.searchDash.waitFor({ state: "attached", timeout: 5000 });
+    try {
+      await this.#waitForDashboardListControls(30000);
+      return;
+    } catch {
+      // A billing redirect is an environment/account state, not a transient — the
+      // app bounces EVERY route to /billings/plans, so re-navigating just lands
+      // there again and doubles the wait. Fail immediately and name the cause,
+      // rather than reporting it as a dashboards-list timeout.
+      this.#assertNotRedirectedToBilling();
+      testLogger.warn("Dashboards list did not become interactive, re-opening it", {
+        state: await this.describeDashboardList(),
+      });
+    }
 
-    // Wait for "New Dashboard" button to be stable
-    await this.dashCreateBtn.waitFor({ state: "visible", timeout: 30000 });
-    await this.dashCreateBtn.waitFor({ state: "attached", timeout: 5000 });
+    const orgId =
+      process.env["ORGNAME"] ?? this.page.url().match(/org_identifier=([^&]+)/)?.[1];
+    // Dashboards.vue expects a `folder` query param — without it the list can fail
+    // to render (same reasoning as the goto fallback in dashboardList.menuItem).
+    await this.page
+      .goto(
+        `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${orgId}&folder=default`,
+        { waitUntil: "domcontentloaded" }
+      )
+      .catch(() => {});
 
-    // Wait for the import button to also be stable (confirms full header is loaded)
+    try {
+      await this.#waitForDashboardListControls(30000);
+      testLogger.info("Dashboards list became interactive after re-opening it");
+    } catch {
+      this.#assertNotRedirectedToBilling();
+      throw new Error(
+        `waitForDashboardUIStable: the dashboards list never became interactive, even after ` +
+          `re-opening it. Dashboards list state: ${await this.describeDashboardList()}`
+      );
+    }
+  }
+
+  /**
+   * Throw a self-explanatory error when the app has bounced us to the billing page.
+   *
+   * On cloud deployments an expired trial / lapsed subscription redirects every
+   * route to /billings/plans. Every dashboard test then fails somewhere deep in
+   * setup on an unrelated-looking selector timeout, which reads as flakiness and
+   * sends you hunting through the specs. It is neither flaky nor a test bug — the
+   * environment needs its plan renewed.
+   */
+  #assertNotRedirectedToBilling() {
+    const url = this.page.url();
+    if (!/\/billings?\//.test(url)) return;
+    throw new Error(
+      `The app redirected to the billing page (${url}). This is an environment/account ` +
+        `state, not a test failure: the org's trial or subscription has lapsed, so every ` +
+        `route bounces to /billings/plans and no dashboard test can run. Renew the plan ` +
+        `for org "${process.env["ORGNAME"] ?? "(unset)"}" or point ORGNAME at an active org.`
+    );
+  }
+
+  /** The three controls that together mean "the list is loaded and interactive". */
+  async #waitForDashboardListControls(timeout) {
+    await this.searchDash.waitFor({ state: "visible", timeout });
+    await this.dashCreateBtn.waitFor({ state: "visible", timeout });
     const importBtn = this.page.locator('[data-test="dashboard-import"]');
     await importBtn.waitFor({ state: "visible", timeout: 10000 });
-    await importBtn.waitFor({ state: "attached", timeout: 5000 });
   }
 
   //Create Dashboard
+  // Open the "New Dashboard" dialog and wait until its name input is usable.
+  // Split out of createDashboard so the submit loop can re-open a dialog that
+  // was destroyed under it by a background re-render.
+  //
+  // Opening is itself flaky: the list behind this button re-renders as
+  // folders/dashboards settle, and a click landing on a button that is being
+  // torn down silently no-ops. The dialog is client-side, so a click that lands
+  // always opens it — a 30s wait expiring means the CLICK was lost, and waiting
+  // longer cannot help. Re-click with a fresh lookup instead.
+  async openCreateDashboardDialog() {
+    const dialogAttempts = 3;
+    let dialogError;
+    for (let attempt = 1; attempt <= dialogAttempts; attempt++) {
+      try {
+        // Re-click ONLY when the dialog is genuinely absent. Once it is open,
+        // ODialog renders a `fixed inset-0` overlay that covers this button, so
+        // a second click cannot land — it fails the actionability check and
+        // burns the attempt. Without this guard a dialog that merely opened
+        // slowly (just past the per-attempt window) would be turned into a hard
+        // failure with a perfectly usable dialog on screen.
+        if (!(await this.dashName.isVisible().catch(() => false))) {
+          await this.dashCreateBtn.click({ timeout: 10000 });
+        }
+        await this.dashName.waitFor({ state: "attached", timeout: 15000 });
+        await this.dashName.waitFor({ state: "visible", timeout: 15000 });
+        dialogError = undefined;
+        break;
+      } catch (e) {
+        dialogError = e;
+      }
+    }
+    if (dialogError) {
+      throw new Error(
+        `createDashboard: "New Dashboard" dialog did not open after ${dialogAttempts} clicks. Last error: ${dialogError.message}`
+      );
+    }
+
+    // Wait for the input to be enabled (not disabled)
+    await this.page.waitForFunction(
+      (selector) => {
+        const element = document.querySelector(selector);
+        return element && !element.disabled && element.offsetParent !== null;
+      },
+      '[data-test="add-dashboard-name"] input',
+      { timeout: 10000 }
+    );
+  }
+
   async createDashboard(dashboardName) {
     // Wait for the dashboard page to be fully loaded by checking for the search input
     await this.searchDash.waitFor({ state: "visible", timeout: 30000 });
@@ -61,31 +220,100 @@ export default class DashboardCreate {
       // Ignore timeout - continue anyway
     });
 
-    // Click the "New Dashboard" button
-    await this.dashCreateBtn.click();
+    // The list resolves its folder selection after mount and router-replaces
+    // `&folder=default` onto the URL. That is a client-side push, so the
+    // networkidle wait above does not cover it — and a dialog opened before it
+    // lands is torn down by the re-render, losing the submit: no create POST
+    // goes out, the dialog is gone so the retry loop below sees "submitted",
+    // and the navigation wait at the end expires with the list still on screen.
+    // The folder tab is the DOM signal that folder resolution has finished.
+    await this.defaultFolderTab
+      .waitFor({ state: "visible", timeout: 30000 })
+      .catch(() => {
+        // Not every list renders a folder strip; the retry loop stays the gate.
+      });
 
-    // Wait for the dialog to appear by checking for the input field to be attached
-    await this.dashName.waitFor({ state: "attached", timeout: 30000 });
+    await this.openCreateDashboardDialog();
 
-    // Wait for the input to be visible and editable
-    await this.dashName.waitFor({ state: "visible", timeout: 30000 });
+    // Submitting is where this flakes, in two ways that look identical from the
+    // outside — an opaque waitForURL timeout with no navigation in the log:
+    //
+    //   1. AddDashboard.vue seeds OForm from :default-values, and a fill that
+    //      lands before that seeding is overwritten with an empty name.
+    //   2. The dialog's primary button submits the form by id, and a click
+    //      issued while that wiring is still settling silently no-ops.
+    //
+    // Either way submit is gated by the form's Zod schema, so onSubmit never
+    // runs, no POST goes out, and updateDashboardList() — the only thing that
+    // routes to /dashboards/view — is never called. Re-assert the name and
+    // watch for the create POST, so a lost submit is retried rather than
+    // waited out, and a rejected one fails with the actual status.
+    //
+    // The retry gate matches on the REQUEST, not the response: a request that
+    // has been sent but not yet answered still proves the click landed, so a
+    // slow server can never be mistaken for a lost submit and re-submitted
+    // into a duplicate dashboard.
+    const isCreateCall = (target) =>
+      /\/api\/[^/]+\/dashboards(?:\?|$)/.test(target.url()) &&
+      (target.method?.() ?? target.request().method()) === "POST";
 
-    // Wait for the input to be enabled (not disabled)
-    await this.page.waitForFunction(
-      (selector) => {
-        const element = document.querySelector(selector);
-        return element && !element.disabled && element.offsetParent !== null;
-      },
-      '[data-test="add-dashboard-name"] input',
-      { timeout: 10000 }
-    );
+    let createRequest = null;
+    let createResponse = null;
 
-    // Fill the dashboard name
-    await this.dashName.fill(dashboardName);
+    const submitAttempts = 3;
+    for (let attempt = 1; attempt <= submitAttempts; attempt++) {
+      // Re-assert on every attempt: if the form seeded over our value, the
+      // retry has to repair the field, not just click again.
+      if ((await this.dashName.inputValue()) !== dashboardName) {
+        await this.dashName.fill(dashboardName);
+      }
 
-    // Wait for and click the submit button
-    await this.submitBtn.waitFor({ state: "visible", timeout: 30000 });
-    await this.submitBtn.click();
+      const requestPromise = this.page
+        .waitForRequest(isCreateCall, { timeout: 10000 })
+        .catch(() => null);
+      const responsePromise = this.page
+        .waitForResponse(isCreateCall, { timeout: 30000 })
+        .catch(() => null);
+
+      await this.submitBtn.waitFor({ state: "visible", timeout: 30000 });
+      await this.submitBtn.click();
+
+      createRequest = await requestPromise;
+      if (createRequest) {
+        createResponse = await responsePromise;
+        break;
+      }
+
+      // Nothing hit the wire, and the dialog is still up: the click no-opped, so
+      // click again.
+      const dialogStillOpen = await this.submitBtn
+        .isVisible()
+        .catch(() => false);
+      if (dialogStillOpen) continue;
+
+      // Nothing hit the wire AND the dialog is gone. Treating that as a landed
+      // submit (as this loop used to) is wrong: a background re-render — the
+      // list re-resolving its folder is the common one — can destroy the dialog
+      // with the form never submitted, and the navigation wait below then
+      // expires with the list still on screen and nothing created. No request
+      // went out, so nothing was created and re-opening cannot duplicate.
+      if (/\/dashboards\/view/.test(this.page.url())) break;
+      if (attempt < submitAttempts) await this.openCreateDashboardDialog();
+    }
+
+    // No POST ever reached the wire — say so, rather than letting the URL wait
+    // below expire with an opaque "navigation timed out".
+    if (!createRequest && !/\/dashboards\/view/.test(this.page.url())) {
+      throw new Error(
+        `createDashboard: submit never reached the network after ${submitAttempts} attempts (dialog kept being torn down); no dashboard was created.`
+      );
+    }
+
+    if (createResponse && !createResponse.ok()) {
+      throw new Error(
+        `Dashboard creation failed: POST ${createResponse.url()} returned ${createResponse.status()}`
+      );
+    }
 
     // Wait for the success notification to confirm dashboard was created
     // OToast root carries both data-test="o-toast-success" and data-test-message="<text>"
@@ -95,8 +323,52 @@ export default class DashboardCreate {
       // waitForURL check below is the real gate for whether creation succeeded.
     });
 
-    // Wait for navigation to the new dashboard view page
-    await this.page.waitForURL(/\/dashboards\/view/, { timeout: 30000 });
+    // Wait for navigation to the new dashboard view page.
+    //
+    // The create can SUCCEED and still not land here: AddDashboard's
+    // updateDashboardList() pushes /dashboards/view, but the list's own
+    // `&folder=default` router-replace races that push and can win, leaving us
+    // back on the list with the dashboard created. Failing here would abandon a
+    // dashboard that exists and is perfectly usable, so open it from the list
+    // instead — and only then give up.
+    const reachedView = await this.page
+      .waitForURL(/\/dashboards\/view/, { timeout: 30000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!reachedView) {
+      const searchInput = this.page
+        .locator('[data-test="dashboard-search-field"]')
+        .first();
+      if (await searchInput.count()) {
+        await searchInput.fill(dashboardName).catch(() => {});
+      }
+
+      const nameCell = this.page
+        .locator(`[data-test="dashboard-name-cell-${dashboardName}"]`)
+        .first();
+      await nameCell.waitFor({ state: "visible", timeout: 15000 }).catch(() => {
+        throw new Error(
+          `createDashboard: POST succeeded but the app stayed on the dashboards list, and "${dashboardName}" never appeared there.`
+        );
+      });
+      // The list can swallow this click while its own router-replace is still
+      // settling, so re-click instead of spending the whole budget on one attempt.
+      let opened = false;
+      for (let attempt = 1; attempt <= 3 && !opened; attempt++) {
+        await nameCell.click().catch(() => {});
+        opened = await this.page
+          .waitForURL(/\/dashboards\/view/, { timeout: 10000 })
+          .then(() => true)
+          .catch(() => false);
+      }
+
+      if (!opened) {
+        throw new Error(
+          `createDashboard: "${dashboardName}" was created and is listed, but opening it never navigated to the dashboard view.`
+        );
+      }
+    }
 
     // Wait for the page to be fully loaded
     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
@@ -105,12 +377,80 @@ export default class DashboardCreate {
 
     // Wait for Vue components to mount — use deterministic check on panel editor or back button
     await this.page.locator('[data-test="dashboard-back-btn"]').waitFor({ state: 'visible', timeout: 15000 });
+
+    // back-btn only proves the OPageLayout header mounted, and ViewDashboard renders
+    // that header immediately — before any dashboard data arrives. Everything callers
+    // actually reach for next lives in the CONTENT subtree: RenderDashboardCharts is
+    // `v-if="selectedDate"`, and loadDashboard() only sets selectedDate once the
+    // dashboard GET resolves. So returning here left every caller racing that load —
+    // the empty-state add-panel button and the variable selectors simply do not exist
+    // yet, and the wait expires on a page that looks perfectly fine in a screenshot.
+    // The date-time picker sits behind the same `v-if="selectedDate"`, so it is the
+    // signal that the content subtree is committed to render.
+    await this.waitForDashboardContentLoaded();
+  }
+
+  // Gate on the dashboard's data having loaded (see createDashboard for why the
+  // header alone is not enough). Safe to call on any ViewDashboard page.
+  async waitForDashboardContentLoaded(timeout = 30000) {
+    await this.page
+      .locator('[data-test="dashboard-global-date-time-picker"]')
+      .waitFor({ state: "visible", timeout });
   }
 
   //back to dashboard list
   async backToDashboardList() {
-    await this.backBtn.waitFor({ state: "visible", timeout: 50000 });
-    await this.backBtn.click();
+    // "Back" is not one hop from everywhere. The panel editor and the
+    // dashboard view both render data-test="dashboard-back-btn", but
+    // AddPanel.vue's goBack() pushes /dashboards/view while ViewDashboard.vue's
+    // goBackToDashboardList() pushes /dashboards — so reaching the list from
+    // the editor genuinely takes TWO clicks. On top of that, a click issued
+    // mid page-transition can land on a header that is being torn down and
+    // silently no-op. Click, re-check the URL, and repeat with a fresh locator
+    // lookup until we're on the list.
+    //
+    // Leaving add_panel with unsaved panel edits fires AddPanel.vue's
+    // onBeforeRouteLeave native window.confirm. Playwright auto-dismisses
+    // dialogs by default, and a dismissed confirm means next(false) — the
+    // route change is cancelled, so every back click no-ops and the loop
+    // burns all its attempts still sitting on add_panel. Accept the dialog
+    // for the duration of the navigation (same handling as
+    // dashboard-multi-sql.js discardPanel()).
+    const LIST_URL = /\/dashboards(?:\?|$)/;
+    const maxClicks = 4;
+    let lastError;
+
+    const dialogHandler = (dialog) => dialog.accept();
+    this.page.on("dialog", dialogHandler);
+    try {
+      for (let attempt = 1; attempt <= maxClicks; attempt++) {
+        if (LIST_URL.test(this.page.url())) return;
+
+        const backBtn = this.page.locator('[data-test="dashboard-back-btn"]');
+        try {
+          await backBtn.waitFor({ state: "visible", timeout: 20000 });
+          await backBtn.click({ timeout: 10000 });
+        } catch (e) {
+          // Header may be remounting between the editor and view pages — fall
+          // through to the URL check and try again with a fresh lookup.
+          lastError = e;
+        }
+
+        try {
+          await this.page.waitForURL(LIST_URL, { timeout: 8000 });
+          return;
+        } catch (e) {
+          lastError = e;
+        }
+      }
+    } finally {
+      this.page.off("dialog", dialogHandler);
+    }
+
+    if (LIST_URL.test(this.page.url())) return;
+    throw new Error(
+      `backToDashboardList: still at ${this.page.url()} after ${maxClicks} back clicks. Last error: ${lastError?.message}`
+    );
   }
 
   //wait for back button to be visible (no click)
@@ -149,6 +489,23 @@ export default class DashboardCreate {
 
   //Add Panel to dashboard (when dashboard is empty)
   async addPanel() {
+    // Nothing below exists until the dashboard's data has loaded: the whole
+    // content subtree is `v-if="selectedDate"`, set by loadDashboard(). Gate on
+    // that first so the waits below fail on their own merits, not on arriving early.
+    await this.waitForDashboardContentLoaded();
+
+    // Clicking the empty-state button before tabs exist makes ViewDashboard.vue's
+    // addPanelData() read tabs[0] and throw inside the handler, so router.push
+    // never runs: the click reports success and the URL never changes, burning
+    // every retry below. The tab strip only renders once tabs have loaded, so
+    // waiting for it gates the click on the data it depends on.
+    await this.defaultDashboardTab
+      .waitFor({ state: "visible", timeout: 30000 })
+      .catch(() => {
+        // Non-fatal: some dashboards legitimately render no tab strip. The
+        // retry loop below is still the real gate on navigation succeeding.
+      });
+
     // Retry pattern for clicking add panel button
     const maxRetries = 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {

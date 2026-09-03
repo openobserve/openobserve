@@ -218,15 +218,25 @@ pub enum ShiftRuleError {
     NoName,
     /// A validity window that ends before it starts is in effect at no instant
     /// at all, so the rule would silently never apply.
-    EmptyValidityWindow { starts_at: i64, ends_at: i64 },
+    EmptyValidityWindow {
+        starts_at: i64,
+        ends_at: i64,
+    },
     /// A restriction's `start_minute`/`end_minute` names a minute past the
     /// end of the day it's allowed to reach.
-    RestrictionMinuteOutOfRange { field: String, got: u32, max: u32 },
+    RestrictionMinuteOutOfRange {
+        field: String,
+        got: u32,
+        max: u32,
+    },
     /// A restriction starts and ends at the same minute, so it covers no
     /// instant of the day at all. This is the trap `end_minute: 0` sets for
     /// someone who means "all day": the rule looks configured but never
     /// wins.
-    EmptyRestriction { field: String, minute: u32 },
+    EmptyRestriction {
+        field: String,
+        minute: u32,
+    },
 }
 
 impl std::fmt::Display for ShiftRuleError {
@@ -327,8 +337,7 @@ impl ShiftRule {
     /// that point in the schedule's life, and the restrictions say which hours
     /// it covers while it does.
     pub fn in_effect_at(&self, at_micros: i64) -> bool {
-        self.starts_at.is_none_or(|s| at_micros >= s)
-            && self.ends_at.is_none_or(|e| at_micros < e)
+        self.starts_at.is_none_or(|s| at_micros >= s) && self.ends_at.is_none_or(|e| at_micros < e)
     }
 
     /// Whether this rotation is in force at `at`.
@@ -567,12 +576,12 @@ fn to_local_micros(at: i64, tz: chrono_tz::Tz) -> Option<i64> {
 /// Two readings have no single answer, and both are handover times somebody
 /// will really be woken by:
 ///
-/// - **Fall back.** The clock reads 01:30 twice. The handover is the *first*
-///   of them; taking the second would leave the outgoing engineer on call for
-///   an extra hour, and taking both would hand over twice.
-/// - **Spring forward.** The clock never reads 02:30 at all. The handover is
-///   the first instant the clock does reach — 03:00 — rather than being
-///   skipped, which would silently extend a shift by a whole cycle.
+/// - **Fall back.** The clock reads 01:30 twice. The handover is the *first* of them; taking the
+///   second would leave the outgoing engineer on call for an extra hour, and taking both would hand
+///   over twice.
+/// - **Spring forward.** The clock never reads 02:30 at all. The handover is the first instant the
+///   clock does reach — 03:00 — rather than being skipped, which would silently extend a shift by a
+///   whole cycle.
 fn from_local_micros(local: i64, tz: chrono_tz::Tz) -> Option<i64> {
     let naive = chrono::DateTime::from_timestamp_micros(local)?.naive_utc();
     match tz.from_local_datetime(&naive) {
@@ -710,7 +719,9 @@ impl Unavailability {
     }
 
     pub fn is(&self, user_email: &str) -> bool {
-        self.user_email.trim().eq_ignore_ascii_case(user_email.trim())
+        self.user_email
+            .trim()
+            .eq_ignore_ascii_case(user_email.trim())
     }
 }
 
@@ -753,7 +764,11 @@ pub fn covering_override_for<'a>(
     overrides
         .iter()
         .filter(|o| o.covers(at) && o.is_for(rotation_id))
-        .max_by(|a, b| a.created_at.cmp(&b.created_at).then_with(|| a.id.cmp(&b.id)))
+        .max_by(|a, b| {
+            a.created_at
+                .cmp(&b.created_at)
+                .then_with(|| a.id.cmp(&b.id))
+        })
 }
 
 pub fn covering_override<'a>(
@@ -1520,7 +1535,10 @@ mod tests {
     #[test]
     fn test_handover_boundary_is_exclusive() {
         let r = weekly(&["ana@o2.ai", "bob@o2.ai"]);
-        assert_eq!(r.member_at(ANCHOR + MICROS_PER_WEEK - 1, TZ), Some("ana@o2.ai"));
+        assert_eq!(
+            r.member_at(ANCHOR + MICROS_PER_WEEK - 1, TZ),
+            Some("ana@o2.ai")
+        );
         assert_eq!(r.member_at(ANCHOR + MICROS_PER_WEEK, TZ), Some("bob@o2.ai"));
     }
 
@@ -1544,7 +1562,10 @@ mod tests {
         let r = weekly(&["ana@o2.ai", "bob@o2.ai"]);
         assert_eq!(r.member_at(ANCHOR - 1, TZ), Some("bob@o2.ai"));
         assert_eq!(r.member_at(ANCHOR - MICROS_PER_WEEK, TZ), Some("bob@o2.ai"));
-        assert_eq!(r.member_at(ANCHOR - MICROS_PER_WEEK - 1, TZ), Some("ana@o2.ai"));
+        assert_eq!(
+            r.member_at(ANCHOR - MICROS_PER_WEEK - 1, TZ),
+            Some("ana@o2.ai")
+        );
     }
 
     #[test]
@@ -1588,7 +1609,10 @@ mod tests {
             ends_at: None,
         };
         assert_eq!(r.member_at(ANCHOR, TZ), Some("ana@o2.ai"));
-        assert_eq!(r.member_at(ANCHOR + 8 * MICROS_PER_HOUR, TZ), Some("bob@o2.ai"));
+        assert_eq!(
+            r.member_at(ANCHOR + 8 * MICROS_PER_HOUR, TZ),
+            Some("bob@o2.ai")
+        );
         assert_eq!(
             r.member_at(ANCHOR + 16 * MICROS_PER_HOUR, TZ),
             Some("ana@o2.ai")
@@ -1638,9 +1662,19 @@ mod tests {
     fn test_a_broken_rotation_staffs_nobody() {
         let rotations = vec![ShiftRule::weekly("Primary", vec![], ANCHOR)];
         assert!(resolve_on_call(&[of(&rotations)], &[], &[], ANCHOR, chrono_tz::UTC).is_empty());
-        assert_eq!(on_call_now(&rotations, &[], &[], ANCHOR, chrono_tz::UTC), None);
-        assert_eq!(of(&rotations).next_holder(&[], ANCHOR, chrono_tz::UTC), None);
-        assert!(of(&rotations).everyone(&[], &[], ANCHOR, chrono_tz::UTC).is_empty());
+        assert_eq!(
+            on_call_now(&rotations, &[], &[], ANCHOR, chrono_tz::UTC),
+            None
+        );
+        assert_eq!(
+            of(&rotations).next_holder(&[], ANCHOR, chrono_tz::UTC),
+            None
+        );
+        assert!(
+            of(&rotations)
+                .everyone(&[], &[], ANCHOR, chrono_tz::UTC)
+                .is_empty()
+        );
     }
 
     #[test]
@@ -1862,18 +1896,8 @@ mod tests {
     /// change who is paged.
     #[test]
     fn test_priority_decides_not_list_order() {
-        let low = layer(
-                "Primary",
-            &["low@o2.ai"],
-            1,
-            vec![window(&[], 0, 1440)],
-        );
-        let high = layer(
-                "Primary",
-            &["high@o2.ai"],
-            5,
-            vec![window(&[], 0, 1440)],
-        );
+        let low = layer("Primary", &["low@o2.ai"], 1, vec![window(&[], 0, 1440)]);
+        let high = layer("Primary", &["high@o2.ai"], 5, vec![window(&[], 0, 1440)]);
         let at = local(IST, 2026, 8, 10, 12, 0);
 
         let forward = on_call_now(&[low.clone(), high.clone()], &[], &[], at, IST);
@@ -1906,7 +1930,7 @@ mod tests {
     #[test]
     fn test_multiple_windows_are_ored() {
         let r = layer(
-                "Primary",
+            "Primary",
             &["ana@o2.ai"],
             0,
             vec![
@@ -1965,7 +1989,7 @@ mod tests {
     #[test]
     fn test_layer_round_trips_through_json() {
         let r = layer(
-                "Primary",
+            "Primary",
             &["ana@o2.ai"],
             7,
             vec![window(&[0, 4], 540, 1020)],
@@ -2005,7 +2029,11 @@ mod tests {
     #[test]
     fn test_a_weekly_handover_keeps_its_local_hour_across_spring_forward() {
         let anchor = local(NY, 2026, 3, 2, 9, 0);
-        let r = ShiftRule::weekly("On-call rotation", vec!["ana@o2.ai".into(), "bob@o2.ai".into()], anchor);
+        let r = ShiftRule::weekly(
+            "On-call rotation",
+            vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
+            anchor,
+        );
 
         let handover = r.next_handover(anchor + HOUR, NY).unwrap();
         assert_eq!(
@@ -2027,7 +2055,11 @@ mod tests {
     #[test]
     fn test_a_weekly_handover_keeps_its_local_hour_across_fall_back() {
         let anchor = local(NY, 2026, 10, 26, 9, 0);
-        let r = ShiftRule::weekly("On-call rotation", vec!["ana@o2.ai".into(), "bob@o2.ai".into()], anchor);
+        let r = ShiftRule::weekly(
+            "On-call rotation",
+            vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
+            anchor,
+        );
 
         let handover = r.next_handover(anchor + HOUR, NY).unwrap();
         assert_eq!(
@@ -2107,7 +2139,11 @@ mod tests {
     #[test]
     fn test_shift_boundaries_are_monotonic_through_both_transitions() {
         for (anchor, from, hours) in [
-            (local(NY, 2026, 3, 5, 2, 30), local(NY, 2026, 3, 6, 0, 0), 96),
+            (
+                local(NY, 2026, 3, 5, 2, 30),
+                local(NY, 2026, 3, 6, 0, 0),
+                96,
+            ),
             (
                 local(NY, 2026, 10, 30, 1, 30),
                 local(NY, 2026, 10, 31, 0, 0),
@@ -2121,7 +2157,10 @@ mod tests {
                 let start = r.shift_start(at, NY).unwrap();
                 let end = r.next_handover(at, NY).unwrap();
                 assert!(start <= at && at < end, "hour {hour} is outside its shift");
-                assert!(start >= last_start, "hour {hour} moved a boundary backwards");
+                assert!(
+                    start >= last_start,
+                    "hour {hour} moved a boundary backwards"
+                );
                 last_start = start;
             }
         }
@@ -2220,7 +2259,10 @@ mod tests {
             (ANCHOR, "early@o2.ai"),
             (ANCHOR + MICROS_PER_WEEK, "late@o2.ai"),
         ] {
-            assert_eq!(on_call_now(&rotations, &[], &[], at, TZ).as_deref(), Some(expected));
+            assert_eq!(
+                on_call_now(&rotations, &[], &[], at, TZ).as_deref(),
+                Some(expected)
+            );
         }
     }
 
@@ -2314,7 +2356,10 @@ mod tests {
     fn test_validity_window_round_trips_and_is_omitted_when_absent() {
         let plain = retirable("Base", "ana@o2.ai", 0);
         let json = serde_json::to_string(&plain).unwrap();
-        assert!(!json.contains("starts_at"), "absent bounds add no noise: {json}");
+        assert!(
+            !json.contains("starts_at"),
+            "absent bounds add no noise: {json}"
+        );
         assert_eq!(serde_json::from_str::<ShiftRule>(&json).unwrap(), plain);
 
         let mut bounded = plain.clone();
@@ -2360,7 +2405,13 @@ mod tests {
         let mut top = retirable("Top", "top@o2.ai", i32::MAX);
         top.restrictions = vec![window(&[], 0, 1440)];
         let rotations = vec![retirable("Base", "base@o2.ai", 0), top];
-        let overrides = vec![cover("ov_1", "cover@o2.ai", ANCHOR, ANCHOR + MICROS_PER_DAY, 1)];
+        let overrides = vec![cover(
+            "ov_1",
+            "cover@o2.ai",
+            ANCHOR,
+            ANCHOR + MICROS_PER_DAY,
+            1,
+        )];
 
         assert_eq!(
             on_call_now(&rotations, &overrides, &[], ANCHOR, TZ).as_deref(),
@@ -2428,7 +2479,9 @@ mod tests {
         }
         // After the first ends, only the second is left.
         assert_eq!(
-            covering_override(&[first, second], R1, 1200).unwrap().user_email,
+            covering_override(&[first, second], R1, 1200)
+                .unwrap()
+                .user_email,
             "second@o2.ai"
         );
     }
@@ -2439,7 +2492,12 @@ mod tests {
     fn test_overrides_created_in_the_same_microsecond_still_resolve_deterministically() {
         let a = cover("ov_a", "a@o2.ai", 0, 1000, 50);
         let b = cover("ov_b", "b@o2.ai", 0, 1000, 50);
-        assert_eq!(covering_override(&[a.clone(), b.clone()], R1, 10).unwrap().id, "ov_b");
+        assert_eq!(
+            covering_override(&[a.clone(), b.clone()], R1, 10)
+                .unwrap()
+                .id,
+            "ov_b"
+        );
         assert_eq!(covering_override(&[b, a], R1, 10).unwrap().id, "ov_b");
     }
 
@@ -2452,7 +2510,13 @@ mod tests {
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             ANCHOR,
         )];
-        let overrides = vec![cover("ov_1", "cara@o2.ai", ANCHOR, ANCHOR + MICROS_PER_DAY, 1)];
+        let overrides = vec![cover(
+            "ov_1",
+            "cara@o2.ai",
+            ANCHOR,
+            ANCHOR + MICROS_PER_DAY,
+            1,
+        )];
         assert_eq!(
             on_call_now(&rotations, &overrides, &[], ANCHOR, TZ).as_deref(),
             Some("cara@o2.ai")
@@ -2485,8 +2549,14 @@ mod tests {
                 "{tz}"
             );
             assert_eq!(
-                on_call_now(&rotations, &overrides, &[], local(IST, 2026, 8, 11, 2, 0), tz)
-                    .as_deref(),
+                on_call_now(
+                    &rotations,
+                    &overrides,
+                    &[],
+                    local(IST, 2026, 8, 11, 2, 0),
+                    tz
+                )
+                .as_deref(),
                 Some("sam@o2.ai"),
                 "{tz} across local midnight"
             );
@@ -2635,7 +2705,13 @@ mod tests {
             .unwrap();
         assert_eq!(handover, local(NY, 2026, 3, 8, 3, 0));
 
-        let overrides = vec![cover("ov_1", "sam@o2.ai", handover - HOUR, handover + HOUR, 1)];
+        let overrides = vec![cover(
+            "ov_1",
+            "sam@o2.ai",
+            handover - HOUR,
+            handover + HOUR,
+            1,
+        )];
         for at in [handover - HOUR, handover - 1, handover, handover + HOUR - 1] {
             assert_eq!(
                 on_call_now(&rotations, &overrides, &[], at, NY).as_deref(),
@@ -2676,7 +2752,10 @@ mod tests {
     /// starting at `from` and ending at `to`. Everything else the grid says is
     /// worthless if this is not true.
     fn assert_tiles(segments: &[CoverageSegment], from: i64, to: i64) {
-        assert!(!segments.is_empty(), "a window always resolves to something");
+        assert!(
+            !segments.is_empty(),
+            "a window always resolves to something"
+        );
         assert_eq!(segments[0].from, from);
         assert_eq!(segments[segments.len() - 1].to, to);
         for pair in segments.windows(2) {
@@ -2698,7 +2777,11 @@ mod tests {
         let segments = resolve_grid(&rotations, &[], &[], from, to, TZ).unwrap();
 
         assert_tiles(&segments, from, to);
-        assert_eq!(segments.len(), 1, "one shift, one row — not 168 identical ones");
+        assert_eq!(
+            segments.len(),
+            1,
+            "one shift, one row — not 168 identical ones"
+        );
         assert_eq!(segments[0].user_email.as_deref(), Some("ana@o2.ai"));
         assert_eq!(segments[0].rotation.as_deref(), Some("On-call rotation"));
     }
@@ -2803,8 +2886,18 @@ mod tests {
     fn test_the_grid_resolves_follow_the_sun_without_the_layer_maths() {
         let rotations = vec![
             layer("Catch-all", &["catchall@o2.ai"], 0, vec![]),
-            layer("APAC", &["apac@o2.ai"], 10, vec![window(&[], 6 * 60, 14 * 60)]),
-            layer("EMEA", &["emea@o2.ai"], 10, vec![window(&[], 14 * 60, 22 * 60)]),
+            layer(
+                "APAC",
+                &["apac@o2.ai"],
+                10,
+                vec![window(&[], 6 * 60, 14 * 60)],
+            ),
+            layer(
+                "EMEA",
+                &["emea@o2.ai"],
+                10,
+                vec![window(&[], 14 * 60, 22 * 60)],
+            ),
         ];
         let from = local(IST, 2026, 8, 10, 0, 0);
         let to = from + MICROS_PER_DAY;
@@ -2816,7 +2909,12 @@ mod tests {
                 .iter()
                 .map(|s| s.user_email.clone().unwrap())
                 .collect::<Vec<_>>(),
-            vec!["catchall@o2.ai", "apac@o2.ai", "emea@o2.ai", "catchall@o2.ai"]
+            vec![
+                "catchall@o2.ai",
+                "apac@o2.ai",
+                "emea@o2.ai",
+                "catchall@o2.ai"
+            ]
         );
         assert_eq!(segments[1].from, local(IST, 2026, 8, 10, 6, 0));
         assert_eq!(segments[2].from, local(IST, 2026, 8, 10, 14, 0));
@@ -2862,8 +2960,15 @@ mod tests {
             vec!["ana@o2.ai".into()],
             ANCHOR,
         )];
-        let err = resolve_grid(&rotations, &[], &[], ANCHOR, ANCHOR + 365 * MICROS_PER_DAY, TZ)
-            .unwrap_err();
+        let err = resolve_grid(
+            &rotations,
+            &[],
+            &[],
+            ANCHOR,
+            ANCHOR + 365 * MICROS_PER_DAY,
+            TZ,
+        )
+        .unwrap_err();
         assert!(
             matches!(err, GridError::WindowTooLong { .. }),
             "a year must be refused: {err}"
@@ -2950,7 +3055,13 @@ mod tests {
             ANCHOR,
         )];
         let (from, to) = (ANCHOR, ANCHOR + 2 * MICROS_PER_WEEK);
-        let overrides = vec![cover("ov_1", "sam@o2.ai", from - MICROS_PER_DAY, to + MICROS_PER_DAY, 1)];
+        let overrides = vec![cover(
+            "ov_1",
+            "sam@o2.ai",
+            from - MICROS_PER_DAY,
+            to + MICROS_PER_DAY,
+            1,
+        )];
         let segments = resolve_grid(&rotations, &overrides, &[], from, to, TZ).unwrap();
 
         assert_tiles(&segments, from, to);
@@ -2991,8 +3102,14 @@ mod tests {
         }
 
         // And the pairing is the one the calendar already shows.
-        assert_eq!(primary.on_call(&[], &[], ANCHOR, TZ).as_deref(), Some("ana@o2.ai"));
-        assert_eq!(secondary.on_call(&[], &[], ANCHOR, TZ).as_deref(), Some("bob@o2.ai"));
+        assert_eq!(
+            primary.on_call(&[], &[], ANCHOR, TZ).as_deref(),
+            Some("ana@o2.ai")
+        );
+        assert_eq!(
+            secondary.on_call(&[], &[], ANCHOR, TZ).as_deref(),
+            Some("bob@o2.ai")
+        );
     }
 
     /// A rotation and its rules are named for different things, so the default
@@ -3021,7 +3138,10 @@ mod tests {
             "Primary"
         );
         assert_eq!(
-            secondary.position_at(&[], &[], at, TZ).unwrap().rotation_name,
+            secondary
+                .position_at(&[], &[], at, TZ)
+                .unwrap()
+                .rotation_name,
             "Secondary"
         );
     }
@@ -3046,7 +3166,8 @@ mod tests {
         let primary = rota("rot_p", &["ana@o2.ai", "bob@o2.ai"]);
         let mut secondary = Rotation::offset_from("rot_s", "Secondary", &primary, 1);
         // Somebody adds cara to the secondary and forgets the primary.
-        secondary.shift_rules[0].members = vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cara@o2.ai".into()];
+        secondary.shift_rules[0].members =
+            vec!["ana@o2.ai".into(), "bob@o2.ai".into(), "cara@o2.ai".into()];
 
         let rotations = [primary, secondary];
         let collided: Vec<i64> = (0..6i64)
@@ -3091,7 +3212,9 @@ mod tests {
             ..cover("ov_1", "sam@o2.ai", ANCHOR, ANCHOR + 1_000, 1)
         };
         assert_eq!(
-            primary.on_call(&[ov.clone()], &[], ANCHOR, TZ).as_deref(),
+            primary
+                .on_call(std::slice::from_ref(&ov), &[], ANCHOR, TZ)
+                .as_deref(),
             Some("sam@o2.ai")
         );
         assert_eq!(
@@ -3171,7 +3294,14 @@ mod tests {
         // is still Cara's — which is the property that makes this safe to
         // recompute at any instant.
         assert_eq!(
-            on_call_now(&rotations, &[], &unavailability, ANCHOR + MICROS_PER_WEEK, TZ).as_deref(),
+            on_call_now(
+                &rotations,
+                &[],
+                &unavailability,
+                ANCHOR + MICROS_PER_WEEK,
+                TZ
+            )
+            .as_deref(),
             Some("bob@o2.ai")
         );
         assert_eq!(
@@ -3237,7 +3367,10 @@ mod tests {
             away("bob@o2.ai", ANCHOR, ANCHOR + MICROS_PER_WEEK),
         ];
 
-        assert_eq!(on_call_now(&rotations, &[], &unavailability, ANCHOR, TZ), None);
+        assert_eq!(
+            on_call_now(&rotations, &[], &unavailability, ANCHOR, TZ),
+            None
+        );
         // "Up next" is asked at the next handover, by which point the absences
         // have ended — so the calendar correctly shows bob taking over. The gap
         // is *now*, and that is what the grid below reports.
@@ -3248,7 +3381,11 @@ mod tests {
             Some("bob@o2.ai")
         );
         assert!(resolve_on_call(&[of(&rotations)], &[], &unavailability, ANCHOR, TZ).is_empty());
-        assert!(of(&rotations).everyone(&[], &unavailability, ANCHOR, TZ).is_empty());
+        assert!(
+            of(&rotations)
+                .everyone(&[], &unavailability, ANCHOR, TZ)
+                .is_empty()
+        );
 
         // And the grid says so out loud rather than leaving a hole in the list.
         let segments = resolve_grid(
@@ -3274,7 +3411,13 @@ mod tests {
             vec!["ana@o2.ai".into(), "bob@o2.ai".into()],
             ANCHOR,
         )];
-        let overrides = vec![cover("ov_1", "sam@o2.ai", ANCHOR, ANCHOR + MICROS_PER_DAY, 1)];
+        let overrides = vec![cover(
+            "ov_1",
+            "sam@o2.ai",
+            ANCHOR,
+            ANCHOR + MICROS_PER_DAY,
+            1,
+        )];
         // Sam is on record as away for exactly the window Sam just claimed.
         let unavailability = vec![away("sam@o2.ai", ANCHOR, ANCHOR + MICROS_PER_WEEK)];
 
@@ -3283,7 +3426,8 @@ mod tests {
             Some("sam@o2.ai")
         );
         assert_eq!(
-            resolve_on_call(&[of(&rotations)], &overrides, &unavailability, ANCHOR, TZ)[0].user_email,
+            resolve_on_call(&[of(&rotations)], &overrides, &unavailability, ANCHOR, TZ)[0]
+                .user_email,
             "sam@o2.ai"
         );
         // The layer underneath is still skipped normally once the cover ends.
@@ -3356,7 +3500,11 @@ mod tests {
             let (was, now) = (holder_at(&before, at), holder_at(&first, at));
             if week == 2 {
                 assert_eq!(was.as_deref(), Some("cara@o2.ai"));
-                assert_eq!(now.as_deref(), Some("dev@o2.ai"), "passed to the next along");
+                assert_eq!(
+                    now.as_deref(),
+                    Some("dev@o2.ai"),
+                    "passed to the next along"
+                );
             } else {
                 assert_eq!(was, now, "week {week} must not move");
             }
@@ -3494,7 +3642,17 @@ mod tests {
 
         // Nothing to say when nobody is away, and nothing to say about a week
         // outside the horizon.
-        assert!(away_assignments(&[of(&rotations)], &[], ANCHOR, ANCHOR + MICROS_PER_WEEK, TZ, 50).is_empty());
+        assert!(
+            away_assignments(
+                &[of(&rotations)],
+                &[],
+                ANCHOR,
+                ANCHOR + MICROS_PER_WEEK,
+                TZ,
+                50
+            )
+            .is_empty()
+        );
         assert!(
             away_assignments(
                 &[of(&rotations)],
@@ -3541,20 +3699,12 @@ mod tests {
         let windows = vec![away("ana@o2.ai", 100, 200)];
         assert!(is_unavailable(&windows, "ana@o2.ai", 100));
         assert!(is_unavailable(&windows, "ANA@o2.ai", 150));
-        assert!(!is_unavailable(&windows, "ana@o2.ai", 200), "the end is exclusive");
+        assert!(
+            !is_unavailable(&windows, "ana@o2.ai", 200),
+            "the end is exclusive"
+        );
         assert!(!is_unavailable(&windows, "ana@o2.ai", 99));
         assert!(!is_unavailable(&windows, "bob@o2.ai", 150));
-    }
-
-    // ── The derived secondary's offset (§E.9) ───────────────────────────────
-
-    /// A roster of `n` people, `p0..p{n-1}`, weekly from the anchor.
-    fn roster(n: usize) -> ShiftRule {
-        ShiftRule::weekly(
-            "On-call rotation",
-            (0..n).map(|i| format!("p{i}@o2.ai")).collect(),
-            ANCHOR,
-        )
     }
 
     // ── The offset composed with an absence ─────────────────────────────────

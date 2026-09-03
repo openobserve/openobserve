@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import PipelineDestinationEditor from "../pipeline/PipelineDestinationEditor.vue";
 import destinationService from "@/services/alert_destination";
@@ -205,10 +205,10 @@ interface ConformDelete {
 }
 
 const formatOutputFormat = (val: any): string => {
-  if (!val) return "N/A";
+  if (!val) return raw("N/A");
   if (typeof val === "string") return val.toUpperCase();
   if (typeof val === "object" && val.esbulk) return "ESBULK";
-  return "N/A";
+  return raw("N/A");
 };
 
 export default defineComponent({
@@ -437,7 +437,7 @@ export default defineComponent({
               const message =
                 err.response.data?.message ||
                 err.response.data?.error ||
-                "Error while deleting destination";
+                t("alerts.messages.deleteDestinationFailed");
               toast({
                 variant: "error",
                 message,
@@ -619,7 +619,7 @@ export default defineComponent({
         const errorMessage =
           error.response?.data?.message ||
           error?.message ||
-          "Error deleting destinations. Please try again.";
+          t("alerts.messages.bulkDeleteDestinationsFailed");
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             variant: "error",

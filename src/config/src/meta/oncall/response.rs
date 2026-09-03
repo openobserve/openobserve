@@ -557,7 +557,6 @@ impl std::fmt::Display for ResolutionCause {
     }
 }
 
-
 /// The record itself, as the API and the UI see it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct Response {
@@ -1007,7 +1006,11 @@ pub fn channel_post(
                 Some(cause) => body.push_str(&format!("Cause: {cause}\n")),
                 None => body.push_str("Cause: not recorded\n"),
             }
-            if let Some(note) = response.cause_note.as_deref().filter(|n| !n.trim().is_empty()) {
+            if let Some(note) = response
+                .cause_note
+                .as_deref()
+                .filter(|n| !n.trim().is_empty())
+            {
                 body.push_str(&format!("{note}\n"));
             }
         }
@@ -1040,13 +1043,12 @@ pub enum ChannelPostAction {
 /// rides — its first caller. The rule it produces is the one that keeps a
 /// record to a single message:
 ///
-/// - nothing posted yet → **post**, whatever the stage. A record whose opening
-///   post was lost still deserves to have its outcome said once, and posting
-///   for the first time is not re-posting.
+/// - nothing posted yet → **post**, whatever the stage. A record whose opening post was lost still
+///   deserves to have its outcome said once, and posting for the first time is not re-posting.
 /// - posted, and the transport can revise what it sent → **edit**.
-/// - posted, and it cannot → **skip**. Not "post again": a room that gets three
-///   messages per record is the noise this whole design exists to avoid, and
-///   the responder who needs the update is on the page, not in the channel.
+/// - posted, and it cannot → **skip**. Not "post again": a room that gets three messages per record
+///   is the noise this whole design exists to avoid, and the responder who needs the update is on
+///   the page, not in the channel.
 pub fn channel_post_action(already_posted: bool, can_edit: bool) -> ChannelPostAction {
     match (already_posted, can_edit) {
         (false, _) => ChannelPostAction::Post,
@@ -1308,7 +1310,9 @@ mod tests {
         let plain = ResponseEvent::new(ResponseEventKind::Note, 10, "ana@o2.ai", "looking");
         assert_eq!(plain.rung_micros, None);
         assert!(
-            !serde_json::to_string(&plain).unwrap().contains("rung_micros"),
+            !serde_json::to_string(&plain)
+                .unwrap()
+                .contains("rung_micros"),
             "an absent rung must not appear in the payload"
         );
 
@@ -1334,8 +1338,9 @@ mod tests {
 
         // Written before the ladder could restart: it belongs to the first
         // run, not to whichever run happens to be climbing now.
-        let legacy = ResponseEvent::new(ResponseEventKind::Page, 10, "o2-engine", "paged ana@o2.ai")
-            .at_rung(0);
+        let legacy =
+            ResponseEvent::new(ResponseEventKind::Page, 10, "o2-engine", "paged ana@o2.ai")
+                .at_rung(0);
         assert_eq!(legacy.ladder_run, None);
         assert_eq!(legacy.run(), FIRST_LADDER_RUN);
     }
@@ -1374,20 +1379,29 @@ mod tests {
     /// re-send a page to no one for as long as its retry budget lasts.
     #[test]
     fn test_only_a_rung_the_transport_lost_reads_as_unsent() {
-        let lost = ResponseEvent::new(ResponseEventKind::Page, 10, "o2-engine", "could not reach ana@o2.ai")
-            .at_rung(5)
-            .in_run(2)
-            .reached_nobody();
+        let lost = ResponseEvent::new(
+            ResponseEventKind::Page,
+            10,
+            "o2-engine",
+            "could not reach ana@o2.ai",
+        )
+        .at_rung(5)
+        .in_run(2)
+        .reached_nobody();
         assert!(lost.is_unreached_rung(2));
         assert!(
             !lost.is_unreached_rung(3),
             "a previous run's lost rung says nothing about this one"
         );
 
-        let nobody_matched =
-            ResponseEvent::new(ResponseEventKind::Page, 10, "o2-engine", "nobody matched on call now")
-                .at_rung(5)
-                .in_run(2);
+        let nobody_matched = ResponseEvent::new(
+            ResponseEventKind::Page,
+            10,
+            "o2-engine",
+            "nobody matched on call now",
+        )
+        .at_rung(5)
+        .in_run(2);
         assert!(!nobody_matched.is_unreached_rung(2));
 
         let paged = ResponseEvent::new(ResponseEventKind::Page, 10, "o2-engine", "paged ana@o2.ai")
@@ -1397,10 +1411,11 @@ mod tests {
 
         // A failed per-recipient row is not a rung, and must not take one out
         // of the ledger on its own: the rest of the rung may well have landed.
-        let one_failure = ResponseEvent::new(ResponseEventKind::Delivery, 10, "o2-engine", "failed")
-            .at_rung(5)
-            .in_run(2)
-            .delivered_to("ana@o2.ai", Channel::Email, false);
+        let one_failure =
+            ResponseEvent::new(ResponseEventKind::Delivery, 10, "o2-engine", "failed")
+                .at_rung(5)
+                .in_run(2)
+                .delivered_to("ana@o2.ai", Channel::Email, false);
         assert!(!one_failure.is_unreached_rung(2));
 
         let back: ResponseEvent =
@@ -1414,7 +1429,8 @@ mod tests {
             .at_rung(0)
             .in_run(2)
             .delivered_to("ana@o2.ai", Channel::Email, true);
-        let back: ResponseEvent = serde_json::from_str(&serde_json::to_string(&d).unwrap()).unwrap();
+        let back: ResponseEvent =
+            serde_json::from_str(&serde_json::to_string(&d).unwrap()).unwrap();
         assert_eq!(back, d);
         assert_eq!(back.channel, Some(Channel::Email));
         assert_eq!(back.delivered, Some(true));
@@ -1486,7 +1502,10 @@ mod tests {
         let opened = r.opened_at;
         r.ladder_anchor = Some(opened + 1_800);
         assert_eq!(r.ladder_start(), opened + 1_800);
-        assert_eq!(r.opened_at, opened, "time-to-resolve still measures reality");
+        assert_eq!(
+            r.opened_at, opened,
+            "time-to-resolve still measures reality"
+        );
     }
 
     /// The bug this pins: handing a page to another team moved the team but
@@ -1501,12 +1520,30 @@ mod tests {
 
         let moved = r.handed_over(Some("team_2"), 9_000);
         assert_eq!(moved.team_id, "team_2");
-        assert_eq!(moved.state, ResponseState::Triggered, "the page is open again");
-        assert_eq!(moved.acked_by, None, "the ack belonged to whoever gave it away");
+        assert_eq!(
+            moved.state,
+            ResponseState::Triggered,
+            "the page is open again"
+        );
+        assert_eq!(
+            moved.acked_by, None,
+            "the ack belonged to whoever gave it away"
+        );
         assert_eq!(moved.acked_at, None);
-        assert_eq!(moved.ladder_start(), 9_000, "the new team's clock starts now");
-        assert_eq!(moved.current_run(), 2, "a fresh run, so the ledger is empty");
-        assert_eq!(moved.opened_at, r.opened_at, "time-to-resolve still measures reality");
+        assert_eq!(
+            moved.ladder_start(),
+            9_000,
+            "the new team's clock starts now"
+        );
+        assert_eq!(
+            moved.current_run(),
+            2,
+            "a fresh run, so the ledger is empty"
+        );
+        assert_eq!(
+            moved.opened_at, r.opened_at,
+            "time-to-resolve still measures reality"
+        );
     }
 
     /// Handing a page to a PERSON has to work the same way: the recipient is
@@ -1519,8 +1556,14 @@ mod tests {
 
         assert_eq!(moved.team_id, r.team_id, "same team, new owner");
         assert_eq!(moved.state, ResponseState::Triggered);
-        assert!(moved.acked_by.is_none(), "nobody is acknowledged on their behalf");
-        assert!(moved.state.is_escalating(), "an unanswered handoff must keep climbing");
+        assert!(
+            moved.acked_by.is_none(),
+            "nobody is acknowledged on their behalf"
+        );
+        assert!(
+            moved.state.is_escalating(),
+            "an unanswered handoff must keep climbing"
+        );
         assert_eq!(moved.current_run(), 2);
     }
 
@@ -1559,7 +1602,10 @@ mod tests {
         );
         r.state = ResponseState::Acknowledged;
         assert!(!r.is_escalating());
-        assert!(r.is_exhausted(), "acknowledged late is still a page nobody answered in time");
+        assert!(
+            r.is_exhausted(),
+            "acknowledged late is still a page nobody answered in time"
+        );
     }
 
     /// A repeat pass has rungs left to climb. Carrying the previous run's
@@ -1606,7 +1652,11 @@ mod tests {
     /// record stays open and unowned the whole time.
     #[test]
     fn test_a_snooze_is_bounded_to_a_day_and_must_be_positive() {
-        assert_eq!(snooze_until(1_000, 0), None, "a zero-minute snooze is not one");
+        assert_eq!(
+            snooze_until(1_000, 0),
+            None,
+            "a zero-minute snooze is not one"
+        );
         assert_eq!(snooze_until(1_000, -5), None);
         assert_eq!(snooze_until(1_000, MAX_SNOOZE_MINUTES + 1), None);
 
@@ -1624,7 +1674,7 @@ mod tests {
         /// pause, so a rung due at +10m becomes due 10m after the quiet ends.
         #[test]
         fn test_a_first_snooze_moves_the_clock_by_its_own_length() {
-            let anchor = snoozed_ladder_anchor(None, 0, None, 1 * MIN, 61 * MIN);
+            let anchor = snoozed_ladder_anchor(None, 0, None, MIN, 61 * MIN);
             assert_eq!(anchor, 60 * MIN);
         }
 
@@ -1634,7 +1684,7 @@ mod tests {
         /// banner and the pager disagreeing by more than an hour.
         #[test]
         fn test_a_second_snooze_does_not_add_to_the_quiet_it_overlaps() {
-            let first = snoozed_ladder_anchor(None, 0, None, 1 * MIN, 61 * MIN);
+            let first = snoozed_ladder_anchor(None, 0, None, MIN, 61 * MIN);
             let second = snoozed_ladder_anchor(Some(first), 0, Some(61 * MIN), 2 * MIN, 62 * MIN);
 
             assert_eq!(
@@ -1655,9 +1705,8 @@ mod tests {
         /// and does add up — the overlap is what must not.
         #[test]
         fn test_consecutive_snoozes_do_accumulate() {
-            let first = snoozed_ladder_anchor(None, 0, None, 1 * MIN, 61 * MIN);
-            let second =
-                snoozed_ladder_anchor(Some(first), 0, Some(61 * MIN), 90 * MIN, 150 * MIN);
+            let first = snoozed_ladder_anchor(None, 0, None, MIN, 61 * MIN);
+            let second = snoozed_ladder_anchor(Some(first), 0, Some(61 * MIN), 90 * MIN, 150 * MIN);
             assert_eq!(second, 60 * MIN + 60 * MIN);
         }
 
@@ -1666,7 +1715,7 @@ mod tests {
         #[test]
         fn test_shortening_a_snooze_never_moves_the_clock_backwards() {
             let long = snoozed_ladder_anchor(None, 0, None, 0, 120 * MIN);
-            let shortened = snoozed_ladder_anchor(Some(long), 0, Some(120 * MIN), 1 * MIN, 5 * MIN);
+            let shortened = snoozed_ladder_anchor(Some(long), 0, Some(120 * MIN), MIN, 5 * MIN);
             assert_eq!(shortened, long);
         }
 
@@ -1684,7 +1733,10 @@ mod tests {
         /// when it opened.
         #[test]
         fn test_an_unanchored_record_measures_from_when_it_opened() {
-            assert_eq!(snoozed_ladder_anchor(None, 7 * MIN, None, 8 * MIN, 18 * MIN), 17 * MIN);
+            assert_eq!(
+                snoozed_ladder_anchor(None, 7 * MIN, None, 8 * MIN, 18 * MIN),
+                17 * MIN
+            );
         }
     }
 
@@ -1821,7 +1873,12 @@ mod tests {
     /// true, so it is pinned: no rung in it, no ladder run in it.
     #[test]
     fn test_the_dedup_key_is_the_record_and_nothing_else() {
-        let paged = channel_post(&record(ResponseState::Triggered), "Platform", ChannelPostStage::Paged, URL);
+        let paged = channel_post(
+            &record(ResponseState::Triggered),
+            "Platform",
+            ChannelPostStage::Paged,
+            URL,
+        );
         let mut acked = record(ResponseState::Acknowledged);
         acked.acked_by = Some("ana@o2.ai".into());
         acked.ladder_run = Some(4);
@@ -1856,22 +1913,39 @@ mod tests {
     /// it, not that one named person is being woken.
     #[test]
     fn test_the_post_is_about_the_record_not_about_the_person_being_woken() {
-        let paged = channel_post(&record(ResponseState::Triggered), "Platform", ChannelPostStage::Paged, URL);
-        assert!(paged.title.contains("Checkout error rate"), "{}", paged.title);
+        let paged = channel_post(
+            &record(ResponseState::Triggered),
+            "Platform",
+            ChannelPostStage::Paged,
+            URL,
+        );
+        assert!(
+            paged.title.contains("Checkout error rate"),
+            "{}",
+            paged.title
+        );
         assert!(paged.title.contains("Platform"));
         assert!(paged.body.contains("has been paged"), "{}", paged.body);
         assert!(
             !paged.body.contains("Acknowledge:"),
             "an ack link belongs to a person, not to a room"
         );
-        assert!(paged.body.contains(URL), "the room can read the whole thing");
+        assert!(
+            paged.body.contains(URL),
+            "the room can read the whole thing"
+        );
     }
 
     /// The record carries no rows or values, so the alert's detail is linked
     /// rather than copied — a link cannot go stale.
     #[test]
     fn test_the_post_links_the_record_rather_than_copying_the_alert() {
-        let post = channel_post(&record(ResponseState::Triggered), "Platform", ChannelPostStage::Paged, URL);
+        let post = channel_post(
+            &record(ResponseState::Triggered),
+            "Platform",
+            ChannelPostStage::Paged,
+            URL,
+        );
         assert_eq!(post.url, URL);
         assert_eq!(post.body.matches(URL).count(), 1, "linked once, not pasted");
     }
@@ -1884,11 +1958,24 @@ mod tests {
         resolved.cause = Some(ResolutionCause::ConfigChangeOrDeploy);
         resolved.cause_note = Some("rolled back deploy 4821".into());
         let with = channel_post(&resolved, "Platform", ChannelPostStage::Resolved, URL);
-        assert!(with.body.contains("Cause: config_change_or_deploy"), "{}", with.body);
+        assert!(
+            with.body.contains("Cause: config_change_or_deploy"),
+            "{}",
+            with.body
+        );
         assert!(with.body.contains("rolled back deploy 4821"));
 
-        let without = channel_post(&record(ResponseState::Resolved), "Platform", ChannelPostStage::Resolved, URL);
-        assert!(without.body.contains("Cause: not recorded"), "{}", without.body);
+        let without = channel_post(
+            &record(ResponseState::Resolved),
+            "Platform",
+            ChannelPostStage::Resolved,
+            URL,
+        );
+        assert!(
+            without.body.contains("Cause: not recorded"),
+            "{}",
+            without.body
+        );
     }
 
     /// An impacted team's room is told it is a liaison seat. Reading "you have
@@ -1898,7 +1985,11 @@ mod tests {
         let mut impacted = record(ResponseState::Triggered);
         impacted.responder_role = ResponderRole::Impacted;
         let post = channel_post(&impacted, "Payments", ChannelPostStage::Paged, URL);
-        assert!(post.body.contains("impacted rather than the owner"), "{}", post.body);
+        assert!(
+            post.body.contains("impacted rather than the owner"),
+            "{}",
+            post.body
+        );
         assert!(post.body.contains("another team is fixing the cause"));
     }
 
@@ -1933,7 +2024,12 @@ mod tests {
                 "{editable}"
             );
         }
-        for fixed in [Channel::Email, Channel::Sms, Channel::Voice, Channel::Webhook] {
+        for fixed in [
+            Channel::Email,
+            Channel::Sms,
+            Channel::Voice,
+            Channel::Webhook,
+        ] {
             assert_eq!(
                 channel_post_action(true, super::super::agent::updates_in_place(fixed)),
                 ChannelPostAction::Skip,
@@ -1991,7 +2087,10 @@ mod tests {
     #[test]
     fn test_a_recovery_that_holds_closes_promptly_and_the_next_firing_pages() {
         let record = closed_at(1_000);
-        assert!(record.state.is_terminal(), "recovery closed it, unconditionally");
+        assert!(
+            record.state.is_terminal(),
+            "recovery closed it, unconditionally"
+        );
         assert_eq!(record.closed_at, Some(1_000));
         // A firing after the window is a new incident and gets its own record —
         // which is what keeps the prior-causes history honest.

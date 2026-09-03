@@ -31,10 +31,7 @@ use sea_orm::{
 };
 
 use super::entity::{oncall_team_members, oncall_teams};
-use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
-    errors,
-};
+use crate::{db::get_orm_client_rw, errors};
 
 /// The team row, for the paging path (`06` §3).
 ///
@@ -133,7 +130,9 @@ fn to_channel(raw: Option<String>) -> Option<Vec<String>> {
     match serde_json::from_str::<Vec<String>>(&raw) {
         Ok(list) => Some(list),
         Err(e) => {
-            log::error!("[oncall] team channel_destinations is not a JSON array ({e}); ignoring it");
+            log::error!(
+                "[oncall] team channel_destinations is not a JSON array ({e}); ignoring it"
+            );
             None
         }
     }
@@ -153,7 +152,7 @@ pub async fn create(
     timezone: &str,
     description: Option<String>,
 ) -> Result<Team, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = now_micros();
     let model = oncall_teams::ActiveModel {
         id: Set(ider::uuid()),
@@ -179,7 +178,7 @@ pub async fn create(
 /// a different write path and a different audience. Keeping them apart is what
 /// lets the channel be edited without invalidating the page path's cache.
 pub async fn get_channel(org_id: &str, id: &str) -> Result<Option<Vec<String>>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_teams::Entity::find_by_id(id)
         .filter(oncall_teams::Column::OrgId.eq(org_id))
         .one(client)
@@ -201,7 +200,7 @@ pub async fn set_channel(
     id: &str,
     destinations: Option<Vec<String>>,
 ) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Some(existing) = oncall_teams::Entity::find_by_id(id)
         .filter(oncall_teams::Column::OrgId.eq(org_id))
         .one(client)
@@ -221,7 +220,7 @@ pub async fn set_channel(
 }
 
 pub async fn get(org_id: &str, id: &str) -> Result<Option<Team>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_teams::Entity::find_by_id(id)
         .filter(oncall_teams::Column::OrgId.eq(org_id))
         .one(client)
@@ -230,7 +229,7 @@ pub async fn get(org_id: &str, id: &str) -> Result<Option<Team>, errors::Error> 
 }
 
 pub async fn get_by_name(org_id: &str, name: &str) -> Result<Option<Team>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_teams::Entity::find()
         .filter(oncall_teams::Column::OrgId.eq(org_id))
         .filter(oncall_teams::Column::Name.eq(name))
@@ -242,7 +241,7 @@ pub async fn get_by_name(org_id: &str, name: &str) -> Result<Option<Team>, error
 /// Ordered by id: stable and roughly creation-ordered, which is all a team
 /// list needs.
 pub async fn list(org_id: &str) -> Result<Vec<Team>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_teams::Entity::find()
         .filter(oncall_teams::Column::OrgId.eq(org_id))
         .order_by_asc(oncall_teams::Column::Id)
@@ -260,7 +259,7 @@ pub async fn update(
     timezone: Option<String>,
     description: Option<Option<String>>,
 ) -> Result<Option<Team>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let Some(existing) = oncall_teams::Entity::find_by_id(id)
         .filter(oncall_teams::Column::OrgId.eq(org_id))
         .one(client)
@@ -289,7 +288,7 @@ pub async fn update(
 /// Schedules, policies and responses are left alone deliberately: a response
 /// record is history and must survive the team being reorganised away.
 pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let txn = client.begin().await?;
     let deleted = oncall_teams::Entity::delete_many()
         .filter(oncall_teams::Column::OrgId.eq(org_id))
@@ -312,7 +311,7 @@ pub async fn delete(org_id: &str, id: &str) -> Result<bool, errors::Error> {
 }
 
 pub async fn add_member(team_id: &str, user_email: &str) -> Result<TeamMember, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = oncall_team_members::ActiveModel {
         id: Set(ider::uuid()),
         team_id: Set(team_id.to_string()),
@@ -344,7 +343,7 @@ pub async fn add_member(team_id: &str, user_email: &str) -> Result<TeamMember, e
 /// `shift_rules[].members` and is already whatever the client last wrote — so
 /// re-ordering an existing rotation does not go through here.
 pub async fn list_members(team_id: &str) -> Result<Vec<TeamMember>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_team_members::Entity::find()
         .filter(oncall_team_members::Column::TeamId.eq(team_id))
         .order_by_asc(oncall_team_members::Column::CreatedAt)
@@ -399,7 +398,7 @@ pub async fn list_members_cached(team_id: &str) -> Result<Vec<TeamMember>, error
 /// joining back to the team, and without that join a member of a team in
 /// another tenant would be reported here.
 pub async fn list_for_user(org_id: &str, user_email: &str) -> Result<Vec<Team>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(oncall_teams::Entity::find()
         .filter(oncall_teams::Column::OrgId.eq(org_id))
         .join(
@@ -429,7 +428,7 @@ pub async fn list_for_user(org_id: &str, user_email: &str) -> Result<Vec<Team>, 
 pub async fn count_alerts_assigned(org_id: &str, team_id: &str) -> Result<u64, errors::Error> {
     use sea_orm::PaginatorTrait;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(super::entity::alerts::Entity::find()
         .filter(super::entity::alerts::Column::Org.eq(org_id))
         .filter(super::entity::alerts::Column::OncallTeam.eq(team_id))
@@ -454,7 +453,7 @@ pub async fn count_alerts_assigned_by_priority(
     org_id: &str,
     team_id: &str,
 ) -> Result<std::collections::HashMap<i32, i64>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Ok(super::entity::alerts::Entity::find()
         .filter(super::entity::alerts::Column::Org.eq(org_id))
         .filter(super::entity::alerts::Column::OncallTeam.eq(team_id))
@@ -472,7 +471,7 @@ pub async fn count_alerts_assigned_by_priority(
 }
 
 pub async fn remove_member(team_id: &str, user_email: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let deleted = oncall_team_members::Entity::delete_many()
         .filter(oncall_team_members::Column::TeamId.eq(team_id))
         .filter(oncall_team_members::Column::UserEmail.eq(user_email))

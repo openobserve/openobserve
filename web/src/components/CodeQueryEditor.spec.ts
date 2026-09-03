@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import CodeQueryEditor from "./CodeQueryEditor.vue";
 import { createStore } from "vuex";
@@ -41,6 +41,7 @@ const mockEditorObj = {
   onDidChangeModelContent: vi.fn(),
   createContextKey: vi.fn(),
   addCommand: vi.fn(),
+  onKeyDown: vi.fn(),
   onDidFocusEditorWidget: vi.fn(),
   onDidBlurEditorWidget: vi.fn(),
   dispose: vi.fn(),
@@ -66,6 +67,7 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     defineTheme: vi.fn(),
     setTheme: vi.fn(),
     setModelMarkers: vi.fn(),
+    setModelLanguage: vi.fn(),
   },
   languages: {
     // Real values, mirroring monaco-editor/esm/vs/editor/common/languages.js
@@ -108,6 +110,7 @@ vi.mock("monaco-editor/esm/vs/language/html/monaco.contribution.js", () => ({}))
 vi.mock("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js", () => ({}));
 vi.mock("monaco-editor/esm/vs/basic-languages/python/python.contribution.js", () => ({}));
 vi.mock("monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js", () => ({}));
+vi.mock("monaco-editor/esm/vs/basic-languages/hcl/hcl.contribution.js", () => ({}));
 
 // Fix: component imports default from "@/composables/useLogs/searchState"
 vi.mock("@/composables/useLogs/searchState", () => ({
@@ -203,6 +206,29 @@ describe("CodeQueryEditor", () => {
       },
     });
   };
+
+  // A surface that switches language, such as the export dialog's JSON and
+  // Terraform tabs, used to force a remount to get new highlighting: that throws
+  // away the DOM, the scroll position and the undo stack on every toggle.
+  describe("language switching", () => {
+    it("retokenizes the existing model instead of recreating the editor", async () => {
+      attachEditorHost();
+      const monacoApi: any = await import("monaco-editor/esm/vs/editor/editor.api");
+      const wrapper = createWrapper({ language: "json", query: "{}" });
+      await vi.waitFor(() => expect(monacoApi.editor.create).toHaveBeenCalled());
+
+      const createdBefore = monacoApi.editor.create.mock.calls.length;
+      monacoApi.editor.setModelLanguage.mockClear();
+
+      await wrapper.setProps({ language: "hcl" });
+      await vi.waitFor(() => expect(monacoApi.editor.setModelLanguage).toHaveBeenCalled());
+
+      expect(monacoApi.editor.setModelLanguage.mock.calls[0][1]).toBe("hcl");
+      // No second editor: the same instance was retokenized.
+      expect(monacoApi.editor.create.mock.calls.length).toBe(createdBefore);
+      wrapper.unmount();
+    });
+  });
 
   describe("Component Rendering", () => {
     it("should render the component", () => {
@@ -558,10 +584,10 @@ describe("CodeQueryEditor", () => {
         },
         global: { plugins: [store] },
       });
-      // Wait until the async setupEditor completes and addCommand is recorded
+      // Wait until the async setupEditor completes and the key handler is bound
       await vi.waitFor(
         () => {
-          expect(mockEditorObj.addCommand).toHaveBeenCalled();
+          expect(mockEditorObj.onKeyDown).toHaveBeenCalled();
         },
         { timeout: 10000 },
       );
@@ -573,28 +599,40 @@ describe("CodeQueryEditor", () => {
       shortcutWrapper = null;
     });
 
-    it("should call addCommand with CtrlCmd+Enter keybinding", async () => {
+    // The shortcut is bound via onKeyDown rather than addCommand: monaco's
+    // addCommand discards the disposable it gets back, so its CommandsRegistry
+    // entry outlives the editor and retains this component.
+    it("should bind the shortcut through onKeyDown, not addCommand", async () => {
       await mountAndSetup();
-      expect(mockEditorObj.addCommand).toHaveBeenCalled();
-      const firstCall = mockEditorObj.addCommand.mock.calls[0];
-      // KeyMod.CtrlCmd | KeyCode.Enter = 1 | 13 (bitwise OR of the mock values)
-      expect(firstCall[0]).toBe(1 | 13);
+      expect(mockEditorObj.onKeyDown).toHaveBeenCalled();
+      expect(mockEditorObj.addCommand).not.toHaveBeenCalled();
     });
 
-    it("should emit run-query when CtrlCmd+Enter handler is invoked", async () => {
+    it("should emit run-query when CtrlCmd+Enter is pressed", async () => {
       const wrapper = await mountAndSetup();
-      expect(mockEditorObj.addCommand).toHaveBeenCalled();
-      const handler = mockEditorObj.addCommand.mock.calls[0][1];
+      const handler = mockEditorObj.onKeyDown.mock.calls[0][0];
       expect(typeof handler).toBe("function");
-      handler();
+      handler({
+        keyCode: 13,
+        ctrlKey: true,
+        metaKey: false,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      });
       expect(wrapper.emitted("run-query")).toBeTruthy();
     });
 
-    it("should register addCommand with ctrlenter context", async () => {
-      await mountAndSetup();
-      expect(mockEditorObj.addCommand).toHaveBeenCalled();
-      const firstCall = mockEditorObj.addCommand.mock.calls[0];
-      expect(firstCall[2]).toBe("ctrlenter");
+    it("should ignore Enter without a modifier", async () => {
+      const wrapper = await mountAndSetup();
+      const handler = mockEditorObj.onKeyDown.mock.calls[0][0];
+      handler({
+        keyCode: 13,
+        ctrlKey: false,
+        metaKey: false,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      });
+      expect(wrapper.emitted("run-query")).toBeFalsy();
     });
   });
 
@@ -619,7 +657,7 @@ describe("CodeQueryEditor", () => {
 
       await vi.waitFor(
         () => {
-          expect(mockEditorObj.addCommand).toHaveBeenCalled();
+          expect(mockEditorObj.onKeyDown).toHaveBeenCalled();
         },
         { timeout: 10000 },
       );

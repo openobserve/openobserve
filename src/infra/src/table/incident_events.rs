@@ -17,7 +17,7 @@ use config::meta::alerts::incidents::IncidentEvent;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     table::entity::incident_events,
 };
 
@@ -111,7 +111,7 @@ fn decode_events(org_id: &str, incident_id: &str, raw: &serde_json::Value) -> Ve
 
 /// Initialize events row for a new incident with a Created event
 pub async fn init(org_id: &str, incident_id: &str) -> Result<(), sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
     let event = IncidentEvent::created();
     let events_json = encode_events(&[event])?;
 
@@ -126,7 +126,7 @@ pub async fn init(org_id: &str, incident_id: &str) -> Result<(), sea_orm::DbErr>
 
 /// Get all events for an incident
 pub async fn get(org_id: &str, incident_id: &str) -> Result<Vec<IncidentEvent>, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_ro().await;
     let row = incident_events::Entity::find()
         .filter(incident_events::Column::OrgId.eq(org_id))
         .filter(incident_events::Column::IncidentId.eq(incident_id))
@@ -222,7 +222,8 @@ pub async fn reconstruct_if_empty(
     org_id: &str,
     incident_id: &str,
 ) -> Result<Option<usize>, sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
+
     let txn = db.begin().await?;
 
     let row = incident_events::Entity::find()
@@ -295,7 +296,8 @@ pub async fn append(
     incident_id: &str,
     event: IncidentEvent,
 ) -> Result<(), sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
+
     let txn = db.begin().await?;
 
     let row = incident_events::Entity::find()
@@ -341,7 +343,8 @@ pub async fn record_alert(
     alert_name: &str,
     triggered_at: i64,
 ) -> Result<(), sea_orm::DbErr> {
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let db = get_orm_client_rw().await;
+
     let txn = db.begin().await?;
 
     let row = incident_events::Entity::find()
@@ -398,7 +401,8 @@ pub async fn record_alert(
 /// Deletes all incident event entries belonging to the given org.
 pub async fn delete_by_org(org_id: &str) -> Result<(), sea_orm::DbErr> {
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-    let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let db = get_orm_client_rw().await;
     incident_events::Entity::delete_many()
         .filter(incident_events::Column::OrgId.eq(org_id))
         .exec(db)

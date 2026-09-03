@@ -30,16 +30,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div data-test="destination-picker" class="flex w-full flex-col gap-4">
-    <!-- Mode toggle — a bare control OUTSIDE the form: it swaps the
-         select-existing form for the CreateDestinationForm create child. -->
+    <!-- Mode toggle — a bare control OUTSIDE the form: it swaps the select-existing
+         form for the CreateDestinationForm create child. Always visible, so the user
+         can toggle back to picking an existing destination without hunting for Cancel. -->
     <OSwitch
       v-model="createNewDestination"
       :label="t('flow.destination.createNew')"
+      :disabled="disabled"
       data-test="destination-picker-create-toggle"
     />
 
     <!-- inline create destination form (own save/cancel) -->
-    <div v-if="createNewDestination" class="w-full">
+    <div v-if="createNewDestination && !disabled" class="w-full">
       <CreateDestinationForm
         :forced-type="forcedType"
         @created="onDestinationCreated"
@@ -52,7 +54,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OFormSelect
         name="selectedDestination"
         :label="t('flow.destination.select')"
-        required
+        :required="!optional"
+        :disabled="disabled"
         :options="destinationOptions"
         tabindex="0"
         data-test="destination-picker-select"
@@ -71,6 +74,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import destinationService from "@/services/alert_destination";
+import { isCustomDestination } from "@/utils/destinationType";
 import CreateDestinationForm from "@/components/pipeline/NodeForm/CreateDestinationForm.vue";
 import {
   makeExternalDestinationSchema,
@@ -79,10 +83,25 @@ import {
 
 // `forcedType`, when set, is forwarded to the inline create form to lock its
 // destination type and skip the type-selection step (workflows → "custom").
-const props = withDefaults(defineProps<{ initialName?: string; forcedType?: string }>(), {
-  initialName: "",
-  forcedType: undefined,
-});
+// `optional` (Workflows) lets the picker be saved with NO destination selected —
+// `submit()` then returns an empty `destination_name` instead of null, and the
+// required schema check is skipped. `disabled` greys the whole picker out (used by
+// the Workflows "Set up later" toggle). Both default false so Pipelines are
+// unaffected.
+const props = withDefaults(
+  defineProps<{
+    initialName?: string;
+    forcedType?: string;
+    optional?: boolean;
+    disabled?: boolean;
+  }>(),
+  {
+    initialName: "",
+    forcedType: undefined,
+    optional: false,
+    disabled: false,
+  },
+);
 const emit = defineEmits<{ (e: "expand", value: boolean): void }>();
 
 const { t } = useI18nTyped();
@@ -122,15 +141,37 @@ watch(createNewDestination, async (v) => {
   }
 });
 
-// Show the destination URL as a sub-label.
-const destinationOptions = computed(() =>
-  destinations.value.map((d: any) => ({
-    label: d.name,
-    value: d.name,
-    subLabel: d.url && d.url.length > 70 ? d.url.slice(0, 70) + "..." : d.url,
-    subLabelInline: true,
-  })),
-);
+const toOption = (d: any) => ({
+  label: d.name,
+  value: d.name,
+  subLabel: d.url && d.url.length > 70 ? d.url.slice(0, 70) + "..." : d.url,
+  subLabelInline: true,
+});
+
+// Show the destination URL as a sub-label. When the host locks the type to custom
+// (Workflows), prebuilt provider destinations are filtered out — they are listed by
+// the shared pipeline endpoint but cannot be executed by a workflow node.
+const destinationOptions = computed(() => {
+  const all = destinations.value;
+  if (props.forcedType !== "custom") return all.map(toOption);
+
+  const custom = all.filter(isCustomDestination);
+  const options = custom.map(toOption);
+
+  // A node saved before this filter existed may point at a prebuilt destination.
+  // Keep it listed (flagged) rather than letting it vanish — an empty picker would
+  // silently downgrade the node to a placeholder on the next Save.
+  const saved = props.initialName
+    ? all.find((d: any) => d.name === props.initialName && !isCustomDestination(d))
+    : undefined;
+  if (saved) {
+    options.unshift({
+      ...toOption(saved),
+      subLabel: t("flow.destination.unsupportedType"),
+    });
+  }
+  return options;
+});
 
 // Pipeline-module external destinations.
 const getDestinations = async () => {
@@ -165,6 +206,16 @@ const onDestinationCreated = (name: string) => {
 // only fires on a schema-valid submit, so `validated` stays null otherwise.
 const submit = async () => {
   if (createNewDestination.value) return null; // still in the inline create form
+  // Optional (Workflows placeholder): empty is allowed. Read the current value
+  // WITHOUT running the required schema, so no inline error and empty resolves to
+  // "" rather than null.
+  if (props.optional) {
+    const name = (form.state.values.selectedDestination as string) || "";
+    return {
+      org_id: store.state.selectedOrganization.identifier,
+      destination_name: name,
+    };
+  }
   validated.value = null;
   await form.handleSubmit();
   const values = validated.value as ExternalDestinationForm | null;

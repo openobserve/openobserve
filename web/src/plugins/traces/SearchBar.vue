@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="toolbarLeftRef"
         class="flex min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden"
       >
-        <!-- Search granularity toggle: Spans / Traces -->
+        <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
           :model-value="searchObj.meta.searchMode"
           @update:model-value="$emit('update:searchMode', $event)"
@@ -44,33 +44,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon-left><OIcon name="account-tree" size="sm" class="shrink-0" /></template>
             <span v-if="!shouldHideToggleText">{{ t("traces.tracesTab") }}</span>
           </OToggleGroupItem>
+          <OToggleGroupItem
+            v-if="config.isEnterprise == 'true'"
+            data-test="traces-service-graph-toggle"
+            value="service-graph"
+            size="sm"
+            :tooltip="shouldHideToggleText ? t('traces.serviceGraphTab') : undefined"
+          >
+            <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
+            <span v-if="!shouldHideToggleText">{{ t("traces.serviceGraphTab") }}</span>
+          </OToggleGroupItem>
+          <OToggleGroupItem
+            data-test="traces-search-mode-services-catalog-btn"
+            value="services-catalog"
+            size="sm"
+            :tooltip="shouldHideToggleText ? t('traces.servicesCatalog.tabLabel') : undefined"
+          >
+            <template #icon-left><OIcon name="menu-book" size="sm" class="shrink-0" /></template>
+            <span v-if="!shouldHideToggleText">{{ t("traces.servicesCatalog.tabLabel") }}</span>
+          </OToggleGroupItem>
         </OToggleGroup>
 
-        <!-- Reset: icon+text at wide widths, icon-only when narrow -->
-        <OButton
-          data-test="traces-search-bar-reset-filters-btn"
-          variant="outline"
-          size="xs"
-          @click="resetFilters"
+        <!-- Show search controls only when not on Service Graph or Services Catalog -->
+        <template
+          v-if="
+            searchObj.meta.searchMode !== 'service-graph' &&
+            searchObj.meta.searchMode !== 'services-catalog'
+          "
         >
-          <template #icon-left>
-            <OIcon name="restart-alt" size="sm" class="shrink-0" />
-          </template>
-          <span v-if="!shouldHideResetText">{{ t("common.reset") }}</span>
-        </OButton>
+          <!-- Reset: icon+text at wide widths, icon-only when narrow -->
+          <OButton
+            data-test="traces-search-bar-reset-filters-btn"
+            variant="outline"
+            size="xs"
+            @click="resetFilters"
+          >
+            <template #icon-left>
+              <OIcon name="restart-alt" size="sm" class="shrink-0" />
+            </template>
+            <span v-if="!shouldHideResetText">{{ t("common.reset") }}</span>
+          </OButton>
 
-        <div
-          class="border-button-outline-border rounded-default hover:bg-button-outline-hover-bg flex cursor-pointer items-center justify-center border px-1.5 py-1 transition-all duration-200"
-        >
-          <OSwitch
-            data-test="traces-search-bar-show-metrics-toggle-btn"
-            v-model="searchObj.meta.showHistogram"
-            class="o2-toggle-button-xs flex items-center justify-center pr-1"
-            size="lg"
-          />
-          <OIcon name="bar-chart" size="sm" class="shrink-0" />
-          <OTooltip :content="t('traces.RedMetrics')" />
-        </div>
+          <div
+            class="border-button-outline-border rounded-default hover:bg-button-outline-hover-bg flex cursor-pointer items-center justify-center border px-1.5 py-1 transition-all duration-200"
+          >
+            <OSwitch
+              data-test="traces-search-bar-show-metrics-toggle-btn"
+              v-model="searchObj.meta.showHistogram"
+              class="o2-toggle-button-xs flex items-center justify-center pr-1"
+              size="lg"
+            />
+            <OIcon name="bar-chart" size="sm" class="shrink-0" />
+            <OTooltip :content="raw('RED Metrics')" />
+          </div>
+        </template>
 
         <!-- More menu: Syntax Guide — always last.
              Sessions + LLM Insights were removed from Traces; they now
@@ -96,7 +123,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Right toolbar — persistent wrapper so toolbarRightRef is always observable -->
       <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center">
-        <div class="flex items-center gap-1.5">
+        <div
+          v-if="
+            searchObj.meta.searchMode !== 'service-graph' &&
+            searchObj.meta.searchMode !== 'services-catalog'
+          "
+          class="flex items-center gap-1.5"
+        >
           <DateTime
             ref="dateTimeRef"
             auto-apply
@@ -131,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
                 :title="t('search.runQuery')"
-                class="element-box-shadow bg-button-primary! text-button-primary-foreground! h-[1.875rem]! w-[5.875rem]! p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]"
+                class="element-box-shadow bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 h-[1.875rem]! w-[5.875rem]! p-0 px-1! py-0! text-center text-xs! leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:ring-2"
                 :class="
                   store.state.zoConfig.auto_query_enabled
                     ? '![border-radius:0.375rem_0_0_0.375rem]'
@@ -162,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :class="[
                       config.isEnterprise == 'true' && isLoading
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                        : 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                        : 'bg-button-primary! text-button-primary-foreground! hover:ring-button-primary/70 hover:opacity-90 hover:ring-2',
                       '![border-radius:0_0.375rem_0.375rem_0]',
                     ]"
                   >
@@ -213,10 +246,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             shortcut-id="tracesCopyUrl"
           />
         </div>
+
+        <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
+        <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ml-auto">
+          <div class="flex items-center gap-2">
+            <DateTime
+              ref="dateTimeRef"
+              auto-apply
+              :default-type="searchObj.data.datetime.type"
+              :default-absolute-time="{
+                startTime: searchObj.data.datetime.startTime,
+                endTime: searchObj.data.datetime.endTime,
+              }"
+              :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+              data-test="service-graph-date-time-picker"
+              class="h-8!"
+              @on:date-change="updateDateTime"
+            />
+            <OButton
+              data-test="service-graph-refresh-btn"
+              variant="outline"
+              size="icon-toolbar"
+              class="min-w-[1.875rem]!"
+              @click="$emit('service-graph-refresh')"
+            >
+              <OIcon name="refresh" size="sm" />
+              <OTooltip :content="t('common.refresh')" />
+            </OButton>
+            <OToggleGroup
+              :model-value="searchObj.meta.serviceGraphVisualizationType"
+              @update:model-value="onServiceGraphVisualizationChange($event)"
+            >
+              <OToggleGroupItem data-test="service-graph-tree-view-btn" value="tree" size="sm">
+                <template #icon-left>
+                  <OIcon name="git-branch" size="sm" />
+                </template>
+                {{ t("traces.treeView") }}
+              </OToggleGroupItem>
+              <OToggleGroupItem data-test="service-graph-graph-view-btn" value="graph" size="sm">
+                <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
+                {{ t("traces.graphView") }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+            <OSelect
+              v-model="searchObj.meta.serviceGraphLayoutType"
+              :options="serviceGraphLayoutOptions"
+              :searchable="false"
+              class="h-8! min-h-8! w-[7.5rem]"
+              :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+              @update:model-value="onServiceGraphLayoutChange"
+            />
+          </div>
+        </div>
+
+        <!-- Services Catalog right toolbar: DateTime, Refresh -->
+        <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ml-auto">
+          <div class="flex items-center gap-2">
+            <DateTime
+              ref="dateTimeRef"
+              auto-apply
+              menu-align="end"
+              :default-type="searchObj.data.datetime.type"
+              :default-absolute-time="{
+                startTime: searchObj.data.datetime.startTime,
+                endTime: searchObj.data.datetime.endTime,
+              }"
+              :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+              data-test="services-catalog-date-time-picker"
+              class="mr-1.5 h-8!"
+              @on:date-change="updateDateTime"
+            />
+          </div>
+        </div>
       </div>
       <!-- /toolbarRightRef wrapper -->
     </div>
-    <div v-if="searchObj.meta.showQuery" class="border-border-default flex min-h-0 flex-1 border-b">
+    <div
+      v-if="
+        searchObj.meta.searchMode !== 'service-graph' &&
+        searchObj.meta.searchMode !== 'services-catalog' &&
+        searchObj.meta.showQuery
+      "
+      class="border-border-default flex min-h-0 flex-1 border-b"
+    >
       <div class="relative flex h-full w-full flex-col overflow-hidden">
         <CodeQueryEditor
           ref="queryEditorRef"
@@ -250,13 +362,12 @@ import {
   watch,
   nextTick,
   defineAsyncComponent,
-  onBeforeUnmount,
   onActivated,
   computed,
   toRef,
 } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -269,6 +380,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import useTraces from "@/composables/useTraces";
@@ -302,6 +414,7 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     OSwitch,
+    OSelect,
     OTooltip,
     CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     SyntaxGuide,
@@ -313,6 +426,8 @@ export default defineComponent({
     "error-only-toggled",
     "filters-reset",
     "onChangeTimezone",
+    "service-graph-refresh",
+    "services-catalog-refresh",
   ],
   props: {
     fieldValues: {
@@ -620,17 +735,15 @@ export default defineComponent({
     // Remove all conditions for a given field from the editor value.
     // Used by parent (Index.vue) to clear the error-only filter on toggle-off.
     const removeFilterByField = (fieldName: string) => {
-      const value = searchObj.data.editorValue;
-      const parts = value.split("|");
-      const target = parts.length > 1 ? 1 : 0;
-      const replaced = replaceExistingFieldCondition(parts[target] as string, fieldName, "");
-      parts[target] = replaced
+      // The whole editor value is the where clause — never split it on "|", the
+      // split is quote-unaware and would corrupt match_all('text | error').
+      const value = searchObj.data.editorValue as string;
+      const newValue = replaceExistingFieldCondition(value, fieldName, "")
         .replace(/\s*\band\b\s*$/i, "")
         .replace(/^\s*\band\b\s*/i, "")
         .replace(/\s+and\s+and\s+/gi, " and ")
         .trim();
-      const newValue = parts.length > 1 ? parts.join("| ") : parts[0];
-      searchObj.data.editorValue = newValue as string;
+      searchObj.data.editorValue = newValue;
       if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(newValue);
       if (store.state.zoConfig?.auto_query_enabled && searchObj.meta.liveMode) {
         emit("searchdata");
@@ -712,6 +825,35 @@ export default defineComponent({
       dateTimeRef.value?.setDateType("absolute");
     };
 
+    // Service Graph toolbar controls
+    const serviceGraphVisualizationTabs = [
+      { label: t("traces.treeView"), value: "tree" },
+      { label: t("traces.graphView"), value: "graph" },
+    ];
+
+    const serviceGraphLayoutOptions = computed(() => {
+      if (searchObj.meta.serviceGraphVisualizationType === "graph") {
+        return [{ label: t("traces.layoutForce"), value: "force" }];
+      }
+      return [
+        { label: t("traces.layoutHorizontal"), value: "horizontal" },
+        { label: t("traces.layoutVertical"), value: "vertical" },
+      ];
+    });
+
+    const onServiceGraphVisualizationChange = (type: "tree" | "graph") => {
+      searchObj.meta.serviceGraphVisualizationType = type;
+      localStorage.setItem("serviceGraph_visualizationType", type);
+      const newLayout = type === "tree" ? "horizontal" : "force";
+      searchObj.meta.serviceGraphLayoutType = newLayout;
+      localStorage.setItem("serviceGraph_layoutType", newLayout);
+    };
+
+    const onServiceGraphLayoutChange = (type: string) => {
+      searchObj.meta.serviceGraphLayoutType = type;
+      localStorage.setItem("serviceGraph_layoutType", type);
+    };
+
     const _traceStreamFields = computed(() => searchObj.data.stream.selectedStreamFields ?? []);
     const _traceFieldValues = computed(() => props.fieldValues ?? {});
     const _traceSqlMode = computed(() => false);
@@ -721,6 +863,7 @@ export default defineComponent({
       _traceFieldValues,
       _traceSqlMode,
       _traceNoStream,
+      t,
       { excludeMatchAll: true },
     );
 
@@ -735,6 +878,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       router,
       store,
       searchObj,
@@ -761,6 +905,10 @@ export default defineComponent({
       config,
       applyFilters,
       removeFilterByField,
+      serviceGraphVisualizationTabs,
+      serviceGraphLayoutOptions,
+      onServiceGraphVisualizationChange,
+      onServiceGraphLayoutChange,
       toggleLiveMode,
       traceEditorPlaceholder,
       toolbarLeftRef,

@@ -144,9 +144,9 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
                         .with_label_values(&[Role::Router.to_string().as_str()])
                         .inc();
                 }
-                if node.is_alert_manager() {
+                if node.is_scheduler() {
                     metrics::META_NUM_NODES
-                        .with_label_values(&[Role::AlertManager.to_string().as_str()])
+                        .with_label_values(&[Role::Scheduler.to_string().as_str()])
                         .inc();
                 }
             }
@@ -272,6 +272,13 @@ async fn update_parquet_metrics() -> Result<(), anyhow::Error> {
         .map_err(|e| anyhow::anyhow!("Failed to collect parquet metrics: {}", e))?;
     // and the wal pack backlog gauges (pack files/segments totals)
     ingester::collect_pack_metrics().await;
+    // and the wal search locks, plus the deletions they are holding back
+    metrics::INGEST_WAL_SEARCHING_FILES
+        .with_label_values::<&str>(&[])
+        .set(common::infra::wal::lock_files_len() as i64);
+    metrics::INGEST_WAL_PENDING_DELETE_FILES
+        .with_label_values::<&str>(&[])
+        .set(infra::file_list::pending_delete::len().await as i64);
     Ok(())
 }
 

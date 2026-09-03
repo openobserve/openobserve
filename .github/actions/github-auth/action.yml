@@ -1,0 +1,20 @@
+name: GitHub auth for git and cargo
+description: Authenticate every github.com fetch in this job (git clone, cargo git dependencies) so shared-IP anonymous rate limits do not apply
+inputs:
+  token:
+    description: Token with read access to the repositories fetched during the build
+    default: ${{ github.token }}
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        TOKEN: ${{ inputs.token }}
+      run: |
+        # A credential helper is consulted only when GitHub answers 401, so it never conflicts with the
+        # header actions/checkout keeps for the checked-out repository.
+        echo "GH_AUTH_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+        git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$GH_AUTH_TOKEN"; }; f'
+        echo "GIT_TERMINAL_PROMPT=0" >> "$GITHUB_ENV"
+        # cargo's libgit2 path does not always consult the helper; the git CLI always does.
+        echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> "$GITHUB_ENV"

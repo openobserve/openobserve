@@ -25,6 +25,7 @@ pub mod authz;
 pub mod bootstrap;
 pub mod cache;
 pub mod dashboards;
+pub mod db_monitoring;
 use ::common;
 use ::db;
 pub mod error_suggest;
@@ -40,7 +41,6 @@ pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod llm_evaluations;
 pub mod logs;
-pub mod metadata;
 pub mod metrics;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
@@ -59,6 +59,7 @@ pub mod service;
 pub mod session;
 pub mod short_url;
 pub mod slo;
+pub mod status_pages;
 pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;

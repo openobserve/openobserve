@@ -31,26 +31,30 @@
         <OIcon name="link" size="xs" class="mr-1" />{{ t("search.viewRelated") }}
         <OTooltip :content="t('search.viewRelatedTooltip')" />
       </OButton>
+      <!-- Stream picker and its action read as one control, sized to sit level
+           with the toolbar buttons above rather than towering over them. -->
       <div
-        v-if="showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)"
-        class="o2-input logs-trace-selector flex items-center"
+        v-if="
+          !hideViewTrace && showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
+        "
+        class="mb-1.5 flex items-center gap-2"
       >
         <OSelect
           data-test="log-search-index-list-select-stream"
           v-model="searchObj.meta.selectedTraceStream"
           :options="tracesStreams"
-          class="w-[auto] flex-shrink-0"
+          class="w-auto shrink-0"
           :loading="isTracesStreamsLoading"
           :disabled="isTracesStreamsLoading"
           size="sm"
         />
         <OButton
           data-test="trace-view-logs-btn"
-          class="traces-view-logs-btn"
-          size="sm-action"
+          size="xs"
           variant="outline"
+          icon-left="account-tree"
           @click="redirectToTraces"
-          ><OIcon name="account-tree" size="sm" class="mr-1" />{{ t("search.viewTrace") }}</OButton
+          >{{ t("search.viewTrace") }}</OButton
         >
       </div>
     </div>
@@ -60,14 +64,16 @@
         <!-- Editor sizing is inlined (not scoped CSS) so it doesn't leak onto
              every .monaco-editor app-wide. The focus-border is left off so this
              editor stays borderless like the others. -->
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <CodeQueryEditor
           v-model:query="unflattendData"
           ref="queryEditorRef"
           :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
-          class="w-[calc(100%-16px)]!"
+          class="w-[calc(100%-1rem)]!"
           :class="[mode, mode === 'expanded' ? 'h-75! max-w-256!' : 'h-[calc(100vh-250px)]!']"
           language="json"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
     <div v-show="activeTab !== 'unflattened'" class="pl-3">
@@ -208,7 +214,7 @@
           <img
             :src="regexIconForContextMenu"
             class="mr-2"
-            style="width: 14px; height: 14px"
+            style="width: 0.875rem; height: 0.875rem"
             alt=""
           />
           {{ t("logs.jsonPreview.createRegexPattern") }}
@@ -251,10 +257,9 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
-import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
 import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
@@ -263,6 +268,7 @@ import config from "@/aws-exports";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
+import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -276,6 +282,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { isSafeNavigableUrl } from "@/utils/safeUrl";
 
 export default {
   name: "JsonPreview",
@@ -304,6 +311,12 @@ export default {
       required: false,
     },
     hideViewRelated: {
+      type: Boolean,
+      default: false,
+    },
+    // Set by DetailTable's drawer, which renders the View Trace action in its
+    // own header row instead so it stays reachable from every tab.
+    hideViewTrace: {
       type: Boolean,
       default: false,
     },
@@ -351,17 +364,9 @@ export default {
 
     const streamSearchValue = ref<string>("");
 
-    const { getStreams } = useStreams(t);
-
-    const filteredTracesStreamOptions = ref([]);
-
     const router = useRouter();
 
-    const tracesStreams = ref([]);
-
     const queryEditorRef = ref<any>();
-
-    const isTracesStreamsLoading = ref(false);
 
     const typeOfRegexPattern = ref(false);
     const regexPatternType = ref("");
@@ -408,6 +413,20 @@ export default {
       emit("addFieldToTable", value);
     };
     const { searchObj, searchAggData } = searchState();
+
+    // Shared with DetailTable's drawer header so both renderings of the
+    // View Trace action apply the same rules. See useViewTraceAction.
+    const {
+      tracesStreams,
+      filteredTracesStreamOptions,
+      isTracesStreamsLoading,
+      showViewTraceBtn,
+      getTracesStreams,
+      setViewTraceBtn: setViewTraceBtnFor,
+      filterStreamFn,
+    } = useViewTraceAction(t, searchObj);
+
+    const setViewTraceBtn = () => setViewTraceBtnFor(props.value);
 
     // Cross-linking: get all matching cross-links for a field using result_schema data
     const getCrossLinksForField = (
@@ -481,12 +500,18 @@ export default {
     const crossLinkDropdownVisible = ref(false);
 
     const openCrossLink = (url: string) => {
-      window.open(url, "_blank");
+      // Guard the RESOLVED url, not just the saved template: links stored
+      // before save-time validation existed are still in the DB, and a field
+      // VALUE substituted into the template can carry a hostile scheme too.
+      if (!isSafeNavigableUrl(url)) {
+        crossLinkDropdownVisible.value = false;
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
       crossLinkDropdownVisible.value = false;
     };
     let multiStreamFields: any = ref([]);
 
-    const showViewTraceBtn = ref(false);
     const showViewRelatedBtn = ref(false);
 
     // Initialize service correlation composable
@@ -520,38 +545,18 @@ export default {
       }
     });
 
-    const getTracesStreams = async () => {
-      isTracesStreamsLoading.value = true;
-      try {
-        getStreams("traces", false)
-          .then((res: any) => {
-            tracesStreams.value = res.list.map((option: any) => option.name);
-            filteredTracesStreamOptions.value = JSON.parse(JSON.stringify(tracesStreams.value));
-
-            if (!searchObj.meta.selectedTraceStream.length)
-              searchObj.meta.selectedTraceStream = tracesStreams.value[0];
-          })
-          .catch(() => Promise.reject())
-          .finally(() => {
-            isTracesStreamsLoading.value = false;
-          });
-      } catch (err: any) {
-        isTracesStreamsLoading.value = false;
-        console.error("Failed to get traces streams", err);
-      }
-    };
-
-    const setViewTraceBtn = () => {
-      // Hide view traces button when service_streams_enabled is true
-      const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false;
-
-      showViewTraceBtn.value =
-        !store.state.hiddenMenus.has("traces") && // Check if traces menu is hidden
-        !serviceStreamsEnabled && // Hide when service streams is enabled
-        props.value[store.state.organizationData?.organizationSettings?.trace_id_field_name];
-
-      if (showViewTraceBtn.value && !filteredTracesStreamOptions.value.length) getTracesStreams();
-    };
+    // `value` can arrive after this component mounts: DetailTable fills its
+    // `rowData` in an async created() hook, so the row-detail drawer's preview
+    // mounts with `{}`. The onBeforeMount check below then ran against an empty
+    // record, left `showViewTraceBtn` false and never fetched the traces
+    // streams, so the drawer's View Trace button stayed hidden for good.
+    // Re-evaluate whenever the previewed record changes.
+    watch(
+      () => props.value,
+      () => {
+        setViewTraceBtn();
+      },
+    );
 
     onBeforeMount(() => {
       setViewTraceBtn();
@@ -692,14 +697,12 @@ export default {
       },
     );
 
-    const filterStreamFn = (val: any = "") => {
-      filteredTracesStreamOptions.value = tracesStreams.value.filter((stream: any) => {
-        return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
-      });
-    };
-
+    // The previewed log rides along with the event: a listener bound by
+    // reference (`@view-trace="handler"`) otherwise receives `undefined` and
+    // throws on `log[timestamp_column]` (issue #13708). Same contract as
+    // `show-correlation` below.
     const redirectToTraces = () => {
-      emit("view-trace");
+      emit("view-trace", props.value);
     };
 
     const openCorrelation = () => {
@@ -761,7 +764,10 @@ export default {
 
     const createRegexPatternFromLogs = (key: string, value: string) => {
       emit("closeTable");
-      const promptToBeAdded = `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`;
+      // Prompt text handed to the assistant — model input, deliberately English.
+      const promptToBeAdded = raw(
+        `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`,
+      );
 
       router.push({
         path: "/settings/regex_patterns",
@@ -785,7 +791,9 @@ export default {
       emit("closeTable");
       // inputMessage.value = `Create a regex pattern for ${store.state.organizationData.customRegexPatternFromLogs.key} field that contains the following value: "${store.state.organizationData.customRegexPatternFromLogs.value}" which should be a type of ${store.state.organizationData.customRegexPatternFromLogs.type} from the ${store.state.organizationData.customRegexPatternFromLogs.stream} stream`;
 
-      const PromptToBeAdded = `Create a regex pattern for the following value: "${selectedText.value}" which should be a type of ${regexPatternType.value} from the ${searchObj.data.stream.selectedStream[0]} stream`;
+      const PromptToBeAdded = raw(
+        `Create a regex pattern for the following value: "${selectedText.value}" which should be a type of ${regexPatternType.value} from the ${searchObj.data.stream.selectedStream[0]} stream`,
+      );
 
       store.state.organizationData.regexPatternPrompt = PromptToBeAdded;
       store.state.organizationData.regexPatternTestValue = selectedText.value;
