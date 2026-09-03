@@ -8,8 +8,8 @@ on:
   pull_request:
     branches:
       - "**"
-    # labeled/unlabeled so adding or removing 'e2e' starts or resets CI.
-    types: [opened, reopened, synchronize, labeled, unlabeled]
+    # labeled/unlabeled so adding or removing 'e2e' starts or resets CI; drafts never run paid CI.
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   merge_group:
 
 concurrency:
@@ -34,7 +34,7 @@ env:
 jobs:
   check_changes:
     # Runs only on PRs carrying the 'e2e' label; the merge queue runs unit tests only (see docs/ci).
-    if: ${{ github.event_name != 'merge_group' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e')) }}
+    if: ${{ github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false)) }}
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
@@ -558,7 +558,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     needs: [check_changes, build_api_binary, api_integration_tests, api_query_agent_tests, api_regression_tests]
-    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e'))
+    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
         run: |
@@ -592,7 +592,7 @@ jobs:
   report_to_openobserve:
     name: Report run metrics to OpenObserve
     needs: [check_changes, api_integration_tests, api_query_agent_tests, api_regression_tests]
-    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e'))
+    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false))
     runs-on: ubuntu-latest
     permissions:
       actions: read
