@@ -1,0 +1,17 @@
+{
+  "feature_slug": "llm-insights-model-filter",
+  "feature_title": "Traces LLM Insights — model-grouped panels exclude spans without a model",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "llmInsightsPanels.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/llmInsightsPanels.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/config/llmInsightsPanels.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

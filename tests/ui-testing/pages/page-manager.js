@@ -58,6 +58,7 @@ import { MetricsExplorerPage } from "./metricsPages/metricsExplorerPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
+import { LLMInsightsPage } from "./tracesPages/llmInsightsPage.js";
 import { DatabaseMonitoringPage } from "./dbmPages/databaseMonitoringPage.js";
 import { RumPage } from "./rumPages/rumPage.js";
 import { RumSessionsPage } from "./rumPages/rumSessionsPage.js";
@@ -196,6 +197,7 @@ class PageManager {
     this.tracesPage = new TracesPage(page);
     this.serviceGraphPage = new ServiceGraphPage(page);
     this.servicesCatalogPage = new ServicesCatalogPage(page);
+    this.llmInsightsPage = new LLMInsightsPage(page);
     this.databaseMonitoringPage = new DatabaseMonitoringPage(page);
     this.rumPage = new RumPage(page);
     this.reportsPage = new ReportsPage(page);
