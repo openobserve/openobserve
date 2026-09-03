@@ -41,10 +41,12 @@ impl MergeResult {
 
 /// One file written by [`super::merge_parquet_files`].
 pub enum MergedFile {
-    /// Ordinary output, including logs, traces and downsampled metrics.
-    Standard { data: Vec<u8>, meta: FileMeta },
-    /// Metrics output ordered by `(__hash__, _timestamp)` and retained in memory.
-    MetricsHashSorted { data: Vec<u8>, meta: FileMeta },
+    /// In-memory output; `layout` marks metrics output ordered by `(__hash__, _timestamp)`.
+    Standard {
+        data: Vec<u8>,
+        meta: FileMeta,
+        layout: Option<MetricsFileLayout>,
+    },
     /// Finalized indexed metrics output spooled to local disk.
     MetricsIndexed {
         data_path: tempfile::TempPath,
@@ -56,8 +58,7 @@ pub enum MergedFile {
 impl MergedFile {
     fn metrics_layout(&self) -> Option<MetricsFileLayout> {
         match self {
-            Self::Standard { .. } => None,
-            Self::MetricsHashSorted { .. } => Some(MetricsFileLayout::HashSorted),
+            Self::Standard { layout, .. } => *layout,
             Self::MetricsIndexed { .. } => Some(MetricsFileLayout::Indexed),
         }
     }
@@ -81,9 +82,7 @@ impl MergedFile {
     /// Consume the single buffered output used by ingester movers.
     pub fn into_buffered(self) -> Result<(Vec<u8>, FileMeta)> {
         match self {
-            Self::Standard { data, meta } | Self::MetricsHashSorted { data, meta } => {
-                Ok((data, meta))
-            }
+            Self::Standard { data, meta, .. } => Ok((data, meta)),
             Self::MetricsIndexed { .. } => Err(DataFusionError::Execution(
                 "ingester cannot consume indexed metrics output".to_string(),
             )),
@@ -95,9 +94,7 @@ impl MergedFile {
         self,
     ) -> Result<(Vec<u8>, FileMeta, Option<tempfile::TempPath>)> {
         match self {
-            Self::Standard { data, meta } | Self::MetricsHashSorted { data, meta } => {
-                Ok((data, meta, None))
-            }
+            Self::Standard { data, meta, .. } => Ok((data, meta, None)),
             Self::MetricsIndexed {
                 data_path,
                 metrics_index_path,

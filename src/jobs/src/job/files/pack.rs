@@ -407,6 +407,7 @@ async fn upload_chunk(
             MergedFile::Standard {
                 data,
                 meta: file_meta,
+                layout: None,
             },
             FileFormat::Parquet,
         )

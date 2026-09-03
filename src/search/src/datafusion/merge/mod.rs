@@ -206,6 +206,7 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use config::{FileFormat, TIMESTAMP_COL_NAME, meta::stream::StreamType};
     use datafusion::datasource::MemTable;
+    use metrics_index::MetricsFileLayout;
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
     use super::*;
@@ -215,6 +216,7 @@ mod tests {
         let standard = MergedFile::Standard {
             data: Vec::new(),
             meta: FileMeta::default(),
+            layout: None,
         };
         assert_eq!(standard.file_name("1", FileFormat::Vortex), "1.vortex");
         assert_eq!(
@@ -222,9 +224,10 @@ mod tests {
             "files/o/logs/s/1.parquet"
         );
 
-        let metrics = MergedFile::MetricsHashSorted {
+        let metrics = MergedFile::Standard {
             data: Vec::new(),
             meta: FileMeta::default(),
+            layout: Some(MetricsFileLayout::HashSorted),
         };
         assert_eq!(
             metrics.file_name("1", FileFormat::Parquet),

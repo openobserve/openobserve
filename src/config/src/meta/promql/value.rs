@@ -420,16 +420,6 @@ impl EvalContext {
         self.start == self.end
     }
 
-    /// More than one evaluation window, overlapping by a positive duration.
-    /// Reset detection compares adjacent sample pairs, and a pair repeats
-    /// across windows only when two windows share at least two samples.
-    pub fn windows_overlap(&self, range_micros: i64) -> bool {
-        !self.is_instant()
-            && self.step > 0
-            && self.end - self.start >= self.step
-            && self.step < range_micros
-    }
-
     /// Get all evaluation timestamps
     pub fn timestamps(&self) -> Vec<i64> {
         if self.is_instant() {
@@ -656,33 +646,16 @@ pub fn extrapolated_rate(
     offset: Duration,
     kind: ExtrapolationKind,
 ) -> Option<f64> {
-    if samples.len() < 2 {
-        // Not enough samples.
-        return None;
-    }
-
-    let first = &samples[0];
-    let last = &samples.last().unwrap();
-    let mut delta = last.value - first.value;
-
-    if kind.is_counter() {
-        // Handle counter resets.
-        let mut prev_value = first.value;
-        for sample in &samples[1..] {
-            if sample.value < prev_value {
-                delta += prev_value;
-            }
-            prev_value = sample.value;
-        }
-    }
-
-    extrapolate_from_delta(samples, delta, eval_ts, range, offset, kind)
+    CounterSeries::new(samples, kind).extrapolate_with_offset(
+        0,
+        samples.len(),
+        eval_ts,
+        range,
+        offset,
+    )
 }
 
-/// Per-series counter state for reset-corrected extrapolation across sliding
-/// windows: resets are located once, then each window sums only its own
-/// corrections in scan order, so results are bit-identical to
-/// [`extrapolated_rate`].
+/// One series' reset list, located once so every window only sums its own corrections.
 pub struct CounterSeries<'a> {
     samples: &'a [Sample],
     // (sample index, value dropped by the reset ending at that index)
@@ -691,30 +664,14 @@ pub struct CounterSeries<'a> {
 }
 
 impl<'a> CounterSeries<'a> {
-    /// Builds the per-series reset state when `kind` is a counter function
-    /// and the one-pass scan can amortize over overlapping windows; `None`
-    /// keeps the caller on the per-window scan.
-    pub fn try_new(
-        samples: &'a [Sample],
-        kind: Option<ExtrapolationKind>,
-        eval_ctx: &EvalContext,
-        range_micros: i64,
-    ) -> Option<Self> {
-        let kind = kind?;
-        eval_ctx
-            .windows_overlap(range_micros)
-            .then(|| Self::new(samples, kind))
-    }
-
-    /// # Panics
-    ///
-    /// Panics if `kind` is not a counter kind.
-    fn new(samples: &'a [Sample], kind: ExtrapolationKind) -> Self {
-        assert!(kind.is_counter(), "CounterSeries requires a counter kind");
+    pub fn new(samples: &'a [Sample], kind: ExtrapolationKind) -> Self {
         let mut resets = Vec::new();
-        for i in 1..samples.len() {
-            if samples[i].value < samples[i - 1].value {
-                resets.push((i, samples[i - 1].value));
+        // only counter kinds correct for resets; a delta keeps the raw difference
+        if kind.is_counter() {
+            for i in 1..samples.len() {
+                if samples[i].value < samples[i - 1].value {
+                    resets.push((i, samples[i - 1].value));
+                }
             }
         }
         Self {
@@ -724,19 +681,24 @@ impl<'a> CounterSeries<'a> {
         }
     }
 
-    /// [`extrapolated_rate`] for the window `samples[start..end]`.
-    ///
-    /// Returns `None` for windows with fewer than two samples.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `start..end` is out of bounds or the window is not in range.
+    /// [`extrapolated_rate`] for `samples[start..end]`; `None` below two samples.
     pub fn extrapolate(
         &self,
         start: usize,
         end: usize,
         eval_ts: i64,
         range: Duration,
+    ) -> Option<f64> {
+        self.extrapolate_with_offset(start, end, eval_ts, range, Duration::ZERO)
+    }
+
+    fn extrapolate_with_offset(
+        &self,
+        start: usize,
+        end: usize,
+        eval_ts: i64,
+        range: Duration,
+        offset: Duration,
     ) -> Option<f64> {
         let window = &self.samples[start..end];
         if window.len() < 2 {
@@ -751,7 +713,7 @@ impl<'a> CounterSeries<'a> {
             }
             delta += correction;
         }
-        extrapolate_from_delta(window, delta, eval_ts, range, Duration::ZERO, self.kind)
+        extrapolate_from_delta(window, delta, eval_ts, range, offset, self.kind)
     }
 }
 
@@ -1136,79 +1098,6 @@ mod tests {
                 .resets
                 .is_empty()
         );
-    }
-
-    #[test]
-    fn test_counter_series_preserves_small_resets_next_to_huge_ones() {
-        const MICROS: i64 = 1_000_000;
-        // A 1e16 reset before the window must not absorb the small reset
-        // inside it: a shared running prefix would round the +1 away.
-        let values = [1e16, 0.0, 0.0, 1.0, 0.0, 2.0];
-        let samples = values
-            .iter()
-            .enumerate()
-            .map(|(i, &value)| Sample::new((20 + 15 * i as i64) * MICROS, value))
-            .collect::<Vec<_>>();
-        let range = Duration::from_secs(60);
-        let eval_ts = 100 * MICROS;
-
-        for kind in [ExtrapolationKind::Rate, ExtrapolationKind::Increase] {
-            let legacy =
-                extrapolated_rate(&samples[2..6], eval_ts, range, Duration::ZERO, kind).unwrap();
-            let counter = CounterSeries::new(&samples, kind);
-            let windowed = counter.extrapolate(2, 6, eval_ts, range).unwrap();
-            assert_eq!(legacy.to_bits(), windowed.to_bits());
-            assert!(legacy.is_finite());
-        }
-    }
-
-    #[test]
-    fn test_counter_series_infinite_reset_outside_window() {
-        const MICROS: i64 = 1_000_000;
-        // The +Inf -> 2.0 reset sits before the window; a shared prefix would
-        // produce inf - inf = NaN where the legacy scan stays finite.
-        let values = [f64::INFINITY, 2.0, 5.0, 9.0];
-        let samples = values
-            .iter()
-            .enumerate()
-            .map(|(i, &value)| Sample::new((20 + 15 * i as i64) * MICROS, value))
-            .collect::<Vec<_>>();
-        let range = Duration::from_secs(60);
-        let eval_ts = 80 * MICROS;
-
-        let legacy = extrapolated_rate(
-            &samples[1..4],
-            eval_ts,
-            range,
-            Duration::ZERO,
-            ExtrapolationKind::Rate,
-        )
-        .unwrap();
-        let counter = CounterSeries::new(&samples, ExtrapolationKind::Rate);
-        let windowed = counter.extrapolate(1, 4, eval_ts, range).unwrap();
-        assert!(legacy.is_finite());
-        assert_eq!(legacy.to_bits(), windowed.to_bits());
-    }
-
-    #[test]
-    fn test_eval_context_windows_overlap() {
-        const MINUTE: i64 = 60 * 1_000_000;
-        let ctx = |end, step| EvalContext::new(MINUTE, MINUTE + end, step, "test".into());
-        // Overlapping windows: 15s step inside a 5m range.
-        assert!(ctx(180 * MINUTE, MINUTE / 4).windows_overlap(5 * MINUTE));
-        // Adjacent windows share at most one sample, so no pair repeats.
-        assert!(!ctx(5 * MINUTE, 5 * MINUTE).windows_overlap(5 * MINUTE));
-        // Disjoint windows (1h step, 5m range) or a single window cannot.
-        assert!(!ctx(7 * 24 * 60 * MINUTE, 60 * MINUTE).windows_overlap(5 * MINUTE));
-        assert!(!ctx(0, MINUTE / 4).windows_overlap(5 * MINUTE));
-        assert!(!ctx(0, 0).windows_overlap(5 * MINUTE));
-        assert!(!ctx(MINUTE, 0).windows_overlap(5 * MINUTE));
-    }
-
-    #[test]
-    #[should_panic(expected = "counter kind")]
-    fn test_counter_series_rejects_non_counter_kind() {
-        CounterSeries::new(&[], ExtrapolationKind::Delta);
     }
 
     #[test]

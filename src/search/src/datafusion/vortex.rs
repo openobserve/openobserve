@@ -220,17 +220,21 @@ pub fn generate_vortex_access_plan_from_ranges(
     let Precision::Exact(num_rows) = stats.num_rows else {
         return None;
     };
+    // the treemap type is not re-exported by vortex; the enum names it
     let mut selection = Selection::IncludeRoaring(Default::default());
     let Selection::IncludeRoaring(rows) = &mut selection else {
-        unreachable!()
+        return None;
     };
     let mut previous_end = 0;
     for range in ranges {
-        assert!(
-            previous_end <= range.start && range.start < range.end && range.end <= num_rows,
-            "invalid sorted Vortex row range {range:?} for file {} with {num_rows} rows",
-            file.path().as_ref()
-        );
+        // a malformed selection falls back to a full scan like the Parquet reader
+        if !(previous_end <= range.start && range.start < range.end && range.end <= num_rows) {
+            log::warn!(
+                "invalid sorted Vortex row range {range:?} for file {} with {num_rows} rows",
+                file.path().as_ref()
+            );
+            return None;
+        }
         previous_end = range.end;
         rows.insert_range(u64::try_from(range.start).ok()?..u64::try_from(range.end).ok()?);
     }
@@ -293,10 +297,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "invalid sorted Vortex row range")]
     fn test_access_plan_from_ranges_rejects_out_of_bounds() {
         let file = vortex_file_with_rows(7);
-        generate_vortex_access_plan_from_ranges(&file, [1..3, 5..8]);
+        assert!(generate_vortex_access_plan_from_ranges(&file, [1..3, 5..8]).is_none());
     }
 
     #[test]

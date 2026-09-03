@@ -113,7 +113,6 @@ mod tests {
     use crate::{aggregations, functions, series_source::matrix::MATRIX_PARTITION_CHUNK};
 
     type GenericAgg = fn(&Option<LabelModifier>, Value, &EvalContext) -> Result<Value>;
-    type GenericRange = fn(Value, &EvalContext) -> Result<Value>;
 
     fn make_series(name: &str, instance: &str, path: &str, points: &[(i64, f64)]) -> RangeValue {
         RangeValue {
@@ -162,6 +161,11 @@ mod tests {
         ]
     }
 
+    /// The generic evaluator over the same table the fused path resolves names through.
+    fn range_eval(name: &str, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        functions::eval_range(data, functions::fusable_range_func(name).unwrap(), eval_ctx)
+    }
+
     async fn run_fused(
         modifier: &Option<LabelModifier>,
         matrix: Vec<RangeValue>,
@@ -185,23 +189,23 @@ mod tests {
             (FusedAggOp::Stdvar, aggregations::stdvar),
             (FusedAggOp::Sum, aggregations::sum),
         ];
-        let range_cases: [(&str, GenericRange); 16] = [
-            ("avg_over_time", functions::avg_over_time),
-            ("changes", functions::changes),
-            ("count_over_time", functions::count_over_time),
-            ("delta", functions::delta),
-            ("deriv", functions::deriv),
-            ("idelta", functions::idelta),
-            ("increase", functions::increase),
-            ("irate", functions::irate),
-            ("last_over_time", functions::last_over_time),
-            ("max_over_time", functions::max_over_time),
-            ("min_over_time", functions::min_over_time),
-            ("rate", functions::rate),
-            ("resets", functions::resets),
-            ("stddev_over_time", functions::stddev_over_time),
-            ("stdvar_over_time", functions::stdvar_over_time),
-            ("sum_over_time", functions::sum_over_time),
+        let range_cases = [
+            "avg_over_time",
+            "changes",
+            "count_over_time",
+            "delta",
+            "deriv",
+            "idelta",
+            "increase",
+            "irate",
+            "last_over_time",
+            "max_over_time",
+            "min_over_time",
+            "rate",
+            "resets",
+            "stddev_over_time",
+            "stdvar_over_time",
+            "sum_over_time",
         ];
         let modifiers = [
             None,
@@ -213,10 +217,10 @@ mod tests {
         let eval_ctx = eval_ctx();
         let matrix = test_matrix();
         for (op, generic_agg) in agg_cases {
-            for (func_name, generic_range) in range_cases {
+            for func_name in range_cases {
                 for modifier in &modifiers {
                     let generic_input =
-                        generic_range(Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
+                        range_eval(func_name, Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
                     let expected = generic_agg(modifier, generic_input, &eval_ctx).unwrap();
 
                     let actual = run_fused(modifier, matrix.clone(), func_name, op, &eval_ctx)
@@ -270,7 +274,7 @@ mod tests {
         for (op, generic_agg) in agg_cases {
             for modifier in [None, by(&["path"])] {
                 let generic_input =
-                    functions::sum_over_time(Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
+                    range_eval("sum_over_time", Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
                 let expected = generic_agg(&modifier, generic_input, &eval_ctx).unwrap();
                 let first = canonical_matrix(
                     run_fused(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx)
@@ -325,7 +329,8 @@ mod tests {
             (FusedAggOp::Sum, aggregations::sum as GenericAgg),
             (FusedAggOp::Avg, aggregations::avg as GenericAgg),
         ] {
-            let generic_input = functions::rate(Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
+            let generic_input =
+                range_eval("rate", Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
             let expected = canonical_matrix(generic_agg(&None, generic_input, &eval_ctx).unwrap());
             let actual = canonical_matrix(
                 run_fused(&None, matrix.clone(), "rate", op, &eval_ctx)
@@ -393,18 +398,5 @@ mod tests {
         .await
         .unwrap();
         assert!(matches!(result, Value::None));
-    }
-
-    #[test]
-    fn test_fusable_range_func_whitelist() {
-        assert!(functions::fusable_range_func("rate").is_some());
-        assert!(functions::fusable_range_func("increase").is_some());
-        assert!(functions::fusable_range_func("last_over_time").is_some());
-        // Parameterized or special-semantics functions stay on the generic path.
-        assert!(functions::fusable_range_func("quantile_over_time").is_none());
-        assert!(functions::fusable_range_func("predict_linear").is_none());
-        assert!(functions::fusable_range_func("holt_winters").is_none());
-        assert!(functions::fusable_range_func("absent_over_time").is_none());
-        assert!(functions::fusable_range_func("histogram_quantile").is_none());
     }
 }

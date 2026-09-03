@@ -18,7 +18,7 @@
 use std::borrow::Cow;
 
 use config::{
-    meta::stream::{FileKey, FileListDeleted, FileMeta, StreamType},
+    meta::stream::{FileKey, FileListDeleted, FileMeta},
     utils::inverted_index::to_tantivy_name,
 };
 use infra::{file_list as infra_file_list, storage};
@@ -113,9 +113,6 @@ pub async fn delete(org_id: &str, time_max: i64) -> Result<i64, anyhow::Error> {
 }
 
 fn metrics_index_key(file: &FileListDeleted) -> Option<Cow<'_, str>> {
-    if file.file.split('/').nth(2) != Some(StreamType::Metrics.as_str()) {
-        return None;
-    }
     MetricsFileLayout::metrics_index_path(&file.file).map(Cow::Owned)
 }
 

@@ -100,34 +100,42 @@ async fn write_parquet(
     metadata: &FileMeta,
     max_file_size: i64,
     timestamp_index: usize,
-    mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
 ) -> Result<Vec<MergedFile>> {
-    let mut active: Option<ActiveIndexedParquetWriter> = None;
-    let mut files = Vec::new();
+    let files = write_rotating(metadata, max_file_size, rx, || {
+        ActiveIndexedParquetWriter::try_new(schema, bloom_filter_fields, metadata, timestamp_index)
+    })
+    .await
+    .map_err(|e| DataFusionError::Execution(format!("Failed to write parquet files: {e}")))?;
+    await_read_task(read_task).await?;
+    Ok(files)
+}
 
+/// Writes batches into size-bounded files, rotating to a new writer once the current one is full.
+async fn write_rotating<W: IndexedWriter>(
+    metadata: &FileMeta,
+    max_file_size: i64,
+    mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    mut new_writer: impl FnMut() -> Result<W>,
+) -> anyhow::Result<Vec<MergedFile>> {
+    let mut active: Option<W> = None;
+    let mut files = Vec::new();
     while let Some(batch) = rx.recv().await {
         if batch.num_rows() == 0 {
             continue;
         }
         if let Some(full) = active.take_if(|writer| {
-            proportional_original_size(metadata, writer.state.file_meta.records) >= max_file_size
+            proportional_original_size(metadata, writer.records()) >= max_file_size
         }) {
             files.push(full.finish(metadata, max_file_size).await?);
         }
         let writer = match active.as_mut() {
             Some(writer) => writer,
-            None => active.insert(ActiveIndexedParquetWriter::try_new(
-                schema,
-                bloom_filter_fields,
-                metadata,
-                timestamp_index,
-            )?),
+            None => active.insert(new_writer()?),
         };
-        writer.write(&batch).await?;
+        writer.write(batch).await?;
     }
-
-    await_read_task(read_task).await?;
     if let Some(active) = active {
         files.push(active.finish(metadata, max_file_size).await?);
     }
@@ -139,7 +147,7 @@ async fn write_vortex(
     metadata: FileMeta,
     max_file_size: i64,
     timestamp_index: usize,
-    mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
+    rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
 ) -> Result<Vec<MergedFile>> {
     let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
@@ -147,39 +155,17 @@ async fn write_vortex(
             let session = VortexSession::default().with_tokio();
             let dtype = DType::from_arrow(schema.as_ref());
             let strategy = vortex_write_strategy();
-            let mut active: Option<ActiveIndexedVortexWriter> = None;
-            let mut files = Vec::new();
-
-            while let Some(batch) = rx.recv().await {
-                if batch.num_rows() == 0 {
-                    continue;
-                }
-                if let Some(full) = active.take_if(|writer| {
-                    proportional_original_size(&metadata, writer.state.file_meta.records)
-                        >= max_file_size
-                }) {
-                    files.push(full.finish(&metadata, max_file_size).await?);
-                }
-                let writer = match active.as_mut() {
-                    Some(writer) => writer,
-                    None => {
-                        let write_options = VortexWriteOptions::new(session.clone())
-                            .with_strategy(strategy.clone());
-                        active.insert(ActiveIndexedVortexWriter::try_new(
-                            &schema,
-                            timestamp_index,
-                            write_options,
-                            dtype.clone(),
-                        )?)
-                    }
-                };
-                writer.write(batch).await?;
-            }
-
-            if let Some(active) = active {
-                files.push(active.finish(&metadata, max_file_size).await?);
-            }
-            Ok::<Vec<MergedFile>, anyhow::Error>(files)
+            write_rotating(&metadata, max_file_size, rx, || {
+                let write_options =
+                    VortexWriteOptions::new(session.clone()).with_strategy(strategy.clone());
+                ActiveIndexedVortexWriter::try_new(
+                    &schema,
+                    timestamp_index,
+                    write_options,
+                    dtype.clone(),
+                )
+            })
+            .await
         })
     });
 
@@ -197,6 +183,17 @@ async fn await_read_task(read_task: tokio::task::JoinHandle<Result<()>>) -> Resu
     read_task
         .await
         .map_err(|e| DataFusionError::External(Box::new(e)))?
+}
+
+/// One active size-bounded output file; `write_rotating` drives both formats through it.
+trait IndexedWriter {
+    fn records(&self) -> i64;
+    fn write(&mut self, batch: RecordBatch) -> impl Future<Output = anyhow::Result<()>>;
+    fn finish(
+        self,
+        source_meta: &FileMeta,
+        max_file_size: i64,
+    ) -> impl Future<Output = anyhow::Result<MergedFile>>;
 }
 
 /// Format-independent `.midx` state and exact metadata for one active file.
@@ -277,13 +274,24 @@ impl ActiveIndexedParquetWriter {
             state: IndexedMetricsFileState::try_new(schema, timestamp_index)?,
         })
     }
+}
 
-    async fn write(&mut self, batch: &RecordBatch) -> Result<()> {
-        self.writer.write(batch).await?;
-        self.state.write(batch)
+impl IndexedWriter for ActiveIndexedParquetWriter {
+    fn records(&self) -> i64 {
+        self.state.file_meta.records
     }
 
-    async fn finish(mut self, source_meta: &FileMeta, max_file_size: i64) -> Result<MergedFile> {
+    async fn write(&mut self, batch: RecordBatch) -> anyhow::Result<()> {
+        self.writer.write(&batch).await?;
+        self.state.write(&batch)?;
+        Ok(())
+    }
+
+    async fn finish(
+        mut self,
+        source_meta: &FileMeta,
+        max_file_size: i64,
+    ) -> anyhow::Result<MergedFile> {
         let (metrics_index, file_meta) = self.state.finish(source_meta, max_file_size)?;
         append_metadata(&mut self.writer, &file_meta)?;
         self.writer.finish().await?;
@@ -315,6 +323,12 @@ impl ActiveIndexedVortexWriter {
             data_path,
             state: IndexedMetricsFileState::try_new(schema, timestamp_index)?,
         })
+    }
+}
+
+impl IndexedWriter for ActiveIndexedVortexWriter {
+    fn records(&self) -> i64 {
+        self.state.file_meta.records
     }
 
     async fn write(&mut self, batch: RecordBatch) -> anyhow::Result<()> {

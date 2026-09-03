@@ -104,10 +104,6 @@ pub fn signature_without_labels(
     gxhash::new().sum64(&key)
 }
 
-fn get_exclude_labels() -> &'static [&'static str] {
-    METRICS_HASH_EXCLUDED_LABELS
-}
-
 /// Series identity for alert dedup, rendering every value so a numeric label still separates two
 /// series.
 fn series_signature(labels: &config::utils::json::Map<String, config::utils::json::Value>) -> u64 {
@@ -220,8 +216,8 @@ mod tests {
     }
 
     #[test]
-    fn test_get_exclude_labels_contains_known_labels() {
-        let labels = get_exclude_labels();
+    fn test_hash_excluded_labels_contains_known_labels() {
+        let labels = config::meta::promql::METRICS_HASH_EXCLUDED_LABELS;
         assert!(labels.contains(&"_timestamp"));
         assert!(labels.contains(&"_all"));
         assert!(labels.contains(&"trace_id"));
