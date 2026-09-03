@@ -367,7 +367,7 @@ probe now tracks its `probeTraceId` in a set (added before fetch, deleted in
 
 | # | Component | Leak | Fix |
 |---|---|---|---|
-| **19** | `components/rum/VideoPlayer.vue` | `onBeforeUnmount` terminated the CSS worker but never destroyed the rrweb player instance (`new rrwebPlayer(...)`), leaking the whole recorded session (events, canvas/iframe, playback timers, its 4 event listeners) on every session-view close | added `player.value.pause?.()` + `player.value.$destroy?.()` in `onBeforeUnmount`, then null the ref |
+| **19** | `components/rum/VideoPlayer.vue` | `onBeforeUnmount` terminated the CSS worker but never destroyed the rrweb player instance (`new rrwebPlayer(...)`), leaking the whole recorded session (events, canvas/iframe, playback timers, its 4 event listeners) on every session-view close. **Measured ~+130 MB retained per session view** (live, a 1285-event replay): heap-after-unmount climbed 256→379→509→639 MB across 4 opens without the fix | added `player.value.pause?.()` + `player.value.$destroy?.()` in `onBeforeUnmount`, then null the ref |
 | **20** | `components/synthetics/results/RunDetailDrawer.vue` | `useLLMStreamQuery` in-flight stream not cancelled on unmount (only cancelled before the next query) | added `onUnmounted(() => cancelAll())` |
 
 Clean in RUM/synthetics: `MobileSessionPlayer` (`pause()` cancels its rAF on unmount),
