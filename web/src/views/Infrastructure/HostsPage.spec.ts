@@ -222,6 +222,18 @@ describe("HostsPage", () => {
       expect(wrapper.text()).toContain("ask your admin");
     });
 
+    it("switches the embedded setup card's slug through the OS toggle (4.8)", async () => {
+      workloadStates.value = { ...workloadStates.value, hosts: "undetected" };
+      wrapper = await mountPage();
+      expect(wrapper.find('[data-test="setup-card-stub"]').attributes("data-slug")).toBe("linux");
+      await wrapper.find('[data-test="hosts-os-toggle-windows"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="setup-card-stub"]').attributes("data-slug")).toBe("windows");
+      await wrapper.find('[data-test="hosts-os-toggle-macos"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="setup-card-stub"]').attributes("data-slug")).toBe("macos");
+    });
+
     it("flips from the embedded setup card to the live table when detection connects", async () => {
       workloadStates.value = { ...workloadStates.value, hosts: "undetected" };
       wrapper = await mountPage();
