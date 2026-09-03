@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onUnmounted } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -44,6 +44,8 @@ const emit = defineEmits<{ close: [] }>();
 
 const store = useStore();
 const { executeQuery, cancelAll } = useLLMStreamQuery();
+
+onUnmounted(() => cancelAll());
 
 const loading = ref(false);
 const queryError = ref<string | null>(null);
