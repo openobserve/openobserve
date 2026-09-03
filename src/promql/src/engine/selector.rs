@@ -60,7 +60,26 @@ impl Engine {
             self.result_type = Some("vector".to_string());
         }
 
-        let selector = named_selector(selector.clone(), "VectorSelector")?;
+        let mut selector = selector.clone();
+        if selector.name.is_none() {
+            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
+                Some(mat) => mat.value.clone(),
+                None => {
+                    return Err(DataFusionError::Plan(
+                        "VectorSelector: metric name is required".into(),
+                    ));
+                }
+            };
+            selector.name = Some(name);
+            // the matcher is fully consumed by stream selection; leaving it in
+            // would filter on the stored `__name__` column (which may keep the
+            // pre-`format_stream_name` case), leak into partition pruning, and
+            // make the selector's PromQL text unparseable on super-cluster peers
+            selector
+                .matchers
+                .matchers
+                .retain(|mat| mat.name != NAME_LABEL);
+        }
 
         let data = self.selector_load_data_owned(&selector, None, None).await?;
 
@@ -141,19 +160,8 @@ impl Engine {
     /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
     ///
     /// MatrixSelector is a special case of VectorSelector that returns a matrix
-    /// of samples.
+    /// of samples. `ctxs` reuses contexts already created for this selector.
     pub(super) async fn eval_matrix_selector(
-        &mut self,
-        selector: &VectorSelector,
-        range: Duration,
-    ) -> Result<Vec<RangeValue>> {
-        let selector = named_selector(selector.clone(), "MatrixSelector")?;
-        self.load_matrix(&selector, range, None).await
-    }
-
-    /// Loads the selector's series with the range window and offset applied; `ctxs` reuses
-    /// contexts already created for this selector.
-    async fn load_matrix(
         &mut self,
         selector: &VectorSelector,
         range: Duration,
@@ -163,8 +171,27 @@ impl Engine {
             self.result_type = Some("matrix".to_string());
         }
 
+        let mut selector = selector.clone();
+        if selector.name.is_none() {
+            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
+                Some(mat) => mat.value.clone(),
+                None => {
+                    return Err(DataFusionError::Plan(
+                        "MatrixSelector: metric name is required".into(),
+                    ));
+                }
+            };
+
+            selector.name = Some(name);
+            // see eval_vector_selector: the matcher is consumed by stream selection
+            selector
+                .matchers
+                .matchers
+                .retain(|mat| mat.name != NAME_LABEL);
+        }
+
         let data = self
-            .selector_load_data_owned(selector, Some(range), ctxs)
+            .selector_load_data_owned(&selector, Some(range), ctxs)
             .await?;
 
         let values = match data.get_range_values() {
@@ -190,7 +217,7 @@ impl Engine {
         );
 
         // apply offset to samples
-        let offset_modifier = get_offset_modifier(selector.offset.clone());
+        let offset_modifier = get_offset_modifier(selector.offset);
         if offset_modifier != 0 {
             values.par_iter_mut().for_each(|rv| {
                 rv.samples
@@ -255,8 +282,13 @@ impl Engine {
         ctxs: Option<SelectorContexts>,
     ) -> Result<Vec<RangeValue>> {
         let start_time = std::time::Instant::now();
+        // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
         let offset_modifier = get_offset_modifier(selector.offset.clone());
-        let (start, end) = self.load_window(selector, range);
+        // Positive offset (e.g. `offset 10m`) looks into the past, so we shift
+        // the data-load window backwards by `offset_modifier`.
+        let start =
+            self.ctx.start - range.map_or(self.ctx.lookback_delta, micros) - offset_modifier;
+        let end = self.ctx.end - offset_modifier;
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
@@ -265,6 +297,8 @@ impl Engine {
             self.trace_id,
             selector.to_string(),
         );
+
+        let mut filters = equal_matcher_filters(&selector.matchers);
 
         // check for super cluster
         let trace_id = self.ctx.query_ctx.trace_id.clone();
@@ -304,7 +338,16 @@ impl Engine {
         let ctxs = match ctxs {
             Some(ctxs) => ctxs,
             None => {
-                self.create_selector_contexts(selector, (start, end))
+                self.ctx
+                    .table_provider
+                    .create_context(
+                        &self.ctx.query_ctx.org_id,
+                        table_name,
+                        (start, end),
+                        selector.matchers.clone(),
+                        self.label_selector.clone(),
+                        &mut filters,
+                    )
                     .await?
             }
         };
@@ -482,108 +525,115 @@ impl Engine {
         Ok(metrics)
     }
 
-    /// The data-load window; a positive offset looks into the past, so the window shifts back.
-    fn load_window(&self, selector: &VectorSelector, range: Option<Duration>) -> (i64, i64) {
-        let offset_modifier = get_offset_modifier(selector.offset.clone());
-        let start =
-            self.ctx.start - range.map_or(self.ctx.lookback_delta, micros) - offset_modifier;
-        (start, self.ctx.end - offset_modifier)
-    }
-
-    async fn create_selector_contexts(
-        &self,
-        selector: &VectorSelector,
-        (start, end): (i64, i64),
-    ) -> Result<SelectorContexts> {
-        let mut filters = equal_matcher_filters(&selector.matchers);
-        self.ctx
-            .table_provider
-            .create_context(
-                &self.ctx.query_ctx.org_id,
-                selector.name.as_deref().unwrap(),
-                (start, end),
-                selector.matchers.clone(),
-                self.label_selector.clone(),
-                &mut filters,
-            )
-            .await
-    }
-
-    /// Evaluates `agg(range_func(selector[range]))`: streams the fold from
-    /// `(__hash__, _timestamp)` ordered scans when the shape and layout allow
-    /// it, otherwise materializes the matrix on the contexts already created.
-    pub(super) async fn fused_agg_over_selector(
+    /// Attempts the streaming fused path: series arrive whole from
+    /// `(__hash__, _timestamp)` ordered scans and fold straight into the
+    /// aggregation, so the sample matrix is never materialized. `None` means
+    /// the query shape requires the materializing path; once a context exists
+    /// the materializing fold runs on it here instead of creating another.
+    pub(super) async fn try_streaming_fused_agg(
         &mut self,
         matrix_selector: &MatrixSelector,
         modifier: &Option<LabelModifier>,
         func: Arc<dyn functions::RangeFunc>,
         op: fused::FusedAggOp,
-    ) -> Result<Value> {
+    ) -> Result<Option<Value>> {
+        let query_ctx = &self.ctx.query_ctx;
+        // need_wal bails early: WAL would split series and double the context-creation cost
+        if !config::get_config()
+            .search
+            .feature_metrics_streaming_agg_enabled
+            || query_ctx.query_exemplars
+            || query_ctx.query_data
+            || query_ctx.is_super_cluster
+            || query_ctx.need_wal
+            || matches!(modifier, Some(LabelModifier::Exclude(_)))
+        {
+            return Ok(None);
+        }
         let MatrixSelector { vs, range } = matrix_selector;
         let range = *range;
-        let selector = named_selector(plain_selector(vs, "MatrixSelector")?, "MatrixSelector")?;
-        let timeout = self.ctx.query_ctx.timeout;
+        let mut selector = vs.clone();
+        remove_filter_all(&mut selector);
+        if !selector.matchers.or_matchers.is_empty() || selector.at.is_some() {
+            return Ok(None);
+        }
+        if selector.name.is_none() {
+            let names = selector.matchers.find_matchers(NAME_LABEL);
+            let Some(matcher) = names.first() else {
+                return Ok(None);
+            };
+            selector.name = Some(matcher.value.clone());
+            selector
+                .matchers
+                .matchers
+                .retain(|mat| mat.name != NAME_LABEL);
+        }
+        let table_name = selector.name.clone().unwrap();
 
-        let ctxs = if self.streams_fused_agg(modifier) {
-            let offset = get_offset_modifier(selector.offset.clone());
-            let window = self.load_window(&selector, Some(range));
-            let ctxs = self.create_selector_contexts(&selector, window).await?;
-            // a second context would split series and evaluate rate windows on partial data
-            if let [(ctx, schema, scan_stats, keep_filters)] = ctxs.as_slice() {
-                let matchers = if *keep_filters {
-                    selector.matchers.clone()
-                } else {
-                    Matchers::empty()
-                };
-                let run = fused::stream::fused_agg(
-                    ctx,
-                    schema,
-                    fused::stream::StreamingSelector {
-                        table_name: selector.name.as_deref().unwrap(),
-                        matchers: &matchers,
-                        offset,
-                    },
-                    fused::stream::FusedShape {
-                        op,
-                        func: func.clone(),
-                        range,
-                    },
-                    modifier,
-                    &self.eval_ctx,
-                );
-                if let Some(value) = self.run_cancellable(run, timeout).await? {
-                    self.ctx.scan_stats.write().await.add(scan_stats);
-                    if self.result_type.is_none() {
-                        self.result_type = Some("matrix".to_string());
-                    }
-                    return Ok(value);
+        let offset = get_offset_modifier(selector.offset.clone());
+        let start = self.ctx.start - micros(range) - offset;
+        let end = self.ctx.end - offset;
+        let mut filters = equal_matcher_filters(&selector.matchers);
+        let mut label_selector = self.label_selector.clone();
+        label_selector.extend(self.ctx.label_selector.iter().cloned());
+
+        let timeout = query_ctx.timeout;
+        let ctxs = self
+            .ctx
+            .table_provider
+            .create_context(
+                &query_ctx.org_id,
+                &table_name,
+                (start, end),
+                selector.matchers.clone(),
+                label_selector,
+                &mut filters,
+            )
+            .await?;
+        // a second context would split series and evaluate rate windows on partial data
+        if let [(ctx, schema, scan_stats, keep_filters)] = ctxs.as_slice() {
+            let matchers = if *keep_filters {
+                selector.matchers.clone()
+            } else {
+                Matchers::empty()
+            };
+            let run = fused::stream::fused_agg(
+                ctx,
+                schema,
+                fused::stream::StreamingSelector {
+                    table_name: &table_name,
+                    matchers: &matchers,
+                    offset,
+                },
+                fused::stream::FusedShape {
+                    op,
+                    func: func.clone(),
+                    range,
+                },
+                modifier,
+                &self.eval_ctx,
+            );
+            if let Some(value) = self.run_cancellable(run, timeout).await? {
+                self.ctx.scan_stats.write().await.add(scan_stats);
+                if self.result_type.is_none() {
+                    self.result_type = Some("matrix".to_string());
                 }
+                return Ok(Some(value));
             }
-            Some(ctxs)
-        } else {
-            None
-        };
+        }
 
-        let matrix = self.load_matrix(&selector, range, ctxs).await?;
+        // the layout cannot stream: materialize on the contexts already created
+        let matrix = self
+            .eval_matrix_selector(&selector, range, Some(ctxs))
+            .await?;
         let input = if matrix.is_empty() {
             Value::None
         } else {
             Value::Matrix(matrix)
         };
-        fused::matrix::fused_agg(modifier, input, func, op, &self.eval_ctx, timeout).await
-    }
-
-    /// The streaming gates that need no context; `without()` cannot project its group columns.
-    fn streams_fused_agg(&self, modifier: &Option<LabelModifier>) -> bool {
-        let query_ctx = &self.ctx.query_ctx;
-        config::get_config()
-            .search
-            .feature_metrics_streaming_agg_enabled
-            && !query_ctx.query_exemplars
-            && !query_ctx.query_data
-            && !query_ctx.is_super_cluster
-            && !query_ctx.need_wal
-            && !matches!(modifier, Some(LabelModifier::Exclude(_)))
+        fused::matrix::fused_agg(modifier, input, func, op, &self.eval_ctx, timeout)
+            .await
+            .map(Some)
     }
 
     /// Runs the streaming fold under the query timeout and the host's cancel signal; dropping
@@ -625,46 +675,6 @@ impl Engine {
             ret = &mut run => ret,
         }
     }
-}
-
-/// Strips placeholder matchers and rejects the selector forms no loader supports.
-pub(super) fn plain_selector(selector: &VectorSelector, kind: &str) -> Result<VectorSelector> {
-    let mut selector = selector.clone();
-    remove_filter_all(&mut selector);
-    if !selector.matchers.or_matchers.is_empty() {
-        return Err(DataFusionError::Plan(format!(
-            "{kind}: or_matchers is not supported"
-        )));
-    }
-    if selector.at.is_some() {
-        return Err(DataFusionError::NotImplemented(format!(
-            "{kind}: @ modifier is not supported"
-        )));
-    }
-    Ok(selector)
-}
-
-/// Moves a `__name__` matcher into the selector name; the stored column may differ in case.
-fn named_selector(mut selector: VectorSelector, kind: &str) -> Result<VectorSelector> {
-    if selector.name.is_some() {
-        return Ok(selector);
-    }
-    let Some(name) = selector
-        .matchers
-        .find_matchers(NAME_LABEL)
-        .first()
-        .map(|mat| mat.value.clone())
-    else {
-        return Err(DataFusionError::Plan(format!(
-            "{kind}: metric name is required"
-        )));
-    };
-    selector.name = Some(name);
-    selector
-        .matchers
-        .matchers
-        .retain(|mat| mat.name != NAME_LABEL);
-    Ok(selector)
 }
 
 fn search_error(code: ErrorCodes) -> DataFusionError {
@@ -989,7 +999,7 @@ mod tests {
         };
 
         let result = engine
-            .eval_matrix_selector(&selector, Duration::from_secs(300))
+            .eval_matrix_selector(&selector, Duration::from_secs(300), None)
             .await;
         assert!(result.is_ok());
         let values = result.unwrap();
@@ -1067,7 +1077,7 @@ mod tests {
         };
 
         let result = engine
-            .eval_matrix_selector(&selector, Duration::from_secs(300))
+            .eval_matrix_selector(&selector, Duration::from_secs(300), None)
             .await;
 
         assert!(result.is_err(), "expected an error, not a panic");
@@ -1111,7 +1121,7 @@ mod tests {
         };
 
         let result = engine
-            .eval_matrix_selector(&selector, Duration::from_secs(300))
+            .eval_matrix_selector(&selector, Duration::from_secs(300), None)
             .await;
         assert!(result.is_ok());
         let values = result.unwrap();
@@ -1135,7 +1145,7 @@ mod tests {
         assert_eq!(result, -30_000_000); // -30s in micros
     }
 
-    mod fused_over_selector {
+    mod streaming_fused_agg {
         use std::sync::atomic::{AtomicUsize, Ordering};
 
         use config::{
@@ -1144,7 +1154,7 @@ mod tests {
         };
         use datafusion::{
             arrow::{
-                array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+                array::{Float64Array, Int64Array, RecordBatch, UInt64Array},
                 datatypes::{DataType, Field},
             },
             datasource::MemTable,
@@ -1162,7 +1172,6 @@ mod tests {
         /// cancel signal.
         struct ContextProvider {
             ctx: SessionContext,
-            schema: Arc<Schema>,
             calls: Arc<AtomicUsize>,
             canceled: bool,
             // a dropped sender reads as a cancel, so a live registration keeps it
@@ -1183,7 +1192,7 @@ mod tests {
                 self.calls.fetch_add(1, Ordering::SeqCst);
                 Ok(vec![(
                     self.ctx.clone(),
-                    self.schema.clone(),
+                    metrics_schema(),
                     ScanStats::default(),
                     true,
                 )])
@@ -1208,25 +1217,23 @@ mod tests {
                 Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
                 Field::new(HASH_LABEL, DataType::UInt64, false),
                 Field::new(VALUE_LABEL, DataType::Float64, false),
-                Field::new("path", DataType::Utf8, true),
             ]))
         }
 
         /// Two counters sampled every 20 s across the evaluation window.
         fn metrics_table(sorted: bool) -> MemTable {
-            let mut rows = Vec::new();
-            for hash in [7u64, u64::MAX / 2] {
-                for step in 0..10 {
-                    rows.push((BASE + step * 20 * SECOND, hash, (step * 3) as f64));
-                }
-            }
+            let rows: Vec<(i64, u64, f64)> = [7u64, u64::MAX / 2]
+                .into_iter()
+                .flat_map(|hash| {
+                    (0..10).map(move |step| (BASE + step * 20 * SECOND, hash, (step * 3) as f64))
+                })
+                .collect();
             let batch = RecordBatch::try_new(
                 metrics_schema(),
                 vec![
                     Arc::new(Int64Array::from_iter_values(rows.iter().map(|row| row.0))),
                     Arc::new(UInt64Array::from_iter_values(rows.iter().map(|row| row.1))),
                     Arc::new(Float64Array::from_iter_values(rows.iter().map(|row| row.2))),
-                    Arc::new(StringArray::from(vec!["/one"; rows.len()])),
                 ],
             )
             .unwrap();
@@ -1242,7 +1249,7 @@ mod tests {
         }
 
         /// `m` always materializes; `m__hash_sorted` is registered only when `streams`.
-        fn session_ctx(streams: bool) -> SessionContext {
+        fn provider(streams: bool, canceled: bool) -> (ContextProvider, Arc<AtomicUsize>) {
             let mut config = SessionConfig::new().with_target_partitions(3);
             config.options_mut().optimizer.prefer_existing_sort = true;
             let ctx = SessionContext::new_with_config(config);
@@ -1255,10 +1262,17 @@ mod tests {
                 )
                 .unwrap();
             }
-            ctx
+            let calls = Arc::new(AtomicUsize::new(0));
+            let provider = ContextProvider {
+                ctx,
+                calls: calls.clone(),
+                canceled,
+                cancel: Default::default(),
+            };
+            (provider, calls)
         }
 
-        fn engine(provider: ContextProvider, timeout: u64) -> Engine {
+        async fn eval_sum_rate(provider: ContextProvider, timeout: u64) -> Result<Value> {
             let eval_ctx = EvalContext::new(
                 BASE + 60 * SECOND,
                 BASE + 180 * SECOND,
@@ -1272,27 +1286,14 @@ mod tests {
             );
             ctx.start = eval_ctx.start;
             ctx.end = eval_ctx.end;
-            Engine::new("test_trace", Arc::new(ctx), eval_ctx)
-        }
-
-        async fn eval_sum_rate(provider: ContextProvider, timeout: u64) -> Result<Value> {
+            let mut engine = Engine::new("test_trace", Arc::new(ctx), eval_ctx);
             let expr = promql_parser::parser::parse("sum(rate(m[1m]))").unwrap();
-            engine(provider, timeout)
-                .exec(&expr)
-                .await
-                .map(|(value, _)| value)
+            engine.exec(&expr).await.map(|(value, _)| value)
         }
 
         #[tokio::test]
         async fn test_fallback_reuses_the_streaming_context() {
-            let calls = Arc::new(AtomicUsize::new(0));
-            let provider = ContextProvider {
-                ctx: session_ctx(false),
-                schema: metrics_schema(),
-                calls: calls.clone(),
-                canceled: false,
-                cancel: Default::default(),
-            };
+            let (provider, calls) = provider(false, false);
 
             let value = eval_sum_rate(provider, 30).await.unwrap();
             let Value::Matrix(matrix) = value else {
@@ -1309,14 +1310,7 @@ mod tests {
 
         #[tokio::test]
         async fn test_streaming_run_stops_on_cancel() {
-            let calls = Arc::new(AtomicUsize::new(0));
-            let provider = ContextProvider {
-                ctx: session_ctx(true),
-                schema: metrics_schema(),
-                calls: calls.clone(),
-                canceled: true,
-                cancel: Default::default(),
-            };
+            let (provider, calls) = provider(true, true);
 
             let err = eval_sum_rate(provider, 30).await.unwrap_err().to_string();
             assert!(err.contains("canceled"), "unexpected error: {err}");
@@ -1325,13 +1319,7 @@ mod tests {
 
         #[tokio::test]
         async fn test_streaming_run_stops_on_timeout() {
-            let provider = ContextProvider {
-                ctx: session_ctx(true),
-                schema: metrics_schema(),
-                calls: Arc::new(AtomicUsize::new(0)),
-                canceled: false,
-                cancel: Default::default(),
-            };
+            let (provider, _) = provider(true, false);
 
             let err = eval_sum_rate(provider, 0).await.unwrap_err().to_string();
             assert!(err.contains("timeout"), "unexpected error: {err}");

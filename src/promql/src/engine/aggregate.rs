@@ -42,10 +42,17 @@ impl Engine {
         // fused shapes fold the range function into the aggregation; others stay generic
         if let Some(shape) = fused_agg_shape(op, expr) {
             // only a plain matrix selector can be planned as ordered shard streams
-            if let PromExpr::MatrixSelector(matrix_selector) = shape.range_arg {
-                return self
-                    .fused_agg_over_selector(matrix_selector, modifier, shape.func, shape.op)
-                    .await;
+            if let PromExpr::MatrixSelector(matrix_selector) = shape.range_arg
+                && let Some(value) = self
+                    .try_streaming_fused_agg(
+                        matrix_selector,
+                        modifier,
+                        shape.func.clone(),
+                        shape.op,
+                    )
+                    .await?
+            {
+                return Ok(value);
             }
             let range_input = self.exec_expr(shape.range_arg).await?;
             return fused::matrix::fused_agg(
