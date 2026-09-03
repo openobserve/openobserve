@@ -42,6 +42,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="copySessionId"
           />
         </span>
+        <span
+          v-if="detail?.userId"
+          class="rounded-default border-border-default bg-surface-base text-text-body inline-flex min-w-0 items-center gap-1.5 border px-2 py-1"
+          data-test="session-detail-user-id"
+        >
+          <OIcon name="person" size="xs" class="text-text-secondary flex-shrink-0" />
+          <span class="max-w-64 truncate text-sm">{{ detail.userId }}</span>
+        </span>
       </template>
 
       <template #actions>

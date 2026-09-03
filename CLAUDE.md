@@ -50,6 +50,11 @@ reworded:
 
 ## PR conventions
 
+- Paid CI runs on a PR only while it carries the `e2e` label (no label = no
+  builds or test suites, and no red checks). Add it when you want the run, not
+  when you open the PR. Which suites run is decided by path detection, never by
+  a label. The merge queue only compiles and unit-tests the merged code, so the
+  labelled PR run is the one that has to be green.
 - PR titles starting with `feat:` require `Design at: #xxx` as the FIRST line
   of the description (enforced by `.github/workflows/feat-design-checker.yml`);
   `fix:`/`chore:`/`test:` PRs skip the check.

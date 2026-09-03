@@ -17,7 +17,7 @@ export class IngestionTokensPage {
         // ============================================================
         this.titleHeading = page.locator('[data-test="ingestion-tokens-title-text"]');
         this.createTokenButton = page.locator('[data-test="add-ingestion-token"]');
-        this.searchInput = page.getByPlaceholder('Search...');
+        this.searchInput = page.locator('[data-test="ingestion-tokens-search-input-field"]');
 
         // ============================================================
         // Create Token dialog (ODialog — no custom data-test, uses ODialog built-ins)
@@ -123,7 +123,11 @@ export class IngestionTokensPage {
     // ----- toggle -----
 
     async toggleToken(name) {
-        await this.tokenToggleByName(name).click();
+        // Table client-paginates at 20/page; filter to the unique name so the target row is on page 1 before we click.
+        await this.searchInput.fill(name);
+        const toggle = this.tokenToggleByName(name);
+        await toggle.waitFor({ state: 'visible', timeout: 10000 });
+        await toggle.click();
     }
 
     // ----- assertions -----

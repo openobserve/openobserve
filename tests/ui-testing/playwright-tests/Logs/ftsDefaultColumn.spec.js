@@ -76,15 +76,17 @@ test.describe("FTS Default Column Selection testcases", () => {
     let resultsReady = false;
     for (let attempt = 1; attempt <= 3 && !resultsReady; attempt++) {
       await pm.logsPage.clickSearchBarRefreshButton();
+      // The results body can render before the FTS default column resolves, so gate on the FTS header too.
       resultsReady = await pm.logsPage
         .waitForSearchResults(20000)
+        .then(() => pm.logsPage.resolveFtsDefaultField(15000))
         .then(() => true)
         .catch(() => false);
       if (!resultsReady) {
         testLogger.info(`Search results not ready (attempt ${attempt}/3), retrying refresh...`);
       }
     }
-    expect(resultsReady, 'Search results did not render after retries').toBe(true);
+    expect(resultsReady, 'Search results / FTS default did not render after retries').toBe(true);
 
     testLogger.info('FTS default column test setup completed');
   });
@@ -332,15 +334,17 @@ test.describe("FTS Default Column Selection testcases", () => {
     let resultsReady = false;
     for (let attempt = 1; attempt <= 3 && !resultsReady; attempt++) {
       await pm.logsPage.clickSearchBarRefreshButton();
+      // The results body can render before the FTS default column re-resolves, so gate on the FTS header too.
       resultsReady = await pm.logsPage
         .waitForSearchResults(20000)
+        .then(() => pm.logsPage.resolveFtsDefaultField(15000))
         .then(() => true)
         .catch(() => false);
       if (!resultsReady) {
         testLogger.info(`TC-FTS-008 search results not ready (attempt ${attempt}/3), retrying refresh...`);
       }
     }
-    expect(resultsReady, 'Search results did not render on second stream').toBe(true);
+    expect(resultsReady, 'Search results / FTS default did not render on second stream').toBe(true);
 
     // Assert that the FTS default column re-resolved on the new stream.
     const secondFtsField = await pm.logsPage.resolveFtsDefaultField(15000);
