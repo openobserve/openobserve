@@ -690,11 +690,13 @@ export default class LogsVisualise {
 
     const inspectorBtn = this.page.locator('[data-test="dashboard-query-inspector-panel"]');
     // Opening the menu before the item mounts leaves it absent for that open, so re-open until it appears.
+    // Escape first each retry: the dropdown is a toggle, so a blind re-click on an already-open menu closes it — fighting itself while metaData populates.
     await expect(async () => {
       if (await inspectorBtn.isVisible().catch(() => false)) return;
+      await this.page.keyboard.press("Escape").catch(() => {});
       await dropdown.click();
-      await expect(inspectorBtn).toBeVisible({ timeout: 2000 });
-    }).toPass({ timeout: 20000, intervals: [300, 700, 1500] });
+      await expect(inspectorBtn).toBeVisible({ timeout: 3000 });
+    }).toPass({ timeout: 30000, intervals: [500, 1000, 2000] });
 
     await inspectorBtn.click();
     await this.waitForQueryInspector(this.page);
