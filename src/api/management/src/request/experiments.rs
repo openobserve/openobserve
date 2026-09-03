@@ -28,6 +28,7 @@ use openobserve_core::{
         experiment_dispersion::{self, NormalizationSpans, RowDispersion},
         experiment_ingest::{self, IngestError},
         experiment_results::{self, ExperimentResultSlot, ExperimentSlotStatus},
+        experiment_usage,
         experiments::{self, ExperimentError, PinnedExperimentScorer},
         remote_tasks,
     },
@@ -634,11 +635,22 @@ pub async fn get_experiment(
                 &summary_executions,
                 &summary_scores,
             );
-            let aggregate_summary = experiment_results::aggregate_summary(
+            let mut aggregate_summary = experiment_results::aggregate_summary(
                 &summary_executions,
                 &summary.task_progress,
                 &summary.scoring_progress,
             );
+            let scoring_cost = experiment_usage::scoring_cost(
+                &experiment,
+                &scorer_definitions,
+                &summary.score_summaries,
+            )
+            .await
+            .unwrap_or_else(|error| {
+                log::warn!("[Experiment] failed to load scoring cost for {experiment_id}: {error}");
+                experiment_usage::ScoringCost::unavailable()
+            });
+            scoring_cost.apply_to(&mut aggregate_summary);
             // Measured over the whole Experiment, then narrowed to this page:
             // a case's trials can straddle a page boundary, and half a case's
             // trials would understate how much it disagreed with itself.
