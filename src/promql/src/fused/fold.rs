@@ -24,7 +24,6 @@ use config::meta::promql::value::{
 };
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::{HashMap, hash_map::Entry};
-use infra::errors::{Error, ErrorCodes};
 use tokio::task::JoinSet;
 
 use super::{accumulator::FusedAccumulator, op::FusedAggOp};
@@ -66,16 +65,6 @@ impl FoldParams {
             timestamps: eval_ctx.timestamps(),
         })
     }
-}
-
-/// The fold ran past the query timeout; dropping it aborts the partitions.
-pub(super) fn timeout_error() -> DataFusionError {
-    DataFusionError::Plan(
-        Error::ErrorCode(ErrorCodes::SearchTimeout(
-            "[PromQL] fused agg timeout".to_string(),
-        ))
-        .to_string(),
-    )
 }
 
 /// Folds all partitions concurrently and merges their groups; each source opens inside its own

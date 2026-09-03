@@ -20,11 +20,12 @@ use config::meta::promql::{
     value::{EvalContext, Value},
 };
 use datafusion::error::{DataFusionError, Result};
+use infra::errors::{Error, ErrorCodes};
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
 use super::{
-    fold::{FoldParams, fold_sources, timeout_error},
+    fold::{FoldParams, fold_sources},
     op::FusedAggOp,
 };
 use crate::{
@@ -92,7 +93,14 @@ pub(crate) async fn fused_agg(
     let (value, _) =
         tokio::time::timeout(Duration::from_secs(timeout), fold_sources(sources, params))
             .await
-            .map_err(|_| timeout_error())??;
+            .map_err(|_| {
+                DataFusionError::Plan(
+                    Error::ErrorCode(ErrorCodes::SearchTimeout(
+                        "[PromQL] fused agg timeout".to_string(),
+                    ))
+                    .to_string(),
+                )
+            })??;
 
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) completed in {:?}, folded {input_series} series into {} series",
