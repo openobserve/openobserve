@@ -58,7 +58,8 @@ pub(crate) struct FusedShape {
     pub range: Duration,
 }
 
-/// Folds from per-shard ordered streams; `None` when the layout or shape cannot stream.
+/// Folds from per-shard ordered streams; `None` when the layout or shape cannot stream. The
+/// caller bounds it: dropping the future aborts the shard folds.
 pub(crate) async fn fused_agg(
     ctx: &SessionContext,
     schema: &Schema,
@@ -66,7 +67,6 @@ pub(crate) async fn fused_agg(
     shape: FusedShape,
     modifier: &Option<LabelModifier>,
     eval_ctx: &EvalContext,
-    timeout: u64,
 ) -> Result<Option<Value>> {
     let start_time = std::time::Instant::now();
     let trace_id = eval_ctx.trace_id.clone();
@@ -113,7 +113,7 @@ pub(crate) async fn fused_agg(
         .into_iter()
         .map(|streams| StreamSource::start(streams, group_cols.clone(), selector.offset))
         .collect();
-    let (value, series_count) = fold_sources(sources, params, timeout).await?;
+    let (value, series_count) = fold_sources(sources, params).await?;
 
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) execution took: {:?}, folded {series_count} series into {} series",
@@ -330,7 +330,6 @@ mod tests {
             FusedShape { op, func, range },
             modifier,
             &eval_ctx,
-            10,
         )
         .await
         .unwrap()
