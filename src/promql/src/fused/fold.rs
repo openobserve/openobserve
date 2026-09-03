@@ -68,12 +68,21 @@ impl FoldParams {
     }
 }
 
+/// The fold ran past the query timeout; dropping it aborts the partitions.
+pub(super) fn timeout_error() -> DataFusionError {
+    DataFusionError::Plan(
+        Error::ErrorCode(ErrorCodes::SearchTimeout(
+            "[PromQL] fused agg timeout".to_string(),
+        ))
+        .to_string(),
+    )
+}
+
 /// Folds all partitions concurrently and merges their groups; each source opens inside its own
-/// task.
+/// task, and dropping the future aborts them all.
 pub(super) async fn fold_sources<F, S>(
     sources: Vec<F>,
     params: Arc<FoldParams>,
-    timeout: u64,
 ) -> Result<(Value, usize)>
 where
     F: Future<Output = Result<S>> + Send + 'static,
@@ -86,7 +95,7 @@ where
             async move { fold_partition(source.await?, params).await }
         })
         .collect();
-    let folds = run_folds(folds, timeout).await?;
+    let folds = run_folds(folds).await?;
     let series_count = folds.iter().map(|(_, series)| series).sum();
     let value = merge_folds(
         folds.into_iter().map(|(groups, _)| groups).collect(),
@@ -163,8 +172,8 @@ fn fold_series(
     }
 }
 
-/// The first failed partition or the `timeout` fails the fold; dropping the set aborts the rest.
-async fn run_folds<Fut>(folds: Vec<Fut>, timeout: u64) -> Result<Vec<(GroupAccs, usize)>>
+/// The first failed partition fails the fold; dropping the set aborts the rest.
+async fn run_folds<Fut>(folds: Vec<Fut>) -> Result<Vec<(GroupAccs, usize)>>
 where
     Fut: Future<Output = Result<(GroupAccs, usize)>> + Send + 'static,
 {
@@ -174,23 +183,10 @@ where
         tasks.spawn(async move { (index, fold.await) });
     }
     // folds finish in any order; the merge needs them in partition order
-    let join = async {
-        while let Some(joined) = tasks.join_next().await {
-            let (index, fold) = joined.map_err(|e| DataFusionError::Execution(e.to_string()))?;
-            results[index] = Some(fold?);
-        }
-        Ok::<_, DataFusionError>(())
-    };
-    tokio::time::timeout(Duration::from_secs(timeout), join)
-        .await
-        .map_err(|_| {
-            DataFusionError::Plan(
-                Error::ErrorCode(ErrorCodes::SearchTimeout(
-                    "[PromQL] fused agg timeout".to_string(),
-                ))
-                .to_string(),
-            )
-        })??;
+    while let Some(joined) = tasks.join_next().await {
+        let (index, fold) = joined.map_err(|e| DataFusionError::Execution(e.to_string()))?;
+        results[index] = Some(fold?);
+    }
     Ok(results
         .into_iter()
         .map(|fold| fold.expect("every partition joined"))
@@ -312,7 +308,7 @@ mod tests {
         ];
 
         let start = std::time::Instant::now();
-        let result = run_folds(folds, 30).await;
+        let result = run_folds(folds).await;
         assert!(result.is_err(), "the failed partition must fail the fold");
         assert!(
             start.elapsed() < Duration::from_secs(5),
