@@ -11,13 +11,15 @@ runs:
       env:
         TOKEN: ${{ inputs.token }}
       run: |
-        # A credential helper is consulted only when GitHub answers 401, so it never conflicts with the
-        # header actions/checkout keeps for the checked-out repository.
-        echo "GH_AUTH_TOKEN=$TOKEN" >> "$GITHUB_ENV"
-        git config --global credential.helper '!f() { echo username=x-access-token; echo "password=$GH_AUTH_TOKEN"; }; f'
-        # The helper only answers a 401; GitHub's download throttling is a protocol error with no challenge, so
-        # the token has to go on the first request: rewrite every github.com URL to carry it.
-        git config --global "url.https://x-access-token:${TOKEN}@github.com/.insteadOf" "https://github.com/"
+        # Sent on every github.com request, so throttled anonymous downloads never happen. A credential helper
+        # or a token in the URL is only used after a 401, and GitHub never challenges for a public repository.
+        B64=$(printf 'x-access-token:%s' "$TOKEN" | base64 | tr -d '\n')
+        echo "::add-mask::$B64"
+        git config --global http.https://github.com/.extraheader "AUTHORIZATION: basic $B64"
+        # actions/checkout keeps the same header in each checked-out repository; two copies make GitHub answer 400.
+        for d in "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE"/*/; do
+          [ -d "$d/.git" ] && git -C "$d" config --local --unset-all http.https://github.com/.extraheader || true
+        done
         echo "GIT_TERMINAL_PROMPT=0" >> "$GITHUB_ENV"
-        # cargo's libgit2 path does not always consult the helper; the git CLI always does.
+        # cargo's libgit2 transport ignores http.extraheader; the git CLI honours it.
         echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> "$GITHUB_ENV"
