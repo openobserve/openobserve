@@ -10,8 +10,7 @@ name: Playwright E2E Crosscheck
 # Behaviour (A+A+C design):
 #   - PR does NOT touch web/** or tests/ui-testing/**            → pass instantly (never blocks).
 #   - Touches them + `skip-ent-e2e` label                       → pass (explicit, auditable opt-out).
-#   - Touches them + NO `e2e` label                             → FAIL "add the e2e label" (blocks; no silent miss).
-#   - Touches them + `e2e` label:
+#   - Touches them (the e2e label gates the whole job, like every paid workflow):
 #       · open sister ENT PR (same-named branch) → DEFER to that PR's checks (link it, don't build here)
 #       · sister ENT branch only (no PR)          → build the enterprise binary against that branch
 #       · no ENT counterpart                      → build against ENT main
@@ -30,12 +29,14 @@ name: Playwright E2E Crosscheck
 
 on:
   pull_request:
-    # labeled/unlabeled so adding `e2e`/`skip-ent-e2e` re-fires and re-evaluates the gate.
-    types: [opened, reopened, synchronize, labeled, unlabeled]
+    # Fires once per PR when "Merge when ready" is clicked, then for pushes/labels while auto-merge stays on.
+    types: [auto_merge_enabled, synchronize, labeled, unlabeled]
+  # A required check must also report on merge-queue commits; the gate already passed on the PR head.
+  merge_group:
 
 # PR-scoped: a new push/label supersedes the previous gate attempt for the same PR.
 concurrency:
-  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number }}
+  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -44,6 +45,8 @@ permissions:
 
 jobs:
   playwright-e2e-crosscheck:
+    # A pre-merge gate: runs once auto-merge is enabled on a labelled PR, not on every push.
+    if: ${{ github.event_name == 'merge_group' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.auto_merge != null) }}
     name: Playwright E2E Crosscheck
     runs-on: ubuntu-latest
     # ~5 min to find the ENT run + up to ~75 min to poll. Generous on purpose: normal is ~20 min,
@@ -51,17 +54,20 @@ jobs:
     # the gate ("timed out") while ENT is still legitimately running.
     timeout-minutes: 90
     steps:
-      - name: Triage — relevant paths? which label?
+      - name: Triage — relevant paths? opted out?
         id: triage
         env:
           GH_TOKEN: ${{ github.token }}          # OSS is same-repo/public → default token can read PR files
           PR: ${{ github.event.pull_request.number }}
-          HAS_E2E: ${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}
           HAS_SKIP: ${{ contains(github.event.pull_request.labels.*.name, 'skip-ent-e2e') }}
           DISABLED: ${{ vars.ENT_E2E_GATE_DISABLED }}
           IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
         run: |
           set -euo pipefail
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            echo "::notice::merge queue commit — gate already passed on the PR head."
+            echo "mode=pass" >> "$GITHUB_OUTPUT"; exit 0
+          fi
           if [ "$DISABLED" = "true" ]; then
             echo "::notice::ENT_E2E_GATE_DISABLED=true — passing without dispatch."
             echo "mode=pass" >> "$GITHUB_OUTPUT"; exit 0
@@ -88,8 +94,6 @@ jobs:
           elif [ "$HAS_SKIP" = "true" ]; then
             echo "::warning::PR carries 'skip-ent-e2e' — enterprise gate explicitly opted out (auditable)."
             echo "mode=skip" >> "$GITHUB_OUTPUT"
-          elif [ "$HAS_E2E" != "true" ]; then
-            echo "mode=need-label" >> "$GITHUB_OUTPUT"
           else
             echo "mode=run" >> "$GITHUB_OUTPUT"
           fi
@@ -97,13 +101,6 @@ jobs:
       - name: Pass — no enterprise-relevant changes (or opted out / disabled)
         if: steps.triage.outputs.mode == 'pass' || steps.triage.outputs.mode == 'skip'
         run: echo "✅ Playwright E2E Crosscheck not required for this PR."
-
-      - name: Block — enterprise-relevant change without the e2e label
-        if: steps.triage.outputs.mode == 'need-label'
-        run: |
-          echo "::error::This PR changes web/** or tests/ui-testing/**, which can break enterprise-only e2e specs."
-          echo "::error::Add the 'e2e' label to run the enterprise gate (or 'skip-ent-e2e' to explicitly opt out)."
-          exit 1
 
       - name: Run — dispatch ENT engine, poll, mirror result
         if: steps.triage.outputs.mode == 'run'

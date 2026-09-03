@@ -19,8 +19,12 @@ use arrow::buffer::BooleanBuffer;
 use arrow_schema::{DataType, SchemaRef};
 use config::{FileFormat, TIMESTAMP_COL_NAME, meta::stream::FileSelection};
 use datafusion::{
+    catalog::memory::DataSourceExec,
     common::{DataFusionError, Result, project_schema, stats::Precision},
-    datasource::{listing::PartitionedFile, physical_plan::parquet::ParquetAccessPlan},
+    datasource::{
+        listing::PartitionedFile,
+        physical_plan::{FileGroup, FileScanConfig, parquet::ParquetAccessPlan},
+    },
     logical_expr::Operator,
     parquet::arrow::arrow_reader::RowSelection,
     physical_expr::conjunction,
@@ -35,6 +39,7 @@ use datafusion::{
 use hashbrown::HashMap;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::sampling::execution::generate_row_group_access_plan;
+use rayon::prelude::*;
 
 use crate::{
     datafusion::{
@@ -319,6 +324,52 @@ pub fn apply_combined_filter(
             .apply_projection(filter_projection.cloned())?
             .build()?,
     ))
+}
+
+/// Attaches the tantivy access plans to every file and rebuilds the scan over
+/// the given groups.
+pub(crate) fn with_access_plans(
+    trace_id: &str,
+    config: &FileScanConfig,
+    file_groups: Vec<FileGroup>,
+    target_partitions: usize,
+) -> Arc<dyn ExecutionPlan> {
+    let start = std::time::Instant::now();
+    let new_file_groups: Vec<_> = file_groups
+        .into_par_iter()
+        .map(|file_group| {
+            let group: Vec<_> = file_group
+                .into_inner()
+                .into_iter()
+                .map(|mut file| {
+                    generate_access_plan(&mut file);
+                    file
+                })
+                .collect();
+            // TODO: check if we need statistics for FileGroup
+            // the statistics in FileGroup is used in ExecutionPlan::partition_statistics
+            FileGroup::new(group)
+        })
+        .collect();
+
+    let groups_len = new_file_groups.len();
+    let max_group_len = new_file_groups.iter().map(|g| g.len()).max().unwrap_or(0);
+    let files_nums = new_file_groups.iter().map(|g| g.len()).sum::<usize>();
+
+    log::info!(
+        "[trace_id {trace_id}] listing table adapter, target_partitions: {target_partitions}, file groups: {groups_len}, max group len: {max_group_len}, total files: {files_nums}, took: {} ms",
+        start.elapsed().as_millis() as usize,
+    );
+
+    let mut config = config.clone();
+    config.file_groups = new_file_groups;
+    Arc::new(DataSourceExec::new(Arc::new(config)))
+}
+
+pub(crate) fn file_scan_config(plan: &Arc<dyn ExecutionPlan>) -> Option<&FileScanConfig> {
+    plan.downcast_ref::<DataSourceExec>()?
+        .data_source()
+        .downcast_ref::<FileScanConfig>()
 }
 
 #[cfg(test)]
