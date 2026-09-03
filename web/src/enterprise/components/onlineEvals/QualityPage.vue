@@ -108,7 +108,6 @@
         :boolean-trend-series="booleanTrendSeries"
         :categorical-rows="categoricalRows"
         :scope="detailScope"
-        :scope-counts="selectedConfigScopeCounts"
         :runs="qualityRuns"
         :runs-counts="runsCounts"
         :runs-filter="runsFilter"
@@ -151,7 +150,7 @@ import {
   combineWhere,
   type AgentFilterSelection,
 } from "./utils/agentFilterSql";
-import type { QualityScope, ScopeCounts } from "./utils/qualityScope";
+import type { QualityScope } from "./utils/qualityScope";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
 const props = defineProps<{
@@ -219,16 +218,6 @@ const selectedConfig = computed<ScoreConfig | null>(() => {
   const id = selectedConfigId.value;
   if (!id) return null;
   return props.scoreConfigs.find((c) => String(c.id) === id) ?? null;
-});
-
-const EMPTY_SCOPE_COUNTS: ScopeCounts = { span: 0, trace: 0, session: 0 };
-const selectedConfigScopeCounts = computed<ScopeCounts>(() => {
-  const id = selectedConfigId.value;
-  if (!id) return EMPTY_SCOPE_COUNTS;
-  return (
-    configRows.value.find((row) => String(row.config.id) === id || String(row.configId) === id)
-      ?.scopeCounts ?? EMPTY_SCOPE_COUNTS
-  );
 });
 
 const {

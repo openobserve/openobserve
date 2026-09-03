@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - "**"
+    # Fires once per PR when "Merge when ready" is clicked, then only for pushes while auto-merge stays on.
+    types: [auto_merge_enabled, synchronize, labeled, ready_for_review, converted_to_draft]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -14,11 +16,15 @@ env:
 
 jobs:
   initiate_enterprise_build:
-    if: ${{ github.event.pull_request.head.repo.fork == false }} # Only run for PRs which are not from forks
+    # A pre-merge gate: runs once auto-merge is enabled on a labelled PR, not on every push.
+    if: ${{ github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) && github.event.pull_request.auto_merge != null }}
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
     steps:
+      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
+      - if: github.event_name == 'pull_request'
+        run: sleep 60
       - name: Generate token
         id: generate_token
         uses: actions/create-github-app-token@v3.2.0

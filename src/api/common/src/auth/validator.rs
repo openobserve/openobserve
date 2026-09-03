@@ -31,7 +31,7 @@ use o2_dex::config::get_config as get_dex_config;
 pub use openobserve_core::auth::get_user_email_from_auth_str;
 pub use openobserve_core::authz::{check_permissions, list_objects_for_user};
 use openobserve_core::{
-    auth::{AuthExtractor, V2_API_PREFIX, get_hash, get_user_details},
+    auth::{AuthExtractor, SESSION_AUTH_MARKER, V2_API_PREFIX, get_hash, get_user_details},
     users,
 };
 
@@ -1247,21 +1247,25 @@ pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResul
     }
 }
 
+// The marker alone proves nothing: only a live session still holding this exact token does.
+async fn session_grants_token(session_id: &str, token: &str) -> bool {
+    matches!(db::session::get(session_id).await, Ok(stored) if stored == token)
+}
+
 async fn oo_validator_internal(
     req_data: &RequestData,
     auth_info: &AuthExtractor,
     path_prefix: &str,
 ) -> Result<AuthValidationResult, AuthError> {
-    // Check if this is a session-based auth (marked with Session:: prefix)
-    let (is_from_session, auth_str) = if let Some(rest) = auth_info.auth.strip_prefix("Session::") {
-        // Format: "Session::<session_id>::<actual_token>"
-        if let Some((_session_id, token)) = rest.split_once("::") {
-            (true, token.to_string())
-        } else {
-            (false, auth_info.auth.clone())
-        }
-    } else {
-        (false, auth_info.auth.clone())
+    // Format: "Session::<session_id>::<actual_token>"
+    let (is_from_session, auth_str) = match auth_info.auth.strip_prefix(SESSION_AUTH_MARKER) {
+        Some(rest) => match rest.split_once("::") {
+            Some((session_id, token)) if session_grants_token(session_id, token).await => {
+                (true, token.to_string())
+            }
+            _ => return Err(AuthError::Unauthorized("Unauthorized Access".to_string())),
+        },
+        None => (false, auth_info.auth.clone()),
     };
 
     if let Some(info) = auth_str.strip_prefix("Basic ").map(str::trim) {
@@ -1289,7 +1293,10 @@ async fn oo_validator_internal(
         .await
     } else if auth_str.starts_with("Bearer") {
         log::debug!("Bearer token found");
-        super::token::token_validator(req_data, auth_info).await
+        // token_validator unwraps a "Bearer" prefix, so it must not see the session marker.
+        let mut unwrapped_auth_info = auth_info.clone();
+        unwrapped_auth_info.auth = auth_str;
+        super::token::token_validator(req_data, &unwrapped_auth_info).await
     } else if let Ok(auth_tokens) = config::utils::json::from_str::<AuthTokensExt>(&auth_info.auth)
     {
         log::debug!("Auth ext token found");
@@ -1418,6 +1425,7 @@ fn _extract_full_url(req: &Request) -> String {
 #[cfg(test)]
 mod tests {
     use config::meta::password_policy::{LockoutPolicy, PasswordPolicy};
+    use chrono::Utc;
     use infra::{
         db as infra_db,
         db::{get_orm_client_ro, get_orm_client_rw},
@@ -1427,7 +1435,7 @@ mod tests {
 
     use super::*;
     use crate::common::{
-        infra::config::{ORG_USERS, USERS},
+        infra::config::{ORG_USERS, USER_SESSIONS, USER_SESSIONS_EXPIRY, USERS},
         meta::user::UserRequest,
     };
 
@@ -1767,6 +1775,77 @@ mod tests {
                 .unwrap()
                 .is_valid,
             "assume_service_account sessions must still authenticate"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_forged_session_marker_cannot_bypass_allow_static_token() {
+        let org_id = "default";
+        let sa_email = "sa-forged-marker@example.com";
+        let token = "sa_static_token_forged_marker_test";
+
+        let _ = get_orm_client_rw().await;
+        let _ = infra_db::create_table().await;
+        let _ = infra_table::create_user_tables().await;
+        let _ = organization::check_and_create_org_without_ofga(org_id).await;
+
+        users::create_service_account_if_not_exists(sa_email)
+            .await
+            .unwrap();
+        db::org_users::add_with_flags(
+            org_id,
+            sa_email,
+            config::meta::user::UserRole::ServiceAccount,
+            token,
+            None,
+            false,
+        )
+        .await
+        .unwrap();
+
+        let credentials = base64::encode(&format!("{sa_email}:{token}"));
+        let req_data = RequestData {
+            uri: "/api/default/users".parse().unwrap(),
+            method: Method::GET,
+            headers: HeaderMap::new(),
+        };
+        let plain = AuthExtractor {
+            auth: format!("Basic {credentials}"),
+            method: "GET".to_string(),
+            o2_type: String::new(),
+            org_id: String::new(),
+            bypass_check: false,
+            parent_id: String::new(),
+            use_all_org: false,
+            use_self_context: false,
+            use_self_parent: false,
+        };
+        assert!(
+            oo_validator(&req_data, &plain).await.is_err(),
+            "a disabled static token must be rejected"
+        );
+
+        // GHSA-3885-f5c9-86xr: the marker names no live session, so it must buy nothing.
+        let forged = AuthExtractor {
+            auth: format!("{SESSION_AUTH_MARKER}forged::Basic {credentials}"),
+            ..plain.clone()
+        };
+        assert!(
+            oo_validator(&req_data, &forged).await.is_err(),
+            "a forged session marker must not bypass the allow_static_token policy"
+        );
+
+        // The same marker backed by a real assume_service_account session still authenticates.
+        let session_id = "session-forged-marker-test";
+        USER_SESSIONS.insert(session_id.to_string(), format!("Basic {credentials}"));
+        USER_SESSIONS_EXPIRY.insert(session_id.to_string(), Utc::now().timestamp() + 3600);
+        let genuine = AuthExtractor {
+            auth: format!("{SESSION_AUTH_MARKER}{session_id}::Basic {credentials}"),
+            ..plain.clone()
+        };
+        assert!(
+            oo_validator(&req_data, &genuine).await.is_ok(),
+            "a marker backed by a live session must still authenticate"
         );
     }
 

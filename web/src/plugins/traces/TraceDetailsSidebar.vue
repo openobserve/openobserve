@@ -222,6 +222,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="table-chart" size="sm" />
               <OTooltip side="bottom" :content="t('aiObservability.traceActions.dataset.button')" />
             </OButton>
+
+            <OButton
+              v-if="canOpenPlayground"
+              variant="outline"
+              size="icon-xs"
+              :aria-label="t('aiObservability.traceActions.playground.button')"
+              data-test="trace-details-sidebar-playground-span-btn"
+              @click.stop="openInPlayground"
+            >
+              <OIcon name="play-circle" size="sm" />
+              <OTooltip
+                side="bottom"
+                :content="t('aiObservability.traceActions.playground.hint')"
+              />
+            </OButton>
           </div>
         </div>
       </div>
@@ -1698,6 +1713,44 @@ export default defineComponent({
       emit("add-to-dataset", props.span);
     };
 
+    // Gated on the raw fields rather than on a parsed hand-off: this runs on
+    // every render, and parsing a whole conversation to decide whether to draw
+    // a button is work the render loop should not be doing.
+    const canOpenPlayground = computed(
+      () =>
+        props.showAnnotateButtons &&
+        isLLMSpan.value &&
+        Boolean(
+          props.span?.gen_ai_input_messages ||
+          props.span?.gen_ai_output_messages ||
+          props.span?.gen_ai_system_instructions ||
+          props.span?.attributes_prompt ||
+          props.span?.attributes_response,
+        ),
+    );
+
+    /** The Playground is enterprise-only, so its module is pulled on click
+     *  rather than bundled into the traces chunk. */
+    const openInPlayground = async () => {
+      const [{ handoffFromSpan, stashHandoff }, { aiPlaygroundRoute }] = await Promise.all([
+        import("@/enterprise/views/AIObservability/playgroundHandoff"),
+        import("@/enterprise/views/AIObservability/playgroundRoutes"),
+      ]);
+      const handoff = handoffFromSpan(props.span);
+      // Navigating on a failed stash would land the user on an empty bench with
+      // no explanation, so the failure is reported where it happened.
+      if (!handoff || !stashHandoff(handoff)) {
+        toast({
+          variant: "error",
+          message: t("aiObservability.playground.openInPlaygroundFailed"),
+        });
+        return;
+      }
+      router.push(
+        aiPlaygroundRoute(store.state.selectedOrganization?.identifier ?? "", { fromSpan: true }),
+      );
+    };
+
     const getStartTime = computed(() => {
       return formatTimeWithSuffix(
         convertTimeFromNsToUs(props.span.start_time) - (props.baseTracePosition?.startTimeUs || 0),
@@ -2229,6 +2282,8 @@ export default defineComponent({
       viewSpanLogs,
       evaluateSpan,
       addSpanToDataset,
+      canOpenPlayground,
+      openInPlayground,
       spanStartTimeUs,
       spanSourceStream,
       getStartTime,
