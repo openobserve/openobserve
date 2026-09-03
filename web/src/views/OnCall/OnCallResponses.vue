@@ -42,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="viewerEmail"
         variant="outline"
         size="sm"
-        icon-left="person"
         :active="mineOnly"
         :aria-pressed="mineOnly"
         data-test="oncall-responses-mine-btn"
