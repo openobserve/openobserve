@@ -2178,6 +2178,7 @@ export default defineComponent({
           parsed = raw;
         }
         if (Array.isArray(parsed)) {
+          // filter drops both null (unsupported part type) and "" (no content); "" from join -> null so callers get one consistent falsy value.
           return (
             parsed
               .map((p: any) => extractGenAiPartText(p))
