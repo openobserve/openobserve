@@ -17,13 +17,15 @@ page.on("pageerror", (e) => errors.push(String(e)));
 try {
   // ── Login ──
   await page.goto(`${UI}/web/login`);
+  // First load after an HMR of a wide module compiles the whole graph — warm it.
+  await page.waitForLoadState("networkidle", { timeout: 60000 }).catch(() => {});
   const internal = page.locator('[data-test="login-as-internal-user"]');
   if (await internal.isVisible({ timeout: 3000 }).catch(() => false)) await internal.click();
   await page.locator('[data-test="login-user-id"] input').fill(process.env.E2E_EMAIL);
   await page.locator('[data-test="login-password"] input').fill(process.env.E2E_PASS);
   await page.locator('[data-test="login-sign-in"]').click();
   // Post-login lands on /web/ first; the org param only appears on deeper routes.
-  await page.waitForURL(/\/web\//, { timeout: 15000 });
+  await page.waitForURL((u) => !u.pathname.includes("login"), { timeout: 45000 });
   await page.waitForLoadState("networkidle").catch(() => {});
   ok("U0 login", !page.url().includes("/login"));
 
@@ -41,69 +43,71 @@ try {
   await page.waitForTimeout(1500); // grouped fetch settles
   await page.screenshot({ path: `${SHOTS}/01-editor-stage.png`, fullPage: false });
 
-  // ── U1: Resolve-as switch present with both environments, stage first ──
-  const select = page.locator('[data-test="synthetics-check-variables-panel-resolve-as"]');
-  ok("U1a resolve-as rendered", await select.count());
-  const selectText = await select.innerText().catch(() => "");
-  ok("U1b defaults to first env (stage_e2e)", selectText.includes("stage_e2e"), selectText);
+  // ── U1: 4b union panel — hover hint, source filter over the check's envs ──
+  ok("U1a hover hint shown", await page.locator('[data-test="synthetics-check-variables-panel-hover-hint"]').count());
+  const filter = page.locator('[data-test="synthetics-inherited-filter"]');
+  ok("U1b source filter rendered", await filter.count());
+  await filter.click();
+  const optionTexts = await page.locator('[role="option"]').allInnerTexts();
+  await page.keyboard.press("Escape");
+  ok("U1c filter offers All/Global and both envs", ["All", "Global", "stage_e2e", "qa_e2e"].every((o) => optionTexts.some((t) => t.includes(o))), JSON.stringify(optionTexts));
 
-  // ── U2: stage view rows ──
+  // ── U2: the union — every selected env's names plus globals, at once ──
   const inherited = page.locator('[data-test="synthetics-inherited-variable"]');
   const stageText = await panel.innerText();
-  ok("U2a BASE_URL row shown", stageText.includes("BASE_URL"));
+  ok("U2a BASE_URL (stage) and DEBUG (qa) shown together", stageText.includes("BASE_URL") && stageText.includes("DEBUG"));
   ok(
     "U2b secret marked by lock, no value-like content",
     (await page.locator('[data-test="synthetics-inherited-secret-lock"]').count()) === 1 &&
       !stageText.includes("••••••"),
   );
-  // Row-scoped: the unbound warning legitimately names DEBUG in panel text.
-  const rowTexts = await inherited.allInnerTexts();
-  ok("U2c no DEBUG row in stage view", !rowTexts.some((t) => t.startsWith("DEBUG")));
-  ok("U2d global ORG shown", stageText.includes("ORG"));
+  ok("U2c global ORG shown", stageText.includes("ORG"));
+  ok("U2d local group header with add button", stageText.includes("Local") && (await page.locator('[data-test="synthetics-check-variables-panel-add-variable-btn"]').count()) === 1);
 
-  // ── U3: override — struck row, relation on the accessible name only ──
+  // ── U3: override — struck inherited row, warning on the local winner ──
   const struck = page.locator('[data-test="synthetics-inherited-variable"] span.line-through');
   ok("U3a struck CHECKOUT_USER", (await struck.count()) === 1 && (await struck.first().innerText()) === "CHECKOUT_USER");
   ok("U3b relation on aria-label", (await struck.first().getAttribute("aria-label")) === "Overridden by local variable");
-  ok("U3c no link and no old badge", !stageText.includes("Overridden here") && !stageText.includes("Overridden by local variable"));
+  ok("U3c local row carries the overrides warning", await page.locator('[data-test="synthetics-check-variables-panel-overrides-0-badge"]').count());
 
-  // ── U4: coverage triangles in stage view (env names on the tooltip/aria-label) ──
+  // ── U4: coverage triangles (env names on the tooltip/aria-label) ──
   const gapBadges = page.locator('[data-test="synthetics-inherited-gap-badge"]');
   const gapLabels = () =>
     gapBadges.evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? ""));
   const gapTexts = await gapLabels();
   ok("U4a stage-only rows warn 'Not in qa_e2e'", gapTexts.some((t) => t.includes("Not in qa_e2e")), JSON.stringify(gapTexts));
-  ok("U4b overridden name has no gap (check tier covers it)", !gapTexts.some((t) => t.includes("CHECKOUT_USER")));
+  ok("U4b DEBUG warns 'Not in stage_e2e' in the same view", gapTexts.some((t) => t.includes("Not in stage_e2e")), JSON.stringify(gapTexts));
 
-  // ── U5: count = effective for stage (API_KEY, BASE_URL, CHECKOUT_USER, ORG = 4) ──
+  // ── U5: header counts distinct resolved names across the union ──
   const count = await page.locator('[data-test="synthetics-check-variables-panel-count"]').innerText();
-  // 6 = fixture (API_KEY, BASE_URL, CHECKOUT_USER, ORG) + pre-existing globals URL, URL_COPY.
-  ok("U5 stage count matches the API's effective set (6)", count.trim() === "6", count);
+  ok("U5 distinct-name count is 7", count.trim() === "7", count);
 
-  await page.screenshot({ path: `${SHOTS}/02-override-strike.png` });
-
-  // ── U8: flip to qa_e2e — client-side, rows swap ──
+  // ── U8: source filter is client-side ──
   let grouped_calls = 0;
   page.on("request", (r) => { if (r.url().includes("resolved-variables")) grouped_calls++; });
-  await select.click();
-  await page.locator('[role="option"], .o-select-item', { hasText: "qa_e2e" }).first().click()
-    .catch(async () => { await page.getByText("qa_e2e", { exact: true }).last().click(); });
+  await filter.selectOption("qa_e2e").catch(async () => {
+    await filter.click();
+    await page.getByText("qa_e2e", { exact: true }).last().click();
+  });
   await page.waitForTimeout(400);
-  const qaText = await panel.innerText();
-  ok("U8a DEBUG appears in qa view", qaText.includes("DEBUG"));
-  ok("U8b BASE_URL gone in qa view", !qaText.includes("BASE_URL"));
-  ok("U8c no struck row in qa view", (await struck.count()) === 0);
-  const qaCount = await page.locator('[data-test="synthetics-check-variables-panel-count"]').innerText();
-  ok("U8d qa count matches the API's effective set (5)", qaCount.trim() === "5", qaCount);
-  ok("U8e no refetch on flip", grouped_calls === 0, `calls=${grouped_calls}`);
-  const qaGaps = await gapLabels();
-  ok("U8f DEBUG warns 'Not in stage_e2e'", qaGaps.some((t) => t.includes("Not in stage_e2e")), JSON.stringify(qaGaps));
-  await page.screenshot({ path: `${SHOTS}/03-qa-view.png` });
-
-  // ── U9: remove-override dialog carries the fallback note (back on stage) ──
-  await select.click();
-  await page.getByText("stage_e2e", { exact: true }).last().click();
+  const qaRows = await inherited.allInnerTexts();
+  ok("U8a qa filter shows DEBUG only", qaRows.length === 1 && qaRows[0].includes("DEBUG"), JSON.stringify(qaRows));
+  await filter.selectOption("__global__").catch(async () => {
+    await filter.click();
+    await page.getByText("Global", { exact: true }).last().click();
+  });
+  await page.waitForTimeout(400);
+  const globalRows = await inherited.allInnerTexts();
+  ok("U8b global filter shows the three globals", globalRows.length === 3, JSON.stringify(globalRows));
+  ok("U8c no refetch on filtering", grouped_calls === 0, `calls=${grouped_calls}`);
+  await filter.selectOption("__all__").catch(async () => {
+    await filter.click();
+    await page.getByText("All", { exact: true }).last().click();
+  });
   await page.waitForTimeout(300);
+  await page.screenshot({ path: `${SHOTS}/03-filters.png` });
+
+  // ── U9: remove-override dialog carries the fallback note ──
   await page.locator('[data-test="synthetics-check-variables-panel-remove-0-btn"]').click();
   const dialog = page.locator('[data-test="synthetics-check-variables-panel-remove-dialog"]');
   await dialog.waitFor({ timeout: 5000 });
@@ -128,6 +132,38 @@ try {
   await page.waitForTimeout(300);
   const widthAfter = (await panel.boundingBox()).width;
   ok("U11b drag widens the panel within limits", widthAfter > widthBefore && (await panel.isVisible()), `w ${widthBefore}→${widthAfter}`);
+
+  // ── U12: at minimum panel width the warnings survive; names ellipsize ──
+  const sep2 = await page.locator('[role="separator"]').last().boundingBox();
+  await page.mouse.move(sep2.x + 1, sep2.y + sep2.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(sep2.x + 400, sep2.y + sep2.height / 2, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  const panelBox = await panel.boundingBox();
+  const badgeBoxes = await gapBadges.evaluateAll((els) =>
+    els.map((e) => { const r = e.getBoundingClientRect(); return { x: r.x, right: r.right, w: r.width }; }),
+  );
+  ok("U12a all warning badges intact at min width", badgeBoxes.length === 3 && badgeBoxes.every((b) => b.w > 0 && b.right <= panelBox.x + panelBox.width + 1), JSON.stringify(badgeBoxes));
+  const overflowContract = await page
+    .locator('[data-test="synthetics-inherited-variable"]')
+    .evaluateAll((rows) =>
+      rows.map((row) => {
+        const name = row.querySelector("span.truncate");
+        const badge = row.querySelector('[data-test="synthetics-inherited-gap-badge"]');
+        const wrap = badge?.parentElement?.closest("span");
+        return {
+          ellipsis: name && getComputedStyle(name).textOverflow === "ellipsis",
+          noShrink: !badge || (wrap && getComputedStyle(wrap).flexShrink === "0"),
+        };
+      }),
+    );
+  ok(
+    "U12b names carry ellipsis, badge wrappers never shrink",
+    overflowContract.every((c) => c.ellipsis && c.noShrink),
+    JSON.stringify(overflowContract),
+  );
+  await page.screenshot({ path: `${SHOTS}/05-narrow-panel.png` });
 
   ok("U10 no page errors", errors.length === 0, errors.join(" | ").slice(0, 300));
 } catch (e) {

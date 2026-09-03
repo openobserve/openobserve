@@ -52,6 +52,7 @@ import ContentPaste from "~icons/material-symbols/content-paste";
 import Delete from "~icons/material-symbols/delete-outline";
 import Download from "~icons/material-symbols/download";
 import Edit from "~icons/material-symbols/edit-outline";
+import EditNote from "~icons/material-symbols/edit-note-outline";
 import Error from "~icons/material-symbols/error-outline";
 import ErrorOutline from "~icons/material-symbols/error-outline";
 import Event from "~icons/material-symbols/event-outline";
@@ -397,6 +398,7 @@ export const iconRegistry = {
   delete: Delete,
   download: Download,
   edit: Edit,
+  "edit-note": EditNote,
   error: Error,
   "error-outline": ErrorOutline,
   event: Event,

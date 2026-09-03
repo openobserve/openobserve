@@ -14,121 +14,171 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-Makes inheritance visible in the check editor. Purely presentational: the panel
-owns the grouped fetch and the environment selection, so this renders one
-environment's rows and never asks which one.
+The Inherited group of the 4b names-only panel: the union of every selected
+environment plus globals, one row per distinct name, filterable by source.
+Purely presentational — the panel owns the grouped fetch.
 -->
 
 <template>
-  <!-- Inset comes from the panel's scroll region, which hosts this section. -->
-  <section
-    v-if="inherited.length"
-    class="flex flex-col gap-2"
-    data-test="synthetics-inherited-variables"
-  >
+  <section class="flex flex-col gap-2" data-test="synthetics-inherited-variables">
     <div class="flex items-center gap-2">
       <h4 class="text-text-heading m-0 text-sm font-semibold">
         {{ t("synthetics.inherited.title") }}
       </h4>
-      <OBadge variant="default" size="sm">{{ inherited.length }}</OBadge>
+      <OBadge variant="default" size="sm">{{ rows.length }}</OBadge>
+      <!-- Resets per visit by design: local state, never persisted. -->
+      <div v-if="filterOptions.length > 2" class="ml-auto">
+        <OSelect
+          :model-value="filter"
+          :options="filterOptions"
+          size="sm"
+          :aria-label="t('synthetics.inherited.filterLabel')"
+          data-test="synthetics-inherited-filter"
+          @update:model-value="filter = String($event)"
+        />
+      </div>
     </div>
 
-    <ul class="m-0 flex list-none flex-col gap-1 p-0">
+    <p
+      v-if="!filteredRows.length"
+      class="text-text-secondary m-0 text-sm"
+      data-test="synthetics-inherited-empty"
+    >
+      {{
+        filter === ALL
+          ? t("synthetics.inherited.emptyNone")
+          : t("synthetics.inherited.emptyIn", { env: filterName })
+      }}
+    </p>
+
+    <ul v-else class="m-0 flex list-none flex-col gap-1 p-0">
       <li
-        v-for="variable in inherited"
-        :key="`${variable.scope}:${variable.name}`"
+        v-for="row in filteredRows"
+        :key="row.name"
         class="flex items-center gap-2 text-sm"
         data-test="synthetics-inherited-variable"
       >
-        <!-- The strike is the whole visible signal; the relation stays on the
-             tooltip and accessible name so it is never strike-only. -->
-        <span
-          class="font-mono"
-          :class="variable.overridden ? 'text-text-secondary line-through' : ''"
-          :aria-label="
-            variable.overridden ? t('synthetics.inherited.overriddenByCheck') : undefined
-          "
-          >{{ variable.name
-          }}<OTooltip
-            v-if="variable.overridden"
-            :content="t('synthetics.inherited.overriddenByCheck')"
-            side="top"
-        /></span>
-        <OTooltip
-          v-if="variable.kind === 'secret'"
-          :content="t('synthetics.variablesPanel.secretTooltip')"
-          side="top"
-        >
-          <OIcon
-            name="lock"
-            size="xs"
-            class="text-text-secondary cursor-help"
-            data-test="synthetics-inherited-secret-lock"
-          />
-        </OTooltip>
         <!-- Same scope vocabulary as the Environments & Variables rail:
-             public = Global, layers = an environment. Name on hover/aria. -->
-        <OTooltip :content="scopeLabel(variable)" side="top">
-          <OIcon
-            :name="variable.scope === 'global' ? 'public' : 'layers'"
-            size="xs"
-            class="text-text-secondary cursor-help"
-            role="img"
-            :aria-label="scopeLabel(variable)"
-            data-test="synthetics-inherited-scope-icon"
-          />
-        </OTooltip>
-
-        <div class="ml-auto flex items-center gap-1">
+             public = Global, layers = an environment. -->
+        <OIcon
+          :name="row.global && !row.envs.length ? 'public' : 'layers'"
+          size="xs"
+          class="text-text-secondary shrink-0"
+          role="img"
+          :aria-label="sourceLabel(row)"
+          data-test="synthetics-inherited-scope-icon"
+        />
+        <!-- The strike is the whole visible signal for a shadowed name; the
+             relation and the per-source value hints live on the tooltip. -->
+        <span
+          class="min-w-0 truncate font-mono"
+          :class="row.overridden ? 'text-text-secondary line-through' : ''"
+          :aria-label="row.overridden ? t('synthetics.inherited.overriddenByCheck') : undefined"
+          >{{ row.name }}<OTooltip :content="rowTooltip(row)" side="top"
+        /></span>
+        <!-- shrink-0 wrappers: on overflow the NAME ellipsizes, never these. -->
+        <span v-if="gapText(row)" class="flex shrink-0">
           <!-- Fires only on non-uniformity; the env names live in the tooltip
                and on aria-label, so hover is not the only path to them. -->
-          <OTooltip v-if="gapText(variable)" :content="gapText(variable)" side="top">
-            <OBadge
-              variant="warning"
+          <OTooltip :content="gapText(row)" side="top">
+            <OIcon
+              name="warning"
               size="sm"
-              class="cursor-help"
+              class="text-warning cursor-help"
               role="img"
-              :aria-label="gapText(variable)"
+              :aria-label="gapText(row)"
               data-test="synthetics-inherited-gap-badge"
-            >
-              <OIcon name="warning" size="xs" />
-            </OBadge>
+            />
           </OTooltip>
-        </div>
+        </span>
+        <span v-if="row.secret" class="flex shrink-0">
+          <OTooltip :content="t('synthetics.variablesPanel.secretTooltip')" side="top">
+            <OIcon
+              name="lock"
+              size="xs"
+              class="text-text-secondary cursor-help"
+              data-test="synthetics-inherited-secret-lock"
+            />
+          </OTooltip>
+        </span>
       </li>
     </ul>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import type { ResolvedVariable } from "./resolved";
-import { inheritedVariables } from "./resolved";
+import type { InheritedUnionRow } from "./resolved";
+
+const ALL = "__all__";
+const GLOBAL = "__global__";
 
 const props = withDefaults(
   defineProps<{
-    /** One environment's resolved rows — the panel picks which environment. */
-    rows: ResolvedVariable[];
+    /** One row per distinct inherited name — see inheritedUnion(). */
+    rows: InheritedUnionRow[];
+    /** The check's environment names, for the source filter. */
+    environments?: string[];
     /** Environments each name fails to resolve in, from coverageGaps(). */
     gaps?: Map<string, string[]>;
   }>(),
-  { gaps: () => new Map() },
+  { environments: () => [], gaps: () => new Map() },
 );
 
 const { t } = useI18nTyped();
 
-const inherited = computed(() => inheritedVariables(props.rows));
+const filter = ref(ALL);
 
-function scopeLabel(variable: ResolvedVariable): I18nText {
-  return variable.scope === "global" ? t("synthetics.variables.global") : raw(variable.scope);
+const filterOptions = computed(() => [
+  { label: t("synthetics.inherited.filterAll"), value: ALL },
+  { label: t("synthetics.variables.global"), value: GLOBAL },
+  ...props.environments.filter((env) => env !== "").map((env) => ({ label: raw(env), value: env })),
+]);
+
+const filteredRows = computed(() => {
+  if (filter.value === ALL) return props.rows;
+  if (filter.value === GLOBAL) return props.rows.filter((row) => row.global);
+  return props.rows.filter((row) => row.envs.includes(filter.value));
+});
+
+const filterName = computed<I18nText>(() =>
+  filter.value === GLOBAL ? t("synthetics.variables.global") : raw(filter.value),
+);
+
+function sourceLabel(row: InheritedUnionRow): I18nText {
+  const sources = [...row.envs];
+  if (row.global) sources.push("Global");
+  return raw(sources.join(", "));
 }
 
-function gapText(variable: ResolvedVariable): string {
-  const missing = props.gaps.get(variable.name);
+/**
+ * Per-source value hints, the closest the metadata-only API allows to a value
+ * on hover: the declared `example` when one exists, else whether a value is
+ * set. Secrets never show more than that by design.
+ */
+function rowTooltip(row: InheritedUnionRow): I18nText {
+  const hints = row.hints.map((hint) => {
+    const label = hint.source === "global" ? "Global" : hint.source;
+    const value = row.secret
+      ? "••••••"
+      : hint.example ||
+        (hint.has_value
+          ? t("synthetics.inherited.valueSet")
+          : t("synthetics.inherited.valueNotSet"));
+    return `${label}: ${value}`;
+  });
+  const parts = [`${row.name} — ${hints.join(" · ")}`];
+  if (row.overridden) parts.push(t("synthetics.inherited.overriddenByCheck"));
+  return raw(parts.join(". "));
+}
+
+function gapText(row: InheritedUnionRow): string {
+  const missing = props.gaps.get(row.name);
   if (!missing?.length) return "";
   return missing.length > 2
     ? t("synthetics.inherited.notInMany", { count: missing.length })

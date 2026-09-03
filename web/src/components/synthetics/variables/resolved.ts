@@ -121,6 +121,58 @@ export interface ResolvedVariablesGrouped {
   resolved: Record<string, ResolvedVariable[]>;
 }
 
+/** One distinct inherited name across every selected environment, for 4b's union view. */
+export interface InheritedUnionRow {
+  name: string;
+  /** Environment names the variable is defined in; empty for a global. */
+  envs: string[];
+  global: boolean;
+  secret: boolean;
+  /** A local (check-tier) variable of the same name wins over this one. */
+  overridden: boolean;
+  /** Per-source value hint: `example` when set, else whether a value exists. */
+  hints: { source: string; example: string; has_value: boolean }[];
+}
+
+/**
+ * The Inherited group's rows: every shared name across the union of the
+ * check's environments plus globals, one row per distinct name.
+ *
+ * Deduped by name — a variable defined in two environments is one row with
+ * both sources — and sorted by name, since lookup is the dominant task.
+ */
+export function inheritedUnion(
+  grouped: ResolvedVariablesGrouped,
+  localNames: ReadonlySet<string>,
+): InheritedUnionRow[] {
+  const byName = new Map<string, InheritedUnionRow>();
+  for (const env of grouped.environments) {
+    for (const v of grouped.resolved[env] ?? []) {
+      if (v.scope === "check") continue;
+      const row = byName.get(v.name) ?? {
+        name: v.name,
+        envs: [],
+        global: false,
+        secret: false,
+        overridden: localNames.has(v.name),
+        hints: [],
+      };
+      if (v.scope === "global") {
+        row.global = true;
+      } else if (!row.envs.includes(v.scope)) {
+        row.envs.push(v.scope);
+      }
+      if (v.kind === "secret") row.secret = true;
+      const source = v.scope === "global" ? "global" : v.scope;
+      if (!row.hints.some((h) => h.source === source)) {
+        row.hints.push({ source, example: v.example, has_value: v.has_value });
+      }
+      byName.set(v.name, row);
+    }
+  }
+  return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /**
  * Environments in which a name fails to resolve, for the coverage warning.
  *

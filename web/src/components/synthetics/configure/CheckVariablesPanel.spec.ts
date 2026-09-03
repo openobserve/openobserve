@@ -71,7 +71,7 @@ const OIconStub = {
 
 const OTooltipStub = {
   props: ["content", "side"],
-  template: "<span />",
+  template: "<span><slot /></span>",
 };
 
 const OEmptyStateStub = {
@@ -448,19 +448,20 @@ describe("CheckVariablesPanel", () => {
       },
     ];
 
-    it("should count steps referencing the exact {{name}} token", () => {
+    it("should count steps referencing the exact {{name}} token in the remove warning", async () => {
       wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], journey) });
 
-      expect(wrapper.find(sel("-usage-0-badge")).text()).toBe("2");
-      expect(wrapper.find(sel("-usage-1-badge")).text()).toBe("1");
+      await wrapper.find(sel("-remove-0-btn")).trigger("click");
+      expect(wrapper.find(sel("-remove-dialog")).text()).toContain("referenced by 2 steps");
     });
 
-    it("should show 0 for a variable that is not referenced, even by a superstring token", () => {
+    it("should not warn for a variable referenced only by a superstring token", async () => {
       // "BASE" is a prefix of "BASE_URL" — {{BASE_URL}} must not count for it.
       const varBase = { id: "var-c", name: "BASE", value: "x", secure: false, example: "" };
       wrapper = mountPanel({ check: checkWith([varBase], journey) });
 
-      expect(wrapper.find(sel("-usage-0-badge")).text()).toBe("0");
+      await wrapper.find(sel("-remove-0-btn")).trigger("click");
+      expect(wrapper.find(sel("-remove-dialog")).text()).not.toContain("referenced by");
     });
   });
 
@@ -571,35 +572,45 @@ describe("CheckVariablesPanel", () => {
       },
     };
 
-    it("fetches once and offers exactly the check's environments", async () => {
+    it("fetches once and offers the source filter over the check's environments", async () => {
       resolvedVariablesGroupedMock.mockResolvedValueOnce({ data: grouped } as never);
       wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
       await flushPromises();
 
-      const options = wrapper.find(sel("-resolve-as")).findAll("option");
-      expect(options.map((o) => o.text())).toEqual(["staging", "qa"]);
+      const options = wrapper.find('[data-test="synthetics-inherited-filter"]').findAll("option");
+      expect(options.map((o) => o.text())).toEqual(["All", "Global", "staging", "qa"]);
       expect(resolvedVariablesGroupedMock).toHaveBeenCalledTimes(1);
     });
 
-    it("switches environments client-side, without a second fetch", async () => {
+    it("filters the union client-side, without a second fetch", async () => {
       resolvedVariablesGroupedMock.mockResolvedValueOnce({ data: grouped } as never);
       wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
       await flushPromises();
 
-      // staging shows the shadowed inherited BASE_URL; qa has no such row.
+      // The shadowed BASE_URL is staging-sourced, so the qa filter hides it.
       expect(wrapper.find("span.line-through").exists()).toBe(true);
-      await wrapper.find(sel("-resolve-as")).setValue("qa");
+      await wrapper.find('[data-test="synthetics-inherited-filter"]').setValue("qa");
       expect(wrapper.find("span.line-through").exists()).toBe(false);
       expect(resolvedVariablesGroupedMock).toHaveBeenCalledTimes(1);
     });
 
-    it("counts the resolved set for the selected environment, not declarations", async () => {
+    it("counts distinct resolved names across local and inherited", async () => {
       resolvedVariablesGroupedMock.mockResolvedValueOnce({ data: grouped } as never);
       wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
       await flushPromises();
 
-      // staging: ORG + effective BASE_URL + TOKEN — the shadowed row not counted.
+      // ORG, BASE_URL (shadowed name counts once), TOKEN.
       expect(wrapper.find(sel("-count")).text()).toBe("3");
+    });
+
+    it("warns on the local row that shadows an inherited name", async () => {
+      resolvedVariablesGroupedMock.mockResolvedValueOnce({ data: grouped } as never);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
+      await flushPromises();
+
+      expect(wrapper.find(sel("-overrides-0-badge")).exists()).toBe(true);
+      // TOKEN shadows nothing inherited.
+      expect(wrapper.find(sel("-overrides-1-badge")).exists()).toBe(false);
     });
 
     it("shows the cap once the resolved count approaches it", async () => {
