@@ -32,110 +32,153 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   not one of its own options — and reported as invalid so the parent blocks Save.
 -->
 <template>
-  <div class="flex flex-col gap-3" data-test="oncall-l0-editor">
-    <!-- Per-severity: what happens between a firing and a page. -->
+  <div class="flex flex-col gap-4" data-test="oncall-l0-editor">
+    <!-- Per-severity: what happens between a firing and a page, one bordered
+         card so P1's invariant, the editable P2/P3 pair and P4/P5's invariant
+         read as one ladder rather than three unrelated rows. -->
     <div class="flex flex-col gap-2">
-      <div class="flex flex-wrap items-center gap-2" data-test="oncall-l0-p1">
-        <OTag variant="error-soft" size="sm" class="w-14 justify-center">{{ raw("P1") }}</OTag>
-        <OText variant="body" as="span">{{ t("oncall.l0P1Fixed") }}</OText>
-      </div>
+      <OText variant="section" as="div">{{ t("oncall.l0BySeveritySection") }}</OText>
 
-      <div
-        v-for="severity in EDITABLE_SEVERITIES"
-        :key="severity"
-        class="flex flex-wrap items-center gap-2"
-        :data-test="`oncall-l0-${severity.toLowerCase()}`"
-      >
-        <OTag variant="warning-soft" size="sm" class="w-14 justify-center">{{ severity }}</OTag>
-        <span class="w-48">
-          <OSelect
-            :model-value="draft.mode[severity]"
-            :options="modeOptions"
-            size="sm"
-            :data-test="`oncall-l0-mode-${severity.toLowerCase()}`"
-            @update:model-value="(v: unknown) => setMode(severity, v)"
-          />
-        </span>
-        <OText variant="meta">{{ modeSentence(draft.mode[severity]) }}</OText>
-      </div>
+      <div class="border-border-default rounded-surface flex flex-col border">
+        <div class="flex flex-wrap items-center gap-2 px-3 py-2" data-test="oncall-l0-p1">
+          <OTag variant="error-soft" size="sm" class="w-14 shrink-0 justify-center">{{
+            raw("P1")
+          }}</OTag>
+          <OText variant="body" as="span">
+            <span class="font-medium">{{ t("oncall.l0P1Lead") }}</span>
+            {{ t("oncall.l0P1Desc") }}
+          </OText>
+        </div>
 
-      <div class="flex flex-wrap items-center gap-2" data-test="oncall-l0-p4">
-        <OTag variant="default-soft" size="sm" class="w-14 justify-center">{{
-          raw("P4 · P5")
-        }}</OTag>
-        <OText variant="body" as="span">{{ t("oncall.l0P4Fixed") }}</OText>
-      </div>
-    </div>
+        <!-- P2 and P3 share one bracket — each keeps its own mode, but the
+             hold budget underneath belongs to the pair, not to either row
+             alone, so it nests under them rather than standing beside P1/P4. -->
+        <div
+          class="border-border-default flex gap-2 border-t px-3 py-2"
+          data-test="oncall-l0-p2-p3"
+        >
+          <OTag variant="warning-soft" size="sm" class="w-14 shrink-0 justify-center self-start">{{
+            raw("P2 · P3")
+          }}</OTag>
+          <div class="flex flex-1 flex-col gap-2">
+            <div
+              v-for="severity in EDITABLE_SEVERITIES"
+              :key="severity"
+              class="flex flex-wrap items-center gap-2"
+              :data-test="`oncall-l0-${severity.toLowerCase()}`"
+            >
+              <OText variant="label" class="w-6 shrink-0">{{ severity }}</OText>
+              <span class="w-48">
+                <OSelect
+                  :model-value="draft.mode[severity]"
+                  :options="modeOptions"
+                  size="sm"
+                  :data-test="`oncall-l0-mode-${severity.toLowerCase()}`"
+                  @update:model-value="(v: unknown) => setMode(severity, v)"
+                />
+              </span>
+              <OText variant="meta">
+                {{ modeSentenceLead(draft.mode[severity]) }}
+                <span v-if="draft.mode[severity] === 'gate'" class="font-medium">{{
+                  t("oncall.l0GateSentenceBold")
+                }}</span>
+              </OText>
+            </div>
 
-    <!-- The hold, and the promise underneath it: fail-open, always. -->
-    <div class="flex flex-wrap items-center gap-2">
-      <OText variant="label" class="w-32 shrink-0">{{ t("oncall.l0BudgetLabel") }}</OText>
-      <span class="w-40">
-        <OSelect
-          :model-value="draft.triage_budget_seconds"
-          :options="budgetOptions"
-          size="sm"
-          :error="!budgetValid"
-          :error-message="t('oncall.l0BudgetRange')"
-          data-test="oncall-l0-budget"
-          @update:model-value="(v: unknown) => setBudget(v)"
-        />
-      </span>
-      <OText variant="meta">{{ t("oncall.l0FailOpen") }}</OText>
+            <!-- The hold, and the promise underneath it: fail-open, always. -->
+            <div class="flex flex-wrap items-center gap-2">
+              <OText variant="label" class="w-24 shrink-0">{{ t("oncall.l0BudgetLabel") }}</OText>
+              <span class="w-40">
+                <OSelect
+                  :model-value="draft.triage_budget_seconds"
+                  :options="budgetOptions"
+                  size="sm"
+                  :error="!budgetValid"
+                  :error-message="t('oncall.l0BudgetRange')"
+                  data-test="oncall-l0-budget"
+                  @update:model-value="(v: unknown) => setBudget(v)"
+                />
+              </span>
+              <OText variant="meta">{{ t("oncall.l0FailOpen") }}</OText>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="border-border-default flex flex-wrap items-center gap-2 border-t px-3 py-2"
+          data-test="oncall-l0-p4"
+        >
+          <OTag variant="default-soft" size="sm" class="w-14 shrink-0 justify-center">{{
+            raw("P4 · P5")
+          }}</OTag>
+          <OText variant="body" as="span">
+            <span class="font-medium">{{ t("oncall.l0P4Lead") }}</span>
+            {{ t("oncall.l0P4Desc") }}
+          </OText>
+        </div>
+      </div>
     </div>
 
     <!-- What a verdict is allowed to DO. Three separate permissions, because
          raising a severity, quieting one notification and cancelling a page
-         are three different amounts of trust. -->
-    <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-      <OText variant="label" class="w-32 shrink-0">{{ t("oncall.l0VerdictPowers") }}</OText>
+         are three different amounts of trust — each gets its own row and its
+         own sentence, rather than one note shared across two toggles. -->
+    <div class="flex flex-col gap-2">
+      <OText variant="section" as="div">{{ t("oncall.l0VerdictPowers") }}</OText>
 
-      <span class="flex flex-wrap items-center gap-2">
-        <OSwitch
-          :model-value="draft.allow_promotion"
-          :label="t('oncall.l0AllowPromotion')"
-          size="sm"
-          data-test="oncall-l0-allow-promotion"
-          @update:model-value="(v: unknown) => update({ allow_promotion: !!v })"
-        />
-        <!-- The ratchet is not a setting — a verdict can only ever RAISE a
-             severity. This bounds how far one hop may climb, so it reads as
-             part of the permission rather than as a field of its own. -->
-        <OSelect
-          v-if="draft.allow_promotion"
-          :model-value="draft.max_promotion_steps"
-          :options="maxStepOptions"
-          appearance="inline"
-          size="sm"
-          data-test="oncall-l0-max-steps"
-          @update:model-value="(v: unknown) => setMaxSteps(v)"
-        />
-      </span>
+      <div class="border-border-default rounded-surface flex flex-col border">
+        <div class="flex flex-col gap-1 px-3 py-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <OSwitch
+              :model-value="draft.allow_promotion"
+              :label="t('oncall.l0AllowPromotion')"
+              size="sm"
+              data-test="oncall-l0-allow-promotion"
+              @update:model-value="(v: unknown) => update({ allow_promotion: !!v })"
+            />
+            <!-- The ratchet is not a setting — a verdict can only ever RAISE a
+                 severity. This bounds how far one hop may climb, so it reads
+                 as part of the permission rather than as a field of its own. -->
+            <OSelect
+              v-if="draft.allow_promotion"
+              :model-value="draft.max_promotion_steps"
+              :options="maxStepOptions"
+              appearance="inline"
+              size="sm"
+              data-test="oncall-l0-max-steps"
+              @update:model-value="(v: unknown) => setMaxSteps(v)"
+            />
+          </div>
+          <OText variant="meta" class="ps-9">{{ t("oncall.l0AllowPromotionNote") }}</OText>
+        </div>
 
-      <OSwitch
-        :model-value="draft.allow_downgrade"
-        :label="t('oncall.l0AllowDowngrade')"
-        size="sm"
-        data-test="oncall-l0-allow-downgrade"
-        @update:model-value="(v: unknown) => update({ allow_downgrade: !!v })"
-      />
+        <div class="border-border-default flex flex-col gap-1 border-t px-3 py-2">
+          <OSwitch
+            :model-value="draft.allow_downgrade"
+            :label="t('oncall.l0AllowDowngrade')"
+            size="sm"
+            data-test="oncall-l0-allow-downgrade"
+            @update:model-value="(v: unknown) => update({ allow_downgrade: !!v })"
+          />
+          <!-- "Soften" is about one notification's channels, never the
+               record's severity — the sentence most often mis-read. -->
+          <OText variant="meta" class="ps-9">{{ t("oncall.l0DowngradeNote") }}</OText>
+        </div>
 
-      <OSwitch
-        :model-value="draft.allow_suppress"
-        :label="t('oncall.l0AllowSuppress')"
-        size="sm"
-        data-test="oncall-l0-allow-suppress"
-        @update:model-value="(v: unknown) => update({ allow_suppress: !!v })"
-      />
+        <div class="border-border-default flex flex-col gap-1 border-t px-3 py-2">
+          <OSwitch
+            :model-value="draft.allow_suppress"
+            :label="t('oncall.l0AllowSuppress')"
+            size="sm"
+            data-test="oncall-l0-allow-suppress"
+            @update:model-value="(v: unknown) => update({ allow_suppress: !!v })"
+          />
+          <!-- Opt-in: until this is on, a Suppress verdict is a
+               recommendation, and the page still goes out. -->
+          <OText variant="meta" class="ps-9">{{ t("oncall.l0SuppressNote") }}</OText>
+        </div>
+      </div>
     </div>
-
-    <!-- The two toggles above whose meaning is routinely mis-read: "soften" is
-         about one notification's channels, never the record's severity, and
-         suppression is opt-in because until it is on a Suppress verdict is only
-         a recommendation. -->
-    <OText variant="meta" data-test="oncall-l0-verdict-notes">
-      {{ t("oncall.l0DowngradeNote") }} {{ t("oncall.l0SuppressNote") }}
-    </OText>
   </div>
 </template>
 
@@ -207,8 +250,8 @@ const modeOptions = computed(() => [
   { label: t("oncall.l0ModeOnly"), value: "only" },
 ]);
 
-function modeSentence(mode: L0Mode): I18nText {
-  if (mode === "gate") return t("oncall.l0GateSentence");
+function modeSentenceLead(mode: L0Mode): I18nText {
+  if (mode === "gate") return t("oncall.l0GateSentenceLead");
   if (mode === "parallel") return t("oncall.l0ParallelSentence");
   return t("oncall.l0OnlySentence");
 }
