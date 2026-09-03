@@ -3,14 +3,14 @@
        positioning, so this is just the button row. -->
   <div
     class="field_overlay table-cell-actions flex items-center"
-    :title="row[column.id]"
-    :data-test="`log-add-data-from-column-${row[column.id]}`"
+    :title="cellValue"
+    :data-test="`log-add-data-from-column-${cellValue}`"
   >
     <span class="mx-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
-        @click.prevent.stop="copyLogToClipboard(row[column.id])"
+        @click.prevent.stop="copyLogToClipboard(cellValue)"
         :title="t('logs.cellActions.copy')"
       >
         <OIcon name="content-copy" size="xs" />
@@ -20,8 +20,8 @@
       <OButton
         variant="ghost"
         size="icon-xs-circle"
-        @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'include')"
-        :data-test="`log-details-include-field-${row[column.id]}`"
+        @click.prevent.stop="addSearchTerm(column.id, cellValue, 'include')"
+        :data-test="`log-details-include-field-${cellValue}`"
         :title="t('logs.cellActions.includeTerm')"
       >
         <OIcon name="" style="height: 0.5rem; width: 0.5rem">
@@ -33,9 +33,9 @@
       <OButton
         variant="ghost"
         size="icon-xs-circle"
-        @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'exclude')"
+        @click.prevent.stop="addSearchTerm(column.id, cellValue, 'exclude')"
         :title="t('logs.cellActions.excludeTerm')"
-        :data-test="`log-details-exclude-field-${row[column.id]}`"
+        :data-test="`log-details-exclude-field-${cellValue}`"
       >
         <OIcon name="" style="height: 0.5rem; width: 0.5rem">
           <NotEqualIcon class="size-full" />
@@ -46,7 +46,7 @@
      then we show some options there we need this  -->
     <O2AIContextAddBtn
       v-if="!hideAi"
-      @send-to-ai-chat="sendToAiChat(JSON.stringify(row[column.id]))"
+      @send-to-ai-chat="sendToAiChat(JSON.stringify(cellValue))"
       class="size-6! border border-solid border-white"
       :imageHeight="'14'"
       :imageWidth="'14'"
@@ -86,7 +86,16 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  /** Rendered cell value, for columns with nothing under `row[column.id]` (logs' `source`). */
+  value: {
+    type: null as unknown as PropType<unknown>,
+    default: undefined,
+  },
 });
+
+const cellValue = computed(() =>
+  props.value === undefined ? props.row[props.column.id] : props.value,
+);
 
 const { t } = useI18nTyped();
 
