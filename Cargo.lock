@@ -11074,6 +11074,7 @@ dependencies = [
  "rayon",
  "regex",
  "regex-syntax",
+ "schema",
  "serde",
  "serde_json",
  "sqlparser",
