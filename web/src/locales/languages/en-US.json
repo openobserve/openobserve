@@ -12105,7 +12105,8 @@
       "remove": "Remove",
       "save": "Save",
       "saveAsDraft": "Save as Draft",
-      "createAndActivate": "Save & Activate"
+      "createAndActivate": "Save & Activate",
+      "testConnection": "Test Connection"
     },
     "scorerTypeDialog": {
       "title": "Create a New Scorer",
@@ -12139,7 +12140,11 @@
       "saveError": "Failed to save provider",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Testing connection...",
+      "testPassed": "Connected",
+      "testFailed": "Connection failed",
+      "testError": "Failed to test connection"
     },
     "scoreConfig": {
       "gteSymbol": "≥",

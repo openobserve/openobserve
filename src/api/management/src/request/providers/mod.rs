@@ -268,6 +268,59 @@ async fn test_provider_connection(
     }
 }
 
+/// TestProviderConfig
+#[utoipa::path(
+    post,
+    path = "/{org_id}/providers/test",
+    context_path = "/api",
+    tag = "Providers",
+    operation_id = "TestProviderConfig",
+    summary = "Test an inline LLM provider configuration",
+    description = "Tests connectivity using the submitted provider configuration directly, without persisting it — useful for validating settings before creating or updating the provider.",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = inline(ProviderRequestBody), description = "Provider configuration to test"),
+    responses(
+        (status = 200, description = "Test result", body = String),
+        (status = 400, description = "Bad Request", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "test"})),
+    ),
+)]
+pub async fn test_provider_config(
+    Path(_org_id): Path<String>,
+    axum::Json(body): axum::Json<ProviderRequestBody>,
+) -> Response {
+    let provider: infra::table::providers::Provider = body.into();
+    match test_provider_connection_config(provider).await {
+        Ok(msg) => MetaHttpResponse::ok(msg),
+        Err(err) => err.into(),
+    }
+}
+
+async fn test_provider_connection_config(
+    provider: infra::table::providers::Provider,
+) -> Result<String, ProviderError> {
+    #[cfg(feature = "enterprise")]
+    {
+        let provider =
+            o2_enterprise::enterprise::llm_evaluations::provider::PreparedProvider::parse(
+                (&provider).into(),
+            )
+            .map_err(|e| ProviderError::InvalidConfig(e.to_string()))?;
+        provider
+            .test_connection()
+            .await
+            .map_err(|e| ProviderError::InfraError(infra::errors::Error::Message(e.to_string())))
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = provider;
+        Err(ProviderError::NotFound)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
