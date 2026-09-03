@@ -644,6 +644,25 @@ describe("TraceDetailsSidebar", async () => {
     });
   });
 
+  // OTel GenAI semconv v5 (issue #14127): gen_ai_system_instructions is a
+  // Part[] array. This must recognise the same part types as the Preview
+  // message renderer (LLMContentRenderer.vue) and the Thread tab
+  // (threadView.utils.ts), not just `type: "text"`.
+  describe("System instructions parsing (parsedSystemInstructions)", () => {
+    it("renders a reasoning part, not just text parts", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "reasoning", content: "Always be concise." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Always be concise.");
+    });
+  });
+
   describe("Service information in Attributes tab", () => {
     it("should display service information", () => {
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');

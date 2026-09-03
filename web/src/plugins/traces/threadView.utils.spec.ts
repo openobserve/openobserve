@@ -363,6 +363,43 @@ describe("extractContent", () => {
   it("returns empty string for unrecognised object shapes", () => {
     expect(extractContent({ random: "field" })).toBe("");
   });
+
+  // OTel GenAI semconv v5 part types (issue #14127) — a "thinking then call
+  // a tool" turn must survive instead of vanishing entirely.
+  it("renders a reasoning part", () => {
+    expect(extractContent([{ type: "reasoning", content: "let me check" }])).toBe(
+      "let me check",
+    );
+  });
+
+  it("renders a tool_call part instead of dropping the turn", () => {
+    const result = extractContent([
+      { type: "reasoning", content: "checking the weather" },
+      { type: "tool_call", name: "get_weather", arguments: { city: "Boston" } },
+    ]);
+    expect(result).toContain("checking the weather");
+    expect(result).toContain("get_weather");
+  });
+
+  it("renders a tool_call_response part", () => {
+    expect(extractContent([{ type: "tool_call_response", response: "rainy, 57F" }])).toBe(
+      "rainy, 57F",
+    );
+  });
+
+  // blob/file/uri stay suppressed — they have first-class rendering
+  // elsewhere and would just dump binary/reference JSON into the chat.
+  it("still drops blob/file/uri parts", () => {
+    expect(extractContent([{ type: "blob", modality: "image", content: "aGVsbG8=" }])).toBe("");
+  });
+
+  // A part type the spec hasn't been taught about yet must not make the
+  // whole turn disappear — show a generic marker instead of "".
+  it("renders a generic marker for an unrecognised future part type", () => {
+    expect(extractContent([{ type: "some_new_part_type", data: 1 }])).toBe(
+      "[some_new_part_type]",
+    );
+  });
 });
 
 // ===========================================================================

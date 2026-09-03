@@ -952,6 +952,7 @@ import {
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
+import { extractGenAiPartText } from "@/plugins/traces/genAiParts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import {
   hasTracePreview,
@@ -2179,8 +2180,8 @@ export default defineComponent({
         if (Array.isArray(parsed)) {
           return (
             parsed
-              .filter((p: any) => p.type === "text" && p.content)
-              .map((p: any) => p.content)
+              .map((p: any) => extractGenAiPartText(p))
+              .filter((text): text is string => !!text)
               .join("\n") || null
           );
         }

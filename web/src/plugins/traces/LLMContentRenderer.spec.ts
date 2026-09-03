@@ -421,6 +421,44 @@ describe("LLMContentRenderer", () => {
       const messages = wrapper.vm.parsedMessages;
       expect(messages[0].content).toContain("[Image: base64]");
     });
+
+    // OTel GenAI semconv v5 (issue #14127): a message carries `parts`
+    // instead of `content`. Preview must stay in sync with the Thread tab
+    // (threadView.utils.ts), which already understands these part types.
+    it("renders a v5 message that only has `parts`, no `content`", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            { role: "user", parts: [{ type: "text", content: "What's the weather?" }] },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      const messages = wrapper.vm.parsedMessages;
+      expect(messages[0].content).toBe("What's the weather?");
+    });
+
+    it("renders reasoning and tool_call v5 parts instead of leaving the turn blank", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            {
+              role: "assistant",
+              parts: [
+                { type: "reasoning", content: "I should check the weather." },
+                { type: "tool_call", name: "get_weather", arguments: { city: "Boston" } },
+              ],
+            },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      const messages = wrapper.vm.parsedMessages;
+      expect(messages[0].content).toContain("I should check the weather.");
+      expect(messages[0].content).toContain("get_weather");
+    });
   });
 
   describe("Content Truncation", () => {
@@ -785,6 +823,28 @@ describe("LLMContentRenderer", () => {
 
       const result = wrapper.vm.formatContent(content);
       expect(result).toBeTruthy();
+    });
+
+    it("formats a v5 text part keyed by `content` (not just legacy `text`)", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "dummy", viewMode: "formatted" },
+      });
+
+      const result = wrapper.vm.formatContent([{ type: "text", content: "hello there" }]);
+      expect(result).toBe("hello there");
+    });
+
+    it("formats a tool_call part as a readable call, not raw JSON", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "dummy", viewMode: "formatted" },
+      });
+
+      const result = wrapper.vm.formatContent([
+        { type: "tool_call", name: "get_weather", arguments: { city: "Boston" } },
+      ]);
+      expect(result).toContain("get_weather");
+      expect(result).toContain("Boston");
+      expect(result).not.toContain('"type"');
     });
   });
 

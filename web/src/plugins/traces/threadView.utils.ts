@@ -23,6 +23,7 @@
 
 import { raw } from "@/types/i18n";
 import type { TurnDetail, TurnMessage } from "./composables/useSessions";
+import { extractGenAiPartText, isSuppressedGenAiPartType } from "./genAiParts";
 
 // ---------------------------------------------------------------------------
 // Field resolvers — read OTEL gen_ai_* attributes.
@@ -200,10 +201,12 @@ export function normalizeRole(raw: unknown): Role {
  *   - Vertex/ADK `parts` arrays
  *   - generic `{text}` / `{content}` objects
  *
- * Non-text parts (function_call objects, image blobs, etc.) are silently
- * dropped — those have first-class rendering elsewhere (tool spans),
- * and including them as raw stringified JSON would cover several screens
- * in a chat UI.
+ * OTel GenAI v5 `reasoning`/`tool_call`/`tool_call_response`/`server_tool_call*`
+ * parts render as text, including SDK vendor spellings (pydantic-ai's
+ * `thinking`/`result`) that don't match the spec's own field names — kept in
+ * sync with LLMContentRenderer.vue via genAiParts.ts. `blob`/`file`/`uri`
+ * stay suppressed (first-class rendering elsewhere), and any other
+ * unrecognised type falls back to a `[type]` marker instead of vanishing.
  *
  * @example extractContent("hello")                 // "hello"
  * @example extractContent([{ text: "a" },
@@ -219,7 +222,9 @@ export function extractContent(content: unknown): string {
         if (typeof part === "string") return part;
         if (!isRecord(part)) return "";
         if (part.text) return String(part.text);
-        if (part.type === "text") return String(part.content ?? "");
+
+        const genAiText = extractGenAiPartText(part);
+        if (genAiText != null) return genAiText;
 
         const functionResponse = part.function_response;
         if (isRecord(functionResponse)) {
@@ -228,6 +233,9 @@ export function extractContent(content: unknown): string {
             return extractContent(response.content);
           }
         }
+
+        const partType = typeof part.type === "string" ? part.type : "";
+        if (partType && !isSuppressedGenAiPartType(partType)) return `[${partType}]`;
         return "";
       })
       .filter(Boolean)
