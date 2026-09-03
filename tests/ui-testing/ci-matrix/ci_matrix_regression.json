@@ -7,7 +7,8 @@
       "logs-regression.spec.js",
       "logs-bugs.spec.js",
       "logs-9754.spec.js",
-      "logs-9044-7354.spec.js"
+      "logs-9044-7354.spec.js",
+      "logs-multistream-matchall-pagination.spec.js"
     ],
     "disabled": []
   },

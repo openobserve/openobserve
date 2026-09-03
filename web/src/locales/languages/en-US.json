@@ -730,7 +730,7 @@
     },
     "copied": "Copied",
     "copiedExclaim": "Copied!",
-    "clearAll": "Clear all",
+    "clearAll": "Clear All",
     "unknown": "Unknown",
     "totalFields": "Total Fields: {count}",
     "providerLogo": "{name} logo",
@@ -10624,6 +10624,10 @@
         "success": "Added to the dataset",
         "loadError": "Failed to load datasets",
         "error": "Failed to add this item to the dataset"
+      },
+      "playground": {
+        "button": "Open in Playground",
+        "hint": "Load this call's messages into the Playground to edit and re-run it"
       }
     },
     "discovery": {
@@ -10991,7 +10995,10 @@
         "columns": {
           "input": "Input",
           "output": "Output",
-          "latency": "Latency"
+          "trials": "Trials",
+          "dispersion": "Dispersion",
+          "latency": "Latency",
+          "p50Latency": "P50 Latency"
         },
         "retryFailed": "Retry Failed Slots",
         "loadError": "Failed to load the experiment",
@@ -11029,8 +11036,12 @@
         },
         "slotStatus": "Status",
         "searchPlaceholder": "Search input or output",
+        "searchInputPlaceholder": "Search input",
         "statusFilter": "Status",
-        "statusFilterAll": "All Statuses"
+        "statusFilterAll": "All Statuses",
+        "sortByDispersion": "Sort by dispersion",
+        "highDispersionBadge": "High",
+        "trialNumber": "Trial {n}"
       },
       "rowDetail": {
         "fallbackTitle": "Experiment Row",
@@ -11121,10 +11132,13 @@
           "trial": "Trial {index}",
           "noContent": "Not provided",
           "noOutput": "No output",
-          "absentSide": "Not present in this run"
+          "absentSide": "Not present in this run",
+          "enterFullscreen": "Enter Fullscreen",
+          "exitFullscreen": "Exit Fullscreen"
         }
       },
-      "selectionCount": "{count} of 2 selected"
+      "selectionCount": "{count} of 2 selected",
+      "clearBaseline": "Clear baseline"
     },
     "datasets": {
       "listTitle": "Datasets",
@@ -11193,7 +11207,7 @@
           "expectedOutput": "Expected Output",
           "source": "Source",
           "tags": "Tags",
-          "version": "Version",
+          "version": "Dataset Version",
           "actions": "Actions"
         },
         "deleteItemTitle": "Delete Item",
@@ -11207,7 +11221,7 @@
             "item": "Item",
             "versions": "Versions"
           },
-          "versionPill": "v{version} · {count} Version | v{version} · {count} Versions",
+          "versionPill": "{count} Version | {count} Versions",
           "sourceSection": "Source",
           "sourceTrace": "Trace",
           "sourceSpan": "Span",
@@ -11672,8 +11686,6 @@
       "title": "Playground",
       "runAll": "Run All",
       "runAllTooltip": "Run every variant",
-      "running": "Running… ({done}/{total})",
-      "stop": "Stop",
       "recentDrafts": "Recent Drafts",
       "recentDraftsSection": "This browser · last 10",
       "draftVersus": "vs",
@@ -11682,6 +11694,7 @@
       "fromExperiment": "Cloned from experiment {name}",
       "variables": "Variables",
       "noVariables": "No {token} in the messages — add one to parameterize the input.",
+      "unusedSampledValue": "Not yet referenced in a message: {tokens}. Type it into a message to use it.",
       "variablePlaceholder": "Value for {name}",
       "addExpected": "+ Expected Output",
       "expectedLabel": "Expected",
@@ -11696,8 +11709,9 @@
       "variant": "Variant {label}",
       "variantLimit": "The bench holds at most {max} variants.",
       "duplicateVariant": "Duplicate Variant",
+      "resetVariant": "Reset Bench",
       "removeVariant": "Remove Variant",
-      "runVariant": "Run This Variant",
+      "runVariant": "Run",
       "createExperiment": "Create Experiment",
       "modelPlaceholder": "Select or type a model",
       "providerUnknown": "Unknown Provider",
@@ -11723,6 +11737,13 @@
       "toolsEmpty": "No tools defined.",
       "toolCall": "Tool Call",
       "toolCallNote": "Run stops here — the Playground does not execute tools.",
+      "toolCallAddToMessages": "Add to messages",
+      "toolCallContinueTooltip": "Adds this call to the conversation and opens its result field.",
+      "toolCallAddedToMessages": "Tool call added — enter the tool result and re-run.",
+      "toolArgumentsPlaceholder": "Tool arguments (JSON)",
+      "toolResultPlaceholder": "Enter the tool result…",
+      "toolResultRequired": "Enter the tool result above to continue.",
+      "toolSetupRequired": "Select a tool and provide its arguments to continue.",
       "toolInvalidJson": "Parameters must be valid JSON.",
       "schema": "Schema",
       "schemaOn": "Schema · On",
@@ -11730,6 +11751,8 @@
       "schemaToggle": "Constrain output to a JSON schema",
       "schemaHelp": "Output renders with JSON formatting when a schema is set.",
       "schemaInvalidJson": "Schema must be valid JSON.",
+      "schemaIgnored": "Schema · Ignored by this provider",
+      "schemaUnsupported": "This provider has no structured-output field. The schema is kept on this column, but it is not sent and the model answers with plain text.",
       "outputPlaceholder": "Output appears here — press Run.",
       "outputNotRun": "Not run",
       "retry": "Retry",
@@ -11747,6 +11770,7 @@
       "sampleDatasetPlaceholder": "Select a dataset",
       "sampleSubmit": "Sample",
       "sampleLoadError": "Could not load rows from that dataset.",
+      "sampleApplied": "Loaded sample {index} of {total} — reference it with {token} in a message.",
       "sampleEmpty": "This dataset has no items yet.",
       "noProviderTitle": "The Playground needs an LLM provider",
       "noProviderBody": "Connect a provider to run prompts. It takes about a minute.",
@@ -11759,6 +11783,8 @@
       "reset": "Reset",
       "resetTitle": "Reset Playground",
       "resetMessage": "Clear every variant, row, and output and start again? This cannot be undone.",
+      "resetVariantTitle": "Reset Bench",
+      "resetVariantMessage": "Clear this bench's prompt and output? This can't be undone.",
       "scrollLeft": "Scroll Left",
       "scrollRight": "Scroll Right",
       "addMessage": "Message",
@@ -11774,6 +11800,7 @@
       "variantSettings": "Model Settings",
       "messageToolPlaceholder": "Select Tool",
       "variablesCount": "Variables · {count}",
+      "newValueTag": "New",
       "variableUsed": "Referenced by this variant",
       "variableUnused": "Not referenced by this variant — renders empty here",
       "addVariable": "Add Variable",
@@ -11822,7 +11849,9 @@
       "sampleFullView": "Full View",
       "sampleBack": "Back to List",
       "sampleInput": "Input",
-      "sampleExpected": "Expected Output"
+      "sampleExpected": "Expected Output",
+      "fromTrace": "From trace span {id}",
+      "openInPlaygroundFailed": "Could not open this span in the Playground"
     }
   },
   "onlineEvals": {
@@ -11855,12 +11884,14 @@
     },
     "scoreConfigLibrary": {
       "searchPlaceholder": "Search Score Configs...",
-      "scoreConfigsLabel": "{count} score config | {count} score configs"
+      "scoreConfigsLabel": "{count} score config | {count} score configs",
+      "selectedOfTotal": "{selected} of {total} selected"
     },
     "scorerLibrary": {
       "noProvidersMessage": "Create a Provider first before importing LLM Judge scorers.",
       "searchPlaceholder": "Search Scorers...",
-      "scorerCountSuffix": "{count} scorer | {count} scorers"
+      "scorerCountSuffix": "{count} scorer | {count} scorers",
+      "selectedOfTotal": "{selected} of {total} selected"
     },
     "title": "Evaluations",
     "loadError": "Failed to load online evals",
@@ -11977,7 +12008,8 @@
         "legendFalseCount": "false ({count})",
         "kpis": {
           "average": "Average",
-          "p50p95": "P50 / P95",
+          "p50": "P50",
+          "p95": "P95",
           "unhealthy": "Unhealthy",
           "healthy": "Healthy",
           "trueRate": "True rate",
@@ -12086,8 +12118,6 @@
       "remoteCta": "Configure Endpoint"
     },
     "provider": {
-      "sectionStep1": "01",
-      "sectionStep2": "02",
       "backTo": "Back to Providers",
       "createTitle": "Create LLM Provider",
       "editTitle": "Edit LLM Provider",
@@ -12096,7 +12126,7 @@
       "nameLabel": "Name",
       "typeLabel": "Provider type",
       "endpointLabel": "Endpoint",
-      "endpointPlaceholder": "Optional custom endpoint",
+      "endpointPlaceholder": "Full completions URL, e.g. https://your-host/v1/chat/completions",
       "defaultModelLabel": "Default model",
       "availableModelsLabel": "Available models",
       "apiKeyLabel": "API Key",

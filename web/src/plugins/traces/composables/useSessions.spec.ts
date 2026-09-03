@@ -604,6 +604,41 @@ describe("useSessions — fetchSession: SessionDetail derivation", () => {
 
     expect(detail!.turns).toBe(2);
   });
+
+  it("uses the first non-empty user ID returned by the detail API", async () => {
+    const hits = [
+      {
+        trace_id: "t1",
+        start_time: "1000",
+        end_time: "2000",
+        spans: [1, 0],
+        service_name: [],
+        user_ids: ["", "user-a", "user-b"],
+        gen_ai_usage_input_tokens: 0,
+        gen_ai_usage_output_tokens: 0,
+        gen_ai_usage_total_tokens: 0,
+        gen_ai_usage_cost: 0,
+      },
+      {
+        trace_id: "t2",
+        start_time: "2000",
+        end_time: "3000",
+        spans: [1, 0],
+        service_name: [],
+        user_ids: ["user-c"],
+        gen_ai_usage_input_tokens: 0,
+        gen_ai_usage_output_tokens: 0,
+        gen_ai_usage_total_tokens: 0,
+        gen_ai_usage_cost: 0,
+      },
+    ];
+    setupDetailsMock(hits);
+
+    const { fetchSession } = useSessions();
+    const { detail } = await fetchSession("stream", "sess-1", 1000, 5000);
+
+    expect(detail!.userId).toBe("user-a");
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -11200,7 +11200,7 @@
             "item": "Item",
             "versions": "Versões"
           },
-          "versionPill": "v{version} · {count} Versão | v{version} · {count} Versões",
+          "versionPill": "{count} Versão | {count} Versões",
           "sourceSection": "Origem",
           "sourceTrace": "Rastro",
           "sourceSpan": "Span",
@@ -11723,6 +11723,8 @@
       "schemaToggle": "Restringir saída a um esquema JSON",
       "schemaHelp": "A saída é renderizada com formatação JSON quando um esquema é definido.",
       "schemaInvalidJson": "O esquema deve ser JSON válido.",
+      "schemaIgnored": "Esquema · Ignorado por este fornecedor",
+      "schemaUnsupported": "Este fornecedor não tem um campo de saída estruturada. O esquema é mantido nesta coluna, mas não é enviado e o modelo responde com texto simples.",
       "outputPlaceholder": "A saída aparece aqui — pressione Executar.",
       "outputNotRun": "Não executado",
       "retry": "Tentar novamente",
