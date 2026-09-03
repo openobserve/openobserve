@@ -75,11 +75,11 @@ const detectionRefresh = vi.fn();
 // Renders the page's #cell-* templates per row so tint/tooltip markup is real.
 const OTableStub = defineComponent({
   name: "OTable",
-  props: ["rows", "columns", "loading"],
+  props: ["data", "columns", "loading"],
   setup(props: any, { slots }: any) {
     return () =>
       h("div", { "data-test": "hosts-table-stub" }, [
-        ...(props.rows ?? []).map((row: any) =>
+        ...(props.data ?? []).map((row: any) =>
           h(
             "div",
             { class: "row-stub" },
