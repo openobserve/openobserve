@@ -3,6 +3,7 @@ const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 const {
+  MANIFEST_GLOB,
   makeEntry,
   makeEntries,
   buildManifest,
@@ -131,5 +132,61 @@ test.describe('Alert Library', () => {
     await expect(page.locator('[data-test="alert-library-install-run"]')).toBeDisabled();
     await pm.alertLibraryPage.confirmLargeBatch();
     await expect(page.locator('[data-test="alert-library-install-run"]')).toBeEnabled();
+  });
+
+  test('readiness surfaces on the card and in the drawer (fresh vs missing)', async ({ page }) => {
+    const ready = entries[0];
+    const missing = entries[1];
+
+    await pm.alertLibraryPage.openViaUrl();
+
+    // Card: missing → "not ingested" chip; fresh → none.
+    await expect(pm.alertLibraryPage.needsDataChip(missing.id)).toBeVisible();
+    await expect(pm.alertLibraryPage.needsDataChip(ready.id)).toHaveCount(0);
+
+    // Drawer: missing → availability warning banner; fresh → no banner.
+    await pm.alertLibraryPage.openCard(missing.id);
+    await expect(page.locator('[data-test="alert-library-drawer-needs-data"]')).toBeVisible();
+    await expect(page.locator('[data-test="alert-library-drawer-availability"]')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[data-test="alert-library-drawer"]')).toBeHidden();
+
+    // The ready card's drawer renders the preview. (Its exact availability
+    // sub-state — fresh vs stale — depends on stream-stats propagation timing,
+    // which is covered deterministically by the useAlertLibrary unit tests.)
+    await pm.alertLibraryPage.openCard(ready.id);
+    await expect(page.locator('[data-test="alert-library-drawer-preview"]')).toBeVisible();
+  });
+
+  test('a broken manifest shows a recovery state, not an empty gallery', async ({ page }) => {
+    const badManifests = [
+      { label: 'http 500', status: 500, body: '{}' },
+      { label: 'unsupported version', status: 200,
+        body: JSON.stringify({ format_version: '2.0', alert_count: 0, packs: [], alerts: [] }) },
+      { label: 'malformed / not JSON', status: 200, body: '<Error>not json</Error>' },
+    ];
+
+    for (const [i, m] of badManifests.entries()) {
+      await page.unroute(MANIFEST_GLOB);
+      await page.route(MANIFEST_GLOB, (route) =>
+        route.fulfill({ status: m.status, contentType: 'application/json', body: m.body }),
+      );
+      if (i === 0) await pm.alertLibraryPage.openViaUrl();
+      else await page.reload();
+      // Distinct error surface with a retry, never a silent empty catalog.
+      await expect(page.locator('[data-test="alert-library-error"]'), m.label).toBeVisible({ timeout: 20000 });
+    }
+  });
+
+  test('Customize opens the alert editor prefilled from the library file', async ({ page }) => {
+    const ready = entries[0];
+
+    await pm.alertLibraryPage.openViaUrl();
+    await pm.alertLibraryPage.openCard(ready.id);
+    await pm.alertLibraryPage.customizeFromDrawer();
+
+    // Customize hands the alert to the full editor via the library prefill
+    // (route "addAlert" with ?prefill=library) — not a customizeFailed toast.
+    await expect(page).toHaveURL(/prefill=library/, { timeout: 15000 });
   });
 });

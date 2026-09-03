@@ -90,13 +90,13 @@ function buildAlertFile(entry, o = {}) {
     enabled: true,
     description: entry.description,
     query_condition: {
-      type: 'custom',
-      conditions: { or: [{ column: 'level', operator: '=', value: 'error', ignore_case: false }] },
-      sql: '',
+      type: 'sql',
+      sql: `SELECT count(*) AS cnt FROM "${entry.stream}"`,
       promql: null,
       promql_condition: null,
       aggregation: null,
       vrl_function: null,
+      conditions: null,
     },
     trigger_condition: {
       period: 10,
