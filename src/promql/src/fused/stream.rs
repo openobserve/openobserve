@@ -105,9 +105,7 @@ pub(crate) async fn fused_agg(
     columns.extend(group_cols.iter().map(String::as_str));
 
     let shards = ctx.state().config().target_partitions();
-    let Some((shard_inputs, shard0_plan)) =
-        build_shard_inputs(&df, &columns, shards, &trace_id).await?
-    else {
+    let Some(shard_inputs) = build_shard_inputs(&df, &columns, shards, &trace_id).await? else {
         return Ok(None);
     };
 
@@ -124,15 +122,6 @@ pub(crate) async fn fused_agg(
         .collect();
     let (value, series_count) = fold_sources(sources, params, timeout).await?;
 
-    if config::get_config().common.print_key_sql {
-        log::info!(
-            "[trace_id: {trace_id}] [PromQL] streaming shard 0 metrics:\n{}",
-            datafusion::physical_plan::display::DisplayableExecutionPlan::with_metrics(
-                shard0_plan.as_ref()
-            )
-            .indent(true)
-        );
-    }
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) completed in {:?}, folded {series_count} series into {} series",
         shape.op.name(),

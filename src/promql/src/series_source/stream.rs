@@ -241,9 +241,8 @@ pub(crate) async fn build_shard_inputs(
     columns: &[&str],
     shards: usize,
     trace_id: &str,
-) -> Result<Option<(Vec<Vec<SendableRecordBatchStream>>, Arc<dyn ExecutionPlan>)>> {
+) -> Result<Option<Vec<Vec<SendableRecordBatchStream>>>> {
     let mut shard_inputs = Vec::with_capacity(shards);
-    let mut shard0_plan = None;
     for (shard, (lo, hi)) in hash_shards(shards).into_iter().enumerate() {
         let shard_df = df
             .clone()
@@ -265,11 +264,9 @@ pub(crate) async fn build_shard_inputs(
             );
             return Ok(None);
         };
-        shard0_plan.get_or_insert(plan);
         shard_inputs.push(streams);
     }
-    let shard0_plan = shard0_plan.expect("target_partitions is at least one shard");
-    Ok(Some((shard_inputs, shard0_plan)))
+    Ok(Some(shard_inputs))
 }
 
 /// The hash-ordered inputs a shard folds from: the merge's own child
