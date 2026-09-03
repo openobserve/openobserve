@@ -1662,6 +1662,56 @@ describe("useRoutes (router.ts)", () => {
   });
 
   // =========================================================================
+  // 18b. homeChildRoutes — Infrastructure routes (Hosts / Kubernetes / AWS)
+  // =========================================================================
+  // Always registered, no feature gate — detection changes page STATE, never
+  // route existence (design 4.7/§6).
+  describe("homeChildRoutes — infra workload routes", () => {
+    it.each([
+      ["infraHosts", "infra/hosts"],
+      ["infraKubernetes", "infra/kubernetes"],
+      ["infraAws", "infra/aws"],
+    ])("registers %s at path %s", (name, path) => {
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, name as string);
+      expect(route).toBeDefined();
+      expect(route.path).toBe(path);
+    });
+
+    it.each(["infraHosts", "infraKubernetes", "infraAws"])(
+      "%s beforeEnter calls routeGuard",
+      async (name) => {
+        const { routeGuard } = await import("@/utils/zincutils");
+        vi.mocked(routeGuard as any).mockClear();
+        const { homeChildRoutes } = useRoutes();
+        const route = findRoute(homeChildRoutes, name);
+        const mockTo = {};
+        const mockFrom = {};
+        const mockNext = vi.fn();
+        route.beforeEnter(mockTo, mockFrom, mockNext);
+        expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+      },
+    );
+
+    it("passes the workload prop to the kubernetes and aws stub pages", () => {
+      const { homeChildRoutes } = useRoutes();
+      expect(findRoute(homeChildRoutes, "infraKubernetes").props).toEqual({
+        workload: "kubernetes",
+      });
+      expect(findRoute(homeChildRoutes, "infraAws").props).toEqual({ workload: "aws" });
+    });
+
+    it("keeps the non-cloud reports route at splice index 13 after the insertion", () => {
+      // The infra routes must land past the splice(13) hazard (design 4.7).
+      config.isCloud = "false";
+      const { homeChildRoutes } = useRoutes();
+      expect(homeChildRoutes[13].name).toBe("reports");
+      expect(homeChildRoutes[14].name).toBe("createReport");
+      expect(findRoute(homeChildRoutes, "infraHosts")).toBeDefined();
+    });
+  });
+
+  // =========================================================================
   // 19. homeChildRoutes — reports routes absent when cloud
   // =========================================================================
   describe("homeChildRoutes — reports routes absent when cloud", () => {

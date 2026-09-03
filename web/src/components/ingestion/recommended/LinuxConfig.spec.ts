@@ -67,7 +67,7 @@ describe("linuxCard builder", () => {
     const card = linuxCard(SUBS, gt);
     expect(card.provider.name).toBe("Linux");
     expect(card.provider.metaBadges).toEqual(["Logs", "Metrics"]);
-    expect(card.steps.map((s) => s.id)).toEqual(["install", "verify"]);
+    expect(card.steps.map((s) => s.id)).toEqual(["install", "verify", "dashboard"]);
     // Host metrics fan out per metric, so detection is existence-based.
     expect(card.detect).toMatchObject({
       streamType: "metrics",
