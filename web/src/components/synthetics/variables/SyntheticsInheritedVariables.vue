@@ -75,8 +75,16 @@ Purely presentational — the panel owns the grouped fetch.
           class="min-w-0 truncate font-mono"
           :class="row.overridden ? 'text-text-muted line-through' : 'text-text-secondary'"
           :aria-label="row.overridden ? t('synthetics.inherited.overriddenByCheck') : undefined"
-          >{{ row.name }}<OTooltip :content="rowTooltip(row)" side="top"
-        /></span>
+          >{{ row.name
+          }}<OTooltip side="top">
+            <template #content>
+              <div v-if="row.overridden" class="text-warning">
+                {{ t("synthetics.inherited.overriddenByCheck") }}
+              </div>
+              <div>{{ hintsLine(row) }}</div>
+            </template>
+          </OTooltip></span
+        >
         <!-- shrink-0 wrappers: on overflow the NAME ellipsizes, never these. -->
         <span v-if="gapText(row)" class="flex shrink-0">
           <!-- Fires only on non-uniformity; the env names live in the tooltip
@@ -162,7 +170,7 @@ function sourceLabel(row: InheritedUnionRow): I18nText {
  * on hover: the declared `example` when one exists, else whether a value is
  * set. Secrets never show more than that by design.
  */
-function rowTooltip(row: InheritedUnionRow): I18nText {
+function hintsLine(row: InheritedUnionRow): I18nText {
   const hints = row.hints.map((hint) => {
     const label = hint.source === "global" ? "Global" : hint.source;
     const value = row.secret
@@ -173,9 +181,7 @@ function rowTooltip(row: InheritedUnionRow): I18nText {
           : t("synthetics.inherited.valueNotSet"));
     return `${label}: ${value}`;
   });
-  const parts = [`${row.name} — ${hints.join(" · ")}`];
-  if (row.overridden) parts.push(t("synthetics.inherited.overriddenByCheck"));
-  return raw(parts.join(". "));
+  return raw(`${row.name} — ${hints.join(" · ")}`);
 }
 
 function gapText(row: InheritedUnionRow): string {
