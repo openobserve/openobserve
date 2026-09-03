@@ -24,6 +24,7 @@ beforeAll(() => {
 import { nextTick, reactive } from "vue";
 import OTable from "./OTable.vue";
 import OTableHeader from "./sub-components/OTableHeader.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { OTableColumnDef } from "./OTable.types";
 
@@ -1843,6 +1844,100 @@ describe("OTable", () => {
         .findAll('[data-test="o2-table-cell-email"]')
         .map((c) => c.text().trim());
       expect(emailCells).toEqual(["a1@example.com", "a2@example.com", "b1@example.com"]);
+    });
+
+    it("gives bottom-edge rowspan cells the divider and sort icon leaf cells get", () => {
+      // A synthetic Others/Total cell spans every header row (rowspan) when
+      // there is a single y field, so no leaf cell renders beneath it — the
+      // rowspan cell itself must then carry the header/body divider and the
+      // sort indicator, or the column sorts blind with a gap in the border.
+      const pivotHeaderLevels = [
+        {
+          isLeaf: false,
+          cells: [
+            { label: "GET", colspan: 1, _sortColumn: "GET_cnt" },
+            { label: "Others", colspan: 1, rowspan: 2, hasBorder: true, _sortColumn: "Others_cnt" },
+          ],
+        },
+        {
+          isLeaf: true,
+          cells: [{ label: "200", colspan: 1, _sortColumn: "GET_cnt" }],
+        },
+      ];
+      const cols: OTableColumnDef<TestRow>[] = [
+        { id: "name", header: "Name", accessorKey: "name" },
+        { id: "GET_cnt", header: "Count", accessorKey: "id" },
+        { id: "Others_cnt", header: "Count", accessorKey: "id" },
+      ];
+      wrapper = mount(OTable, {
+        props: { data: makeRows(2), columns: cols, pivotHeaderLevels },
+      });
+
+      const groupTh = wrapper.find('[data-test="o2-table-pivot-th-0-0"]');
+      const othersTh = wrapper.find('[data-test="o2-table-pivot-th-0-1"]');
+      const leafTh = wrapper.find('[data-test="o2-table-pivot-th-1-0"]');
+
+      // Divider: leaf and bottom-edge rowspan cells, not the mid-header group.
+      expect(othersTh.classes()).toContain("border-b");
+      expect(leafTh.classes()).toContain("border-b");
+      expect(groupTh.classes()).not.toContain("border-b");
+
+      // Sort indicator: the rowspan cell renders one (neutral state here), the
+      // mid-header group cell stays icon-free even though it is clickable.
+      expect(othersTh.findComponent(OIcon).exists()).toBe(true);
+      expect(groupTh.findComponent(OIcon).exists()).toBe(false);
+    });
+
+    it("pins row-field columns left even when entries carry only name/field", () => {
+      // Regression: pivotRowColumnIds pinned by `c.id`, but dashboard pivot
+      // columns carry only name/field — leftPinnedIds became [undefined] and
+      // the row-field column silently scrolled away with the data columns.
+      const pivotHeaderLevels = [
+        {
+          isLeaf: true,
+          cells: [{ label: "Count", colspan: 1, _sortColumn: "id" }],
+        },
+      ];
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          pivotHeaderLevels,
+          pivotRowColumns: [{ name: "name", field: "name" }],
+        },
+      });
+
+      const rowFieldTh = wrapper.find('[data-test="o2-table-pivot-th-name"]');
+      expect(rowFieldTh.exists()).toBe(true);
+      expect(rowFieldTh.attributes("style") ?? "").toContain("position: sticky");
+    });
+
+    it.each([
+      ["standard-header mode", []],
+      [
+        "pivot-header mode",
+        [{ isLeaf: true, cells: [{ label: "Count", colspan: 1, _sortColumn: "id" }] }],
+      ],
+    ])("pins only the first row-field column in %s", (_name, pivotHeaderLevels) => {
+      // Pin offsets come from TanStack's nominal sizes, but table-auto layout
+      // can render any column wider than its nominal size, so only the first
+      // row field — whose offset (0) is width-independent — pins.
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: makeColumns(),
+          pivotHeaderLevels,
+          pivotRowColumns: [
+            { name: "name", field: "name" },
+            { name: "email", field: "email" },
+          ],
+        },
+      });
+
+      const header = wrapper.findComponent(OTableHeader);
+      const table: any = header.props("table");
+      expect(table.getColumn("name")?.getIsPinned?.()).toBe("left");
+      expect(table.getColumn("email")?.getIsPinned?.()).toBe(false);
     });
 
     it("renders standard header when pivotHeaderLevels is empty", () => {

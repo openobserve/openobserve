@@ -31,6 +31,7 @@ vi.mock("./convertTableData", () => ({
 
 vi.mock("./convertPivotTableData", () => ({
   convertPivotTableData: vi.fn().mockReturnValue({ columns: [], rows: [], pivoted: true }),
+  resolvePivotCustomQueryAggregations: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("./convertGeoMapData", () => ({
@@ -1214,7 +1215,8 @@ describe("convertPanelData", () => {
         mockAnnotations,
       );
 
-      expect(convertPivotTableData).toHaveBeenCalledWith(panelSchema, mockData, mockStore);
+      // Fourth argument is the custom-SQL aggregation map; null for builder panels.
+      expect(convertPivotTableData).toHaveBeenCalledWith(panelSchema, mockData, mockStore, null);
       expect(result.chartType).toBe("table");
     });
 

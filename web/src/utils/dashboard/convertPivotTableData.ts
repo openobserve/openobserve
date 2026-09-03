@@ -15,12 +15,15 @@
 
 import { gt } from "@/types/i18n";
 import { getDataValue } from "./aliasUtils";
+import { getFieldsFromQuery } from "@/utils/query/sqlUtils";
 import {
   PIVOT_TABLE_MAX_COLUMNS,
   PIVOT_TABLE_SEPARATOR,
   PIVOT_TABLE_ROW_KEY_SEPARATOR,
   PIVOT_TABLE_TOTAL_LABEL,
   PIVOT_TABLE_OTHERS_LABEL,
+  PIVOT_TABLE_EMPTY_KEY,
+  PIVOT_TABLE_EMPTY_LABEL,
 } from "./constants";
 import {
   buildValueMappingCache,
@@ -29,6 +32,44 @@ import {
   parseTimestampValue,
   detectTimestampFields,
 } from "./tableConfigUtils";
+
+// Parsed custom-SQL aggregations keyed by query text. A pivot re-converts on
+// every streaming chunk while the query text stays put, and astify() is not
+// cheap, so the parse is done once per distinct query.
+const customQueryAggregationCache = new Map<string, Record<string, string | null>>();
+const CUSTOM_QUERY_AGGREGATION_CACHE_LIMIT = 20;
+
+/**
+ * Maps each SELECT alias of a custom-SQL panel to the aggregation wrapping it,
+ * so duplicate pivot cells combine the way the query says rather than the way
+ * the field's placeholder `functionName` claims. Returns null for builder
+ * panels, whose fields carry a trustworthy aggregation of their own.
+ */
+export const resolvePivotCustomQueryAggregations = async (
+  query: any,
+): Promise<Record<string, string | null> | null> => {
+  const sql = query?.query;
+  if (!query?.customQuery || typeof sql !== "string" || !sql.trim()) return null;
+
+  const cached = customQueryAggregationCache.get(sql);
+  if (cached) return cached;
+
+  const byAlias: Record<string, string | null> = {};
+  try {
+    const { fields } = await getFieldsFromQuery(sql);
+    for (const field of fields ?? []) {
+      if (field?.alias) byAlias[field.alias] = field.aggregationFunction ?? null;
+    }
+  } catch {
+    // Unparseable SQL leaves the map empty, which reads as "unknown" below.
+  }
+
+  if (customQueryAggregationCache.size >= CUSTOM_QUERY_AGGREGATION_CACHE_LIMIT) {
+    customQueryAggregationCache.clear();
+  }
+  customQueryAggregationCache.set(sql, byAlias);
+  return byAlias;
+};
 
 /**
  * Builds N-level header metadata for the TableRenderer.
@@ -45,6 +86,7 @@ function buildPivotHeaderLevels(
   showRowTotals: boolean,
   timestampFieldAliases: Set<string>,
   timezone: string,
+  hasOthers: boolean,
 ): any[] {
   const pivotCount = breakdownFields.length;
   const yCount = yFields.length;
@@ -56,7 +98,12 @@ function buildPivotHeaderLevels(
 
   // Parse pivot keys into per-level values
   // e.g., "GET\x00200" → ["GET", "200"]
-  const parsedKeys = allPivotKeys.map((pk) => pk.split(PIVOT_TABLE_SEPARATOR));
+  // The synthetic overflow bucket is excluded: it is a single app-authored
+  // label, not a breakdown tuple, so splitting it would yield `undefined` at
+  // every level below the first. It is emitted separately at level 0 with a
+  // rowspan covering all pivot levels (the same shape as the Total group).
+  const realPivotKeys = hasOthers ? allPivotKeys.slice(0, -1) : allPivotKeys;
+  const parsedKeys = realPivotKeys.map((pk) => pk.split(PIVOT_TABLE_SEPARATOR));
 
   // Track top-level (level 0) group boundary positions (leaf column indices)
   // These propagate down so borders align across all header rows.
@@ -64,6 +111,10 @@ function buildPivotHeaderLevels(
 
   const formatPivotLabel = (value: string, levelIndex: number) => {
     if (!value) return value;
+    // The empty-bucket sentinel never reaches the user: render its label
+    // before any field-specific formatting (a timestamp parse would fail and
+    // fall back to the raw sentinel).
+    if (value === PIVOT_TABLE_EMPTY_KEY) return PIVOT_TABLE_EMPTY_LABEL;
     const fieldAlias = breakdownFields[levelIndex]?.alias;
     if (!fieldAlias || !timestampFieldAliases.has(fieldAlias)) return value;
     if (value === PIVOT_TABLE_TOTAL_LABEL || value === PIVOT_TABLE_OTHERS_LABEL) {
@@ -112,8 +163,8 @@ function buildPivotHeaderLevels(
         colspan,
         hasBorder,
         // Sort by the first leaf column under this group header.
-        // allPivotKeys[i] is the first pivot key in this group.
-        _sortColumn: `${allPivotKeys[i]}_${yFields[0].alias}`,
+        // realPivotKeys[i] is the first pivot key in this group.
+        _sortColumn: `${realPivotKeys[i]}_${yFields[0].alias}`,
       };
 
       cells.push(cell);
@@ -122,20 +173,35 @@ function buildPivotHeaderLevels(
       i += span;
     }
 
-    // Total group at level 0 only
-    if (lvl === 0 && showRowTotals) {
-      topLevelBoundaries.add(leafColPos);
-      cells.push({
-        // The constant stays the machine key; only the rendered label is translated.
-        key: `${lvl}_${PIVOT_TABLE_TOTAL_LABEL}`,
-        label: gt("dashboard.pivotTotal"),
-        colspan: yCount > 1 ? yCount : 1,
-        rowspan: pivotCount,
-        hasBorder: true,
-        _isTotalHeader: true,
-        // Sort by the first total column
-        _sortColumn: `${PIVOT_TABLE_TOTAL_LABEL}_${yFields[0].alias}`,
-      });
+    // Synthetic groups at level 0 only — Others (overflow) then Total, each a
+    // single cell whose rowspan spans every pivot level. One shared writer so
+    // the two cells cannot drift apart: the renderer relies on them having
+    // identical rowspan/border/colspan semantics. The constant stays the
+    // machine key; only the rendered label is translated. Sorts by the group's
+    // first leaf column.
+    if (lvl === 0) {
+      const pushSyntheticGroupCell = (machineKey: string, i18nKey: string, extra: any) => {
+        topLevelBoundaries.add(leafColPos);
+        cells.push({
+          key: `${lvl}_${machineKey}`,
+          label: gt(i18nKey),
+          colspan: yCount,
+          rowspan: pivotCount,
+          hasBorder: true,
+          _sortColumn: `${machineKey}_${yFields[0].alias}`,
+          ...extra,
+        });
+        leafColPos += yCount;
+      };
+
+      if (hasOthers) {
+        pushSyntheticGroupCell(PIVOT_TABLE_OTHERS_LABEL, "dashboard.pivotOthers", {});
+      }
+      if (showRowTotals) {
+        pushSyntheticGroupCell(PIVOT_TABLE_TOTAL_LABEL, "dashboard.pivotTotal", {
+          _isTotalHeader: true,
+        });
+      }
     }
 
     levels.push({ cells, isLeaf: false });
@@ -195,6 +261,9 @@ export const convertPivotTableData = (
   panelSchema: any,
   searchQueryData: any,
   store: any,
+  // Alias → aggregation for custom-SQL panels, from
+  // resolvePivotCustomQueryAggregations. Null for builder panels.
+  customQueryAggregations: Record<string, string | null> | null = null,
 ): {
   rows: any[];
   columns: any[];
@@ -245,7 +314,19 @@ export const convertPivotTableData = (
 
   const getPivotKey = (row: any): string => {
     return breakdownAliases
-      .map((alias: string) => String(getDataValue(row, alias) ?? "(empty)"))
+      .map((alias: string) => {
+        // Fold null, undefined and "" into one bucket — `?? ` alone would
+        // leave "" as a blank column header. Deliberately wider than the chart
+        // path (sql/shared/seriesBuilder.ts), which drops null/undefined
+        // breakdown series entirely and folds only "": a table column with no
+        // header is unusable, a missing chart series is merely absent. The
+        // bucket's machine key is a sentinel outside the user-data namespace,
+        // so a genuine "(empty)" string value keeps its own column; the
+        // "(empty)" label is applied only when rendering headers.
+        const raw = getDataValue(row, alias);
+        const value = raw === null || raw === undefined ? "" : String(raw);
+        return value === "" ? PIVOT_TABLE_EMPTY_KEY : value;
+      })
       .join(PIVOT_TABLE_SEPARATOR);
   };
 
@@ -294,6 +375,72 @@ export const convertPivotTableData = (
   }
 
   // --- Step 2: Build pivoted rows ---
+  // Several source rows land in one cell whenever the query groups more finely
+  // than (x, breakdown) — an extra GROUP BY column — or when breakdown groups
+  // fold into the overflow bucket. How they combine follows the y-field's
+  // aggregation: additive ones combine exactly, min/max keep the exact bound
+  // of the union, and anything else cannot be reconstructed from the values
+  // the query returned, so the first value is kept. Keeping a real returned
+  // value is the point: combining an avg or a max produces a number that
+  // appears nowhere in the data and silently disagrees with the same query
+  // shown anywhere else.
+  //
+  // Custom-SQL panels carry a hardcoded `functionName: "count"` placeholder
+  // (usePanelFields stamps it on every y field; the real aggregation lives in
+  // the SQL text), so their aggregation comes from parsing the query instead —
+  // trusting the placeholder would add up rows the user asked to max. Builder
+  // panels declare it on the field, in either of two live shapes: `functionName`
+  // today, `aggregationFunction` on older saved panels (see utils/autoName.ts).
+  type MergeKind = "add" | "min" | "max" | "first";
+  const MERGE_FNS: Record<MergeKind, (a: number, b: number) => number> = {
+    add: (a, b) => a + b,
+    // Wrapped, not bare Math.min/max: those read every argument, so a bare
+    // reference passed to reduce() would also consume its index/array args.
+    min: (a, b) => Math.min(a, b),
+    max: (a, b) => Math.max(a, b),
+    first: (a) => a,
+  };
+
+  const resolveMergeKind = (yField: any): MergeKind => {
+    const declared = query.customQuery
+      ? customQueryAggregations?.[yField?.alias]
+      : (yField?.functionName ?? yField?.aggregationFunction);
+
+    switch (String(declared ?? "").toLowerCase()) {
+      case "count":
+      case "sum":
+        return "add";
+      case "min":
+        return "min";
+      case "max":
+        return "max";
+      default:
+        return "first";
+    }
+  };
+
+  const mergeKindByAlias: Record<string, MergeKind> = {};
+  for (const yField of yFields) {
+    mergeKindByAlias[yField.alias] = resolveMergeKind(yField);
+  }
+
+  // Totals combine a row/column the same way its cells combine, so a min/max
+  // pivot reports the bound across the row instead of a sum of bounds. An
+  // unknown aggregation keeps the historical sum: "Total" has to mean
+  // something, and keeping one cell's value would not.
+  const foldTotal = (yAlias: string, values: any[]): number | null => {
+    const kind = mergeKindByAlias[yAlias];
+    const nums = values
+      .filter((v) => v !== null && v !== undefined)
+      .map(Number)
+      .filter((v) => !Number.isNaN(v));
+
+    if (kind === "min" || kind === "max") {
+      return nums.length ? nums.reduce((a, b) => MERGE_FNS[kind](a, b)) : null;
+    }
+    return nums.reduce((a, b) => a + b, 0);
+  };
+
   const rowMap: Map<string, any> = new Map();
 
   for (const row of tableRows) {
@@ -315,16 +462,30 @@ export const convertPivotTableData = (
 
     const targetRow = rowMap.get(rowKey)!;
 
-    for (const yAlias of yAliases) {
-      const numericValue = Number(getDataValue(row, yAlias)) || 0;
+    const bucket = pivotKeySet.has(pivotKey)
+      ? pivotKey
+      : hasOthers
+        ? PIVOT_TABLE_OTHERS_LABEL
+        : null;
+    if (bucket === null) continue;
 
-      if (pivotKeySet.has(pivotKey)) {
-        const colKey = `${pivotKey}_${yAlias}`;
-        targetRow[colKey] = numericValue;
-      } else if (hasOthers) {
-        const othersKey = `${PIVOT_TABLE_OTHERS_LABEL}_${yAlias}`;
-        targetRow[othersKey] = (targetRow[othersKey] || 0) + numericValue;
-      }
+    for (const yAlias of yAliases) {
+      // A null/undefined aggregate (e.g. min() over an all-null group) is
+      // absent, not zero: coercing it before merging corrupts min/max and can
+      // lock keep-first onto a synthetic 0. Skip it — the cell stays unwritten
+      // until a real value arrives, and Step 3 fills never-written cells with
+      // null so they render as missing.
+      const rawValue = getDataValue(row, yAlias);
+      if (rawValue === null || rawValue === undefined) continue;
+
+      const numericValue = Number(rawValue) || 0;
+      const colKey = `${bucket}_${yAlias}`;
+      const existing = targetRow[colKey];
+      // First write assigns: seeding the merge with 0 would corrupt min/max.
+      targetRow[colKey] =
+        existing === undefined || existing === null
+          ? numericValue
+          : MERGE_FNS[mergeKindByAlias[yAlias]](existing, numericValue);
     }
   }
 
@@ -334,16 +495,16 @@ export const convertPivotTableData = (
 
   for (const row of pivotedRows) {
     for (const yAlias of yAliases) {
-      let rowTotal = 0;
+      const cells: any[] = [];
       for (const pk of allPivotKeys) {
         const colKey = `${pk}_${yAlias}`;
         if (row[colKey] === undefined || row[colKey] === null) {
           row[colKey] = null; // Keep null for correct totals/sorting; format() handles display
         }
-        rowTotal += Number(row[colKey]) || 0;
+        cells.push(row[colKey]);
       }
       if (showRowTotals) {
-        row[`${PIVOT_TABLE_TOTAL_LABEL}_${yAlias}`] = rowTotal;
+        row[`${PIVOT_TABLE_TOTAL_LABEL}_${yAlias}`] = foldTotal(yAlias, cells);
       }
     }
   }
@@ -359,18 +520,17 @@ export const convertPivotTableData = (
     for (const yAlias of yAliases) {
       for (const pk of allPivotKeys) {
         const colKey = `${pk}_${yAlias}`;
-        let colTotal = 0;
-        for (const row of pivotedRows) {
-          colTotal += Number(row[colKey]) || 0;
-        }
-        totalRow[colKey] = colTotal;
+        totalRow[colKey] = foldTotal(
+          yAlias,
+          pivotedRows.map((row) => row[colKey]),
+        );
       }
       if (showRowTotals) {
-        let grandTotal = 0;
-        for (const row of pivotedRows) {
-          grandTotal += Number(row[`${PIVOT_TABLE_TOTAL_LABEL}_${yAlias}`]) || 0;
-        }
-        totalRow[`${PIVOT_TABLE_TOTAL_LABEL}_${yAlias}`] = grandTotal;
+        const totalKey = `${PIVOT_TABLE_TOTAL_LABEL}_${yAlias}`;
+        totalRow[totalKey] = foldTotal(
+          yAlias,
+          pivotedRows.map((row) => row[totalKey]),
+        );
       }
     }
 
@@ -425,9 +585,11 @@ export const convertPivotTableData = (
       const formattedPivotKey =
         pk === PIVOT_TABLE_OTHERS_LABEL
           ? gt("dashboard.pivotOthers")
-          : breakdownTimestampAliases.has(breakdownFields[0]?.alias)
-            ? parseTimestampValue(pk, timezone) || pk
-            : pk;
+          : pk === PIVOT_TABLE_EMPTY_KEY
+            ? PIVOT_TABLE_EMPTY_LABEL
+            : breakdownTimestampAliases.has(breakdownFields[0]?.alias)
+              ? parseTimestampValue(pk, timezone) || pk
+              : pk;
       const label = needsMultiRowHeader
         ? yField.label
         : isSingleValueField
@@ -513,6 +675,7 @@ export const convertPivotTableData = (
     showRowTotals,
     breakdownTimestampAliases,
     timezone,
+    hasOthers,
   );
 
   // --- Step 7: Separate sticky total row if needed ---

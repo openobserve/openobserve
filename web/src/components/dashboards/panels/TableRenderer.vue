@@ -300,9 +300,12 @@ export default defineComponent({
       })),
     );
 
-    // Row-field columns drive the pivot header row-field cells + body cell-merge.
+    // Row-field columns drive the pivot header row-field cells, body cell-merge
+    // and left-pinning. Filtered from otableColumns (not the raw configs) so
+    // each entry carries the `id` that useTableCore pins by — a raw config has
+    // only name/field, and an id-less entry silently disables the pinning.
     const pivotRowColumns = computed(() =>
-      (tableColumns.value as any[]).filter((c: any) => c._isRowField),
+      (otableColumns.value as any[]).filter((c: any) => c._isRowField),
     );
 
     // Columns the user flagged with "Render Data as JSON / Array"
