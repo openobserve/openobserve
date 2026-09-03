@@ -25,7 +25,6 @@ use datafusion::{
     arrow::datatypes::Schema,
     error::{DataFusionError, Result},
 };
-use metrics_index::MetricsFileLayout;
 use vortex::{
     VortexSessionDefault,
     array::ArrayRef,
@@ -64,12 +63,15 @@ pub(super) async fn write(
     };
     metadata.compressed_size = buf.len() as i64;
 
-    let layout =
-        matches!(mode, MergeMode::MetricsHashSorted).then_some(MetricsFileLayout::HashSorted);
-    Ok(vec![MergedFile::Standard {
-        data: buf,
-        meta: metadata,
-        layout,
+    Ok(vec![match mode {
+        MergeMode::MetricsHashSorted => MergedFile::MetricsHashSorted {
+            data: buf,
+            meta: metadata,
+        },
+        _ => MergedFile::Standard {
+            data: buf,
+            meta: metadata,
+        },
     }])
 }
 
