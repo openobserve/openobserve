@@ -59,17 +59,7 @@ impl Engine {
             None => return Ok(vec![]),
         };
 
-        let mut offset_modifier = 0;
-        if let Some(offset) = selector.offset {
-            match offset {
-                Offset::Pos(offset) => {
-                    offset_modifier = micros(offset);
-                }
-                Offset::Neg(offset) => {
-                    offset_modifier = -micros(offset);
-                }
-            }
-        };
+        let offset_modifier = get_offset_modifier(selector.offset);
 
         // Get all evaluation timestamps from the context
         let eval_timestamps = self.eval_ctx.timestamps();
@@ -497,22 +487,7 @@ impl Engine {
         }
         let MatrixSelector { vs, range } = matrix_selector;
         let range = *range;
-        let mut selector = vs.clone();
-        remove_filter_all(&mut selector);
-        if !selector.matchers.or_matchers.is_empty() || selector.at.is_some() {
-            return Ok(None);
-        }
-        if selector.name.is_none() {
-            let names = selector.matchers.find_matchers(NAME_LABEL);
-            let Some(matcher) = names.first() else {
-                return Ok(None);
-            };
-            selector.name = Some(matcher.value.clone());
-            selector
-                .matchers
-                .matchers
-                .retain(|mat| mat.name != NAME_LABEL);
-        }
+        let mut selector = named_selector(plain_selector(vs, "MatrixSelector")?, "MatrixSelector")?;
         let table_name = selector.name.clone().unwrap();
 
         let offset = get_offset_modifier(selector.offset.clone());
