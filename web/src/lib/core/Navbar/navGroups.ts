@@ -43,6 +43,10 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   // Pipelines: the Stream Pipelines tab hides when custom_hide_menus lists
   // "pipelines" — mirrors PipelineSectionTabs.vue exactly.
   streamPipelines: (c) => !c.hiddenMenus.has("pipelines"),
+  // On-call: backend /config flag `oncall_enabled` (enterprise
+  // O2_ONCALL_ENABLED). `!== false`, matching oncallRouteGuard, so the flyout
+  // does not blink out while /config is still in flight on a cold load.
+  oncall: (c) => c.oncallEnabled,
   // The runtime flag is the whole gate for the MENU ENTRY, which is not
   // enterprise-only. Three of Database Monitoring's seven tabs (deadlocks,
   // blocked queries, table health) ARE enterprise-only, but they are gated
@@ -129,7 +133,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     titleKey: "menu.reliability",
     icon: "shield",
     parentLink: "/alerts",
-    absorbs: ["alertList", "sloList", "incidentList"],
+    absorbs: ["alertList", "sloList", "incidentList", "onCallResponses"],
     children: [
       // ── Alerts ──────────────────────────────────────────────────────────
       // These four are the alerting cluster, and they carry a peer tab strip
@@ -189,6 +193,34 @@ export const NAV_GROUPS: NavGroupDef[] = [
         icon: "notifications-active",
         name: "incidentList",
         requires: "incidentList",
+      },
+      // A page is where an alert escalates to a person, so On-Call sits in the
+      // same workflow tile rather than as its own rail entry. Pages, Teams and
+      // Routing share the "On-Call" category header so the flyout reads as one
+      // module with three destinations, not three unrelated reliability
+      // entries. `gate: "oncall"` is the single place the O2_ONCALL_ENABLED
+      // flag is read for navigation, and `router.hasRoute` already limits this
+      // to the enterprise/cloud build.
+      {
+        titleKey: "oncall.pagesNav",
+        icon: "notifications-active",
+        name: "onCallResponses",
+        categoryKey: "menu.onCall",
+        gate: "oncall",
+      },
+      {
+        titleKey: "oncall.teams",
+        icon: "group-work",
+        name: "onCallTeams",
+        categoryKey: "menu.onCall",
+        gate: "oncall",
+      },
+      {
+        titleKey: "oncall.routingNav",
+        icon: "alt-route",
+        name: "onCallRouting",
+        categoryKey: "menu.onCall",
+        gate: "oncall",
       },
       // Where external alerts (Grafana, Alertmanager, etc.) feed Incidents.
       // Gated on incidentList, not alertList: this only makes sense where
@@ -397,6 +429,14 @@ export function groupNavLinks(
   links: NavItem[],
   // `raw` brands the key unchanged — the identity fallback for callers with no translator.
   t: TranslateFn = raw,
+  /**
+   * Evaluates a child's `gate` (see GATE_PREDICATES). It has to be applied HERE
+   * and not only in the flyout: a child that a gate will remove must not count
+   * towards "is this group worth existing", or a single ungated survivor ends
+   * up inside a one-item flyout instead of staying a plain rail link.
+   * Defaults to open, matching the component's own "an unknown gate shows".
+   */
+  gateOpen: (gate: string) => boolean = () => true,
 ): RailEntry[] {
   const presentNames = new Set(links.map((l) => l.name));
 
@@ -413,7 +453,9 @@ export function groupNavLinks(
   const groupChildren = new Map<string, SubnavChild[]>();
   const absorbedToGroup = new Map<string, NavGroupDef>();
   for (const def of NAV_GROUPS) {
-    const children = def.children.filter((c) => !c.requires || presentNames.has(c.requires));
+    const children = def.children.filter(
+      (c) => (!c.requires || presentNames.has(c.requires)) && (!c.gate || gateOpen(c.gate)),
+    );
     const hasAbsorbed = def.absorbs.some((n) => presentNames.has(n));
     if (def.standalone) {
       if (children.length === 0) continue;

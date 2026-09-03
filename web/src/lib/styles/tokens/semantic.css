@@ -112,6 +112,60 @@
      outlines stay neutral. */
   --color-favorite: #eab308;
 
+  /* Alert PRIORITY — the semantic hot→cold ramp for P1…P5, so the priority
+     chip and the row rail that carries the same priority are provably the same
+     colour. Feature code must never reach a `*-500` ramp primitive for this. */
+  --color-priority-p1: var(--color-error-600);
+  --color-priority-p2: var(--color-orange-600);
+  --color-priority-p3: var(--color-amber-600);
+  --color-priority-p4: var(--color-blue-600);
+  --color-priority-p5: var(--color-grey-500);
+
+  /* Schedule bands — a DECORATIVE identity ramp for "which person / rotation
+     is this", not a status ramp. Six so a five-person rotation never puts two
+     neighbouring bands on the same hue. Deliberately excludes red, which is
+     reserved for a coverage gap below. */
+  --color-schedule-band-1-bg: var(--color-blue-50);
+  --color-schedule-band-1-text: var(--color-blue-700);
+  --color-schedule-band-2-bg: var(--color-purple-50);
+  --color-schedule-band-2-text: var(--color-purple-700);
+  --color-schedule-band-3-bg: var(--color-teal-50);
+  --color-schedule-band-3-text: var(--color-teal-700);
+  --color-schedule-band-4-bg: var(--color-amber-50);
+  --color-schedule-band-4-text: var(--color-amber-700);
+  --color-schedule-band-5-bg: var(--color-indigo-50);
+  --color-schedule-band-5-text: var(--color-indigo-700);
+  --color-schedule-band-6-bg: var(--color-cyan-50);
+  --color-schedule-band-6-text: var(--color-cyan-700);
+
+  /* The same six hues painted solid, plus a border for each.
+
+     `soft` says "a different row from the one above"; on a chart whose subject
+     is who is on call RIGHT NOW, a 50-tint says it too quietly — the band is
+     the answer, not a wash behind one. Solid is the rotation running normally;
+     the border is for a span somebody took FROM it, which keeps the lane's hue
+     while the hollow fill says the roster did not produce this. */
+  --color-schedule-band-1-solid-bg: var(--color-blue-600);
+  --color-schedule-band-1-border: var(--color-blue-500);
+  --color-schedule-band-2-solid-bg: var(--color-purple-600);
+  --color-schedule-band-2-border: var(--color-purple-500);
+  --color-schedule-band-3-solid-bg: var(--color-teal-600);
+  --color-schedule-band-3-border: var(--color-teal-500);
+  --color-schedule-band-4-solid-bg: var(--color-amber-600);
+  --color-schedule-band-4-border: var(--color-amber-500);
+  --color-schedule-band-5-solid-bg: var(--color-indigo-600);
+  --color-schedule-band-5-border: var(--color-indigo-500);
+  --color-schedule-band-6-solid-bg: var(--color-cyan-600);
+  --color-schedule-band-6-border: var(--color-cyan-500);
+  /* One foreground for all six: they are chosen to carry white. */
+  --color-schedule-band-solid-text: var(--color-white);
+
+  /* Nobody on call — the one alarming thing on a schedule, so it is an error
+     tint rather than a seventh band tone. */
+  --color-schedule-gap-bg: var(--color-error-50);
+  --color-schedule-gap-border: var(--color-error-300);
+  --color-schedule-gap-text: var(--color-error-700);
+
   /* Focus rings — the 27 component focus-ring tokens collapsed to 4 intents, so a
      whole intent's ring changes in one place instead of 27.
      This RECOLOURS focus rings, it is not a pure dedup: they carried 5 distinct light
@@ -224,6 +278,43 @@
 
   /* Favorite */
   --color-favorite: var(--color-favorite);
+
+  /* Alert priority ramp (row rails, coverage rails) */
+  --color-priority-p1: var(--color-priority-p1);
+  --color-priority-p2: var(--color-priority-p2);
+  --color-priority-p3: var(--color-priority-p3);
+  --color-priority-p4: var(--color-priority-p4);
+  --color-priority-p5: var(--color-priority-p5);
+
+  /* Schedule band identity ramp + the coverage-gap tint */
+  --color-schedule-band-1-bg: var(--color-schedule-band-1-bg);
+  --color-schedule-band-1-text: var(--color-schedule-band-1-text);
+  --color-schedule-band-2-bg: var(--color-schedule-band-2-bg);
+  --color-schedule-band-2-text: var(--color-schedule-band-2-text);
+  --color-schedule-band-3-bg: var(--color-schedule-band-3-bg);
+  --color-schedule-band-3-text: var(--color-schedule-band-3-text);
+  --color-schedule-band-4-bg: var(--color-schedule-band-4-bg);
+  --color-schedule-band-4-text: var(--color-schedule-band-4-text);
+  --color-schedule-band-5-bg: var(--color-schedule-band-5-bg);
+  --color-schedule-band-5-text: var(--color-schedule-band-5-text);
+  --color-schedule-band-6-bg: var(--color-schedule-band-6-bg);
+  --color-schedule-band-6-text: var(--color-schedule-band-6-text);
+  --color-schedule-band-1-solid-bg: var(--color-schedule-band-1-solid-bg);
+  --color-schedule-band-2-solid-bg: var(--color-schedule-band-2-solid-bg);
+  --color-schedule-band-3-solid-bg: var(--color-schedule-band-3-solid-bg);
+  --color-schedule-band-4-solid-bg: var(--color-schedule-band-4-solid-bg);
+  --color-schedule-band-5-solid-bg: var(--color-schedule-band-5-solid-bg);
+  --color-schedule-band-6-solid-bg: var(--color-schedule-band-6-solid-bg);
+  --color-schedule-band-solid-text: var(--color-schedule-band-solid-text);
+  --color-schedule-band-1-border: var(--color-schedule-band-1-border);
+  --color-schedule-band-2-border: var(--color-schedule-band-2-border);
+  --color-schedule-band-3-border: var(--color-schedule-band-3-border);
+  --color-schedule-band-4-border: var(--color-schedule-band-4-border);
+  --color-schedule-band-5-border: var(--color-schedule-band-5-border);
+  --color-schedule-band-6-border: var(--color-schedule-band-6-border);
+  --color-schedule-gap-bg: var(--color-schedule-gap-bg);
+  --color-schedule-gap-border: var(--color-schedule-gap-border);
+  --color-schedule-gap-text: var(--color-schedule-gap-text);
 
   /* Brand / Primary (re-exports from base.css) */
   --color-primary-50: var(--color-primary-50);

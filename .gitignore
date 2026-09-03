@@ -69,6 +69,15 @@ tests/ui-testing/playwright-tests/utils/auth/user.json
 # ---------- other agents ----------
 /.agents/*
 
+alert_mock
+# Local verification artifacts (browser screenshots, per-crate scratch DBs)
+/alerts-list-f2.png
+/final-list.png
+/form-advanced.png
+
+# Compiler crash dumps — machine-local debris from a build that fell over.
+rustc-ice-*.txt
+
 # ---------- Claude Code ----------
 /.claude/settings.json
 /.claude/settings.local.json

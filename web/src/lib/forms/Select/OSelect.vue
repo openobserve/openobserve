@@ -16,6 +16,8 @@ import {
 import OSelectItem from "./OSelectItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useIsTruncated } from "@/lib/overlay/Tooltip/useIsTruncated";
 import {
   ListboxFilter,
   ListboxItem,
@@ -400,6 +402,9 @@ const triggerDisplayLabel = computed(() => {
   return selectedLabels.value[0] ?? "";
 });
 
+const triggerLabelRef = ref<HTMLElement | null>(null);
+const { isTruncated: isTriggerLabelTruncated } = useIsTruncated(triggerLabelRef);
+
 watch(searchTerm, (value) => {
   if (!inputEnabled.value) return;
   if ((props.searchDebounce ?? 0) > 0) {
@@ -653,8 +658,31 @@ const navigableIndices = computed(() =>
 );
 
 // Reset highlight whenever the dropdown opens or the filtered list changes.
+// Single-select: land on the current value instead of the top of the list —
+// a 48-row virtualised list (e.g. a time-of-day picker) otherwise always opens
+// scrolled to its first entry, forcing a scroll/search just to see what's
+// already chosen. Multi-select keeps its own affordance (pinned-to-top in
+// `baseFilteredOptions`), so it stays untouched.
 watch(popoverOpen, (open) => {
-  if (open) highlightedIndex.value = -1;
+  if (!open) {
+    highlightedIndex.value = -1;
+    return;
+  }
+  if (props.multiple) {
+    highlightedIndex.value = -1;
+    return;
+  }
+  const selected = selectedValues.value[0];
+  const index =
+    selected === undefined
+      ? -1
+      : filteredOptions.value.findIndex((opt) => !opt.header && opt.value === selected);
+  highlightedIndex.value = index;
+  if (index < 0) return;
+  nextTick(() => {
+    virtualizer.value.scrollToIndex(index, { align: "center", behavior: "auto" });
+    nextTick(scrollHighlightedIntoView);
+  });
 });
 watch(filteredOptions, () => {
   highlightedIndex.value = -1;
@@ -749,7 +777,7 @@ function getPaletteGradient(colors: string[]): string {
 
 // Aligned with OInput and OButton sm: h-[2.125rem] ≈ 30px at the 14px html base.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
-  sm: "h-6 text-sm",
+  sm: "h-[2.125rem] text-sm",
   md: "h-[2.125rem] text-sm",
 };
 
@@ -1160,6 +1188,7 @@ const fieldWidthClass = computed(() => {
                       >
                         {{ labelText }}
                       </span>
+                      <OTooltip :content="raw(String(labelText ?? ''))" />
                     </slot>
                     <span
                       v-if="overflowSelectedCount > 0"
@@ -1170,25 +1199,31 @@ const fieldWidthClass = computed(() => {
                     </span>
                   </div>
                 </template>
-                <span
-                  v-else
-                  :title="optionTooltip && hasSelection ? triggerDisplayLabel : undefined"
-                  :class="[
-                    'text-start',
-                    // An inline trigger is a word in a sentence: it grows to fit
-                    // its value. `truncate` would also zero its min-content
-                    // width, letting any ancestor squeeze it to a lone ellipsis.
-                    isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
-                    labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
-                    disabled
-                      ? 'text-select-disabled-text'
-                      : hasSelection
-                        ? 'text-select-text'
-                        : 'text-select-placeholder',
-                  ]"
-                >
-                  {{ hasSelection ? triggerDisplayLabel : placeholder }}
-                </span>
+                <template v-else>
+                  <span
+                    ref="triggerLabelRef"
+                    :class="[
+                      'text-start',
+                      // An inline trigger is a word in a sentence: it grows to fit
+                      // its value. `truncate` would also zero its min-content
+                      // width, letting any ancestor squeeze it to a lone ellipsis.
+                      isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
+                      labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
+                      disabled
+                        ? 'text-select-disabled-text'
+                        : hasSelection
+                          ? 'text-select-text'
+                          : 'text-select-placeholder',
+                    ]"
+                  >
+                    {{ hasSelection ? triggerDisplayLabel : placeholder }}
+                  </span>
+                  <OTooltip
+                    v-if="hasSelection"
+                    :content="raw(triggerDisplayLabel)"
+                    :disabled="!isTriggerLabelTruncated"
+                  />
+                </template>
               </slot>
             </div>
           </PopoverTrigger>
@@ -1612,7 +1647,7 @@ const fieldWidthClass = computed(() => {
                             <span v-else-if="iconKey" class="size-4 shrink-0" />
                             <span
                               class="truncate"
-                              :title="optionTooltip ? filteredOptions[vRow.index].label : undefined"
+                              :title="filteredOptions[vRow.index].label"
                               >{{ filteredOptions[vRow.index].label }}</span
                             >
                           </template>

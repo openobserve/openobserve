@@ -83,6 +83,7 @@ export const advancedShape = {
   description: z.string().optional(),
   row_template: z.string().optional(),
   row_template_type: z.string().optional(),
+  oncall_team: z.string().optional(),
 } as const;
 
 export const createAdvancedSchema = () => z.looseObject({ ...advancedShape });

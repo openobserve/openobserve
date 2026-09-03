@@ -125,6 +125,10 @@ const barVariantClass = computed(() => {
       bar ? barVariantClass : variantClass,
     ]"
   >
+    <!-- `inlineActions` is the one-line layout — the outer row already centres,
+         so the icon centres against the whole content block with it. Stacked
+         banners keep `items-start`, where the icon belongs beside the first
+         line of a paragraph rather than halfway down it. -->
     <div
       :class="[
         'flex flex-row gap-3',
@@ -132,13 +136,19 @@ const barVariantClass = computed(() => {
           ? center
             ? 'min-w-0 items-center'
             : 'min-w-0 flex-1 items-center'
-          : preserveWhitespace
-            ? 'min-w-0 items-start'
-            : 'items-start',
-        inlineActions && !bar ? 'flex-1' : '',
+          : inlineActions
+            ? 'flex-1 items-center'
+            : preserveWhitespace
+              ? 'min-w-0 items-start'
+              : 'items-start',
       ]"
     >
-      <div v-if="showIconArea" :class="['flex shrink-0', bar ? 'items-center' : 'items-start']">
+      <!-- Aligned to the FIRST LINE of the content, not the top of the box:
+           `items-start` anchored a 1rem icon to the top of a 1.25rem line box,
+           which reads as the icon sitting a hair high beside its own label.
+           `min-h-5` is that line box, so a taller slotted icon still grows the
+           wrapper and keeps its old top alignment instead of overflowing. -->
+      <div v-if="showIconArea" :class="['flex shrink-0', bar ? 'items-center' : 'min-h-5 items-center']">
         <slot name="icon">
           <OIcon :name="icon" size="sm" />
         </slot>

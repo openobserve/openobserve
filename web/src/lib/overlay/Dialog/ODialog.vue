@@ -549,8 +549,9 @@ watch(internalOpen, (open) => {
         >
           <!-- ── Built-in footer buttons ──────────────────────────────────────── -->
           <div v-if="!slots.footer" class="flex items-center justify-between gap-2">
-            <!-- Left: neutral button -->
-            <div>
+            <!-- Left: optional footer-left content, then neutral button -->
+            <div class="flex items-center gap-2">
+              <slot name="footer-left" />
               <OButton
                 v-if="neutralButtonLabel"
                 data-test="o-dialog-neutral-btn"

@@ -13,6 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// On-call keeps its metrics in their own file: the set is a coherent story
+// about one subsystem, and reading it as a block is the only way to see that
+// the bad outcomes are all covered.
+pub mod oncall;
+
 use std::{collections::HashMap, sync::LazyLock as Lazy};
 
 use prometheus::{
@@ -3088,6 +3093,9 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(EVAL_SCHEDULER_WATERMARK_LAG_SECONDS.clone()))
         .expect("Metric registered");
+
+    // on-call paging and escalation
+    oncall::register(registry);
 }
 
 pub fn create_const_labels() -> HashMap<String, String> {

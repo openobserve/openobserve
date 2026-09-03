@@ -75,6 +75,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_workflows_migration = false;
     let mut need_synthetics_migration = false;
     let mut need_stream_names_migration = false;
+    let mut need_oncall_migration = false;
     let mut need_annotation_queues_datasets_migration = false;
     let mut need_llm_workbench_migration = false;
 
@@ -264,6 +265,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 let v0_0_38 = version_compare::Version::from("0.0.38").unwrap();
                 let v0_0_39 = version_compare::Version::from("0.0.39").unwrap();
                 let v0_0_42 = version_compare::Version::from("0.0.42").unwrap();
+                let v0_0_43 = version_compare::Version::from("0.0.43").unwrap();
 
                 if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
                     need_pipeline_migration = true;
@@ -356,6 +358,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 if existing_model_version < v0_0_42 {
                     log::info!("[OFGA:Local] LLM workbench permissions migration needed");
                     need_llm_workbench_migration = true;
+                }
+                if existing_model_version < v0_0_43 {
+                    log::info!("[OFGA:Local] on-call permissions migration needed");
+                    need_oncall_migration = true;
                 }
             }
 
@@ -510,6 +516,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                     if need_workflows_migration {
                         get_ownership_all_org_tuple(org_name, "workflows", &mut tuples);
+                    }
+                    // Without the org-ownership tuple, `viewer from owningOrg`
+                    // and `allowed_user from owningOrg` resolve to nothing, so
+                    // every non-admin in an existing org would still be denied
+                    // on-call — which is the defect this model version fixes.
+                    if need_oncall_migration {
+                        get_ownership_all_org_tuple(org_name, "oncall", &mut tuples);
+                        get_ownership_all_org_tuple(org_name, "oncall_responses", &mut tuples);
                     }
                     if need_annotation_queues_datasets_migration {
                         get_ownership_all_org_tuple(org_name, "annotation_queues", &mut tuples);

@@ -463,6 +463,44 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-oncall-teams": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noOncallTeams.title",
+    descriptionKey: "emptyState.noOncallTeams.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noOncallTeams.action",
+        descriptionKey: "emptyState.noOncallTeams.actionDesc",
+      },
+    ],
+  },
+  // Nothing open is the GOOD state here, so this is neutral rather than a
+  // create prompt - a responder should not be nudged to make a page exist.
+  "no-oncall-responses": {
+    illustration: "check",
+    variant: "neutral",
+    titleKey: "emptyState.noOncallResponses.title",
+    descriptionKey: "emptyState.noOncallResponses.description",
+  },
+  // Ownership is claimed by path, so the prompt is about the path rather than
+  // about a list of services somebody has to enumerate.
+  "no-oncall-rules": {
+    illustration: "connect",
+    variant: "create",
+    titleKey: "emptyState.noOncallRules.title",
+    descriptionKey: "emptyState.noOncallRules.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noOncallRules.action",
+        descriptionKey: "emptyState.noOncallRules.actionDesc",
+      },
+    ],
+  },
   "no-groups": {
     illustration: "users",
     variant: "create",

@@ -29,6 +29,8 @@ pub struct Model {
 
     pub title: Option<String>,
     pub assigned_to: Option<String>,
+    pub acknowledged_by: Option<String>,
+    pub acknowledged_at: Option<i64>,
 
     pub created_at: i64,
     pub updated_at: i64,
@@ -68,6 +70,8 @@ mod tests {
             alert_count: 3,
             title: Some("High Error Rate".to_string()),
             assigned_to: None,
+            acknowledged_by: None,
+            acknowledged_at: None,
             created_at: 1000,
             updated_at: 2000,
         };
@@ -77,5 +81,32 @@ mod tests {
         assert_eq!(m.alert_count, 3);
         assert!(m.topology_context.is_none());
         assert!(m.resolved_at.is_none());
+        assert!(m.acknowledged_by.is_none());
+        assert!(m.acknowledged_at.is_none());
+    }
+
+    #[test]
+    fn test_model_construction_acknowledged() {
+        let m = Model {
+            id: "inc-2".to_string(),
+            org_id: "myorg".to_string(),
+            status: "acknowledged".to_string(),
+            severity: "P1".to_string(),
+            group_values: serde_json::json!({"service": "api"}),
+            key_type: "service".to_string(),
+            topology_context: None,
+            first_alert_at: 1000,
+            last_alert_at: 2000,
+            resolved_at: None,
+            alert_count: 3,
+            title: Some("High Error Rate".to_string()),
+            assigned_to: None,
+            acknowledged_by: Some("user@example.com".to_string()),
+            acknowledged_at: Some(1500),
+            created_at: 1000,
+            updated_at: 1500,
+        };
+        assert_eq!(m.acknowledged_by.as_deref(), Some("user@example.com"));
+        assert_eq!(m.acknowledged_at, Some(1500));
     }
 }

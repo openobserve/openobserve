@@ -1,0 +1,218 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<!--
+  Who this page is supposed to be reaching, and whether it reached them.
+
+  "Who is on call" was answerable on the team screen and "did the page land" in
+  the delivery ledger, and joining the two was left to the reader mid-incident.
+  They are one question, so they are one card.
+
+  Every name here is a ROTATION's holder. There is no derived secondary: a
+  position exists because a rotation fills it, and each row names the rotation
+  it came from so "why that person" is answerable on the screen itself.
+
+  A rotation that resolves to nobody is ABSENT from the response, not present
+  with a null holder — so a coverage gap is a row that is not drawn, which is
+  why the count of rows is the count of people who would be paged.
+-->
+<template>
+  <OCard variant="glass" data-test="oncall-who-is-on">
+    <OCardSection role="header" dense>
+      <OText variant="card-title">{{ t("oncall.onCallDetails") }}</OText>
+    </OCardSection>
+
+    <OCardSection role="body" dense>
+      <!-- An unstaffed rotation is an emergency while a page is open and a
+           plain fact once it is closed, so the colour follows the state. -->
+      <p
+        v-if="!positions.length"
+        class="text-sm"
+        :class="closed ? 'text-text-secondary' : 'text-status-error-text'"
+        data-test="oncall-who-is-on-nobody"
+      >
+        {{ closed ? t("oncall.nobodyWasOnCall") : t("oncall.nobodyOnCall") }}
+      </p>
+
+      <template v-else>
+        <!-- The roster first, and only the roster: a reach tag pinned to the
+             right edge gives every person the same two columns to read, which
+             a tag trailing the address never does. -->
+        <ODescriptionList dense>
+          <ODescriptionItem :label="closed ? t('oncall.onCallThen') : t('oncall.onCallNow')">
+            <span class="flex w-full items-center gap-2">
+              <OUserCell class="min-w-0 truncate font-medium" :value="primary.user_email" />
+              <OTag
+                v-if="reachOf(primary.user_email)"
+                :variant="reachOf(primary.user_email) === 'landed' ? 'success-soft' : 'error-soft'"
+                size="sm"
+                class="ml-auto shrink-0"
+                data-test="oncall-who-is-on-primary-reach"
+              >
+                {{ reachLabel(primary.user_email) }}
+              </OTag>
+            </span>
+          </ODescriptionItem>
+
+          <!-- Every other staffed rotation, named by the ROTATION rather than
+               called "backup": a team may staff three, and two of them called
+               backup is a card that cannot be read. -->
+          <ODescriptionItem
+            v-for="entry in others"
+            :key="entry.rotation_id"
+            :label="raw(entry.rotation_name)"
+          >
+            <span class="flex w-full items-center gap-2">
+              <OUserCell class="min-w-0 truncate" :value="entry.user_email" />
+              <OTag
+                v-if="reachOf(entry.user_email)"
+                :variant="reachOf(entry.user_email) === 'landed' ? 'success-soft' : 'error-soft'"
+                size="sm"
+                class="ml-auto shrink-0"
+                :data-test="`oncall-who-is-on-reach-${entry.user_email}`"
+              >
+                {{ reachLabel(entry.user_email) }}
+              </OTag>
+            </span>
+          </ODescriptionItem>
+        </ODescriptionList>
+
+        <!-- Below the rule is the schedule around those people, not more
+             people — the two were one run of rows, and a separator between
+             them read as a boundary the roster and its own handover don't
+             have. `next_user_email` used to get its own row ("Up next"), but
+             it names the same person `handoverTo` does, so the row was a
+             second copy of this one rather than a second fact. -->
+        <ODescriptionList v-if="!closed && handoverAt" dense>
+          <!-- When the pager changes hands. A page still open at handover is one
+               the next person inherits without being told, unless a screen says
+               so before it happens. -->
+          <ODescriptionItem :label="t('oncall.shiftHandover')">
+            <span class="flex w-full flex-wrap items-center gap-x-1 gap-y-1">
+              <OUserCell v-if="handoverTo" class="min-w-0 truncate" :value="handoverTo" />
+              <span class="text-text-secondary text-xs whitespace-nowrap">
+                {{ raw(`(${handoverInLabel})`) }}
+              </span>
+            </span>
+          </ODescriptionItem>
+        </ODescriptionList>
+      </template>
+
+      <!-- Who acked it — the one fact about the ack this card still owns, now
+           that its timing rides the stat strip above the fold. -->
+      <template v-if="ackedBy">
+        <OSeparator class="my-3" />
+        <ODescriptionList dense>
+          <ODescriptionItem :label="t('oncall.ackedBy')">
+            <OUserCell class="min-w-0 truncate" :value="ackedBy" />
+          </ODescriptionItem>
+        </ODescriptionList>
+      </template>
+    </OCardSection>
+  </OCard>
+</template>
+
+<script setup lang="ts">
+import { computed } from "vue";
+
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import OText from "@/lib/core/Typography/OText.vue";
+import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
+import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
+import { useOnCallClock } from "@/composables/useOnCallClock";
+import type { DeliveryRecord, OnCallPosition } from "@/ts/interfaces/oncall";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { formatMicrosDuration } from "@/utils/formatters";
+
+const props = withDefaults(
+  defineProps<{
+    /**
+     * `GET /teams/{id}/on-call` — one entry per rotation that resolves to
+     * somebody. A rotation with a gap is absent rather than null-held.
+     */
+    positions?: OnCallPosition[];
+    /** Every send this page attempted, for the reached/unreached tags. */
+    deliveries?: DeliveryRecord[];
+    /** Micros — when the first rotation's current span ends. */
+    handoverAt?: number | null;
+    /** Who holds it after that. */
+    handoverTo?: string | null;
+    /**
+     * Micros — when this record closed, or null while it is still open.
+     *
+     * A closed record is read as history: the roster it carries was resolved
+     * as of this instant rather than as of now, so the card says so in its
+     * tense and drops the rows that are advice about a pager still being held.
+     */
+    closedAt?: number | null;
+    /** Who acked it, once somebody has — the timing itself rides the stat strip above. */
+    ackedBy?: string | null;
+  }>(),
+  {
+    positions: () => [],
+    deliveries: () => [],
+    handoverAt: null,
+    handoverTo: null,
+    closedAt: null,
+    ackedBy: null,
+  },
+);
+
+const { t } = useI18nTyped();
+const nowMicros = useOnCallClock();
+
+const closed = computed(() => Boolean(props.closedAt));
+
+/// The first rotation the team staffs. Not a special one: the response is
+/// ordered by the schedule, so this is "the position listed first" rather than
+/// a keyword the way `primary` was — there is no default slot to look up any
+/// more, and no derivation behind it.
+const primary = computed<OnCallPosition>(
+  () =>
+    props.positions[0] ?? {
+      rotation_id: "",
+      rotation_name: "",
+      rule: "",
+      user_email: "",
+    },
+);
+
+const others = computed(() => props.positions.filter((p) => p !== primary.value));
+
+/// How long until the pager changes hands, in the same compact form the rest
+/// of the page uses ("5d", "3h 12m"). `next_user_email` used to render this
+/// same fact as a second row ("Up next") — one clock, one name, one row.
+const handoverInLabel = computed(() =>
+  props.handoverAt !== null ? formatMicrosDuration(props.handoverAt - nowMicros.value) : "",
+);
+
+/// What this page's own sends did for one address — never the team's general
+/// reachability, which answers a different question and would contradict the
+/// ledger sitting below it.
+function reachOf(email: string): "landed" | "failed" | null {
+  const sends = props.deliveries.filter((d) => d.recipient === email);
+  if (!sends.length) return null;
+  return sends.some((d) => d.delivered === true) ? "landed" : "failed";
+}
+
+function reachLabel(email: string) {
+  return reachOf(email) === "landed" ? t("oncall.reachLanded") : t("oncall.reachUnreached");
+}
+</script>

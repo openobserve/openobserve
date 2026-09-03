@@ -897,6 +897,50 @@
   --color-icon-chip-orange-bg: color-mix(in srgb, var(--color-orange-500) 15%, transparent);
   --color-icon-chip-orange-text: var(--color-orange-400);
 
+  /* Alert priority ramp — one step lighter on the dark canvas, where a 600 is
+     too dense to read as a 4px rail. */
+  --color-priority-p1: var(--color-error-400);
+  --color-priority-p2: var(--color-orange-400);
+  --color-priority-p3: var(--color-amber-400);
+  --color-priority-p4: var(--color-blue-400);
+  --color-priority-p5: var(--color-grey-400);
+
+  /* Schedule bands — the light 50-tints become faint accent washes, matching
+     the badge-soft treatment, with a light foreground for contrast. */
+  --color-schedule-band-1-bg: color-mix(in srgb, var(--color-blue-500) 22%, transparent);
+  --color-schedule-band-1-text: var(--color-blue-300);
+  --color-schedule-band-2-bg: color-mix(in srgb, var(--color-purple-500) 22%, transparent);
+  --color-schedule-band-2-text: var(--color-purple-400);
+  --color-schedule-band-3-bg: color-mix(in srgb, var(--color-teal-500) 22%, transparent);
+  --color-schedule-band-3-text: var(--color-teal-300);
+  --color-schedule-band-4-bg: color-mix(in srgb, var(--color-amber-500) 22%, transparent);
+  --color-schedule-band-4-text: var(--color-amber-300);
+  --color-schedule-band-5-bg: color-mix(in srgb, var(--color-indigo-500) 22%, transparent);
+  --color-schedule-band-5-text: var(--color-indigo-300);
+  --color-schedule-band-6-bg: color-mix(in srgb, var(--color-cyan-500) 22%, transparent);
+  --color-schedule-band-6-text: var(--color-cyan-300);
+
+  /* Solid stays saturated in dark too — it is the one thing on the chart that
+     must not recede. A step lighter than light mode so it lifts off the dark
+     surface instead of sinking into it. */
+  --color-schedule-band-1-solid-bg: var(--color-blue-500);
+  --color-schedule-band-1-border: var(--color-blue-400);
+  --color-schedule-band-2-solid-bg: var(--color-purple-500);
+  --color-schedule-band-2-border: var(--color-purple-400);
+  --color-schedule-band-3-solid-bg: var(--color-teal-500);
+  --color-schedule-band-3-border: var(--color-teal-400);
+  --color-schedule-band-4-solid-bg: var(--color-amber-500);
+  --color-schedule-band-4-border: var(--color-amber-400);
+  --color-schedule-band-5-solid-bg: var(--color-indigo-500);
+  --color-schedule-band-5-border: var(--color-indigo-400);
+  --color-schedule-band-6-solid-bg: var(--color-cyan-500);
+  --color-schedule-band-6-border: var(--color-cyan-400);
+  --color-schedule-band-solid-text: var(--color-white);
+
+  --color-schedule-gap-bg: color-mix(in srgb, var(--color-error-500) 15%, transparent);
+  --color-schedule-gap-border: var(--color-error-400);
+  --color-schedule-gap-text: var(--color-error-300);
+
   /* Misc dark overrides. */
   --color-cancel-query-bg: #7a3838;
   --color-highlight-bg: #747474;

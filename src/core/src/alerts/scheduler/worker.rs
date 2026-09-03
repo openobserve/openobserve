@@ -49,6 +49,13 @@ pub struct ModuleSchedulerConfig {
     pub concurrency: i64,
     /// Poll cadence for this module's puller, in seconds.
     pub poll_interval_secs: u64,
+    /// How long a row this lane claims may be held before `watch_timeout` hands it to another
+    /// node, in seconds. `None` keeps the shared `ZO_ALERT_SCHEDULE_TIMEOUT`.
+    ///
+    /// Only meaningful on a module-filtered lane: every row such a lane pulls belongs to its own
+    /// module, so the lease it asks for applies to that module alone. The shared lane pulls a mix
+    /// and has no such freedom.
+    pub lease_timeout_secs: Option<i64>,
 }
 
 /// Scheduler worker for processing triggers
@@ -483,42 +490,77 @@ impl SchedulerLane {
 
 impl Scheduler {
     /// Build the scheduler from the base config, honoring `ZO_SCHEDULER_PER_MODULE_PULLERS`.
-    /// When the flag is off, a single shared lane handles all modules (legacy behavior).
+    ///
+    /// With the flag on, every module gets its own lane. With it off the legacy shared lane
+    /// handles the mix — plus whatever [`always_on_module_configs`] says cannot be shared. That
+    /// second half is the point: the flag is off by default, so a lane that only exists behind it
+    /// does not exist in any deployment nobody has tuned.
     pub fn new(config: SchedulerConfig) -> Self {
         let cfg = config::get_config();
-        let module_configs = if cfg.limit.scheduler_per_module_pullers {
-            resolve_module_configs(&cfg, &config)
+        if cfg.limit.scheduler_per_module_pullers {
+            Self::new_with_modules(config.clone(), resolve_module_configs(&cfg, &config))
         } else {
-            Vec::new()
-        };
-        Self::new_with_modules(config, module_configs)
+            Self::new_with_shared_and_modules(
+                config.clone(),
+                always_on_module_configs(&cfg, &config),
+            )
+        }
     }
 
     /// Build the scheduler from an explicit set of per-module configs. An empty `module_configs`
-    /// yields the single shared (legacy) lane; otherwise one lane per module. Kept
-    /// separate from [`Scheduler::new`] so both paths are unit-testable without env mutation.
+    /// yields the single shared (legacy) lane; otherwise one lane per module and no shared lane.
+    /// Kept separate from [`Scheduler::new`] so both paths are unit-testable without env mutation.
     pub fn new_with_modules(
         config: SchedulerConfig,
         module_configs: Vec<ModuleSchedulerConfig>,
     ) -> Self {
-        let lanes: Vec<SchedulerLane> = if module_configs.is_empty() {
-            vec![SchedulerLane::new(
+        let with_shared_lane = module_configs.is_empty();
+        Self::build(config, module_configs, with_shared_lane)
+    }
+
+    /// Build the shared (legacy) lane *and* a dedicated lane for each of `module_configs`.
+    ///
+    /// The shared lane still pulls every module, so a module named here is pulled by two lanes.
+    /// That is safe rather than merely tolerable: `pull` claims rows inside one transaction under
+    /// a per-module advisory lock and flips their status in the same statement, so exactly one
+    /// lane ever gets a given row. What the dedicated lane buys is a channel and a worker pool
+    /// that nothing else can fill — its rows get claimed on their own cadence even while the
+    /// shared lane's whole budget is going to a backlog of something else.
+    pub fn new_with_shared_and_modules(
+        config: SchedulerConfig,
+        module_configs: Vec<ModuleSchedulerConfig>,
+    ) -> Self {
+        Self::build(config, module_configs, true)
+    }
+
+    fn build(
+        config: SchedulerConfig,
+        module_configs: Vec<ModuleSchedulerConfig>,
+        with_shared_lane: bool,
+    ) -> Self {
+        let mut lanes: Vec<SchedulerLane> = Vec::with_capacity(module_configs.len() + 1);
+        if with_shared_lane {
+            lanes.push(SchedulerLane::new(
                 None,
                 config.alert_schedule_concurrency,
                 config.clone(),
-            )]
-        } else {
-            module_configs
-                .into_iter()
-                .map(|mc| {
-                    // Per-module config: override the LIMIT/worker budget and the poll cadence.
-                    let mut module_cfg = config.clone();
-                    module_cfg.alert_schedule_concurrency = mc.concurrency;
-                    module_cfg.poll_interval_secs = mc.poll_interval_secs;
-                    SchedulerLane::new(Some(mc.module), mc.concurrency, module_cfg)
-                })
-                .collect()
-        };
+            ));
+        }
+        for mc in module_configs {
+            // Per-module config: override the LIMIT/worker budget, the poll cadence, and — where
+            // the module asked for one — the lease it takes on the rows it claims.
+            let mut module_cfg = config.clone();
+            module_cfg.alert_schedule_concurrency = mc.concurrency;
+            module_cfg.poll_interval_secs = mc.poll_interval_secs;
+            if let Some(secs) = mc.lease_timeout_secs {
+                module_cfg.alert_schedule_timeout = secs;
+            }
+            lanes.push(SchedulerLane::new(
+                Some(mc.module),
+                mc.concurrency,
+                module_cfg,
+            ));
+        }
 
         // Flattened view of every lane's workers (introspection/tests).
         let workers = lanes
@@ -607,6 +649,7 @@ fn resolve_module_configs(
             // (ZO_ALERT_SCHEDULE_CONCURRENCY / ZO_ALERT_SCHEDULE_INTERVAL), so no dedicated vars.
             concurrency: default_concurrency,
             poll_interval_secs: default_interval,
+            lease_timeout_secs: None,
         },
         ModuleSchedulerConfig {
             module: TriggerModule::CompositeAlert,
@@ -614,16 +657,19 @@ fn resolve_module_configs(
             // cadence (§9.4); it has no dedicated concurrency/interval vars.
             concurrency: default_concurrency,
             poll_interval_secs: default_interval,
+            lease_timeout_secs: None,
         },
         ModuleSchedulerConfig {
             module: TriggerModule::Report,
             concurrency: pick_concurrency(cfg.limit.scheduler_report_concurrency),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_report_interval),
+            lease_timeout_secs: None,
         },
         ModuleSchedulerConfig {
             module: TriggerModule::DerivedStream,
             concurrency: pick_concurrency(cfg.limit.scheduler_derived_stream_concurrency),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_derived_stream_interval),
+            lease_timeout_secs: None,
         },
         ModuleSchedulerConfig {
             module: TriggerModule::Backfill,
@@ -631,16 +677,19 @@ fn resolve_module_configs(
             // cadence.
             concurrency: std::cmp::max(1, cfg.limit.scheduler_backfill_concurrency),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_backfill_interval),
+            lease_timeout_secs: None,
         },
         ModuleSchedulerConfig {
             module: TriggerModule::AnomalyDetection,
             concurrency: pick_concurrency(cfg.limit.scheduler_anomaly_concurrency),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_anomaly_interval),
+            lease_timeout_secs: None,
         },
         ModuleSchedulerConfig {
             module: TriggerModule::Slo,
             concurrency: pick_concurrency(cfg.limit.scheduler_slo_concurrency),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_slo_interval),
+            lease_timeout_secs: None,
         },
         ModuleSchedulerConfig {
             // Its own lane on purpose: a bulk historical scan sharing a
@@ -648,13 +697,121 @@ fn resolve_module_configs(
             module: TriggerModule::SloBackfill,
             concurrency: std::cmp::max(1, cfg.limit.scheduler_slo_backfill_concurrency),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_slo_backfill_interval),
+            lease_timeout_secs: None,
         },
+        oncall_module_config(cfg, base),
         ModuleSchedulerConfig {
             module: TriggerModule::QueryRecommendations,
             concurrency: pick_concurrency(cfg.limit.scheduler_query_reco_concurrency),
             poll_interval_secs: pick_interval(cfg.limit.scheduler_query_reco_interval),
+            lease_timeout_secs: None,
         },
     ]
+}
+
+/// The lanes that exist even when `ZO_SCHEDULER_PER_MODULE_PULLERS` is off.
+///
+/// Every other module degrades to "late" when it shares a lane; that is a nuisance and a flag is
+/// the right way to buy your way out of it. On-call escalation degrades to "nobody was woken up".
+/// A rung that says five minutes has to fire in five minutes, and a paging timer sitting behind a
+/// thousand queued alert evaluations does not — which is exactly what the lane's own comment in
+/// [`resolve_module_configs`] says must never happen. So this one is not behind the flag: a
+/// deployment nobody has tuned is precisely the deployment where the promise still has to hold.
+///
+/// Nothing else joins it. Widening this list would flip the default lane topology for modules
+/// whose owners chose the shared lane, which is not a decision on-call gets to make for them.
+fn always_on_module_configs(
+    cfg: &config::Config,
+    base: &SchedulerConfig,
+) -> Vec<ModuleSchedulerConfig> {
+    if oncall_lane_wanted() {
+        vec![oncall_module_config(cfg, base)]
+    } else {
+        // Nothing pushes an escalation trigger when the feature is off, so a puller for it would
+        // be a query per interval per node against rows that cannot exist.
+        Vec::new()
+    }
+}
+
+/// Whether this build, so configured, can produce escalation triggers at all.
+#[cfg(feature = "enterprise")]
+fn oncall_lane_wanted() -> bool {
+    o2_enterprise::enterprise::common::config::get_config()
+        .oncall
+        .enabled
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn oncall_lane_wanted() -> bool {
+    false
+}
+
+/// The on-call escalation lane's budget, cadence and lease.
+///
+/// Two config vocabularies name the same numbers and both are documented, so both are honoured
+/// with a stated precedence rather than one of them silently losing: the generic scheduler var
+/// (`ZO_SCHEDULER_ONCALL_*`) wins when an operator sets it, because that is how every other
+/// module's lane is tuned and someone reaching for it means it; otherwise the feature's own
+/// `O2_ONCALL_ESCALATION_*`, which is the knob the on-call docs point at and the only one with a
+/// meaningful default; otherwise the shared scheduler defaults.
+fn oncall_module_config(cfg: &config::Config, base: &SchedulerConfig) -> ModuleSchedulerConfig {
+    ModuleSchedulerConfig {
+        // Its own lane so a paging timer is never queued behind an alert
+        // evaluation backlog: the whole point of an escalation delay is
+        // that it fires when it says it will.
+        module: TriggerModule::OncallEscalation,
+        concurrency: first_positive(&[
+            cfg.limit.scheduler_oncall_concurrency,
+            oncall_escalation_concurrency(),
+            base.alert_schedule_concurrency,
+        ]),
+        poll_interval_secs: first_positive(&[
+            cfg.limit.scheduler_oncall_interval,
+            base.poll_interval_secs as i64,
+        ]) as u64,
+        // A lease is only overridable on a module-filtered lane, and this is one. An escalation
+        // tick is a handful of DB reads and N sends, so it does not need the alert lane's budget;
+        // shortening it is how a node that died mid-dispatch gets its rung retried sooner.
+        lease_timeout_secs: match oncall_escalation_timeout_secs() {
+            secs if secs > 0 => Some(secs),
+            _ => None,
+        },
+    }
+}
+
+/// First value greater than zero, treating zero as "inherit the next one down". The last entry is
+/// the floor and is assumed already sane; `SchedulerLane::new` clamps to at least one worker
+/// regardless.
+fn first_positive(candidates: &[i64]) -> i64 {
+    candidates
+        .iter()
+        .copied()
+        .find(|v| *v > 0)
+        .unwrap_or_else(|| candidates.last().copied().unwrap_or(1))
+}
+
+#[cfg(feature = "enterprise")]
+fn oncall_escalation_concurrency() -> i64 {
+    o2_enterprise::enterprise::common::config::get_config()
+        .oncall
+        .escalation_concurrency
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn oncall_escalation_concurrency() -> i64 {
+    0
+}
+
+#[cfg(feature = "enterprise")]
+fn oncall_escalation_timeout_secs() -> i64 {
+    o2_enterprise::enterprise::common::config::get_config()
+        .oncall
+        .escalation_timeout_secs
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn oncall_escalation_timeout_secs() -> i64 {
+    0
 }
 
 #[cfg(test)]
@@ -732,11 +889,13 @@ mod tests {
                 module: TriggerModule::Alert,
                 concurrency: 4,
                 poll_interval_secs: 10,
+                lease_timeout_secs: None,
             },
             ModuleSchedulerConfig {
                 module: TriggerModule::Backfill,
                 concurrency: 1,
                 poll_interval_secs: 30,
+                lease_timeout_secs: None,
             },
         ];
         let scheduler = Scheduler::new_with_modules(cfg, module_configs);
@@ -766,6 +925,7 @@ mod tests {
             module: TriggerModule::Report,
             concurrency: 0,
             poll_interval_secs: 10,
+            lease_timeout_secs: None,
         }];
         let scheduler = Scheduler::new_with_modules(cfg, module_configs);
         assert_eq!(scheduler.lanes.len(), 1);
@@ -789,10 +949,19 @@ mod tests {
         // never be pulled once per-module pullers are enabled.
         let cfg = config::Config::default();
         let configs = resolve_module_configs(&cfg, &make_config());
-        assert_eq!(configs.len(), 9);
+        // Ten, and the list below is the authority: the count trailed the
+        // modules when `CompositeAlert` and `OncallEscalation` arrived from
+        // different branches, so it is asserted against the same number the
+        // loop walks rather than a literal somebody has to remember to bump.
+        let expected = 10;
+        assert_eq!(configs.len(), expected);
         let modules: std::collections::HashSet<_> =
             configs.iter().map(|c| c.module.clone()).collect();
-        assert_eq!(modules.len(), 9, "duplicate module in resolved configs");
+        assert_eq!(
+            modules.len(),
+            expected,
+            "duplicate module in resolved configs"
+        );
         for m in [
             TriggerModule::Alert,
             TriggerModule::CompositeAlert,
@@ -803,6 +972,7 @@ mod tests {
             TriggerModule::QueryRecommendations,
             TriggerModule::Slo,
             TriggerModule::SloBackfill,
+            TriggerModule::OncallEscalation,
         ] {
             assert!(modules.contains(&m), "missing module {m:?}");
         }
@@ -816,6 +986,9 @@ mod tests {
         let cfg = config::Config::default();
         let configs = resolve_module_configs(&cfg, &base);
 
+        // On-call is excluded: it inherits the base only after its own
+        // `O2_ONCALL_ESCALATION_CONCURRENCY` has had its say, which
+        // `test_oncall_lane_prefers_the_scheduler_var_then_the_feature_var` covers.
         for m in [
             TriggerModule::Alert,
             TriggerModule::CompositeAlert,
@@ -936,5 +1109,160 @@ mod tests {
             10,
             "query_reco with 0 inherits the alert pull frequency"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // On-call lane (F-23): a paging timer must not share the alert lane in a
+    // deployment nobody has tuned.
+    // -----------------------------------------------------------------------
+
+    /// The shared lane keeps every module, and the named modules get one more lane each. This is
+    /// the shape a stock deployment now runs: legacy behaviour for everything, plus a lane whose
+    /// rows can be claimed while the shared lane is busy.
+    #[test]
+    fn test_shared_and_modules_builds_both_kinds_of_lane() {
+        let cfg = make_config();
+        let scheduler = Scheduler::new_with_shared_and_modules(
+            cfg.clone(),
+            vec![ModuleSchedulerConfig {
+                module: TriggerModule::OncallEscalation,
+                concurrency: 2,
+                poll_interval_secs: 5,
+                lease_timeout_secs: Some(45),
+            }],
+        );
+        assert_eq!(scheduler.lanes.len(), 2);
+        assert_eq!(
+            scheduler
+                .workers
+                .iter()
+                .filter(|w| w.module.is_none())
+                .count(),
+            cfg.alert_schedule_concurrency as usize,
+            "the shared lane must keep its full worker pool"
+        );
+        assert_eq!(
+            scheduler
+                .workers
+                .iter()
+                .filter(|w| w.module == Some(TriggerModule::OncallEscalation))
+                .count(),
+            2
+        );
+    }
+
+    /// A lane-level lease override has to reach the puller, since that is what `pull` binds as
+    /// the row's `end_time`. Setting it on the struct and dropping it on the floor would look
+    /// exactly like honouring it.
+    #[test]
+    fn test_lease_timeout_override_reaches_the_lane() {
+        let cfg = make_config(); // alert_schedule_timeout 60
+        let scheduler = Scheduler::new_with_modules(
+            cfg,
+            vec![
+                ModuleSchedulerConfig {
+                    module: TriggerModule::OncallEscalation,
+                    concurrency: 1,
+                    poll_interval_secs: 5,
+                    lease_timeout_secs: Some(45),
+                },
+                ModuleSchedulerConfig {
+                    module: TriggerModule::Alert,
+                    concurrency: 1,
+                    poll_interval_secs: 10,
+                    lease_timeout_secs: None,
+                },
+            ],
+        );
+        let oncall = scheduler
+            .lanes
+            .iter()
+            .find(|l| l.job_puller.module == Some(TriggerModule::OncallEscalation))
+            .expect("on-call lane");
+        assert_eq!(oncall.job_puller.config.alert_schedule_timeout, 45);
+
+        let alert = scheduler
+            .lanes
+            .iter()
+            .find(|l| l.job_puller.module == Some(TriggerModule::Alert))
+            .expect("alert lane");
+        assert_eq!(
+            alert.job_puller.config.alert_schedule_timeout, 60,
+            "a lane that asked for no override keeps ZO_ALERT_SCHEDULE_TIMEOUT"
+        );
+    }
+
+    /// `ZO_SCHEDULER_ONCALL_CONCURRENCY` is the generic per-module knob and wins when set;
+    /// `O2_ONCALL_ESCALATION_CONCURRENCY` is the feature's own and is the fallback. Both are
+    /// documented, so neither may be silently ignored — which is the defect this pins.
+    #[test]
+    fn test_oncall_lane_prefers_the_scheduler_var_then_the_feature_var() {
+        let base = make_config(); // alert concurrency 3
+        let mut cfg = config::Config::default();
+        cfg.limit.scheduler_oncall_concurrency = 9;
+        assert_eq!(
+            oncall_module_config(&cfg, &base).concurrency,
+            9,
+            "an explicitly set scheduler var wins"
+        );
+
+        cfg.limit.scheduler_oncall_concurrency = 0;
+        let inherited = oncall_module_config(&cfg, &base).concurrency;
+        let feature_default = oncall_escalation_concurrency();
+        if feature_default > 0 {
+            assert_eq!(
+                inherited, feature_default,
+                "with the scheduler var unset, the feature's own knob decides"
+            );
+        } else {
+            assert_eq!(
+                inherited, base.alert_schedule_concurrency,
+                "with neither set, the shared scheduler default decides"
+            );
+        }
+    }
+
+    /// The timeout knob has no `ZO_SCHEDULER_*` twin, so it either reaches the lane or it does
+    /// nothing at all — which is the state this fix found it in.
+    #[test]
+    fn test_oncall_lease_timeout_tracks_the_feature_knob() {
+        let cfg = config::Config::default();
+        let resolved = oncall_module_config(&cfg, &make_config()).lease_timeout_secs;
+        let declared = oncall_escalation_timeout_secs();
+        if declared > 0 {
+            assert_eq!(resolved, Some(declared));
+        } else {
+            assert_eq!(
+                resolved, None,
+                "no declared timeout means the shared one is left alone"
+            );
+        }
+    }
+
+    /// An OSS build has no escalation engine, so the extra lane would poll for rows that cannot
+    /// exist. The enterprise arm is covered by the toggle's own default being off.
+    #[test]
+    fn test_always_on_lane_is_empty_when_oncall_cannot_page() {
+        let cfg = config::Config::default();
+        let base = make_config();
+        if !oncall_lane_wanted() {
+            assert!(always_on_module_configs(&cfg, &base).is_empty());
+        } else {
+            let lanes = always_on_module_configs(&cfg, &base);
+            assert_eq!(lanes.len(), 1, "on-call gets a lane, and only on-call");
+            assert_eq!(lanes[0].module, TriggerModule::OncallEscalation);
+        }
+    }
+
+    #[test]
+    fn test_first_positive_walks_down_to_the_floor() {
+        assert_eq!(first_positive(&[5, 7, 3]), 5);
+        assert_eq!(first_positive(&[0, 7, 3]), 7);
+        assert_eq!(first_positive(&[0, 0, 3]), 3);
+        // A negative reads as "unset", not as a budget.
+        assert_eq!(first_positive(&[-1, 0, 3]), 3);
+        // Everything unset falls back to the last candidate even when it is not positive; the
+        // lane clamps to one worker, so this cannot produce a lane with none.
+        assert_eq!(first_positive(&[0, 0, 0]), 0);
     }
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { BadgeProps, BadgeEmits, BadgeSlots } from "./OBadge.types";
 import { computed, useSlots } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "../Icon/OIcon.vue";
 import { iconRegistry } from "../Icon/OIcon.icons";
 
@@ -13,6 +14,7 @@ const props = withDefaults(defineProps<BadgeProps>(), {
   dot: false,
   clickable: false,
   disabled: false,
+  removable: false,
 });
 
 const emit = defineEmits<BadgeEmits>();
@@ -20,6 +22,7 @@ const emit = defineEmits<BadgeEmits>();
 defineSlots<BadgeSlots>();
 
 const slots = useSlots();
+const { t } = useI18nTyped();
 
 /** True when the left icon area should render (slot OR icon prop). */
 const hasIcon = computed(() => !!slots.icon || !!props.icon);
@@ -39,8 +42,11 @@ const hasTrailing = computed(() => {
   return true;
 });
 
-/** Render as <button> when interactive so keyboard + disabled work natively. */
-const tag = computed(() => (props.clickable ? "button" : "span"));
+/** Render as <button> when interactive so keyboard + disabled work natively.
+ *  A removable chip stays a <span> even when clickable — the ✕ is a nested
+ *  button, and a button inside a button is invalid markup that browsers repair
+ *  by hoisting the inner one out of the chip. */
+const tag = computed(() => (props.clickable && !props.removable ? "button" : "span"));
 
 // ── Variant class map ─────────────────────────────────────────────────────
 // Each entry is a complete token-based class string. No inline colours.
@@ -242,6 +248,14 @@ function handleKeydown(e: KeyboardEvent): void {
     emit("click", e);
   }
 }
+
+// The ✕ lives inside a `clickable` badge, so its click must not also read as a
+// click on the badge itself.
+function handleRemove(e: MouseEvent): void {
+  if (props.disabled) return;
+  e.stopPropagation();
+  emit("remove", e);
+}
 </script>
 
 <template>
@@ -297,5 +311,28 @@ function handleKeydown(e: KeyboardEvent): void {
     >
       <slot name="trailing">{{ count }}</slot>
     </span>
+
+    <!--
+      Remove affordance — a real focusable control, no divider (a chip's ✕ is
+      part of the chip, not a second segment). `type=button` matters: a chip
+      inside an OForm must not submit it.
+    -->
+    <button
+      v-if="removable"
+      type="button"
+      :disabled="disabled || undefined"
+      :aria-label="removeLabel ?? t('common.remove')"
+      :class="[
+        '-me-0.5 ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center',
+        'rounded-full p-0.5 opacity-70',
+        'hover:bg-current/15 hover:opacity-100',
+        'focus-visible:ring-badge-focus-ring focus-visible:ring-2 focus-visible:outline-none',
+        'disabled:pointer-events-none disabled:opacity-40',
+      ]"
+      data-test="o2-badge-remove"
+      @click="handleRemove"
+    >
+      <OIcon name="close" size="xs" />
+    </button>
   </component>
 </template>

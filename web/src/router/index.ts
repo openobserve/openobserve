@@ -83,10 +83,12 @@ export default function (store: any) {
     // are module-scope, so translating where a route is declared would freeze the
     // tab title at whatever locale happened to be active at import time. Resolving
     // here — per navigation — keeps it in the current locale. `gt` (not `t`)
-    // because a navigation guard runs outside any component setup.
-    if (to.meta && to.meta.titleKey) {
+    // because a navigation guard runs outside any component setup. `title` is the
+    // English literal fallback the routes not yet migrated to `titleKey` still carry.
+    const routeTitle = to.meta?.titleKey ? gt(to.meta.titleKey) : to.meta?.title;
+    if (routeTitle) {
       // The brand prefix is a product noun, never translated; the page name is.
-      document.title = `OpenObserve - ${gt(to.meta.titleKey)}`;
+      document.title = `OpenObserve - ${routeTitle}`;
     } else {
       document.title = "OpenObserve";
     }

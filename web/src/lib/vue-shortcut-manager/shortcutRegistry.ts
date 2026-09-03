@@ -103,6 +103,10 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.alertIncidents",
     ],
   },
+  {
+    titleKey: "shortcuts.modules.oncall",
+    pages: ["shortcuts.pages.oncall", "shortcuts.pages.oncallDetail"],
+  },
   { titleKey: "shortcuts.modules.streams", pages: ["shortcuts.pages.streams"] },
   {
     titleKey: "shortcuts.modules.pipelines",
@@ -732,6 +736,34 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
         key: "r",
         descriptionKey: "shortcuts.actions.alertIncidentsRefresh",
       },
+    ],
+  },
+
+  // ── On-Call: the list screens ───────────────────────────────────────────
+  // One scope for Pages / My on-call / Teams / Routing. A page registers only
+  // the ids it actually handles, so sharing the scope costs nothing and lets
+  // `r` mean "refresh this list" everywhere in the module.
+  {
+    pageKey: "shortcuts.pages.oncall",
+    scope: "oncall",
+    shortcuts: [
+      { id: "oncallRefresh", key: "r", descriptionKey: "shortcuts.actions.oncallRefresh" },
+      { id: "oncallSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { id: "oncallNewTeam", key: "n", descriptionKey: "shortcuts.actions.oncallNewTeam" },
+    ],
+  },
+
+  // ── On-Call: one page ───────────────────────────────────────────────────
+  // Its own scope: `r` on a record would mean something different from `r` on
+  // a list, and `shift+r` must not be shadowed by the list's refresh.
+  {
+    pageKey: "shortcuts.pages.oncallDetail",
+    scope: "oncall-detail",
+    shortcuts: [
+      { id: "oncallAck", key: "a", descriptionKey: "shortcuts.actions.oncallAck" },
+      { id: "oncallEscalate", key: "e", descriptionKey: "shortcuts.actions.oncallEscalate" },
+      { id: "oncallSnooze", key: "s", descriptionKey: "shortcuts.actions.oncallSnooze" },
+      { id: "oncallResolve", key: "shift+r", descriptionKey: "shortcuts.actions.oncallResolve" },
     ],
   },
 

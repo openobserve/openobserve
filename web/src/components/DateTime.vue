@@ -103,19 +103,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabPanels v-model="selectedType" animated>
             <OTabPanel v-if="!disableRelative" name="relative">
               <div class="date-time-table relative flex flex-col">
+                <div class="border-border-default border-b px-3 py-2">
+                  <OSearchInput v-model="relativeSearchTerm" data-test="date-time-relative-search" />
+                </div>
+                <div
+                  v-if="filteredRelativePeriods.length === 0"
+                  class="text-text-secondary px-3 py-4 text-center text-sm"
+                >
+                  {{ t("common.noMatchingRelativePresets") }}
+                </div>
                 <div
                   class="relative-row border-border-default flex items-center border-b py-2 pl-3 [&>*]:mr-1.5"
-                  v-for="(period, index) in relativePeriods"
+                  v-for="(period, index) in filteredRelativePeriods"
                   :key="'date_' + index"
                 >
                   <div class="min-w-18.75 text-sm font-semibold">
                     {{ period.label }}
                   </div>
-                  <div v-for="(item, item_index) in relativeDates[period.value]" :key="item">
+                  <div v-for="(item, item_index) in visibleRelativeItems(period)" :key="item">
                     <OButton
                       :disabled="
-                        relativeDatesInHour[period.value][item_index] >
-                          queryRangeRestrictionInHour && queryRangeRestrictionInHour > 0
+                        relativeItemHours(period.value, item) > queryRangeRestrictionInHour &&
+                        queryRangeRestrictionInHour > 0
                       "
                       :data-test="`date-time-relative-${item}-${period.value}-btn`"
                       class="h-8! w-8! font-bold! disabled:opacity-35"
@@ -134,8 +143,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ item }}
                       <OTooltip
                         v-if="
-                          relativeDatesInHour[period.value][item_index] >
-                            queryRangeRestrictionInHour && queryRangeRestrictionInHour > 0
+                          relativeItemHours(period.value, item) > queryRangeRestrictionInHour &&
+                          queryRangeRestrictionInHour > 0
                         "
                         side="right"
                         align="center"
@@ -293,6 +302,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
@@ -337,6 +347,7 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OInput,
+    OSearchInput,
     OSelect,
     OTime,
     ODateRangeCalendar,
@@ -518,6 +529,26 @@ export default defineComponent({
       w: 0,
       M: 0,
     });
+
+    // Filters the relative-preset grid so the picker matches every other
+    // searchable list in the app, rather than only the nested unit/timezone
+    // selects. A period row stays visible either its label matches or one of
+    // its preset values does; only the matching values render within it.
+    const relativeSearchTerm = ref("");
+
+    const visibleRelativeItems = (period: { label: string; value: string }) => {
+      const items = relativeDates[period.value] || [];
+      const query = relativeSearchTerm.value.trim().toLowerCase();
+      if (!query || period.label.toLowerCase().includes(query)) return items;
+      return items.filter((item) => String(item).includes(query));
+    };
+
+    const filteredRelativePeriods = computed(() =>
+      relativePeriods.filter((period) => visibleRelativeItems(period).length > 0),
+    );
+
+    const relativeItemHours = (periodValue: string, item: number) =>
+      relativeDatesInHour[periodValue][relativeDates[periodValue].indexOf(item)];
 
     const periodUnits = ["s", "m", "h", "d", "w", "M"];
 
@@ -1329,6 +1360,10 @@ export default defineComponent({
       setRelativeDate,
       relativePeriods,
       relativeDates,
+      relativeSearchTerm,
+      visibleRelativeItems,
+      filteredRelativePeriods,
+      relativeItemHours,
       saveDate,
       onBeforeShow,
       selectedType,

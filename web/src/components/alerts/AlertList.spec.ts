@@ -25,6 +25,10 @@ vi.mock("@/aws-exports", () => ({
 }));
 
 // Mock services before importing component (follow reference style)
+vi.mock("@/services/oncall", () => ({
+  default: { listTeams: vi.fn().mockResolvedValue({ data: [{ id: "t1", name: "Payments" }] }) },
+}));
+
 vi.mock("@/services/alerts", () => ({
   default: {
     listByFolderId: vi.fn(),
@@ -1616,4 +1620,43 @@ describe("AlertList - ODialog/ODrawer migration", () => {
       expect(row.groups_observed).toBeUndefined();
     });
   }, 15000);
+});
+
+/// The payoff of ownership routing is being able to see, from the alerts list,
+/// which team each rule pages. Only an alert that NAMES a team can be answered
+/// here — see the column comment in AlertList.vue.
+describe("AlertList - on-call owner column", () => {
+  afterEach(() => {
+    delete (store.state as any).zoConfig.oncall_enabled;
+  });
+
+  it("is absent on a build with on-call switched off", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    expect(wrapper.vm.columns.map((c: any) => c.id)).not.toContain("oncall_team");
+  });
+
+  it("appears once on-call is enabled", async () => {
+    (store.state as any).zoConfig.oncall_enabled = true;
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    expect(wrapper.vm.columns.map((c: any) => c.id)).toContain("oncall_team");
+  });
+
+  // The alert stores an id; a woken engineer needs the name.
+  it("renders the team's name rather than its id", async () => {
+    (store.state as any).zoConfig.oncall_enabled = true;
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    expect(String(wrapper.vm.oncallTeamName("t1"))).toBe("Payments");
+  });
+
+  /// An unreadable team list must not blank the cell: an opaque id still says
+  /// "this alert names a team", which an empty cell would deny.
+  it("falls back to the id when the team is unknown", async () => {
+    (store.state as any).zoConfig.oncall_enabled = true;
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    expect(String(wrapper.vm.oncallTeamName("t_gone"))).toBe("t_gone");
+  });
 });

@@ -15,7 +15,7 @@
 
 use axum::{
     Json,
-    extract::{FromRequestParts, OptionalFromRequestParts},
+    extract::{FromRequest, FromRequestParts, OptionalFromRequestParts, Request},
     http::{StatusCode, header::HeaderMap, request::Parts},
     response::{IntoResponse, Response},
 };
@@ -90,6 +90,54 @@ fn deserialize_headers<T: DeserializeOwned>(headers: &HeaderMap) -> Result<T, St
         log::warn!("Header deserialization error: {e}");
         "Invalid request".to_string()
     })
+}
+
+/// Wrapper around [`axum::Json`] whose rejection is JSON-shaped like the rest
+/// of the API, rather than axum's default plain-text rejection body.
+///
+/// A handler using plain `axum::Json<T>` looks identical until a caller sends
+/// a body that fails to deserialize: axum answers that with a `text/plain`
+/// rejection before the handler ever runs, so callers that assume every error
+/// response carries a `message` field (as every handler-level error in this
+/// API does) see nothing recognizable. This wrapper closes that gap by giving
+/// the extraction failure the same `{"code", "message"}` shape.
+pub struct ValidatedJson<T>(pub T);
+
+/// Rejection type for [`ValidatedJson`].
+pub struct ValidatedJsonRejection {
+    status: StatusCode,
+    message: String,
+}
+
+impl IntoResponse for ValidatedJsonRejection {
+    fn into_response(self) -> Response {
+        (
+            self.status,
+            Json(serde_json::json!({
+                "code": self.status.as_u16(),
+                "message": self.message
+            })),
+        )
+            .into_response()
+    }
+}
+
+impl<S, T> FromRequest<S> for ValidatedJson<T>
+where
+    T: DeserializeOwned,
+    S: Send + Sync,
+{
+    type Rejection = ValidatedJsonRejection;
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+        match Json::<T>::from_request(req, state).await {
+            Ok(Json(value)) => Ok(ValidatedJson(value)),
+            Err(rejection) => Err(ValidatedJsonRejection {
+                status: rejection.status(),
+                message: rejection.body_text(),
+            }),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -221,5 +269,76 @@ mod tests {
         assert_eq!(multi_headers.authorization, "Bearer token123");
         assert_eq!(multi_headers.content_type, "application/json");
         assert_eq!(multi_headers.accept, "*/*");
+    }
+
+    /// The bug this extractor exists for: a body that fails to deserialize is
+    /// rejected by axum *before the handler runs*, so no handler-level error
+    /// mapping can reach it. It answered `text/plain`, and a client reading
+    /// `message` from every other error in this API saw nothing — which is
+    /// exactly what "Request failed with status code 422" was.
+    #[tokio::test]
+    async fn test_a_malformed_body_is_rejected_as_json_not_text() {
+        #[derive(serde::Deserialize)]
+        struct Body {
+            #[allow(dead_code)]
+            name: String,
+        }
+
+        let req = Request::builder()
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(axum::body::Body::from(r#"{"nope":1}"#))
+            .unwrap();
+
+        let rejection = ValidatedJson::<Body>::from_request(req, &())
+            .await
+            .err()
+            .expect("a body missing a required field must be rejected");
+        let response = rejection.into_response();
+
+        assert_eq!(
+            response
+                .headers()
+                .get(axum::http::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .map(|v| v.starts_with("application/json")),
+            Some(true),
+            "the rejection has to be JSON, or a client cannot read `message`"
+        );
+
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert!(body.get("code").is_some(), "no `code`: {body}");
+        // The reason, not just the status. "missing field `name`" is the whole
+        // point — the UI had a 422 and no way to learn which field.
+        let message = body["message"].as_str().unwrap_or_default();
+        assert!(
+            message.contains("name"),
+            "the message must name the field: {body}"
+        );
+    }
+
+    /// A well-formed body still arrives as the deserialized value — the wrapper
+    /// changes the failure path only.
+    #[tokio::test]
+    async fn test_a_valid_body_still_extracts() {
+        #[derive(serde::Deserialize)]
+        struct Body {
+            name: String,
+        }
+
+        let req = Request::builder()
+            .method("POST")
+            .header("content-type", "application/json")
+            .body(axum::body::Body::from(r#"{"name":"apac"}"#))
+            .unwrap();
+
+        let ValidatedJson(body) = ValidatedJson::<Body>::from_request(req, &())
+            .await
+            .ok()
+            .expect("a valid body must extract");
+        assert_eq!(body.name, "apac");
     }
 }

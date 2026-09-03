@@ -64,6 +64,12 @@ const props = defineProps<{
   enableCellCopy?: boolean;
   /** Per-cell inline style function */
   getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
+  /**
+   * Contiguous row runs to render under headings. When set, the plain body
+   * iterates sections instead of `rows` — `rows` is still the flat
+   * concatenation, so nothing else has to branch on it.
+   */
+  sections?: { key: string; rows: Row<any>[] }[];
   /** Pivot row-field cell merge: returns hide flags for a merged cell. */
   getPivotMerge?: (
     row: any,
@@ -149,6 +155,50 @@ function getRowForIndex(index: number) {
 function getRowForItem(item: any): Row<any> {
   return rowByOriginal.value.get(item) ?? props.rows[0];
 }
+
+const sectioned = computed(() => !isVirtual() && !rowReorderEnabled.value && !!props.sections);
+
+/** A heading row or a data row, so the plain body renders both from one loop. */
+type BodyItem =
+  | { kind: "heading"; itemKey: string; sectionKey: string; rows: Row<any>[] }
+  | { kind: "row"; itemKey: string; row: Row<any> };
+
+/**
+ * The plain body's render list. Unsectioned, this is just the rows; sectioned,
+ * each run is preceded by its heading. Built as one list so the row markup is
+ * written once rather than duplicated under a second `v-for`.
+ */
+const plainBodyItems = computed<BodyItem[]>(() => {
+  if (!sectioned.value) {
+    return props.rows.map((row) => ({ kind: "row" as const, itemKey: row.id, row }));
+  }
+  const out: BodyItem[] = [];
+  for (const section of props.sections ?? []) {
+    // An empty section renders nothing at all — a heading over no rows reads as
+    // a load that failed rather than a state nothing is in.
+    if (!section.rows.length) continue;
+    out.push({
+      kind: "heading",
+      itemKey: `heading:${section.key}`,
+      sectionKey: section.key,
+      rows: section.rows,
+    });
+    for (const row of section.rows) out.push({ kind: "row", itemKey: row.id, row });
+  }
+  return out;
+});
+
+/**
+ * Columns a heading row has to span. Counted from the table rather than from a
+ * row, so a section whose rows are all filtered out still spans correctly.
+ */
+const headingColspan = computed(
+  () =>
+    props.table.getVisibleLeafColumns().length +
+    (props.expansionEnabled ? 1 : 0) +
+    (props.selectionEnabled ? 1 : 0) +
+    (props.enableRowReorder ? 1 : 0),
+);
 </script>
 
 <template>
@@ -213,21 +263,37 @@ function getRowForItem(item: any): Row<any> {
     </OTableBodyRow>
   </VueDraggableNext>
 
-  <!-- Normal (non-virtual, non-draggable) body -->
+  <!-- Normal (non-virtual, non-draggable) body. One loop over heading-or-row
+       items, so sectioned and unsectioned bodies share the row markup. -->
   <tbody v-else-if="!isVirtual()" data-test="o2-table-body">
+    <template v-for="item in plainBodyItems" :key="item.itemKey">
+    <!-- Spans every visible column: a heading is about the run below it, not
+         about one column. -->
+    <tr
+      v-if="item.kind === 'heading'"
+      :data-test="`o2-table-section-${item.sectionKey}`"
+      class="bg-surface-panel"
+    >
+      <td
+        :colspan="headingColspan"
+        :class="bordered ? 'border-table-row-divider border-b' : ''"
+      >
+        <slot name="group-header" :section-key="item.sectionKey" :rows="item.rows" />
+      </td>
+    </tr>
+
     <OTableBodyRow
-      v-for="row in rows"
-      :key="row.id"
-      :row="row"
+      v-else-if="item.kind === 'row'"
+      :row="item.row"
       :table="table"
       :clickable="clickable"
       :selection-enabled="selectionEnabled"
       :selection-multiple="selectionMultiple"
-      :is-row-selected="isRowSelectedFn?.(row.original)"
+      :is-row-selected="isRowSelectedFn?.(item.row.original)"
       :is-row-selectable="isRowSelectable"
       :expansion-enabled="expansionEnabled"
-      :can-expand="getRowExpansionEnabled ? getRowExpansionEnabled(row.original) : true"
-      :is-expanded="isExpandedFn?.(row.original)"
+      :can-expand="getRowExpansionEnabled ? getRowExpansionEnabled(item.row.original) : true"
+      :is-expanded="isExpandedFn?.(item.row.original)"
       :highlight-text="highlightText"
       :should-highlight-column="shouldHighlightColumn"
       :get-highlighted-html="getHighlightedHtml"
@@ -237,7 +303,7 @@ function getRowForItem(item: any): Row<any> {
       :striped="striped"
       :row-class-fn="rowClass"
       :row-style-fn="rowStyleFn"
-      :status-bar-color="getStatusBarColor?.(row.original)"
+      :status-bar-color="getStatusBarColor?.(item.row.original)"
       :enable-cell-copy="enableCellCopy"
       :get-cell-style="getCellStyle"
       :get-pivot-merge="getPivotMerge"
@@ -260,6 +326,7 @@ function getRowForItem(item: any): Row<any> {
         <slot name="expansion" v-bind="expSlotProps" />
       </template>
     </OTableBodyRow>
+    </template>
   </tbody>
 
   <!-- Virtual scroll body: rows stay in flow; top/bottom spacer rows

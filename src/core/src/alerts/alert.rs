@@ -569,8 +569,18 @@ async fn prepare_alert(
         });
     }
 
+    // Naming an on-call team IS naming somewhere for this to go. Paging is
+    // documented as additive to destinations, but the check only knew about
+    // destinations and workflows — so an alert whose whole purpose was to wake
+    // the owning team could not be saved without also nominating a webhook it
+    // did not want.
     #[cfg(feature = "enterprise")]
-    let destination_missing = alert.destinations.is_empty() && alert.workflows.is_empty();
+    let destination_missing = alert.destinations.is_empty()
+        && alert.workflows.is_empty()
+        && alert
+            .oncall_team
+            .as_deref()
+            .is_none_or(|t| t.trim().is_empty());
     #[cfg(not(feature = "enterprise"))]
     let destination_missing = alert.destinations.is_empty();
 

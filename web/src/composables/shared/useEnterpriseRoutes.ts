@@ -60,6 +60,26 @@ const workflowsRouteGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
+// On-call routes are gated on the backend /config flag `oncall_enabled`
+// (enterprise O2_ONCALL_ENABLED). Same `=== false` stance as synthetics above:
+// the flag is briefly undefined on a cold load, and bouncing a bookmarked page
+// home on "not yet known" is worse than a moment of empty state.
+const oncallRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.oncall_enabled === false) {
+    next("/");
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
+const OnCallTeams = () => import("@/views/OnCall/OnCallTeams.vue");
+const OnCallTeamDetail = () => import("@/views/OnCall/OnCallTeamDetail.vue");
+const OnCallResponses = () => import("@/views/OnCall/OnCallResponses.vue");
+const OnCallResponseDetail = () => import("@/views/OnCall/OnCallResponseDetail.vue");
+const OnCallRouting = () => import("@/views/OnCall/OnCallRouting.vue");
+const OnCallMine = () => import("@/views/OnCall/OnCallMine.vue");
+const OnCallPolicies = () => import("@/views/OnCall/OnCallPolicies.vue");
+
 const IdentityAccessManagement = () => import("@/views/IdentityAccessManagement.vue");
 
 const AppGroups = () => import("@/components/iam/groups/AppGroups.vue");
@@ -262,6 +282,92 @@ const useEnterpriseRoutes = () => {
   //the above are the routes that we support for oss including both enterprise and cloud
 
   if (config.isCloud == "true" || config.isEnterprise == "true") {
+    // Seven on-call routes, one guard, one gate expression. `titleKey` rather
+    // than `title` so the browser tab is translated like everything else.
+    routes.push(
+      {
+        path: "oncall/responses",
+        name: "onCallResponses",
+        component: OnCallResponses,
+        meta: { titleKey: "oncall.responsesTitle" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "oncall/responses/:responseId",
+        name: "onCallResponseDetail",
+        component: OnCallResponseDetail,
+        meta: { titleKey: "oncall.responseDetail" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+      {
+        // A page again. It was retired to a redirect for being a stub that
+        // hardcoded "You are not on an on-call team yet" without asking the
+        // server anything — but two endpoints exist that only make sense here:
+        // `my/teams` answers duty in one request instead of one per team, and
+        // `my/deliveries` is the only thing in the product that answers "did my
+        // phone actually ring", which no per-team screen can ask.
+        //
+        // "What needs somebody" still belongs to the Pages list; this page
+        // links to it narrowed rather than rendering a second copy.
+        path: "oncall/me",
+        name: "onCallMine",
+        component: OnCallMine,
+        meta: { titleKey: "oncall.mineTitle" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "oncall/teams",
+        name: "onCallTeams",
+        component: OnCallTeams,
+        meta: { titleKey: "oncall.teamsTitle" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+      {
+        // The tab is part of the URL, so a schedule somebody sends is the
+        // schedule the recipient lands on. Defaults to `schedule`.
+        //
+        // `escalation` and `routing` are what the tabs are CALLED; `policy` and
+        // `ownership` are what they were called when the routes were written,
+        // and links to them are already in Slack threads and setup checklists.
+        // Both are accepted, the view canonicalises to the visible word — a
+        // shared link and the tab it lands on should not use two vocabularies
+        // for one thing.
+        path: "oncall/teams/:teamId/:tab(overview|schedule|members|policy|escalation|ownership|routing)?",
+        name: "onCallTeamDetail",
+        component: OnCallTeamDetail,
+        meta: { titleKey: "oncall.teamDetail" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "oncall/policies",
+        name: "onCallPolicies",
+        component: OnCallPolicies,
+        meta: { titleKey: "oncall.policiesTitle" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "oncall/routing",
+        name: "onCallRouting",
+        component: OnCallRouting,
+        meta: { titleKey: "oncall.routingTitle" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+    );
+
     routes.push(
       {
         path: "incidents",

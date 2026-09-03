@@ -56,8 +56,8 @@ use {
     },
     openobserve_api_management::request::{
         ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
-        domain_management, eval_jobs, experiments, gen_ai, keys, license, playground, providers,
-        remote_tasks, score_configs, scorers, service_streams, workflows,
+        domain_management, eval_jobs, experiments, gen_ai, keys, license, oncall, playground,
+        providers, remote_tasks, score_configs, scorers, service_streams, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -682,6 +682,29 @@ pub fn basic_routes() -> Router {
         "/api/v2/{org_id}/alerts/charts/render",
         get(alerts::chart_render::render_chart),
     );
+
+    // On-call acknowledgement — the URL carries an HMAC-signed token verified
+    // inside the handler itself (never via auth_middleware), because the whole
+    // point is acknowledging from an email at 3am with no session. Like the
+    // chart endpoint above, it must stay in basic_routes.
+    //
+    // **Under `/api/v2/` for a routing reason, not a versioning one.** A router
+    // node merges these same routes alongside its catch-all proxy
+    // `/api/{*path}`, and axum refuses to register a parameter and a wildcard
+    // at the same position: `/api/{org_id}/...` beside `/api/{*path}` panics
+    // the process at startup, so every router pod crash-loops. A *static*
+    // second segment does not conflict, which is why the three sibling
+    // token-authenticated routes here — chart render and both incident webhooks
+    // — are all `/api/v2/...`. This one has to be too.
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().oncall.enabled {
+        // GET renders a confirmation page; only POST acknowledges, so a mail
+        // gateway prefetching the emailed link cannot take somebody's page.
+        router = router.route(
+            "/api/v2/{org_id}/oncall/ack",
+            get(oncall::ack_page).post(oncall::acknowledge),
+        );
+    }
 
     // External alert source webhooks — token-authenticated inside the handler itself
     // (never via auth_middleware), so these must stay in basic_routes rather than
@@ -1555,6 +1578,243 @@ pub fn service_routes() -> Router {
         }
     }
 
+    // On-call — all routes gated behind O2_ONCALL_ENABLED. When off,
+    // nothing is registered and every on-call path 404s.
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().oncall.enabled {
+        router = router
+            .route(
+                "/{org_id}/oncall/teams",
+                get(oncall::list_teams).post(oncall::create_team),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}",
+                get(oncall::get_team)
+                    .put(oncall::update_team)
+                    .delete(oncall::delete_team),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/members",
+                get(oncall::list_members)
+                    .post(oncall::add_member)
+                    .delete(oncall::remove_member),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/schedule",
+                get(oncall::get_schedule).put(oncall::set_schedule),
+            )
+            // §3b's four starting points. The catalogue is org-scoped
+            // only because everything under /oncall is — it is a compiled
+            // constant, and applying one is a full replace that goes out
+            // through the same write as PUT /schedule.
+            .route(
+                "/{org_id}/oncall/schedule-presets",
+                get(oncall::list_schedule_presets),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/schedule/from-preset",
+                post(oncall::apply_schedule_preset),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/on-call",
+                get(oncall::who_is_on_call),
+            )
+            // §5: "cover for me". A cover outranks every layer for its
+            // window, so it lives beside the schedule it stands over.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/overrides",
+                get(oncall::list_overrides).post(oncall::create_override),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/overrides/{override_id}",
+                delete(oncall::delete_override),
+            )
+            // §5a: "Ana is away 20 Aug – 3 Sep". Org-scoped rather than
+            // hung off a team, because being away is a fact about a
+            // person: somebody on two teams is away from both, and a
+            // per-team window is one somebody forgets to write twice.
+            .route(
+                "/{org_id}/oncall/unavailability",
+                get(oncall::list_unavailability).post(oncall::create_unavailability),
+            )
+            .route(
+                "/{org_id}/oncall/unavailability/{unavailability_id}",
+                delete(oncall::delete_unavailability),
+            )
+            // §3b: the resolved schedule, which is what a human reads
+            // instead of running the precedence rules in their head.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/resolved-schedule",
+                get(oncall::get_resolved_schedule),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/policy",
+                get(oncall::get_policy).put(oncall::set_policy),
+            )
+            // Where the team is talked to, as opposed to where its ladder
+            // pages. Its own route rather than a field on the policy: a
+            // team's chat room is not a property of its escalation ladder,
+            // and changing one should never mean opening the other.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/channel",
+                get(oncall::get_team_channel).put(oncall::set_team_channel),
+            )
+            // The four derived team reads the screens are built on.
+            // Nothing here is stored: a saved risk list argues with the
+            // configuration beside it the moment somebody fixes something.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/reachability",
+                get(oncall::get_team_reachability),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/config-risks",
+                get(oncall::list_team_config_risks),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/overview",
+                get(oncall::get_team_overview),
+            )
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/load",
+                get(oncall::get_team_load),
+            )
+            // "If a P1 fired right now" — a dry run, and free of side
+            // effects. `test-page` is the one that actually delivers.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/escalation-preview",
+                get(oncall::get_escalation_preview),
+            )
+            .route("/{org_id}/oncall/responses", get(oncall::list_responses))
+            .route(
+                "/{org_id}/oncall/responses/{response_id}",
+                get(oncall::get_response),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/resolve",
+                post(oncall::resolve_response),
+            )
+            .route(
+                "/{org_id}/oncall/ownership",
+                get(oncall::list_ownership_rules).post(oncall::create_ownership_rule),
+            )
+            // A sibling of the list rather than a widening of it: the
+            // counts cost a grouped read of the timeline, and the routing
+            // path's own list has to stay the cheap read it is.
+            .route(
+                "/{org_id}/oncall/ownership/stats",
+                get(oncall::list_ownership_rule_stats),
+            )
+            .route(
+                "/{org_id}/oncall/ownership/{rule_id}",
+                put(oncall::update_ownership_rule).delete(oncall::delete_ownership_rule),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/notes",
+                post(oncall::add_note),
+            )
+            .route(
+                "/{org_id}/oncall/incidents/{incident_id}/responses",
+                get(oncall::list_responses_for_incident),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/escalation",
+                get(oncall::get_escalation_progress),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/prior-causes",
+                get(oncall::get_prior_causes),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/acknowledge",
+                post(oncall::acknowledge_response),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/snooze",
+                post(oncall::snooze_response),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/handoff",
+                post(oncall::handoff_response),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/history",
+                get(oncall::get_response_history),
+            )
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/deliveries",
+                get(oncall::list_deliveries),
+            )
+            .route(
+                "/{org_id}/oncall/routing/config",
+                get(oncall::get_routing_config).put(oncall::set_routing_config),
+            )
+            .route(
+                "/{org_id}/oncall/routing/preview",
+                post(oncall::preview_routing),
+            )
+            // The unrouted queue and the coverage banner: the two places
+            // the product admits it would page nobody.
+            .route(
+                "/{org_id}/oncall/unrouted",
+                get(oncall::list_unrouted_signals),
+            )
+            .route(
+                "/{org_id}/oncall/unrouted/{signal_id}",
+                delete(oncall::dismiss_unrouted_signal),
+            )
+            .route(
+                "/{org_id}/oncall/coverage-gaps",
+                get(oncall::list_coverage_gaps),
+            )
+            // A firing that turned out to be bigger than an alert.
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/promote",
+                post(oncall::promote_to_incident),
+            )
+            // How to reach one person (§5). Storage and API only — no SMS
+            // or voice transport exists yet, so everything saved here is
+            // marked unverified and nothing can page it.
+            .route(
+                "/{org_id}/oncall/contacts/{user_email}",
+                get(oncall::get_contact)
+                    .put(oncall::set_contact)
+                    .delete(oncall::delete_contact),
+            )
+            // The responder's own view: what was sent to me, and which
+            // teams am I on.
+            .route(
+                "/{org_id}/oncall/my/deliveries",
+                get(oncall::list_my_deliveries),
+            )
+            .route(
+                "/{org_id}/oncall/my/deliveries/read",
+                post(oncall::mark_deliveries_read),
+            )
+            .route("/{org_id}/oncall/my/teams", get(oncall::list_my_teams))
+            .route(
+                "/{org_id}/oncall/analytics/causes",
+                get(oncall::cause_analytics),
+            )
+            // Ordered recovery (`00-simplified-flow` §4): the dependent's
+            // own verb. Without it the owner's record waits forever.
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/confirm-recovery",
+                post(oncall::confirm_recovery),
+            )
+            // "This needs more people, now" — the ladder advances a rung
+            // without waiting for its timer.
+            .route(
+                "/{org_id}/oncall/responses/{response_id}/escalate",
+                post(oncall::escalate_response),
+            )
+            // Proves a team's paging configuration reaches a human, down
+            // the real dispatch path, leaving no record behind.
+            .route(
+                "/{org_id}/oncall/teams/{team_id}/test-page",
+                post(oncall::send_test_page),
+            );
+    }
+
     #[cfg(feature = "cloud")]
     {
         router = router
@@ -1842,6 +2102,44 @@ mod tests {
     use tower::ServiceExt;
 
     use super::*;
+
+    /// A router node merges `basic_routes()` beside its catch-all proxy
+    /// `/api/{*path}`, and axum **panics at registration** — not at request
+    /// time — when a parameter and a wildcard sit at the same position. So
+    /// `/api/{org_id}/...` in `basic_routes` crash-loops every router pod on
+    /// startup, while every single-node deployment stays perfectly healthy.
+    ///
+    /// That asymmetry is why this shipped: nothing in the test suite or in
+    /// local development builds the router-role tree. This test does.
+    ///
+    /// A **static** second segment does not conflict, which is why every
+    /// token-authenticated route here lives under `/api/v2/`. If you add one,
+    /// it must too.
+    #[test]
+    fn test_basic_routes_cannot_conflict_with_the_router_catch_all() {
+        // Registration is where the panic would happen, so building it is the
+        // whole assertion.
+        let merged = Router::<()>::new()
+            .merge(basic_routes())
+            .route("/api/{*path}", get(|| async { "proxy" }));
+        drop(merged);
+
+        // And the rule that keeps it true, stated where somebody adding a route
+        // will read it: nothing in `basic_routes` may take a path parameter
+        // directly after `/api/`.
+        let src = include_str!("mod.rs");
+        let offenders: Vec<&str> = src
+            .lines()
+            .map(str::trim)
+            .filter(|l| l.starts_with("\"/api/{") && !l.starts_with("\"/api/{*"))
+            .collect();
+        assert!(
+            offenders.is_empty(),
+            "these routes take a parameter straight after /api/ and will panic \
+             every router pod at startup; give them a static segment such as \
+             /api/v2/: {offenders:?}"
+        );
+    }
 
     #[cfg(feature = "enterprise")]
     #[test]

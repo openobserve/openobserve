@@ -139,7 +139,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-dimensions="{ row }">
-          <div class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
+          <div
+            v-if="getSortedDimensions(row.group_values).length"
+            class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
+          >
             <ODimensionChip
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
@@ -174,6 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTooltip>
             </OTag>
           </div>
+          <span v-else class="text-text-muted text-xs italic">
+            {{ t("alerts.incidents.noDimensionsAvailable") }}
+          </span>
         </template>
         <template #cell-alert_count="{ row }">
           <OTag type="countChip" value="neutral">{{ row.alert_count }}</OTag>
@@ -193,9 +199,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.status === 'open'"
               variant="ghost-warning"
               size="icon-sm"
+              :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
               @click.stop="acknowledgeIncident(row)"
               data-test="incident-ack-btn"
-              ><OIcon name="visibility" size="sm" /><OTooltip
+              ><OIcon name="check-circle" size="sm" aria-hidden="true" /><OTooltip
                 :content="t('alerts.incidents.acknowledge')"
             /></OButton>
             <OButton
@@ -276,6 +283,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 export default defineComponent({
   name: "IncidentList",
@@ -299,6 +307,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
+    const { confirm } = useConfirmDialog();
 
     const qTableRef: any = ref(null);
     const loading = ref(false);
@@ -632,7 +641,15 @@ export default defineComponent({
       }
     };
 
-    const acknowledgeIncident = (incident: Incident) => {
+    const acknowledgeIncident = async (incident: Incident) => {
+      const ok = await confirm({
+        title: t("alerts.incidents.acknowledgeConfirmTitle"),
+        message: t("alerts.incidents.acknowledgeConfirmMessage"),
+        confirmLabel: t("alerts.incidents.acknowledgeConfirmLabel"),
+        cancelLabel: t("alerts.incidents.acknowledgeConfirmCancelLabel"),
+        persistent: false,
+      });
+      if (!ok) return;
       updateStatus(incident, "acknowledged");
     };
 

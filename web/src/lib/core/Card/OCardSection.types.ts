@@ -22,6 +22,13 @@ export interface OCardSectionProps {
    * Only meaningful with `role="body"`.
    */
   scrollable?: boolean;
+  /**
+   * Tightens the zone padding to the detail-page rhythm: a header that hugs its
+   * title and a body that starts directly under it, instead of both zones
+   * carrying full padding. Use it on every section of a card so the pane reads
+   * as one block — pairs with `OCard variant="glass"`.
+   */
+  dense?: boolean;
 }
 
 export type OCardSectionEmits = Record<never, never>;

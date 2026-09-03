@@ -1,0 +1,48 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// Validation for OnCallTeamForm.vue. Mirrors the server's `validate_team_name`
+// and `validate_timezone` so a bad value is caught before the round trip;
+// the server still enforces both, since the UI is not the only caller.
+
+import { z } from "zod";
+
+/** Matches the server bound, which counts CHARACTERS not bytes. */
+export const TEAM_NAME_MAX = 200;
+
+export const makeOnCallTeamSchema = (t: (_key: string) => string) =>
+  z.object({
+    // No `.trim()` in the schema: OForm validates with the schema but saves the
+    // RAW value, so a trimming transform would let "  " pass while persisting
+    // the spaces. Validating the raw value means the min/regex judge what is
+    // actually stored.
+    name: z
+      .string()
+      .min(1, t("oncall.teamNameRequired"))
+      .refine((v) => v.trim().length > 0, t("oncall.teamNameRequired"))
+      .refine(
+        (v) => [...v].length <= TEAM_NAME_MAX,
+        t("oncall.teamNameTooLong"),
+      ),
+    timezone: z.string().min(1, t("oncall.timezoneRequired")),
+    description: z.string().optional(),
+    // Creation-only. Optional so the edit drawer — which shows none of these,
+    // because membership and the schedule have their own screens once the team
+    // exists — validates exactly as it did before.
+    members: z.array(z.string()).optional(),
+    shift_micros: z.number().optional(),
+    /** `datetime-local`, so a browser-local wall time. */
+    first_handover: z.string().optional(),
+    /**
+     * Write a second rotation beside the first — same roster, anchor one shift
+     * behind, so the two can never resolve to the same person while the roster
+     * holds two or more people.
+     *
+     * It writes two ORDINARY rotations. Nothing links them: there is no
+     * `secondary_of` field and nothing at resolution time knows they are
+     * related, so editing either is allowed and drift is reported rather than
+     * prevented.
+     */
+    create_secondary: z.boolean().optional(),
+  });
+
+export type OnCallTeamFormValues = z.infer<ReturnType<typeof makeOnCallTeamSchema>>;

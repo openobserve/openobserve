@@ -57,7 +57,9 @@ pub struct CorrelationSubject {
     pub org_id: String,
     pub kind: config::meta::alerts::incidents::AlertKind,
     pub base_destinations: Vec<String>,
-    /// Pre-mapped severity for external events; `None` → enterprise default (internal path)
+    /// Pre-mapped severity: external events carry their own; internal alerts
+    /// carry `alert.priority` mapped through `determine_severity`, when set.
+    /// `None` → eval_level default (Critical→P2, Warning→P3).
     pub severity: Option<config::meta::alerts::incidents::IncidentSeverity>,
 }
 
@@ -632,6 +634,17 @@ pub async fn correlate_alert_to_incident(
             sem_result.group_values
         );
     }
+    // B-29: a P1 alert must open a P1 incident, not the eval_level default.
+    // `alert.priority` is the operator's stated urgency, so when it's set it
+    // wins over the Critical/Warning->P2/P3 fallback in `create_new_incident`
+    // — otherwise the incident dashboard's severity tiles silently undercount
+    // P1s for every alert that only defines a Critical tier.
+    let severity = alert.priority.and_then(|p| {
+        o2_enterprise::enterprise::alerts::incidents::determine_severity(Some(p.as_str()))
+            .parse()
+            .ok()
+    });
+
     // Build the correlation subject for the internal alert path.
     let subject = CorrelationSubject {
         id: alert.get_unique_key(),
@@ -639,7 +652,7 @@ pub async fn correlate_alert_to_incident(
         org_id: alert.org_id.to_string(),
         kind: AlertKind::Internal,
         base_destinations: alert.destinations.clone(),
-        severity: None,
+        severity,
     };
 
     // Find or create incident
@@ -654,6 +667,108 @@ pub async fn correlate_alert_to_incident(
         eval_level,
     )
     .await?;
+
+    // An incident is the correlated view, so it pages ONCE however many alerts
+    // fed it. Only on creation: an alert joining an existing incident must not
+    // open a second record.
+    #[cfg(feature = "enterprise")]
+    if let IncidentCorrelationOutcome::NewIncidentCreated {
+        incident_id,
+        service_name,
+    } = &outcome
+        && o2_enterprise::enterprise::oncall::is_enabled()
+    {
+        // Single-sourced with the alert path in `scheduler::handlers`: the row,
+        // then the alert's own conditions for whatever the row left blank.
+        let mut dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
+            &crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await,
+            &alert.query_condition,
+            result_row,
+        );
+        // Last resort: what correlation already worked out.
+        //
+        // Reached only when neither the row nor the alert's conditions named
+        // anything — a `SELECT count(*)` whose threshold lives in an
+        // inequality, with no equality anywhere to identify it. Nothing static
+        // can route that alert, but correlation can: it has already queried the
+        // service-discovery registry, and re-deriving from the row here and
+        // ignoring that answer was throwing away the better of the two.
+        //
+        // Only this path can offer it — correlation does not run when
+        // `creates_incident` is off — which is why the two paths agree on the
+        // sources above and diverge here rather than earlier.
+        //
+        // Additive like those sources. A row that carries its own
+        // identity keeps routing on it, so no existing alert changes team —
+        // this can only add a route where there was none.
+        if dimensions.is_empty() && !service_name.trim().is_empty() {
+            dimensions.insert(
+                config::meta::oncall::SERVICE_DIMENSION.to_string(),
+                service_name.clone(),
+            );
+            log::debug!(
+                "[incidents] {}/{}: no identity fields in the result row; routing on the \
+                 correlated service `{service_name}`",
+                alert.org_id,
+                alert.name,
+            );
+        }
+        // Single-sourced with the alert path in `scheduler::handlers`. The two
+        // used to disagree — P2 here, P3 there — so ticking `creates_incident`
+        // on an alert quietly changed how loudly it woke somebody.
+        let priority = alert
+            .priority
+            .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
+        let title = alert.name.clone();
+        match o2_enterprise::enterprise::oncall::escalation::start_for_incident(
+            &alert.org_id,
+            &incident_id.to_string(),
+            &title,
+            priority,
+            alert.oncall_team.as_deref(),
+            alert.context_team(),
+            &dimensions,
+        )
+        .await
+        {
+            // Blast radius: whoever CALLS the failing service is impacted and
+            // has containment work of their own. It hangs off whichever record
+            // actually paged, which for an incident-backed alert is this one.
+            Ok(Some(origin)) => {
+                // Without this the link exists only as a naming convention in
+                // `subject_id`, so nothing can get from an incident to the
+                // record that paged for it.
+                if let Err(e) = infra::table::oncall_responses::attach_incident(
+                    &alert.org_id,
+                    &origin.id,
+                    &incident_id.to_string(),
+                )
+                .await
+                {
+                    log::error!("[incidents] could not link on-call record for {incident_id}: {e}");
+                }
+
+                let impacted = crate::alerts::scheduler::handlers::impacted_services(
+                    &alert.org_id,
+                    &dimensions,
+                )
+                .await;
+                if !impacted.is_empty()
+                    && let Err(e) = o2_enterprise::enterprise::oncall::escalation::page_impacted(
+                        &alert.org_id,
+                        &origin,
+                        &impacted,
+                        config::utils::time::now_micros(),
+                    )
+                    .await
+                {
+                    log::error!("[incidents] impacted paging failed for {incident_id}: {e}");
+                }
+            }
+            Ok(None) => {}
+            Err(e) => log::error!("[incidents] on-call paging failed for {incident_id}: {e}"),
+        }
+    }
 
     // AI credit deduction for incident creation (cloud only).
     // Only deduct when a NEW incident is created — alerts joining an existing
@@ -1294,11 +1409,20 @@ async fn find_or_create_incident(
             // silence layer explicitly let this delivery through, and
             // suppressing it here would lose the only page for the
             // escalation.
+            //
+            // B-29: `subject.severity` (alert.priority, when set) is the same
+            // precedence signal `create_new_incident` uses and takes the same
+            // priority here — otherwise a P1 alert repeating against an
+            // incident it didn't create could be capped at the eval_level
+            // default (P2) instead of escalating to the priority it's
+            // actually configured for.
             use config::meta::alerts::incidents::{IncidentEvent, IncidentSeverity};
-            let level_severity = eval_level.and_then(|l| match l {
-                config::meta::alerts::level::AlertLevel::Critical => Some(IncidentSeverity::P2),
-                config::meta::alerts::level::AlertLevel::Warning => Some(IncidentSeverity::P3),
-                _ => None,
+            let level_severity = subject.severity.or_else(|| {
+                eval_level.and_then(|l| match l {
+                    config::meta::alerts::level::AlertLevel::Critical => Some(IncidentSeverity::P2),
+                    config::meta::alerts::level::AlertLevel::Warning => Some(IncidentSeverity::P3),
+                    _ => None,
+                })
             });
             // P1 is most urgent; higher urgency = escalation.
             let urgency = |s: IncidentSeverity| match s {
@@ -2114,7 +2238,6 @@ pub async fn trigger_rca_for_incident(
     // Automatic triggers pass false so each run stands on its own.
     build_on_previous: bool,
 ) -> Result<(), anyhow::Error> {
-    use config::meta::alerts::incidents::IncidentTopology;
     use o2_enterprise::enterprise::{
         ai::client::get_agent_client, common::config::get_config as get_o2_config,
     };
@@ -2124,11 +2247,25 @@ pub async fn trigger_rca_for_incident(
     // Check if RCA is enabled and configured
     if !config.incidents.enabled || !config.incidents.rca_enabled {
         log::debug!("[INCIDENTS::RCA] RCA not enabled, skipping immediate trigger");
+        // §6: no verdict is coming, so nothing may go on holding a page for
+        // one. Every guard below reaches this same state.
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
         return Ok(()); // Not an error - just not configured
     }
 
     if config.ai.agent_url.is_empty() {
         log::debug!("[INCIDENTS::RCA] RCA agent URL not set, skipping immediate trigger");
+        // §6: no verdict is coming, so nothing may go on holding a page for
+        // one. Every guard below reaches this same state.
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
         return Ok(());
     }
 
@@ -2146,12 +2283,26 @@ pub async fn trigger_rca_for_incident(
         // In-flight guard: always enforced, even for user-initiated reanalysis
         if is_analysis_in_flight(&events, stale_threshold) {
             log::debug!("[INCIDENTS::RCA] Analysis already in-flight for {incident_id}, skipping");
+            // §6: no verdict is coming, so nothing may go on holding a page for
+            // one. Every guard below reaches this same state.
+            o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+                &org_id,
+                &incident_id,
+            )
+            .await;
             return Ok(());
         }
 
         // Cooldown gate: skip for user-initiated reanalysis (reanalysis=true bypasses it)
         if !reanalysis && !cooldown_elapsed(&events, cooldown) {
             log::debug!("[INCIDENTS::RCA] Cooldown not elapsed for {incident_id}, skipping");
+            // §6: no verdict is coming, so nothing may go on holding a page for
+            // one. Every guard below reaches this same state.
+            o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+                &org_id,
+                &incident_id,
+            )
+            .await;
             return Ok(());
         }
     }
@@ -2232,12 +2383,39 @@ pub async fn trigger_rca_for_incident(
     // Quick health check
     if let Err(e) = client.health(&auth_header).await {
         log::debug!("[INCIDENTS::RCA] Agent health check failed for immediate trigger: {e}");
+        // §6: no verdict is coming, so nothing may go on holding a page for
+        // one. Every guard below reaches this same state.
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
         return Err(anyhow::anyhow!("RCA agent not available: {}", e));
     }
 
     // Analyze incident
+    // §7: the agent is told how loudly this pages, and stops rendering
+    // `Severity: Unknown` on every automatic run.
+    let severity = o2_enterprise::enterprise::alerts::rca_service::paging_severity_for_incident(
+        &org_id,
+        &incident_id,
+    )
+    .await;
+    // §7: what this same subject turned out to be the last few times, which is
+    // the cross-incident memory the agent otherwise has none of.
+    let past_causes = o2_enterprise::enterprise::alerts::rca_service::past_causes_for_incident(
+        &org_id,
+        &incident_id,
+    )
+    .await;
     match client
-        .analyze_incident(&incident, &auth_header, build_on_previous)
+        .analyze_incident(
+            &incident,
+            &auth_header,
+            build_on_previous,
+            severity,
+            past_causes,
+        )
         .await
     {
         Ok(rca_result) => {
@@ -2246,20 +2424,19 @@ pub async fn trigger_rca_for_incident(
                 rca_result.len()
             );
 
-            // Update topology_context with the new report, archiving the previous one
-            let mut topology = incident
-                .topology_context
-                .and_then(|ctx| serde_json::from_value::<IncidentTopology>(ctx).ok())
-                .unwrap_or_default();
-
-            topology.record_rca_result(rca_result, config.incidents.rca_history_limit);
-
-            if let Err(e) =
-                infra::table::alert_incidents::update_topology(&org_id, &incident_id, &topology)
-                    .await
+            // §2.2: the report and the verdict are read once, by the single
+            // writer. Writing `topology_context` here instead is what left the
+            // autonomous run — the one that IS L0 acting — with an answer no
+            // ladder could ever see.
+            if let Err(e) = o2_enterprise::enterprise::alerts::rca_service::save_rca_result(
+                &org_id,
+                &incident_id,
+                &rca_result,
+            )
+            .await
             {
                 log::error!("[INCIDENTS::RCA] Failed to save RCA result for {incident_id}: {e}");
-                return Err(e.into());
+                return Err(e);
             }
 
             // Emit AIAnalysisComplete on success
@@ -2337,6 +2514,8 @@ fn model_to_incident_with_topology(
         alert_count: db_model.alert_count,
         title: db_model.title,
         assigned_to: db_model.assigned_to,
+        acknowledged_by: db_model.acknowledged_by,
+        acknowledged_at: db_model.acknowledged_at,
         created_at: db_model.created_at,
         updated_at: db_model.updated_at,
         group_values: db_model.group_values,
@@ -2352,7 +2531,29 @@ pub async fn update_status(
     status: &str,
     user_id: &str,
 ) -> Result<Incident, anyhow::Error> {
-    let updated = infra::table::alert_incidents::update_status(org_id, incident_id, status).await?;
+    // Acknowledging goes through a dedicated atomic path so the actor and
+    // timestamp land on the row itself (not just the event log) and a
+    // second/concurrent acknowledge can't silently overwrite the first
+    // acknowledger — see `infra::table::alert_incidents::acknowledge`.
+    let updated = if status == "acknowledged" {
+        infra::table::alert_incidents::acknowledge(org_id, incident_id, user_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Incident not found"))?
+    } else {
+        infra::table::alert_incidents::update_status(org_id, incident_id, status).await?
+    };
+
+    // Every resolution path lands here — manual, auto-resolve and external —
+    // so closing the on-call record once, here, covers all of them.
+    #[cfg(feature = "enterprise")]
+    if status == "resolved"
+        && o2_enterprise::enterprise::oncall::is_enabled()
+        && let Err(e) =
+            o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, incident_id)
+                .await
+    {
+        log::error!("[incidents] on-call recovery failed for {incident_id}: {e}");
+    }
 
     // Emit status change event
     use config::meta::alerts::incidents::IncidentEvent;
@@ -2514,6 +2715,66 @@ pub async fn update_severity(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The incident path and the alert path page the same person about the
+    /// same alert, so an unset priority has to mean the same thing on both.
+    /// They used to differ — P2 here, P3 in `scheduler::handlers` — which made
+    /// `creates_incident` a hidden severity switch.
+    #[test]
+    fn test_the_incident_path_uses_the_shared_default_priority() {
+        assert_eq!(
+            config::meta::oncall::DEFAULT_PAGING_PRIORITY,
+            config::meta::alerts::priority::AlertPriority::P2,
+            "the shared default must stay the louder of the two"
+        );
+    }
+
+    /// B-29: a P1 alert must map to a P1 incident severity, not the eval_level
+    /// default (Critical -> P2) — this is the exact mapping `correlate_alert_to_incident`
+    /// uses to pre-populate `CorrelationSubject.severity` for the internal alert path.
+    #[test]
+    fn test_alert_priority_maps_to_incident_severity() {
+        use config::meta::alerts::{incidents::IncidentSeverity, priority::AlertPriority};
+
+        let map = |p: AlertPriority| -> Option<IncidentSeverity> {
+            o2_enterprise::enterprise::alerts::incidents::determine_severity(Some(p.as_str()))
+                .parse()
+                .ok()
+        };
+
+        assert_eq!(map(AlertPriority::P1), Some(IncidentSeverity::P1));
+        assert_eq!(map(AlertPriority::P2), Some(IncidentSeverity::P2));
+        assert_eq!(map(AlertPriority::P4), Some(IncidentSeverity::P4));
+
+        // The two that reach the mapping's default arm, and so were the two it
+        // could get wrong unnoticed. P5 mapped to P3 until 2026-08-24 — the
+        // least urgent priority opening a more severe incident than P4 does.
+        assert_eq!(map(AlertPriority::P3), Some(IncidentSeverity::P3));
+        assert_eq!(map(AlertPriority::P5), Some(IncidentSeverity::P4));
+
+        // Five priorities into four severities, and the ordering has to survive
+        // the join: a less urgent alert must never open a more severe incident.
+        let rank = |s: IncidentSeverity| match s {
+            IncidentSeverity::P1 => 4,
+            IncidentSeverity::P2 => 3,
+            IncidentSeverity::P3 => 2,
+            IncidentSeverity::P4 => 1,
+        };
+        let ranks: Vec<i32> = [
+            AlertPriority::P1,
+            AlertPriority::P2,
+            AlertPriority::P3,
+            AlertPriority::P4,
+            AlertPriority::P5,
+        ]
+        .into_iter()
+        .map(|p| rank(map(p).expect("every priority maps")))
+        .collect();
+        assert!(
+            ranks.windows(2).all(|w| w[0] >= w[1]),
+            "severity must not increase as priority falls: {ranks:?}"
+        );
+    }
 
     #[test]
     fn test_merge_dimensions_adds_new_keys() {

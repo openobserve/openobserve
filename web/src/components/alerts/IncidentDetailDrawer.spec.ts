@@ -39,6 +39,16 @@ vi.mock("@/services/incidents", () => ({
   },
 }));
 
+// The panel is absent unless on-call answers, which is also the OSS and
+// feature-off case — so the default here is a rejection, and only the tests
+// about the panel resolve it.
+vi.mock("@/services/oncall", () => ({
+  default: {
+    listResponsesForIncident: vi.fn(),
+    listTeams: vi.fn(),
+  },
+}));
+
 // Mock service streams API
 vi.mock("@/services/service_streams", () => ({
   default: {
@@ -57,6 +67,7 @@ import incidentsService, {
   IncidentAlert,
 } from "@/services/incidents";
 import serviceStreamsApi, { buildChipDimensionsFromFilters } from "@/services/service_streams";
+import oncallService from "@/services/oncall";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -209,6 +220,9 @@ describe("IncidentDetailDrawer.vue", () => {
     (incidentsService.updateIncident as any).mockResolvedValue({
       data: { severity: "P2" },
     });
+
+    (oncallService.listResponsesForIncident as any).mockRejectedValue(new Error("off"));
+    (oncallService.listTeams as any).mockRejectedValue(new Error("off"));
 
     // Mock service streams API
     (serviceStreamsApi.getSemanticGroups as any).mockResolvedValue({
@@ -1504,6 +1518,79 @@ describe("IncidentDetailDrawer.vue", () => {
       await wrapper.vm.updateSeverity("P3");
       await flushPromises();
       expect(wrapper.vm.updating).toBe(false);
+    });
+  });
+  /// The panel fetched a whole record and rendered two of its fields, so an
+  /// incident never said which team it woke, at what priority, or whether the
+  /// page had been answered — while the payload behind it said all three.
+  describe("on-call panel", () => {
+    const record = (overrides: Record<string, unknown> = {}) => ({
+      id: "resp-1",
+      org_id: "default",
+      subject: { subject_type: "alert", source_id: "alert-1", firing: 1 },
+      team_id: "team_1",
+      priority: 2,
+      state: "triggered",
+      opened_at: 1700000000000000,
+      responder_role: "owner",
+      ...overrides,
+    });
+
+    const withRecords = async (records: unknown[]) => {
+      (oncallService.listResponsesForIncident as any).mockResolvedValue({ data: records });
+      (oncallService.listTeams as any).mockResolvedValue({
+        data: [
+          { id: "team_1", name: "Payments" },
+          { id: "team_2", name: "Checkout" },
+        ],
+      });
+      const w = await createWrapper({}, {}, "1");
+      await flushPromises();
+      return w;
+    };
+
+    it("names the paged team rather than its id", async () => {
+      wrapper = await withRecords([record()]);
+      const panel = wrapper.find('[data-test="incident-oncall-panel"]');
+      expect(panel.exists()).toBe(true);
+      expect(panel.text()).toContain("Payments");
+      expect(panel.text()).not.toContain("team_1");
+    });
+
+    /// An unanswered page is still climbing the ladder — the fact worth a
+    /// colour, and the one an empty dash used to hide.
+    it("says a page is unanswered instead of printing a dash", async () => {
+      wrapper = await withRecords([record()]);
+      expect(wrapper.find('[data-test="incident-oncall-panel"]').text()).toContain(
+        "Not acknowledged",
+      );
+    });
+
+    /// A snoozed page looks exactly like a quiet one, which is how an incident
+    /// gets forgotten.
+    it("surfaces a snooze", async () => {
+      wrapper = await withRecords([record({ snoozed_until: 1700003600000000 })]);
+      expect(wrapper.find('[data-test="incident-oncall-snoozed"]').exists()).toBe(true);
+    });
+
+    /// An impacted team gets its own record. Taking `[0]` and discarding the
+    /// rest hid every liaison the incident had woken.
+    it("lists the teams paged alongside the owner", async () => {
+      wrapper = await withRecords([
+        record({ id: "resp-2", team_id: "team_2", responder_role: "impacted", state: "acknowledged" }),
+        record(),
+      ]);
+      const panel = wrapper.find('[data-test="incident-oncall-panel"]');
+      // The owner's record is the headline whatever order the server sent.
+      expect(panel.text()).toContain("Payments");
+      expect(wrapper.find('[data-test="incident-oncall-liaisons"]').text()).toContain("Checkout");
+    });
+
+    /// OSS, feature-off and nothing-routed are the same calm fact: no panel.
+    it("renders nothing when on-call does not answer", async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await flushPromises();
+      expect(wrapper.find('[data-test="incident-oncall-panel"]').exists()).toBe(false);
     });
   });
 });

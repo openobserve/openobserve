@@ -160,20 +160,29 @@ mod m20260802_000001_add_template_kind;
 mod m20260803_000001_add_destinations_to_incident_integrations;
 mod m20260803_000001_add_down_notified_at_to_synthetics_locations;
 mod m20260804_000001_create_workflow_drafts_table;
+mod m20260806_000001_create_oncall_tables;
+mod m20260807_000001_create_oncall_ownership;
 mod m20260809_000001_create_alert_eval_intervals_table;
 mod m20260811_000001_create_llm_experiments;
+mod m20260811_000001_create_oncall_unrouted_signals;
 mod m20260812_000001_add_provider_rate_limits;
 mod m20260812_000001_create_composite_alerts;
+mod m20260812_000001_create_oncall_routing_config;
+mod m20260812_000002_create_oncall_overrides;
+mod m20260812_000003_create_oncall_contacts_and_reads;
+mod m20260813_000001_create_oncall_unavailability;
 mod m20260818_000001_create_llm_idempotency_records;
 mod m20260818_000002_create_llm_remote_tasks;
 mod m20260820_000001_add_icon_to_folders;
 mod m20260820_000003_create_llm_secrets;
 mod m20260822_000001_create_status_pages_tables;
+mod m20260824_000001_add_incident_acknowledged_columns;
 mod m20260824_000001_create_llm_playground_snapshots;
 mod m20260825_000001_add_alert_pending_period_col;
 mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
 mod m20260825_000001_create_status_page_custom_domains;
 mod m20260827_000001_drop_table_action_scripts;
+mod m20260831_000001_add_exhausted_at_to_oncall_responses;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -431,6 +440,15 @@ impl MigratorTrait for Migrator {
             Box::new(m20260827_000001_drop_table_action_scripts::Migration),
             Box::new(m20260822_000001_create_status_pages_tables::Migration),
             Box::new(m20260825_000001_create_status_page_custom_domains::Migration),
+            Box::new(m20260806_000001_create_oncall_tables::Migration),
+            Box::new(m20260807_000001_create_oncall_ownership::Migration),
+            Box::new(m20260811_000001_create_oncall_unrouted_signals::Migration),
+            Box::new(m20260812_000001_create_oncall_routing_config::Migration),
+            Box::new(m20260812_000002_create_oncall_overrides::Migration),
+            Box::new(m20260812_000003_create_oncall_contacts_and_reads::Migration),
+            Box::new(m20260813_000001_create_oncall_unavailability::Migration),
+            Box::new(m20260824_000001_add_incident_acknowledged_columns::Migration),
+            Box::new(m20260831_000001_add_exhausted_at_to_oncall_responses::Migration),
         ]
     }
 }

@@ -17,6 +17,16 @@ import { getUUID, getUUIDv7 } from "@/utils/uuid";
 // Matched exactly, not by prefix, so the rest of the Settings tree stays gated.
 export const emptyDataAllowedPaths = ["/settings", "/settings/general"];
 
+// Route SUBTREES that stay reachable with nothing ingested. On-call is
+// configured before data flows — teams, schedules, escalation and routing are
+// exactly what a fresh org sets up first, and bouncing those clicks to
+// /ingestion made every on-call screen unreachable by navigation (I14). A
+// prefix list because these routes carry dynamic segments (:teamId, :tab),
+// which the exact-match list above cannot express. A prefix admits its whole
+// subtree — add a screen's root here only when everything under it is
+// configuration rather than a data view.
+export const emptyDataAllowedPrefixes = ["/oncall"];
+
 // "/settings/general/" and "/settings/general" are the same page; an exact match
 // must not hinge on a trailing slash.
 const normalizePath = (path: string) =>
@@ -130,6 +140,10 @@ export const routeGuard = async (to: any, from: any, next: any) => {
     to.path.indexOf("/iam") === -1 &&
     to.name !== "iam" &&
     emptyDataAllowedPaths.indexOf(normalizePath(to.path)) === -1 &&
+    !emptyDataAllowedPrefixes.some(
+      (prefix) =>
+        normalizePath(to.path) === prefix || normalizePath(to.path).startsWith(prefix + "/"),
+    ) &&
     trialPeriodAllowedPath.indexOf(to.name) === -1 &&
     Object.prototype.hasOwnProperty.call(store.state.zoConfig, "restricted_routes_on_empty_data") &&
     store.state.zoConfig.restricted_routes_on_empty_data === true &&
