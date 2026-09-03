@@ -31,7 +31,7 @@ vi.mock("@/composables/useWorkloadDetection", () => ({
 }));
 
 vi.mock("@/services/dashboards", () => ({
-  default: { list: vi.fn(), create: vi.fn(), delete: vi.fn() },
+  default: { list: vi.fn(), create: vi.fn(), delete: vi.fn(), list_Folders: vi.fn() },
 }));
 
 const workloadStates = ref<Record<string, string>>({
@@ -41,6 +41,7 @@ const workloadStates = ref<Record<string, string>>({
 });
 
 const listMock = vi.mocked(dashboardsService.list);
+const listFoldersMock = vi.mocked(dashboardsService.list_Folders);
 
 const setupCardStub = {
   name: "DataSourceSetupCard",
@@ -95,6 +96,14 @@ describe("WorkloadStubPage", () => {
     vi.clearAllMocks();
     workloadStates.value = { hosts: "undetected", kubernetes: "undetected", aws: "undetected" };
     listMock.mockResolvedValue({ data: { dashboards: [] } } as any);
+    listFoldersMock.mockResolvedValue({
+      data: {
+        list: [
+          { name: "default", folderId: "default" },
+          { name: "AWS", folderId: "xyz" },
+        ],
+      },
+    } as any);
   });
 
   afterEach(() => {
@@ -138,14 +147,14 @@ describe("WorkloadStubPage", () => {
       expect(wrapper.find('[data-test="workload-dashboard-row-x1"]').exists()).toBe(false);
     });
 
-    it("unions the default and AWS folders for the aws workload", async () => {
+    it("unions default with the AWS folder RESOLVED to its server id, never its name", async () => {
       workloadStates.value = { ...workloadStates.value, aws: "detected" };
       listMock.mockImplementation((...args: any[]) => {
         const folder = args[6];
         return Promise.resolve({
           data: {
             dashboards:
-              folder === "AWS"
+              folder === "xyz"
                 ? [{ dashboardId: "a2", title: "AWS CloudWatch" }]
                 : [{ dashboardId: "a1", title: "AWS EC2" }],
           },
@@ -154,10 +163,60 @@ describe("WorkloadStubPage", () => {
       wrapper = await mountPage("aws");
       const folders = listMock.mock.calls.map((c) => c[6]);
       expect(folders).toContain("default");
-      // The one folder ensureIntegrationsFolderExists creates (4.9).
-      expect(folders).toContain("AWS");
+      // ensureIntegrationsFolderExists creates the folder NAMED "AWS" with a server-generated id.
+      expect(folders).toContain("xyz");
+      expect(folders).not.toContain("AWS");
       expect(wrapper.find('[data-test="workload-dashboard-row-a1"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="workload-dashboard-row-a2"]').exists()).toBe(true);
+      // The deep link must carry the real folder id too.
+      await wrapper.find('[data-test="workload-dashboard-row-a2"]').trigger("click");
+      expect(router.push).toHaveBeenCalledWith(
+        expect.objectContaining({ query: expect.objectContaining({ folder: "xyz" }) }),
+      );
+    });
+
+    it("skips the AWS folder when it does not exist yet", async () => {
+      workloadStates.value = { ...workloadStates.value, aws: "detected" };
+      listFoldersMock.mockResolvedValue({
+        data: { list: [{ name: "default", folderId: "default" }] },
+      } as any);
+      wrapper = await mountPage("aws");
+      const folders = listMock.mock.calls.map((c) => c[6]);
+      expect(folders).toEqual(["default"]);
+    });
+
+    it("drops a stale dashboards response that resolves after a newer load", async () => {
+      workloadStates.value = { ...workloadStates.value, kubernetes: "detected" };
+      let resolveStale!: (v: any) => void;
+      listMock.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveStale = resolve;
+          }) as any,
+      );
+      listMock.mockResolvedValue({
+        data: { dashboards: [{ dashboardId: "new1", title: "Kubernetes New" }] },
+      } as any);
+      wrapper = await mountPage("kubernetes");
+      // Org switch issues a fresh load while the first is still in flight.
+      store.state.selectedOrganization = { identifier: "other-org" };
+      await flushPromises();
+      resolveStale({
+        data: { dashboards: [{ dashboardId: "stale1", title: "Kubernetes Stale" }] },
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="workload-dashboard-row-stale1"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="workload-dashboard-row-new1"]').exists()).toBe(true);
+    });
+
+    it("reloads the dashboards list when the drawer reports an import (@added)", async () => {
+      workloadStates.value = { ...workloadStates.value, kubernetes: "detected" };
+      wrapper = await mountPage("kubernetes");
+      listMock.mockClear();
+      wrapper.findComponent({ name: "AddDashboardFromGitHub" }).vm.$emit("added");
+      await flushPromises();
+      // An imported template must appear without a remount.
+      expect(listMock).toHaveBeenCalled();
     });
 
     it("opens the template drawer with the gallery search pre-seeded", async () => {

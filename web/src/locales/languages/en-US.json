@@ -16263,7 +16263,7 @@
     "hosts": {
       "emptyHeadline": "No host telemetry visible to you yet",
       "emptyRbacHint": "If your team already collects host metrics, you may not have access to the system_* metric streams — ask your admin.",
-      "fleetCount": "{total} hosts, {active} active",
+      "fleetCount": "{total} host, {active} active | {total} hosts, {active} active",
       "livenessBanner": "Couldn't determine which hosts are currently reporting — status shown as Unknown.",
       "lastSeenBanner": "Inactive hosts and last-seen are unavailable right now.",
       "retry": "Retry",

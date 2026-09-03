@@ -448,8 +448,7 @@ export default defineComponent({
       }
     };
 
-    // Replace-on-import now needs an explicit user confirm (design 4.3) — the
-    // import loop parks on this promise until the dialog answers.
+    // Replace-on-import needs an explicit user confirm (design 4.3); the import loop parks here.
     const replaceConfirm = ref<{ title: string; resolve: (ok: boolean) => void } | null>(null);
     const requestReplaceConfirm = (title: string) =>
       new Promise<boolean>((resolve) => {
@@ -612,6 +611,8 @@ export default defineComponent({
         searchQuery.value = props.initialSearch ?? "";
         loadDashboards();
       } else {
+        // A confirm left parked by a programmatic close would leak `importing` forever.
+        resolveReplaceConfirm(false);
         // Reset state when closing
         selectedDashboards.value = [];
         searchQuery.value = "";

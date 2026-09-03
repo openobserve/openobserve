@@ -39,8 +39,7 @@ export function useWorkloadDetection(): {
   refresh: () => Promise<void>;
 } {
   const { getStreams } = useStreams(gt);
-  // Per-instance refs, never module state — an org switch resets the stream
-  // cache upstream and consumers call refresh(); nothing stale can leak.
+  // Per-instance refs, never module state — org switches reset the stream cache upstream.
   const metricsNames = ref<string[] | null>(null);
   const logsNames = ref<string[] | null>(null);
 
@@ -52,8 +51,9 @@ export function useWorkloadDetection(): {
       getStreams("metrics", false, false).catch(() => null),
       getStreams("logs", false, false).catch(() => null),
     ]);
-    metricsNames.value = names(metrics);
-    logsNames.value = names(logs);
+    // A failed fetch stays null ⇒ "unknown", never a false "set up" state (design 4.6).
+    metricsNames.value = metrics == null ? null : names(metrics);
+    logsNames.value = logs == null ? null : names(logs);
   };
 
   const states = computed<Record<WorkloadId, WorkloadState>>(() => {

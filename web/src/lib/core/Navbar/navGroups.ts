@@ -206,9 +206,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     key: "infra",
     titleKey: "menu.infra",
     icon: "dns",
-    // The tile still lands on Database Monitoring where DBM is enabled; when
-    // its gate filters that child out, ONavGroup's anchor-child fallback sends
-    // the tile to the first visible child instead (Hosts) — see tileLink there.
+    // DBM-off orgs don't land here: ONavGroup's anchor-child fallback retargets the tile (tileLink).
     parentLink: "/infra/databases",
     // Nothing to absorb: Infra is a NEW rail section, not a fold of existing
     // tiles. Database Monitoring only ever lived inside the Traces flyout, so
@@ -227,9 +225,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     // it immediately below the Reliability tile. Moving it back below Data here
     // would silently drop it one slot.
     placeAfter: "reliability",
-    // Hosts is declared FIRST so the flyout leads with it (pass-4 finding 4);
-    // the workload children are ungated on purpose — entries are always
-    // present under Infra, detection changes page state, never existence.
+    // Hosts leads the flyout; the workload children are ungated on purpose — detection changes page state, never existence.
     children: [
       { titleKey: "menu.hosts", icon: "dns", name: "infraHosts" },
       // Moved here from the Traces flyout. The routes are always registered

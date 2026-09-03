@@ -48,8 +48,7 @@ export const CATEGORY_ORDER = [
   "dashboard",
 ];
 
-// Classify a dashboard into a category key, its icon, and a token-backed
-// badge variant. Category keys resolve to translated labels at the call site.
+// Category keys resolve to translated labels at the call site; badge variants are token-backed.
 export function getCategoryInfo(dashboard: { name: string }): {
   icon: string;
   variant: BadgeVariant;

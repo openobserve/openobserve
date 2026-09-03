@@ -22,6 +22,7 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import { defineComponent } from "vue";
 import HostDetailDrawer from "./HostDetailDrawer.vue";
 import searchService from "@/services/search";
+import { b64DecodeUnicode } from "@/utils/zincutils";
 import i18n from "@/locales";
 
 const { importHostMetricsDashboard, toastMock } = vi.hoisted(() => ({
@@ -232,7 +233,7 @@ describe("HostDetailDrawer", () => {
   });
 
   describe("traces tab", () => {
-    it("hands off to /traces carrying the time range and the host filter", async () => {
+    it("hands off to /traces with a b64 query that decodes to the host filter", async () => {
       wrapper = await mountDrawer();
       await openTab("traces");
       const link = wrapper.find('[data-test="host-drawer-traces-link"]');
@@ -241,9 +242,51 @@ describe("HostDetailDrawer", () => {
       expect(href).toContain("/traces");
       expect(href).toContain("from=");
       expect(href).toContain("to=");
-      expect(href).toContain("host_name");
-      // The filter must carry the actual host value, not just the label name.
-      expect(href).toContain("web-01");
+      // The traces page b64-decodes ?query= (Index.vue restoreUrlQueryParams) — raw SQL would garble.
+      const query = new URL(href, "http://localhost").searchParams.get("query") ?? "";
+      expect(b64DecodeUnicode(query)).toBe("host_name = 'web-01'");
+    });
+  });
+
+  describe("host switch while open (?host= edited)", () => {
+    it("resets the logs preview and refetches for the new host", async () => {
+      wrapper = await mountDrawer();
+      await openTab("logs");
+      expect(searchMock).toHaveBeenCalledTimes(1);
+      await wrapper.setProps({ hostName: "web-02" });
+      await flushPromises();
+      // The previous host's hits must not linger behind the new host's name.
+      expect(searchMock).toHaveBeenCalledTimes(2);
+      const args: any = searchMock.mock.calls[1][0];
+      expect(args.query.query.sql).toContain("host_name = 'web-02'");
+    });
+
+    it("clears the loaded flag when the host changes off the logs tab", async () => {
+      wrapper = await mountDrawer();
+      await openTab("logs");
+      await openTab("metrics");
+      searchMock.mockClear();
+      await wrapper.setProps({ hostName: "web-02" });
+      await flushPromises();
+      expect(searchMock).not.toHaveBeenCalled();
+      // Re-opening the tab fetches fresh for the new host instead of trusting stale hits.
+      await openTab("logs");
+      expect(searchMock).toHaveBeenCalledTimes(1);
+      expect((searchMock.mock.calls[0][0] as any).query.query.sql).toContain("web-02");
+    });
+  });
+
+  describe("header chips", () => {
+    it("renders an os chip when os_type is known", async () => {
+      wrapper = await mountDrawer({ osType: "linux" });
+      const chip = wrapper.find('[data-test="host-drawer-os-chip"]');
+      expect(chip.exists()).toBe(true);
+      expect(chip.text()).toBe("linux");
+    });
+
+    it("renders no os chip when os_type is absent", async () => {
+      wrapper = await mountDrawer({ osType: null });
+      expect(wrapper.find('[data-test="host-drawer-os-chip"]').exists()).toBe(false);
     });
   });
 

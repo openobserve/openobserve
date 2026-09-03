@@ -281,12 +281,7 @@ function childTo(child: SubnavChild) {
   return { name: child.name, query };
 }
 
-// Anchor-child rule (design 4.7): the tile keeps its declared parentLink while
-// the child that RESOLVES to that link survives gating (or while no declared
-// child resolves to it at all — every pre-existing group renders bit-identical).
-// Only when the anchor child gates out does the tile fall back to the first
-// visible child — otherwise a DBM-off org's Infra tile would bounce off the
-// /infra/databases guard onto Traces.
+// Anchor-child rule (design 4.7): parentLink holds unless the child resolving to it gates out — then first visible child, so a DBM-off Infra tile can't bounce onto Traces.
 const tileLink = computed(() => {
   const parent = props.parentItem;
   if (!parent) return "";

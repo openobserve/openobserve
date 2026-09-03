@@ -703,6 +703,21 @@ describe("AddDashboardFromGitHub Component", () => {
 
       expect(wrapper.vm.showFolderSelection).toBe(false);
     });
+
+    it("resolves a pending replace-confirm as declined when the dialog closes", async () => {
+      wrapper = createWrapper({ modelValue: true });
+      await flushPromises();
+
+      // A parked confirm would otherwise never settle and leak `importing` as true.
+      const resolveSpy = vi.fn();
+      wrapper.vm.replaceConfirm = { title: "Host Metrics", resolve: resolveSpy };
+
+      await wrapper.setProps({ modelValue: false });
+      await wrapper.vm.$nextTick();
+
+      expect(resolveSpy).toHaveBeenCalledWith(false);
+      expect(wrapper.vm.replaceConfirm).toBeNull();
+    });
   });
 
   describe("loadFolders Function", () => {

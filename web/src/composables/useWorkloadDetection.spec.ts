@@ -67,6 +67,17 @@ describe("useWorkloadDetection", () => {
       // Pages render a spinner on unknown, never a false "set up" flash.
       expect(states.value.hosts).toBe("unknown");
     });
+
+    it("stays unknown when the stream fetch REJECTS — a failure is not 'undetected'", async () => {
+      // Design 4.6: a fetch failure must never flash the "set up" onboarding face.
+      getStreams.mockRejectedValue(new Error("network down"));
+      const { states, refresh } = useWorkloadDetection();
+      await refresh();
+      await flushPromises();
+      expect(states.value.hosts).toBe("unknown");
+      expect(states.value.kubernetes).toBe("unknown");
+      expect(states.value.aws).toBe("unknown");
+    });
   });
 
   describe("kubernetes signature (≥2 k8s_-prefixed metric streams)", () => {

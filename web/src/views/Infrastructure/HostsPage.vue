@@ -80,8 +80,11 @@ const refreshList = async () => {
   }
 };
 
-const onDateChange = (date: { startTime: number; endTime: number }) => {
+const onDateChange = (date: { startTime: number; endTime: number; userChangedValue?: boolean }) => {
   range.value = { start: date.startTime, end: date.endTime };
+  // DateTime replays on mount with userChangedValue:false — "do not fetch" (DateTime.vue contract).
+  if (date.userChangedValue === false) return;
+  if (hostsState.value !== "detected") return;
   refreshList();
 };
 
@@ -118,12 +121,21 @@ const syncQuery = () => {
   router.replace({ query: q });
 };
 
-// Suppressed during the org-switch reset so the state watchers don't race the
-// cleared-query replace and re-add params from the stale route snapshot.
+// Suppressed during the org-switch reset so state watchers don't re-add stale params.
 let suppressQuerySync = false;
-watch([nameFilter, statusFilter, osFilter, page, sortBy, sortDesc], () => {
-  if (!suppressQuerySync) syncQuery();
-});
+watch(
+  [nameFilter, statusFilter, osFilter, page, sortBy, sortDesc],
+  ([name, status, os, pg], [oldName, oldStatus, oldOs, oldPg]) => {
+    if (suppressQuerySync) return;
+    const filterChanged = name !== oldName || status !== oldStatus || os !== oldOs;
+    // A filter change invalidates the page; a same-tick page write (URL restore) wins.
+    if (filterChanged && pg === oldPg && pg !== 1) {
+      page.value = 1;
+      return;
+    }
+    syncQuery();
+  },
+);
 
 // ── Org switching — flat routes get no remount for free (design 4.8) ────────
 watch(
@@ -141,13 +153,13 @@ watch(
     for (const key of ["host", "name", "status", "os", "page", "sort", "desc"]) delete q[key];
     await router.replace({ query: q });
     suppressQuerySync = false;
-    detection.refresh();
-    refreshList();
+    // The new org's fan-out only runs once detection confirms host streams exist there.
+    await detection.refresh();
+    if (hostsState.value === "detected") refreshList();
   },
 );
 
-// Empty→live flip: detection connecting inside the embedded setup card
-// re-evaluates, and the list loads the moment the state turns detected.
+// Empty→live flip: the list loads the moment detection turns detected.
 watch(hostsState, (state, prev) => {
   if (state === "detected" && prev !== "detected") refreshList();
 });
@@ -162,6 +174,9 @@ onMounted(() => {
 const drawerHost = computed(() => first(route.query.host) ?? "");
 const drawerStatus = computed(
   () => list.rows.value.find((r) => r.host_name === drawerHost.value)?.status ?? "UNKNOWN",
+);
+const drawerOs = computed(
+  () => list.rows.value.find((r) => r.host_name === drawerHost.value)?.os_type ?? null,
 );
 const openDrawer = (host: string) => {
   router.replace({ query: { ...route.query, host } });
@@ -293,7 +308,13 @@ const osToggleLabel = (slug: string) =>
     <template #actions>
       <div class="flex items-center gap-2">
         <OText v-if="hostsState === 'detected'" variant="meta" data-test="hosts-fleet-count">
-          {{ t("infra.hosts.fleetCount", { total: fleetCount.total, active: fleetCount.active }) }}
+          {{
+            t(
+              "infra.hosts.fleetCount",
+              { total: fleetCount.total, active: fleetCount.active },
+              fleetCount.total,
+            )
+          }}
         </OText>
         <DateTime
           auto-apply
@@ -321,8 +342,7 @@ const osToggleLabel = (slug: string) =>
       <OSpinner size="lg" />
     </div>
 
-    <!-- Undetected: onboarding, not a dead end — the embedded setup card's
-         detection fires the same auto-import wiring as the ingestion page. -->
+    <!-- Undetected: onboarding, not a dead end — the embedded card carries the auto-import wiring. -->
     <div
       v-else-if="hostsState !== 'detected'"
       class="mx-auto flex max-w-3xl flex-col gap-3 py-6"
@@ -342,7 +362,8 @@ const osToggleLabel = (slug: string) =>
           {{ osToggleLabel(slug) }}
         </OButton>
       </div>
-      <DataSourceSetupCard :slug="osSlug" />
+      <!-- Detection connecting inside the embedded card must flip this page live (design 4.8). -->
+      <DataSourceSetupCard :slug="osSlug" @detected="detection.refresh()" />
     </div>
 
     <!-- Total failure: ONE page-level surface, never stacked column warnings. -->
@@ -505,6 +526,7 @@ const osToggleLabel = (slug: string) =>
       v-if="drawerHost"
       :host-name="drawerHost"
       :status="drawerStatus"
+      :os-type="drawerOs"
       :range="{ from: range.start, to: range.end }"
       @close="closeDrawer"
     />
