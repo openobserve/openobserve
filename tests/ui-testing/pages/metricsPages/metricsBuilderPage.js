@@ -574,6 +574,20 @@ export class MetricsBuilderPage {
         return false;
     }
 
+    /** Select the first available label value, gating on the async values fetch; returns the value or ''. */
+    async selectFirstLabelValue() {
+        if (await this.isValueSelectDisabled()) return '';
+        await this.valueSelectLast.click();
+        await this.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
+        // Values load async after the popover opens; wait for the first option to attach before reading, else a one-shot count races the fetch and selects nothing (→ metric{label=""} matches nothing).
+        await this.valueOptions.first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+        if (await this.valueOptions.count() === 0) return '';
+        const value = (await this.valueOptions.first().textContent()).trim();
+        await this.valueOptions.first().click();
+        await this.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+        return value;
+    }
+
     /**
      * Remove a label filter at the given index
      * @param {number} index - 0-based index
