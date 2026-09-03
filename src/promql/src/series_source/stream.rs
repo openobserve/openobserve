@@ -58,14 +58,6 @@ pub(crate) struct StreamSource {
     samples: Vec<Sample>,
 }
 
-/// One hash-ordered input of a shard's merge (a chain of non-overlapping
-/// files). All samples of one series sit in a single run per chain.
-struct ChainCursor {
-    stream: SendableRecordBatchStream,
-    batch: Option<RecordBatch>,
-    row: usize,
-}
-
 impl StreamSource {
     pub(crate) async fn start(
         streams: Vec<SendableRecordBatchStream>,
@@ -156,6 +148,14 @@ impl SeriesSource for StreamSource {
         self.samples.sort_unstable_by_key(|sample| sample.timestamp);
         Ok(&self.samples)
     }
+}
+
+/// One hash-ordered input of a shard's merge (a chain of non-overlapping
+/// files). All samples of one series sit in a single run per chain.
+struct ChainCursor {
+    stream: SendableRecordBatchStream,
+    batch: Option<RecordBatch>,
+    row: usize,
 }
 
 impl ChainCursor {
