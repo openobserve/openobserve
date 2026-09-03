@@ -73,7 +73,11 @@ describe("extractGenAiPartText", () => {
 
   it("prefers the spec's `response` field over the `result` alias when both are present", () => {
     expect(
-      extractGenAiPartText({ type: "tool_call_response", response: "spec-says-this", result: "vendor-says-this" }),
+      extractGenAiPartText({
+        type: "tool_call_response",
+        response: "spec-says-this",
+        result: "vendor-says-this",
+      }),
     ).toBe("spec-says-this");
   });
 
@@ -102,11 +106,11 @@ describe("extractGenAiPartText", () => {
     expect(result).toContain("ok");
   });
 
-  it("defaults tool_call's name to \"tool\" when missing", () => {
+  it('defaults tool_call\'s name to "tool" when missing', () => {
     expect(extractGenAiPartText({ type: "tool_call", arguments: { x: 1 } })).toContain("tool(");
   });
 
-  it("defaults server_tool_call's name to \"tool\" when missing", () => {
+  it('defaults server_tool_call\'s name to "tool" when missing', () => {
     expect(extractGenAiPartText({ type: "server_tool_call", server_tool_call: {} })).toContain(
       "tool(",
     );

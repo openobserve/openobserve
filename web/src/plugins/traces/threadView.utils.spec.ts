@@ -367,9 +367,7 @@ describe("extractContent", () => {
   // OTel GenAI semconv v5 part types (issue #14127) — a "thinking then call
   // a tool" turn must survive instead of vanishing entirely.
   it("renders a reasoning part", () => {
-    expect(extractContent([{ type: "reasoning", content: "let me check" }])).toBe(
-      "let me check",
-    );
+    expect(extractContent([{ type: "reasoning", content: "let me check" }])).toBe("let me check");
   });
 
   it("renders a tool_call part instead of dropping the turn", () => {
@@ -396,9 +394,7 @@ describe("extractContent", () => {
   // A part type the spec hasn't been taught about yet must not make the
   // whole turn disappear — show a generic marker instead of "".
   it("renders a generic marker for an unrecognised future part type", () => {
-    expect(extractContent([{ type: "some_new_part_type", data: 1 }])).toBe(
-      "[some_new_part_type]",
-    );
+    expect(extractContent([{ type: "some_new_part_type", data: 1 }])).toBe("[some_new_part_type]");
   });
 
   // Real-world SDK field-name aliases (verified against actual instrumentation

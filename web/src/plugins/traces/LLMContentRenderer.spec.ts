@@ -517,7 +517,9 @@ describe("LLMContentRenderer", () => {
           content: JSON.stringify([
             {
               role: "assistant",
-              parts: [{ type: "blob", modality: "image", mime_type: "image/png", content: "aGVsbG8=" }],
+              parts: [
+                { type: "blob", modality: "image", mime_type: "image/png", content: "aGVsbG8=" },
+              ],
             },
           ]),
           viewMode: "formatted",
