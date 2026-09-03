@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Streaming evaluation of `agg(range_func(selector))` over hash-sorted
-//! metrics files: each hash band merges its hash-ordered file chains one
+//! metrics files: each hash shard merges its hash-ordered file chains one
 //! series at a time through the shared fused fold, so the sample matrix is
 //! never materialized.
 
@@ -39,7 +39,7 @@ use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
     fused::FusedAggOp,
     load_series::apply_time_window,
-    series_stream::banded::{StreamSource, build_band_inputs},
+    series_stream::hash_sorted::{StreamSource, build_shard_inputs},
     utils::apply_matchers,
 };
 
@@ -62,7 +62,7 @@ pub(crate) struct FusedShape {
     pub range: Duration,
 }
 
-/// Runs the fused aggregation as parallel per-hash-band ordered streams.
+/// Runs the fused aggregation as parallel per-hash-shard ordered streams.
 /// Returns `None` when the layout or query shape rules the streaming plan out
 /// (no ordered table, non-UInt64 hashes, `without` grouping, a plan that would
 /// need an actual sort); the caller then falls back to the materializing path.
@@ -104,15 +104,15 @@ pub(crate) async fn streaming_fused_agg(
     let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
     columns.extend(group_cols.iter().map(String::as_str));
 
-    let bands = ctx.state().config().target_partitions();
-    let Some((band_inputs, band0_plan)) =
-        build_band_inputs(&df, &columns, bands, &trace_id).await?
+    let shards = ctx.state().config().target_partitions();
+    let Some((shard_inputs, shard0_plan)) =
+        build_shard_inputs(&df, &columns, shards, &trace_id).await?
     else {
         return Ok(None);
     };
 
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) started with {bands} bands",
+        "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) started with {shards} shards",
         shape.op.name(),
         shape.func.name(),
     );
@@ -126,7 +126,7 @@ pub(crate) async fn streaming_fused_agg(
     });
     let group_cols = Arc::new(group_cols);
     let offset = selector.offset;
-    let folds = band_inputs
+    let folds = shard_inputs
         .into_iter()
         .map(|streams| {
             let params = params.clone();
@@ -141,9 +141,9 @@ pub(crate) async fn streaming_fused_agg(
 
     if config::get_config().common.print_key_sql {
         log::info!(
-            "[trace_id: {trace_id}] [PromQL] streaming band 0 metrics:\n{}",
+            "[trace_id: {trace_id}] [PromQL] streaming shard 0 metrics:\n{}",
             datafusion::physical_plan::display::DisplayableExecutionPlan::with_metrics(
-                band0_plan.as_ref()
+                shard0_plan.as_ref()
             )
             .indent(true)
         );

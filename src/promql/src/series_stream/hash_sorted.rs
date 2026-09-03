@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! The banded producer: hash-space band plans over hash-sorted scans, and the
-//! per-band series source that merges a band's ordered chains one series at a
+//! The hash-sorted producer: hash-space shard plans over hash-sorted scans, and the
+//! per-shard series source that merges a shard's ordered chains one series at a
 //! time (one round of cursor checks per series instead of one heap operation
 //! per row).
 
@@ -47,7 +47,7 @@ use futures::TryStreamExt;
 use super::SeriesSource;
 use crate::load_series::{LabelColumn, batch_run_len};
 
-/// One band's series source: every chain is hash-ordered and holds one run
+/// One shard's series source: every chain is hash-ordered and holds one run
 /// per series, so the minimum head hash across chains is the next series.
 pub(crate) struct StreamSource {
     cursors: Vec<ChainCursor>,
@@ -58,7 +58,7 @@ pub(crate) struct StreamSource {
     samples: Vec<Sample>,
 }
 
-/// One hash-ordered input of a band's merge (a chain of non-overlapping
+/// One hash-ordered input of a shard's merge (a chain of non-overlapping
 /// files). All samples of one series sit in a single run per chain.
 struct ChainCursor {
     stream: SendableRecordBatchStream,
@@ -222,30 +222,30 @@ impl ChainCursor {
 }
 
 /// Uniform partition of the u64 hash space into `count` inclusive ranges.
-fn hash_bands(count: usize) -> Vec<(u64, u64)> {
+fn hash_shards(count: usize) -> Vec<(u64, u64)> {
     let count = count.max(1) as u128;
     let span = (u64::MAX as u128) + 1;
     (0..count)
-        .map(|band| {
-            let lo = (span * band / count) as u64;
-            let hi = (span * (band + 1) / count - 1) as u64;
+        .map(|shard| {
+            let lo = (span * shard / count) as u64;
+            let hi = (span * (shard + 1) / count - 1) as u64;
             (lo, hi)
         })
         .collect()
 }
 
-/// Builds every band's ordered input streams; `None` (with the offending band
-/// logged) means some band's plan cannot stream in order.
-pub(crate) async fn build_band_inputs(
+/// Builds every shard's ordered input streams; `None` (with the offending shard
+/// logged) means some shard's plan cannot stream in order.
+pub(crate) async fn build_shard_inputs(
     df: &DataFrame,
     columns: &[&str],
-    bands: usize,
+    shards: usize,
     trace_id: &str,
 ) -> Result<Option<(Vec<Vec<SendableRecordBatchStream>>, Arc<dyn ExecutionPlan>)>> {
-    let mut band_inputs = Vec::with_capacity(bands);
-    let mut band0_plan = None;
-    for (band, (lo, hi)) in hash_bands(bands).into_iter().enumerate() {
-        let band_df = df
+    let mut shard_inputs = Vec::with_capacity(shards);
+    let mut shard0_plan = None;
+    for (shard, (lo, hi)) in hash_shards(shards).into_iter().enumerate() {
+        let shard_df = df
             .clone()
             .filter(
                 col(HASH_LABEL)
@@ -253,35 +253,35 @@ pub(crate) async fn build_band_inputs(
                     .and(col(HASH_LABEL).lt_eq(lit(hi))),
             )?
             .select_columns(columns)?
-            // planning-only: proves the scan partitions hash-ordered; the band source merges, not the SPM
+            // planning-only: proves the scan partitions hash-ordered; the shard source merges, not the SPM
             .sort(vec![col(HASH_LABEL).sort(true, false)])?;
-        let task_ctx = Arc::new(band_df.task_ctx());
-        let plan = band_df.create_physical_plan().await?;
-        let Some(streams) = band_streams(plan.clone(), task_ctx)? else {
+        let task_ctx = Arc::new(shard_df.task_ctx());
+        let plan = shard_df.create_physical_plan().await?;
+        let Some(streams) = shard_streams(plan.clone(), task_ctx)? else {
             log::info!(
-                "[trace_id: {trace_id}] [PromQL] streaming fused agg fallback: band {band} plan cannot stream in order:\n{}",
+                "[trace_id: {trace_id}] [PromQL] streaming fused agg fallback: shard {shard} plan cannot stream in order:\n{}",
                 datafusion::physical_plan::display::DisplayableExecutionPlan::new(plan.as_ref())
                     .indent(true)
             );
             return Ok(None);
         };
-        band0_plan.get_or_insert(plan);
-        band_inputs.push(streams);
+        shard0_plan.get_or_insert(plan);
+        shard_inputs.push(streams);
     }
-    let band0_plan = band0_plan.expect("target_partitions is at least one band");
-    Ok(Some((band_inputs, band0_plan)))
+    let shard0_plan = shard0_plan.expect("target_partitions is at least one shard");
+    Ok(Some((shard_inputs, shard0_plan)))
 }
 
-/// The hash-ordered inputs a band folds from: the merge's own child
+/// The hash-ordered inputs a shard folds from: the merge's own child
 /// partitions, so the row-level merge node itself is never executed.
-fn band_streams(
+fn shard_streams(
     plan: Arc<dyn ExecutionPlan>,
     task_ctx: Arc<TaskContext>,
 ) -> Result<Option<Vec<SendableRecordBatchStream>>> {
     if plan_contains_sort(&plan) {
         return Ok(None);
     }
-    // a band whose pruning dropped every file scans nothing: zero chains
+    // a shard whose pruning dropped every file scans nothing: zero chains
     if plan.properties().output_partitioning().partition_count() == 0 {
         return Ok(Some(vec![]));
     }
@@ -326,25 +326,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_band_streams_empty_scan_yields_zero_chains() {
+    fn test_shard_streams_empty_scan_yields_zero_chains() {
         let schema = Arc::new(Schema::new(vec![Field::new(
             HASH_LABEL,
             DataType::UInt64,
             false,
         )]));
         let plan = Arc::new(EmptyExec::new(schema).with_partitions(0));
-        let streams = band_streams(plan, Arc::new(TaskContext::default())).unwrap();
+        let streams = shard_streams(plan, Arc::new(TaskContext::default())).unwrap();
         assert_eq!(streams.map(|streams| streams.len()), Some(0));
     }
 
     #[test]
-    fn test_hash_bands_cover_the_full_space_contiguously() {
+    fn test_hash_shards_cover_the_full_space_contiguously() {
         for count in [1, 3, 7, 16] {
-            let bands = hash_bands(count);
-            assert_eq!(bands.len(), count);
-            assert_eq!(bands[0].0, 0);
-            assert_eq!(bands[count - 1].1, u64::MAX);
-            for pair in bands.windows(2) {
+            let shards = hash_shards(count);
+            assert_eq!(shards.len(), count);
+            assert_eq!(shards[0].0, 0);
+            assert_eq!(shards[count - 1].1, u64::MAX);
+            for pair in shards.windows(2) {
                 assert_eq!(pair[0].1.wrapping_add(1), pair[1].0);
             }
         }

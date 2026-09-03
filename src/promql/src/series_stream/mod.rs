@@ -15,10 +15,10 @@
 
 //! Sources that deliver a query's series one at a time, so a consumer can
 //! evaluate and drop each series without materializing the full set: the
-//! banded producer streams hash-ordered scans, the matrix producer adapts an
+//! hash-sorted producer streams hash-ordered scans, the matrix producer adapts an
 //! already-materialized matrix behind the same contract.
 
-pub(crate) mod banded;
+pub(crate) mod hash_sorted;
 pub(crate) mod matrix;
 
 use config::meta::promql::value::{Labels, Sample};
