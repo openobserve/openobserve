@@ -86,7 +86,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- `table-id` carries a version suffix because column widths and
          visibility are persisted per column id: the previous entry hid Team,
          hid a column that no longer exists, and sized a time column that has
-         since been renamed — three settings no reader chose. -->
+         since been renamed — three settings no reader chose. v3 adds the
+         "On call now" column. -->
     <OTable
       v-if="!unavailable && !setupOnly"
       :frame="false"
@@ -105,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         state: false,
         channels: false,
       }"
-      table-id="oncall-responses-list-v2"
+      table-id="oncall-responses-list-v3"
       :persist-columns="true"
       :show-global-filter="false"
       :enable-column-resize="true"
@@ -439,12 +440,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
 
-      <!-- Who owns it, or — while nobody does — that nobody does, plus who
-           the rotation would actually ring right now, so the reader has
-           someone to reach out to instead of just the fact that no one has
-           answered. An icon rather than a text badge for that second line:
-           "On call now" competed with the escalation column's own words for
-           the reader's attention; a glyph doesn't. -->
+      <!-- Who owns it, or — while nobody does — that nobody does. Who the
+           rotation would ring right now is a separate question (an escalated
+           or reassigned page can be answered by someone no longer holding the
+           pager), so it lives in its own "On call now" column instead of
+           repeating here. -->
       <template #cell-responder="{ row }">
         <OUserCell
           v-if="row.latest.acked_by"
@@ -452,60 +452,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :value="row.latest.acked_by"
           :name="row.latest.acked_by === viewerEmail ? youLabel : undefined"
         />
-        <span v-else class="flex min-w-0 flex-col gap-0.5">
-          <!-- Same text color as the P2 priority tag, so an unanswered page
-               reads as the same order of urgency the priority column already
-               establishes. -->
-          <OText
-            variant="body"
-            as="span"
-            class="text-badge-orange-soft-text"
-            data-test="oncall-responder-nobody"
-          >
-            {{ t("oncall.nobodyYet") }}
-          </OText>
-          <!-- Not in the map yet vs. fetched-and-empty are different facts —
-               see positionsByTeam's loading contract in OnCallTeams.vue. Say
-               nothing while it's still loading rather than flash a name or a
-               gap in and out. -->
-          <span
-            v-if="positionsByTeam[row.latest.team_id ?? '']?.[0]"
-            class="flex min-w-0 items-center gap-1"
-          >
-            <OIcon name="notifications-active" size="xs" class="text-text-secondary shrink-0" />
-            <span
-              class="text-text-secondary truncate text-xs"
-              :data-test="`oncall-responder-oncall-now-${row.rowKey}`"
-            >
-              {{ positionsByTeam[row.latest.team_id ?? '']![0].user_email }}
-              <OTooltip :content="raw(positionsByTeam[row.latest.team_id ?? '']![0].user_email)" />
-            </span>
-            <!-- A bare button, sized to the icon rather than to a control: the
-                 same compact copy affordance OCodeCell uses, so it sits on
-                 this line instead of stretching the row to a button's height. -->
-            <button
-              type="button"
-              class="text-text-secondary hover:text-text-body shrink-0 cursor-pointer leading-none"
-              :title="String(t('common.copy'))"
-              :data-test="`oncall-responder-copy-${row.rowKey}`"
-              @click.stop="
-                copyToClipboard(positionsByTeam[row.latest.team_id ?? '']![0].user_email, t)
-              "
-            >
-              <OIcon name="content-copy" size="xs" />
-            </button>
-          </span>
-          <!-- Fetched, and genuinely nobody: as true of the "who would this
-               page ring" question as "Nobody yet" is of "who answered it". -->
-          <OText
-            v-else-if="row.latest.team_id && positionsByTeam[row.latest.team_id] !== undefined"
-            variant="meta"
-            class="text-status-warning-text"
-            data-test="oncall-responder-gap"
-          >
-            {{ t("oncall.coverage_gap") }}
-          </OText>
-        </span>
+        <!-- Same text color as the P2 priority tag, so an unanswered page
+             reads as the same order of urgency the priority column already
+             establishes. -->
+        <OText
+          v-else
+          variant="body"
+          as="span"
+          class="text-badge-orange-soft-text"
+          data-test="oncall-responder-nobody"
+        >
+          {{ t("oncall.nobodyYet") }}
+        </OText>
+      </template>
+
+      <!-- Who the rotation would ring right now, for this row's team — the
+           person to reach out to, whether or not the page itself has been
+           claimed. Not in the map yet vs. fetched-and-empty are different
+           facts — see positionsByTeam's loading contract in
+           OnCallTeams.vue — so this says nothing while still loading rather
+           than flash a name or a gap in and out. -->
+      <template #cell-on_call_now="{ row }">
+        <OUserCell
+          v-if="positionsByTeam[row.latest.team_id ?? '']?.[0]"
+          class="text-sm"
+          :value="positionsByTeam[row.latest.team_id ?? '']![0].user_email"
+          :name="
+            positionsByTeam[row.latest.team_id ?? '']![0].user_email === viewerEmail
+              ? youLabel
+              : undefined
+          "
+        />
+        <OText
+          v-else-if="row.latest.team_id && positionsByTeam[row.latest.team_id] !== undefined"
+          variant="meta"
+          class="text-status-warning-text"
+          data-test="oncall-oncallnow-gap"
+        >
+          {{ t("oncall.coverage_gap") }}
+        </OText>
       </template>
 
       <!-- The same cell as the Incident list's "Last Alert", down to the hover
@@ -787,7 +772,6 @@ import type {
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { copyToClipboard } from "@/utils/clipboard";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import {
@@ -1028,6 +1012,17 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     header: t("oncall.responder"),
     size: 184,
     accessorFn: (row: PageRow) => row.latest.acked_by ?? "",
+    sortable: true,
+  },
+  {
+    // Who the rotation would ring right now, independent of who (if anyone)
+    // has answered THIS page — an escalated or reassigned page can be
+    // answered by someone no longer holding the pager.
+    id: "on_call_now",
+    header: t("oncall.onCallNow"),
+    size: 184,
+    accessorFn: (row: PageRow) =>
+      positionsByTeam.value[row.latest.team_id ?? ""]?.[0]?.user_email ?? "",
     sortable: true,
   },
   {

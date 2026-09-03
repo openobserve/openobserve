@@ -86,7 +86,7 @@ const geometry = computed(() => ({
     :aria-label="band.ariaLabel"
     :class="[
       'absolute inset-y-0 flex items-center overflow-hidden',
-      'rounded-default px-1.5 text-2xs leading-none font-medium whitespace-nowrap',
+      'rounded-default px-1.5 text-2xs leading-none font-medium whitespace-nowrap text-ellipsis',
       'focus-visible:ring-badge-focus-ring focus-visible:ring-2 focus-visible:outline-none',
       toneClass,
     ]"

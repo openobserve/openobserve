@@ -601,14 +601,14 @@ function openOnCallList() {
   router.push({ name: "onCallResponses", query: { org_identifier: orgId.value } });
 }
 
-/// The banner already resolved which tab repairs the finding. Setting
-/// `activeTab` to its own value is a no-op Vue never re-renders on, so a
-/// finding pointing at the tab the user is already standing on used to do
-/// nothing they could see. Landing on the rotation's own drawer instead of a
-/// bare table is a visible action regardless of which tab was active before.
+// A coverage_gap finding has no single rotation to point at, so land in create mode instead of leaving the drawer closed.
 function onAttentionAct(tab: string, rotation?: string | null) {
   activeTab.value = tab;
-  if (tab !== "schedule" || !rotation) return;
+  if (tab !== "schedule") return;
+  if (!rotation) {
+    openScheduleEditor({ mode: "new" });
+    return;
+  }
   const target = schedule.value?.rotations.find((r) => r.name === rotation);
   if (target) openScheduleEditor({ mode: "edit", id: target.id });
 }

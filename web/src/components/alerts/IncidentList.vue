@@ -139,7 +139,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-dimensions="{ row }">
-          <div class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
+          <div
+            v-if="getSortedDimensions(row.group_values).length"
+            class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
+          >
             <ODimensionChip
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
@@ -174,6 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTooltip>
             </OTag>
           </div>
+          <span v-else class="text-text-muted text-xs italic">
+            {{ t("alerts.incidents.noDimensionsAvailable") }}
+          </span>
         </template>
         <template #cell-alert_count="{ row }">
           <OTag type="countChip" value="neutral">{{ row.alert_count }}</OTag>

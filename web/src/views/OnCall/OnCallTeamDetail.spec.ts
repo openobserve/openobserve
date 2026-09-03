@@ -782,6 +782,22 @@ describe("OnCallTeamDetail", () => {
     expect(editor.props("intent")).toEqual({ mode: "edit", id: "rot_2" });
   });
 
+  /// "coverage_gap" findings name no rotation — the hole is in the schedule as
+  /// a whole. Landing on the bare table there is the exact "Fill gap did
+  /// nothing" bug; the drawer has to open in create mode instead.
+  it("opens the drawer in create mode for a finding with no rotation", async () => {
+    const wrapper = render();
+    await flushPromises();
+
+    wrapper.findComponent({ name: "OnCallTeamAttention" }).vm.$emit("act", "schedule");
+    await flushPromises();
+
+    const panels = wrapper.findComponent({ name: "OTabPanels" });
+    expect(panels.props("modelValue")).toBe("schedule");
+    const editor = wrapper.findComponent({ name: "OnCallScheduleEditor" });
+    expect(editor.props("intent")).toEqual({ mode: "new" });
+  });
+
   /// A rotation the schedule fetch never returned (renamed or deleted between
   /// the check and the click) must not crash the page or fling the reader at
   /// a drawer for an id nothing recognises — the tab switch is still the

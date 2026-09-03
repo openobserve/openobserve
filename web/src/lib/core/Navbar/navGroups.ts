@@ -202,7 +202,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
       // flag is read for navigation, and `router.hasRoute` already limits this
       // to the enterprise/cloud build.
       {
-        titleKey: "oncall.responsesTitle",
+        titleKey: "oncall.pagesNav",
         icon: "notifications-active",
         name: "onCallResponses",
         categoryKey: "menu.onCall",

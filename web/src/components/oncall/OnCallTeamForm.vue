@@ -57,6 +57,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="oncall-team-form-description"
       />
 
+      <!-- The fields above are the whole of what this drawer can change. A
+           reader who opened it to fix "nobody on call" needs a way out to the
+           screen that actually holds members/schedule/escalation, or the
+           pencil that got them here is a dead end. -->
+      <OButton
+        v-if="isEdit"
+        variant="outline"
+        size="sm-action"
+        icon-right="arrow-right-alt"
+        class="self-start"
+        data-test="oncall-team-form-manage-link"
+        @click="goToTeamDetail"
+      >
+        {{ t("oncall.manageTeamCta") }}
+      </OButton>
+
       <!-- Creation only. Once the team exists, membership and the schedule
            have screens of their own and duplicating them here would give two
            places to edit one thing. -->
@@ -119,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
+import { useRouter } from "vue-router";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -156,6 +173,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const store = useStore();
+const router = useRouter();
 const { noteConfigurationDenied } = useOnCallPermissions();
 
 const formKey = ref(0);
@@ -259,6 +277,16 @@ watch(
 
 function close() {
   emit("update:open", false);
+}
+
+function goToTeamDetail() {
+  if (!props.team) return;
+  close();
+  router.push({
+    name: "onCallTeamDetail",
+    params: { teamId: props.team.id },
+    query: { org_identifier: orgId.value },
+  });
 }
 
 async function onSubmit(values: OnCallTeamFormValues) {

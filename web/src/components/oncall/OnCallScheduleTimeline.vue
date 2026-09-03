@@ -311,7 +311,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
+import { useStore } from "vuex";
 
 import { useOnCallClock } from "@/composables/useOnCallClock";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -337,6 +338,7 @@ import type { I18nKey, I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatInZone, formatMinuteOfDay, MINUTES_PER_DAY, rotationMembers } from "@/utils/oncall";
 import { formatMicrosDuration } from "@/utils/formatters";
+import usersService from "@/services/users";
 
 const props = withDefaults(
   defineProps<{
@@ -380,8 +382,32 @@ const emit = defineEmits<{
 const window = defineModel<{ from: number; to: number }>("window", { required: true });
 
 const { t } = useI18nTyped();
+const store = useStore();
 
 const nowMicros = useOnCallClock();
+
+/// Fetched for band labels only: a bar drawn at a few percent of the window's
+/// width has no room for an email, and at a dozen members "o2q-apac1…" and
+/// "o2q-apac2…" clip to the same illegible prefix. The aria-label keeps the
+/// full email regardless — this is a display-only lookup.
+const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[]>([]);
+
+function nameOf(email: string): string {
+  const user = orgUsers.value.find((u) => u.email.toLowerCase() === email.toLowerCase());
+  const name = [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim();
+  return name || email;
+}
+
+onMounted(async () => {
+  try {
+    const orgId = store.state.selectedOrganization.identifier;
+    const res = await usersService.orgUsers(orgId);
+    orgUsers.value = res.data?.data ?? [];
+  } catch {
+    // Labels fall back to the raw email, which is what they showed before.
+    orgUsers.value = [];
+  }
+});
 
 /// The lane dots, spelled out rather than built from the index: Tailwind reads
 /// class names as literal text, so a template-built `bg-schedule-band-${n}-...`
@@ -640,17 +666,18 @@ const tracks = computed<ScheduleTrack[]>(() =>
         const start = Math.max(segment.from, from.value);
         const end = Math.min(segment.to, to.value);
         const who = segment.user_email ?? "";
+        const whoLabel = who ? nameOf(who) : "";
         const isNow = segment.from <= nowMicros.value && segment.to > nowMicros.value;
 
         // The band the reader is actually looking for says so, and says when it
         // ends — the two facts they came to the tab for, on the span itself
         // rather than only in the line above the chart.
-        let label: I18nText = raw(who);
+        let label: I18nText = raw(whoLabel);
         if (who && segment.override_id) {
-          label = t("oncall.schedBandOverride", { who: raw(who) });
+          label = t("oncall.schedBandOverride", { who: raw(whoLabel) });
         } else if (who && isNow) {
           label = t("oncall.schedBandOnNow", {
-            who: raw(who),
+            who: raw(whoLabel),
             when: raw(fmt(segment.to, { weekday: "short", hour: "2-digit", minute: "2-digit" })),
           });
         }
