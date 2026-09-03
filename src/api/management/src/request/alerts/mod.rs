@@ -1200,6 +1200,10 @@ async fn create_anomaly_alert(
         {
             MetaHttpResponse::bad_request(e.to_string())
         }
+        // A rejected config shape is the caller's to fix, not a server fault.
+        Err(e) if e.to_string().contains("validation error") => {
+            MetaHttpResponse::bad_request(e.to_string())
+        }
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
 }
@@ -1978,6 +1982,10 @@ async fn build_and_run_anomaly_update(
             if e.downcast_ref::<config::meta::alerts::tags::TagError>()
                 .is_some() =>
         {
+            MetaHttpResponse::bad_request(e.to_string())
+        }
+        // A rejected config shape is the caller's to fix, not a server fault.
+        Err(e) if e.to_string().contains("validation error") => {
             MetaHttpResponse::bad_request(e.to_string())
         }
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
