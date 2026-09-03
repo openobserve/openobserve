@@ -992,6 +992,39 @@ async fn handle_composite_alert_trigger(
 
     let mut delivery_retry_at = None;
     if evaluated.result {
+        // A composite is an alert as far as paging is concerned, so it pages
+        // through the one path an alert does — same dedup, same flap dampening,
+        // same blast radius — and, like an alert, it pages on FIRING rather
+        // than on being deliverable. Whether it has destinations, and whether
+        // its silence window is open, are questions about notifications; the
+        // record has its own dedup and must not inherit them.
+        //
+        // What a composite does NOT have is an identity. Its notification row
+        // carries the expression and which children fired, not a cluster or a
+        // service, and there is no `oncall_team` column on the definition. So
+        // unless somebody labels it, a composite routes to the org's catch-all
+        // and lands on the unrouted queue — the honest outcome for a signal
+        // nobody has claimed, and a visible one rather than silence.
+        #[cfg(feature = "enterprise")]
+        {
+            let notification_alert = composite_notification_alert(&definition.definition);
+            // Mirrors the alert path: a firing the incident path will take is
+            // not paged twice. A predicate, asked before correlation runs, so
+            // both producers gate on the same thing.
+            let incidents_will_page = notification_alert.creates_incident
+                && o2_enterprise::enterprise::common::config::get_config()
+                    .incidents
+                    .enabled;
+            if o2_enterprise::enterprise::oncall::is_enabled() && !incidents_will_page {
+                let rows = [composite_notification_row(
+                    &definition.definition.expression,
+                    evaluated.result,
+                    &evaluated.children,
+                )];
+                page_for_alert_firing(trace_id, &notification_alert, &rows).await;
+            }
+        }
+
         let delivery = if matches!(outcome, RunOutcome::Pending) {
             DeliveryDecision::SuppressedByPending
         } else {
@@ -1614,6 +1647,199 @@ pub(crate) async fn impacted_services(
     callers.sort();
     callers.dedup();
     callers
+}
+
+/// Open an on-call page for one firing of an alert-shaped signal.
+///
+/// Both producers that page as an alert reach this: an ordinary scheduled
+/// alert, and a composite — which is an alert as far as paging is concerned.
+/// They share the body deliberately. The alert and incident paths were allowed
+/// to drift apart and `creates_incident` ended up meaning something subtly
+/// different on each; one function is how that does not happen a third time.
+///
+/// Whether the incident path has already taken this firing is the caller's
+/// question. This one only decides whether a *record* is owed, and to whom.
+#[cfg(feature = "enterprise")]
+async fn page_for_alert_firing(
+    trace_id: &str,
+    alert: &config::meta::alerts::alert::Alert,
+    rows: &[config::utils::json::Map<String, config::utils::json::Value>],
+) {
+    let (Some(first_row), Some(alert_id)) = (rows.first(), alert.id.as_ref()) else {
+        // Nothing fired, or the signal has no stable id to key a record on.
+        return;
+    };
+        // One page per firing, not one per evaluation cycle. With
+        // `silence = 0` this branch runs every time the query still
+        // matches, and each run used to mint a record with the next firing
+        // number and start a fresh ladder — so a broken thing that stayed
+        // broken paged its owner every minute. The record that is already
+        // open IS this firing; the ladder attached to it is what escalates
+        // if nobody answers.
+        //
+        // The newest record for this source, open OR closed. Widened from
+        // the open-only read for G16: the flap this has to catch is the
+        // close-then-reopen cycle, and a query that returns only open
+        // records cannot see it. `page_decision` decides which of the two
+        // cases the row is.
+        let latest = infra::table::oncall_responses::history_for_source(
+            &alert.org_id,
+            config::meta::oncall::SubjectType::Alert,
+            &alert_id.to_string(),
+            1,
+        )
+        .await
+        .unwrap_or_else(|e| {
+            // A read failure must not silence the page: an extra record is
+            // recoverable, a missed page is not.
+            log::error!(
+                "[SCHEDULER trace_id {trace_id}] could not check for an existing on-call record for {}/{}: {e}",
+                alert.org_id,
+                alert.name
+            );
+            vec![]
+        });
+        let decision = config::meta::oncall::page_decision(
+            latest.first(),
+            now_micros(),
+            flap_dampening_micros(),
+        );
+        if let config::meta::oncall::PageDecision::AlreadyOpen = decision {
+            log::debug!(
+                "[SCHEDULER trace_id {trace_id}] {}/{} already has an open on-call record, so this evaluation does not page again",
+                alert.org_id,
+                alert.name
+            );
+        } else if let config::meta::oncall::PageDecision::Flap {
+            response_id,
+            recovered_for_micros,
+        } = &decision
+        {
+            // G16: the condition cleared and came straight back. That is
+            // one unstable firing, not two, so the responder is not woken
+            // again — but the record they WERE woken for has to say it
+            // happened, or the timeline claims a clean recovery that did
+            // not hold.
+            log::debug!(
+                "[SCHEDULER trace_id {trace_id}] {}/{} fired again {}us after recovering, dampened onto record {response_id}",
+                alert.org_id,
+                alert.name,
+                recovered_for_micros
+            );
+            if let Err(e) = o2_enterprise::enterprise::oncall::escalation::note_flap(
+                &alert.org_id,
+                response_id,
+                *recovered_for_micros,
+                now_micros(),
+            )
+            .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {trace_id}] could not record the flap on {response_id} for {}/{}: {e}",
+                    alert.org_id,
+                    alert.name
+                );
+            }
+        } else {
+            let semantic_groups =
+                crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
+            // Row first, alert conditions for whatever the row left blank.
+            // An aggregating alert returns no identity columns at all, so
+            // without the conditions this path routes on an empty map and
+            // pages the catch-all.
+            let dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
+                &semantic_groups,
+                &alert.query_condition,
+                first_row,
+            );
+            // A multi-alert's groups are separate things broken, and the
+            // notification path already treats them that way — one send per
+            // group, with per-group state. Paging read `rows.first()`, so
+            // whichever group came back first decided who was woken and the
+            // other teams heard nothing about their own outage.
+            //
+            // One representative row per group key, the same reduction
+            // `dispatch_per_group` performs, so the two halves of a firing
+            // cannot disagree about what its groups are.
+            let group_dimensions: Vec<std::collections::HashMap<String, String>> =
+                if alert.query_condition.multi_alert_enabled() {
+                    let group_by = alert
+                        .query_condition
+                        .aggregation
+                        .as_ref()
+                        .and_then(|a| a.group_by.clone())
+                        .unwrap_or_default();
+                    config::meta::alerts::dispatch::rows_by_group_key(&rows, &group_by)
+                        .values()
+                        .map(|row| {
+                            o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
+                                &semantic_groups,
+                                &alert.query_condition,
+                                row,
+                            )
+                        })
+                        .collect()
+                } else {
+                    vec![dimensions.clone()]
+                };
+            // Single-sourced with the incident path: the same alert must
+            // not page at a different severity depending on whether it
+            // creates an incident.
+            let priority = alert
+                .priority
+                .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
+            match o2_enterprise::enterprise::oncall::escalation::start_for_alert_groups(
+                &alert.org_id,
+                &alert_id.to_string(),
+                &alert.name,
+                priority,
+                alert.oncall_team.as_deref(),
+                alert.context_team(),
+                &group_dimensions,
+            )
+            .await
+            {
+                // Blast radius: whoever CALLS the failing service is
+                // impacted and has containment work of their own. The
+                // service-graph query lives here rather than in the engine
+                // because o2_enterprise cannot depend on this crate.
+                //
+                // Per record, against ITS OWN dimensions. A firing that
+                // woke two teams has two origins, and running the graph
+                // query once for whichever came first would leave the other
+                // team's downstream neighbours unwarned — the same silence
+                // one level further out.
+                Ok(opened) => {
+                    for paged in &opened {
+                        let impacted =
+                            impacted_services(&alert.org_id, &paged.dimensions).await;
+                        if !impacted.is_empty()
+                            && let Err(e) =
+                                o2_enterprise::enterprise::oncall::escalation::page_impacted(
+                                    &alert.org_id,
+                                    &paged.response,
+                                    &impacted,
+                                    now_micros(),
+                                )
+                                .await
+                        {
+                            log::error!(
+                                "[SCHEDULER trace_id {trace_id}] impacted paging failed for {}/{}: {e}",
+                                alert.org_id,
+                                alert.name
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::error!(
+                        "[SCHEDULER trace_id {trace_id}] on-call paging failed for {}/{}: {e}",
+                        alert.org_id,
+                        alert.name
+                    );
+                }
+            }
+        }
 }
 
 #[allow(clippy::cognitive_complexity, clippy::too_many_lines)]
@@ -2700,182 +2926,8 @@ async fn handle_alert_triggers(
             && !data.is_empty();
 
         #[cfg(feature = "enterprise")]
-        if o2_enterprise::enterprise::oncall::is_enabled()
-            && !incidents_will_page
-            && let Some(first_row) = data.first()
-            && let Some(alert_id) = alert.id.as_ref()
-        {
-            // One page per firing, not one per evaluation cycle. With
-            // `silence = 0` this branch runs every time the query still
-            // matches, and each run used to mint a record with the next firing
-            // number and start a fresh ladder — so a broken thing that stayed
-            // broken paged its owner every minute. The record that is already
-            // open IS this firing; the ladder attached to it is what escalates
-            // if nobody answers.
-            //
-            // The newest record for this source, open OR closed. Widened from
-            // the open-only read for G16: the flap this has to catch is the
-            // close-then-reopen cycle, and a query that returns only open
-            // records cannot see it. `page_decision` decides which of the two
-            // cases the row is.
-            let latest = infra::table::oncall_responses::history_for_source(
-                &alert.org_id,
-                config::meta::oncall::SubjectType::Alert,
-                &alert_id.to_string(),
-                1,
-            )
-            .await
-            .unwrap_or_else(|e| {
-                // A read failure must not silence the page: an extra record is
-                // recoverable, a missed page is not.
-                log::error!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] could not check for an existing on-call record for {}/{}: {e}",
-                    alert.org_id,
-                    alert.name
-                );
-                vec![]
-            });
-            let decision = config::meta::oncall::page_decision(
-                latest.first(),
-                now_micros(),
-                flap_dampening_micros(),
-            );
-            if let config::meta::oncall::PageDecision::AlreadyOpen = decision {
-                log::debug!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] {}/{} already has an open on-call record, so this evaluation does not page again",
-                    alert.org_id,
-                    alert.name
-                );
-            } else if let config::meta::oncall::PageDecision::Flap {
-                response_id,
-                recovered_for_micros,
-            } = &decision
-            {
-                // G16: the condition cleared and came straight back. That is
-                // one unstable firing, not two, so the responder is not woken
-                // again — but the record they WERE woken for has to say it
-                // happened, or the timeline claims a clean recovery that did
-                // not hold.
-                log::debug!(
-                    "[SCHEDULER trace_id {scheduler_trace_id}] {}/{} fired again {}us after recovering, dampened onto record {response_id}",
-                    alert.org_id,
-                    alert.name,
-                    recovered_for_micros
-                );
-                if let Err(e) = o2_enterprise::enterprise::oncall::escalation::note_flap(
-                    &alert.org_id,
-                    response_id,
-                    *recovered_for_micros,
-                    now_micros(),
-                )
-                .await
-                {
-                    log::error!(
-                        "[SCHEDULER trace_id {scheduler_trace_id}] could not record the flap on {response_id} for {}/{}: {e}",
-                        alert.org_id,
-                        alert.name
-                    );
-                }
-            } else {
-                let semantic_groups =
-                    crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
-                // Row first, alert conditions for whatever the row left blank.
-                // An aggregating alert returns no identity columns at all, so
-                // without the conditions this path routes on an empty map and
-                // pages the catch-all.
-                let dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
-                    &semantic_groups,
-                    &alert.query_condition,
-                    first_row,
-                );
-                // A multi-alert's groups are separate things broken, and the
-                // notification path already treats them that way — one send per
-                // group, with per-group state. Paging read `data.first()`, so
-                // whichever group came back first decided who was woken and the
-                // other teams heard nothing about their own outage.
-                //
-                // One representative row per group key, the same reduction
-                // `dispatch_per_group` performs, so the two halves of a firing
-                // cannot disagree about what its groups are.
-                let group_dimensions: Vec<std::collections::HashMap<String, String>> =
-                    if alert.query_condition.multi_alert_enabled() {
-                        let group_by = alert
-                            .query_condition
-                            .aggregation
-                            .as_ref()
-                            .and_then(|a| a.group_by.clone())
-                            .unwrap_or_default();
-                        config::meta::alerts::dispatch::rows_by_group_key(&data, &group_by)
-                            .values()
-                            .map(|row| {
-                                o2_enterprise::enterprise::oncall::routing::dimensions_for_alert(
-                                    &semantic_groups,
-                                    &alert.query_condition,
-                                    row,
-                                )
-                            })
-                            .collect()
-                    } else {
-                        vec![dimensions.clone()]
-                    };
-                // Single-sourced with the incident path: the same alert must
-                // not page at a different severity depending on whether it
-                // creates an incident.
-                let priority = alert
-                    .priority
-                    .unwrap_or(config::meta::oncall::DEFAULT_PAGING_PRIORITY);
-                match o2_enterprise::enterprise::oncall::escalation::start_for_alert_groups(
-                    &alert.org_id,
-                    &alert_id.to_string(),
-                    &alert.name,
-                    priority,
-                    alert.oncall_team.as_deref(),
-                    alert.context_team(),
-                    &group_dimensions,
-                )
-                .await
-                {
-                    // Blast radius: whoever CALLS the failing service is
-                    // impacted and has containment work of their own. The
-                    // service-graph query lives here rather than in the engine
-                    // because o2_enterprise cannot depend on this crate.
-                    //
-                    // Per record, against ITS OWN dimensions. A firing that
-                    // woke two teams has two origins, and running the graph
-                    // query once for whichever came first would leave the other
-                    // team's downstream neighbours unwarned — the same silence
-                    // one level further out.
-                    Ok(opened) => {
-                        for paged in &opened {
-                            let impacted =
-                                impacted_services(&alert.org_id, &paged.dimensions).await;
-                            if !impacted.is_empty()
-                                && let Err(e) =
-                                    o2_enterprise::enterprise::oncall::escalation::page_impacted(
-                                        &alert.org_id,
-                                        &paged.response,
-                                        &impacted,
-                                        now_micros(),
-                                    )
-                                    .await
-                            {
-                                log::error!(
-                                    "[SCHEDULER trace_id {scheduler_trace_id}] impacted paging failed for {}/{}: {e}",
-                                    alert.org_id,
-                                    alert.name
-                                );
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        log::error!(
-                            "[SCHEDULER trace_id {scheduler_trace_id}] on-call paging failed for {}/{}: {e}",
-                            alert.org_id,
-                            alert.name
-                        );
-                    }
-                }
-            }
+        if o2_enterprise::enterprise::oncall::is_enabled() && !incidents_will_page {
+            page_for_alert_firing(&scheduler_trace_id, &alert, &data).await;
         }
 
         // True when incident correlation ran and handled the notification internally

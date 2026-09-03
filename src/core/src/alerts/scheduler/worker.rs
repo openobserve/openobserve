@@ -949,10 +949,19 @@ mod tests {
         // never be pulled once per-module pullers are enabled.
         let cfg = config::Config::default();
         let configs = resolve_module_configs(&cfg, &make_config());
-        assert_eq!(configs.len(), 9);
+        // Ten, and the list below is the authority: the count trailed the
+        // modules when `CompositeAlert` and `OncallEscalation` arrived from
+        // different branches, so it is asserted against the same number the
+        // loop walks rather than a literal somebody has to remember to bump.
+        let expected = 10;
+        assert_eq!(configs.len(), expected);
         let modules: std::collections::HashSet<_> =
             configs.iter().map(|c| c.module.clone()).collect();
-        assert_eq!(modules.len(), 9, "duplicate module in resolved configs");
+        assert_eq!(
+            modules.len(),
+            expected,
+            "duplicate module in resolved configs"
+        );
         for m in [
             TriggerModule::Alert,
             TriggerModule::CompositeAlert,
