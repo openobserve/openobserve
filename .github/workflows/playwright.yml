@@ -102,11 +102,82 @@ jobs:
             echo "has_changes=false" >> "$GITHUB_OUTPUT"
           fi
 
+  resolve_binary:
+    timeout-minutes: 5
+    name: resolve_binary
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      reuse: ${{ steps.resolve.outputs.reuse }}
+      run_id: ${{ steps.resolve.outputs.run_id }}
+      binary_artifact_name: ${{ steps.resolve.outputs.binary_artifact_name }}
+      frontend_artifact_name: ${{ steps.resolve.outputs.frontend_artifact_name }}
+    steps:
+      - name: Find exact-SHA Playwright runtime
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          ARTIFACT_SHA: ${{ github.sha }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          binary_artifact="release-ci-binary-${ARTIFACT_SHA}"
+          frontend_artifact="frontend-dist-${ARTIFACT_SHA}"
+          selected_run_id="$CURRENT_RUN_ID"
+          reuse=false
+
+          # Scope candidates to this workflow and source head. ARTIFACT_SHA is
+          # the exact tested merge/commit SHA, so a base-branch update cannot
+          # reuse a binary built from an older synthetic merge commit.
+          run_ids="$(
+            gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/playwright.yml/runs?head_sha=${SOURCE_HEAD_SHA}&per_page=100" \
+              --jq '.workflow_runs | sort_by(.created_at) | reverse | .[].id' \
+              2>/dev/null || true
+          )"
+          while IFS= read -r run_id; do
+            [ -n "$run_id" ] || continue
+            artifact_names="$(
+              gh api --method GET \
+                "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" \
+                --jq '.artifacts[] | select(.expired == false) | .name' \
+                2>/dev/null || true
+            )"
+            if grep -Fxq "$binary_artifact" <<< "$artifact_names" &&
+               grep -Fxq "$frontend_artifact" <<< "$artifact_names"; then
+              selected_run_id="$run_id"
+              reuse=true
+              break
+            fi
+          done <<< "$run_ids"
+
+          {
+            echo "reuse=$reuse"
+            echo "run_id=$selected_run_id"
+            echo "binary_artifact_name=$binary_artifact"
+            echo "frontend_artifact_name=$frontend_artifact"
+          } >> "$GITHUB_OUTPUT"
+          if [ "$reuse" = "true" ]; then
+            echo "Reusing exact-SHA Playwright runtime from run $selected_run_id"
+          else
+            echo "No reusable exact-SHA Playwright runtime found; build_binary will run"
+          fi
+
   build_binary:
     timeout-minutes: 45
     name: build_binary
-    needs: [check_changes]
-    if: needs.check_changes.outputs.has_changes == 'true'
+    needs: [check_changes, resolve_binary]
+    if: >-
+      always() &&
+      needs.check_changes.result == 'success' &&
+      needs.check_changes.outputs.has_changes == 'true' &&
+      needs.resolve_binary.result == 'success' &&
+      needs.resolve_binary.outputs.reuse != 'true'
     runs-on:
       labels: ubicloud-standard-16
     permissions:
@@ -256,8 +327,13 @@ jobs:
   ui_integration_tests:
     timeout-minutes: 45
     name: e2e / ${{ matrix.testfolder }}
-    needs: [build_binary, generate_matrix]
-    if: ${{ !cancelled() && needs.build_binary.result == 'success' }}
+    needs: [resolve_binary, build_binary, generate_matrix]
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.resolve_binary.result == 'success' &&
+      needs.generate_matrix.result == 'success' &&
+      (needs.resolve_binary.outputs.reuse == 'true' || needs.build_binary.result == 'success')
     runs-on:
       labels: eks-openobserve-standard-8
     permissions:
@@ -288,14 +364,20 @@ jobs:
       - name: Download binary artifact
         uses: actions/download-artifact@v5
         with:
-          name: release-ci-binary-${{ github.sha }}
+          name: ${{ needs.resolve_binary.outputs.binary_artifact_name }}
           path: release-ci-binary
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve_binary.outputs.run_id }}
 
       - name: Download frontend artifact
         uses: actions/download-artifact@v5
         with:
-          name: frontend-dist-${{ github.sha }}
+          name: ${{ needs.resolve_binary.outputs.frontend_artifact_name }}
           path: /tmp/dist
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve_binary.outputs.run_id }}
 
       - name: Start mail sink (Mailpit)
         # A local SMTP server the tests can also READ. Runs as a static binary
@@ -826,6 +908,7 @@ jobs:
     needs:
       [
         check_changes,
+        resolve_binary,
         build_binary,
         ui_integration_tests,
       ]
@@ -846,13 +929,25 @@ jobs:
             exit 0
           fi
 
-          # 3. Suite was expected to run — pass only if build + tests actually succeeded.
-          if [ "${{ needs.build_binary.result }}" == "success" ] && \
-             [ "${{ needs.ui_integration_tests.result }}" == "success" ]; then
+          # 3. Suite was expected to run. The resolver must succeed, and either
+          #    an exact-SHA pair was reused or this run built a fresh pair.
+          if [ "${{ needs.resolve_binary.result }}" != "success" ]; then
+            echo "resolve_binary job did not succeed: ${{ needs.resolve_binary.result }}"
+            exit 1
+          fi
+          if [ "${{ needs.resolve_binary.outputs.reuse }}" != "true" ] && \
+             [ "${{ needs.build_binary.result }}" != "success" ]; then
+            echo "No reusable artifact and build_binary did not succeed: ${{ needs.build_binary.result }}"
+            exit 1
+          fi
+
+          # 4. Runtime readiness alone is not enough; all selected shards must pass.
+          if [ "${{ needs.ui_integration_tests.result }}" == "success" ]; then
             echo "All Playwright tests completed successfully"
             exit 0
           else
             echo "Playwright tests failed:"
+            echo "  resolve_binary: ${{ needs.resolve_binary.result }} (reuse=${{ needs.resolve_binary.outputs.reuse }})"
             echo "  build_binary: ${{ needs.build_binary.result }}"
             echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
             exit 1
