@@ -2,7 +2,8 @@ name: AI Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    # labeled/unlabeled so adding or removing 'e2e' starts or resets the review.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -17,6 +18,8 @@ on:
 
 jobs:
   review:
+    # Paid CI runs only on PRs carrying the 'e2e' label; the merge queue runs unit tests on the merged code.
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e') }}
     # Explicit name: without it GitHub serializes the whole matrix object (api_key_env, marker) into the public check name.
     name: review (${{ matrix.provider.name }})
     runs-on: ubuntu-latest
@@ -36,17 +39,20 @@ jobs:
       fail-fast: false
       matrix:
         # DeepSeek-V4-Pro is the sole reviewer (the GLM-5.2 head-to-head has ended).
-        # Adding a provider? Also add its `marker` to ALL_REVIEW_MARKERS in run-review.mjs,
-        # or the other legs will claim and overwrite this one's comment.
+        # Markers must not name the model: they ship inside the posted PR comment. Adding a
+        # provider? Give it a distinct `<!-- ai-code-review-<suffix> -->` marker — run-review.mjs
+        # matches that shape, so two legs sharing one marker overwrite each other's comment.
         provider:
           - name: deepseek
-            label: DeepSeek-V4-Pro
             provider_id: deepseek-review
             model_id: deepseek-v4-pro
             model_variant: ""
             api_key_env: DEEPSEEK_API_KEY
-            marker: "<!-- ai-code-review-deepseek -->"
+            marker: "<!-- ai-code-review -->"
     steps:
+      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
+      - if: github.event_name == 'pull_request'
+        run: sleep 60
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
@@ -144,7 +150,6 @@ jobs:
           REVIEW_MODEL_ID: ${{ matrix.provider.model_id }}
           REVIEW_MODEL_VARIANT: ${{ matrix.provider.model_variant }}
           REVIEW_API_KEY_ENV: ${{ matrix.provider.api_key_env }}
-          REVIEW_LABEL: ${{ matrix.provider.label }}
           REVIEW_MARKER: ${{ matrix.provider.marker }}
           # run-review.mjs reads only the key named by REVIEW_API_KEY_ENV.
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}

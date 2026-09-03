@@ -23,7 +23,6 @@ use config::{
 };
 use hashbrown::{HashMap, HashSet};
 use infra::{cache::file_data, file_list as infra_file_list, schema::get_partition_time_level};
-use metrics_index::MetricsFileLayout;
 use search::datafusion::merge::MergeMode;
 use search_service::file_list;
 use tokio::{
@@ -33,7 +32,7 @@ use tokio::{
 
 use super::{
     job::job_range_end,
-    metrics::{MetricsIndexMergeScope, metrics_index_merge_scope},
+    plan::{BatchLimits, plan_batches},
 };
 use crate::worker::{MergeBatch, MergeSender};
 
@@ -170,95 +169,33 @@ pub async fn merge_by_stream(
                 }
             }
 
-            if files_with_size.len() <= 1 && !mode.merges_whole_batch() {
-                return Ok(vec![]);
-            }
-            // what a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`]
-            if mode.is_metrics_indexed() {
-                match metrics_index_merge_scope(&files_with_size, cfg.compact.max_file_size) {
-                    MetricsIndexMergeScope::Skip => return Ok(vec![]),
-                    MetricsIndexMergeScope::LateFilesOnly => {
-                        files_with_size.retain(|f| {
-                            MetricsFileLayout::of(&f.key) != Some(MetricsFileLayout::Indexed)
-                        });
-                        log::debug!(
-                            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] metrics_indexed late merge of {} files, indexed files untouched",
-                            files_with_size.len()
-                        );
-                    }
-                    MetricsIndexMergeScope::WholeHour => {
-                        log::debug!(
-                            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] metrics_indexed fragmentation cap hit, full rewrite of {} files",
-                            files_with_size.len()
-                        );
-                    }
-                }
-            }
-
-            // group files need to merge
-            let mut batch_groups = Vec::new();
-            if mode.merges_whole_batch() {
-                batch_groups.push(MergeBatch {
-                    batch_id: 0,
-                    org_id: org_id.clone(),
-                    stream_type,
-                    stream_name: stream_name.clone(),
-                    prefix: prefix.clone(),
-                    files: files_with_size.clone(),
-                    mode: mode.clone(),
-                });
-            } else {
-                let mut new_file_list = Vec::new();
-                let mut new_file_size = 0;
-                for file in files_with_size.iter() {
-                    if new_file_size + file.meta.original_size > cfg.compact.max_file_size as i64
-                        || (cfg.compact.max_group_files > 0
-                            && new_file_list.len() >= cfg.compact.max_group_files)
-                    {
-                        if new_file_list.len() <= 1 {
-                            if job_strategy == MergeStrategy::FileSize {
-                                break;
-                            }
-                            new_file_list.clear();
-                            new_file_size = file.meta.original_size;
-                            new_file_list.push(file.clone());
-                            continue; // replace previous file with current file
-                        }
-                        batch_groups.push(MergeBatch {
-                            batch_id: batch_groups.len(),
-                            org_id: org_id.clone(),
-                            stream_type,
-                            stream_name: stream_name.clone(),
-                            prefix: prefix.clone(),
-                            files: new_file_list.clone(),
-                            mode: mode.clone(),
-                        });
-                        new_file_size = 0;
-                        new_file_list.clear();
-                    }
-                    new_file_size += file.meta.original_size;
-                    new_file_list.push(file.clone());
-                }
-                // The trailing batch is always below max_file_size (the loop flushes a group
-                // only when adding the next file would exceed it). In incremental mode we do
-                // NOT seal this remainder: more files will arrive in the still-open hour, and
-                // sealing now would force re-merging it later (write amplification). Carry it
-                // to the next round; the scheduled hour-end pass seals whatever is left.
-                if new_file_list.len() > 1 && !is_incremental {
-                    batch_groups.push(MergeBatch {
-                        batch_id: batch_groups.len(),
-                        org_id: org_id.clone(),
-                        stream_type,
-                        stream_name: stream_name.clone(),
-                        prefix: prefix.clone(),
-                        files: new_file_list.clone(),
-                        mode: mode.clone(),
-                    });
-                }
-
-                if batch_groups.is_empty() {
-                    return Ok(vec![]); // no files need to merge
-                }
+            let limits = BatchLimits {
+                strategy: &job_strategy,
+                max_file_size: cfg.compact.max_file_size,
+                max_group_files: cfg.compact.max_group_files,
+                is_incremental,
+                merge_max_original_size: infra_file_list::merge_max_original_size(),
+            };
+            let batch_groups: Vec<MergeBatch> = plan_batches(
+                files_with_size,
+                &mode,
+                &limits,
+                &format!("{org_id}/{stream_type}/{stream_name}"),
+            )
+            .into_iter()
+            .enumerate()
+            .map(|(batch_id, (files, mode))| MergeBatch {
+                batch_id,
+                org_id: org_id.clone(),
+                stream_type,
+                stream_name: stream_name.clone(),
+                prefix: prefix.clone(),
+                files,
+                mode,
+            })
+            .collect();
+            if batch_groups.is_empty() {
+                return Ok(vec![]); // no files need to merge
             }
 
             // send to worker
