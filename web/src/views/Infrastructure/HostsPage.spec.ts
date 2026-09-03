@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The Hosts fleet page (design 4.8/§6): empty-state-as-onboarding, URL-carried
-// state, tri-state banners, threshold tinting, org-switch hygiene.
+// The Hosts fleet page (design 4.8/§6): onboarding empty state, URL-carried state, banners, tinting.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
@@ -24,8 +23,7 @@ import { defineComponent, h, ref } from "vue";
 import HostsPage from "./HostsPage.vue";
 import i18n from "@/locales";
 
-// Mock factories run at import time but only dereference these at mount time,
-// so module-scope reactive state is safe to share with the mocks.
+// Mock factories only dereference these at mount time, so module-scope reactive state is safe.
 vi.mock("./useHostsList", () => ({
   useHostsList: () => hostsListState,
   utilizationTint: (v: number | null) =>
@@ -202,6 +200,7 @@ describe("HostsPage", () => {
     hostsListState.pageError.value = null;
     hostsListState.nameFilter.value = "";
     hostsListState.statusFilter.value = [];
+    hostsListState.osFilter.value = [];
     hostsListState.page.value = 1;
     hostsListState.sortBy.value = "cpu";
     hostsListState.sortDesc.value = true;
@@ -280,12 +279,14 @@ describe("HostsPage", () => {
       wrapper = await mountPage({
         name: "web",
         status: "ACTIVE",
+        os: "linux",
         page: "2",
         sort: "memoryPct",
         desc: "false",
       });
       expect(hostsListState.nameFilter.value).toBe("web");
       expect(hostsListState.statusFilter.value).toContain("ACTIVE");
+      expect(hostsListState.osFilter.value).toContain("linux");
       expect(hostsListState.page.value).toBe(2);
       expect(hostsListState.sortBy.value).toBe("memoryPct");
       expect(hostsListState.sortDesc.value).toBe(false);
@@ -295,9 +296,11 @@ describe("HostsPage", () => {
       wrapper = await mountPage();
       hostsListState.nameFilter.value = "db";
       hostsListState.sortBy.value = "disk";
+      hostsListState.osFilter.value = ["windows"];
       await flushPromises();
       expect(router.currentRoute.value.query.name).toBe("db");
       expect(router.currentRoute.value.query.sort).toBe("disk");
+      expect([router.currentRoute.value.query.os].flat()).toContain("windows");
     });
   });
 
@@ -309,10 +312,11 @@ describe("HostsPage", () => {
         .map((el) => el.attributes("data-test"));
       expect(values).toEqual(["hosts-facet-status-ACTIVE", "hosts-facet-status-INACTIVE"]);
 
+      // §4.8: UNKNOWN only exists on total liveness failure ⇒ ALL rows UNKNOWN, zero-count rows kept.
       hostsListState.facets.value = {
         status: [
-          { value: "ACTIVE", count: 2 },
-          { value: "INACTIVE", count: 1 },
+          { value: "ACTIVE", count: 0 },
+          { value: "INACTIVE", count: 0 },
           { value: "UNKNOWN", count: 3 },
         ],
         os: [],

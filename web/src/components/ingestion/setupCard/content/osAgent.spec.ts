@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Shared host-agent card content (design 4.2/4.5/§6): the tightened detection
-// keyword and the dashboard-ready step every host card appends.
+// Shared host-agent card content (design 4.2/4.5/§6): detection keyword + dashboard-ready step.
 
 import { describe, it, expect } from "vitest";
 import { hostMetricsDetect, dashboardReadyStep } from "./osAgent";
+import i18n from "@/locales";
 import linuxCard from "./linux";
 import windowsCard from "./windows";
 import macosCard from "./macos";
@@ -31,8 +31,7 @@ const SUBS = {
 
 describe("hostMetricsDetect", () => {
   it("is frozen to keyword detection on the verified system_ prefix", () => {
-    // OTLP ingest names streams format_stream_name(metric.name), so hostmetrics'
-    // system.* metrics land as system_* streams (3.8) — underscore included.
+    // OTLP ingest lands hostmetrics' system.* metrics as system_* streams (3.8) — underscore included.
     expect(hostMetricsDetect).toEqual({
       streamType: "metrics",
       match: "keyword",
@@ -68,5 +67,37 @@ describe("host agent cards include the dashboard step", () => {
     const card = builder(SUBS, gt);
     expect(card.steps.map((s: any) => s.id)).toEqual(["install", "verify", "dashboard"]);
     expect(card.steps[2].completeOn).toBe("detect");
+  });
+});
+
+describe("ingestion.setupCard i18n keys (design 4.2 — the 9 new en-US keys)", () => {
+  const NEW_KEYS = [
+    "ingestion.setupCard.dashboardReadyTitle",
+    "ingestion.setupCard.dashboardReadyDesc",
+    "ingestion.setupCard.chipDashboard",
+    "ingestion.setupCard.viewHostDashboard",
+    "ingestion.setupCard.hostDashboardImported",
+    "ingestion.setupCard.hostDashboardExists",
+    "ingestion.setupCard.viewHosts",
+    "ingestion.setupCard.hostDashboardImportForbidden",
+    "ingestion.setupCard.hostDashboardImportFailed",
+  ];
+
+  it.each(NEW_KEYS)("%s exists in en-US (t(key) must not echo the key)", (key) => {
+    // vue-i18n echoes the raw key when missing — echoing makes every t()-based pin vacuous.
+    expect(i18n.global.t(key)).not.toBe(key);
+  });
+
+  it("keeps the forbidden and generic failure copy distinct (pass-4 finding 2)", () => {
+    expect(i18n.global.t("ingestion.setupCard.hostDashboardImportForbidden")).not.toBe(
+      i18n.global.t("ingestion.setupCard.hostDashboardImportFailed"),
+    );
+  });
+
+  it("leads the imported/exists toast copy with the Infra → Hosts destination (4.2)", () => {
+    expect(i18n.global.t("ingestion.setupCard.hostDashboardImported")).toContain("Infra → Hosts");
+    expect(i18n.global.t("ingestion.setupCard.hostDashboardExists")).toContain("Infra → Hosts");
+    expect(i18n.global.t("ingestion.setupCard.viewHosts")).toBe("View Hosts");
+    expect(i18n.global.t("ingestion.setupCard.dashboardReadyTitle")).toBe("Get your dashboard");
   });
 });

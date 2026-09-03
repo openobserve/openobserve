@@ -298,10 +298,7 @@ describe("ONavGroup", () => {
     });
   });
 
-  // The always-present Infra tile and its anchor-child tile link (design 4.7/§6):
-  // the tile's destination follows the DECLARED child that resolves to
-  // parentLink (dbmDatabases); when that child gates out, the first visible
-  // child wins — NOT the first declared child, which is now ungated Hosts.
+  // Anchor-child tile link (4.7/§6): the child resolving to parentLink wins; gated out ⇒ first visible child.
   describe("Infra tile with workload children (Hosts first)", () => {
     // Exposes the resolved tile link so the anchor-child rule is assertable.
     const linkedTileStub = {
@@ -402,8 +399,7 @@ describe("ONavGroup", () => {
     });
 
     it("keeps /infra/databases as the tile link when DBM is on, despite Hosts being declared first", () => {
-      // The case that catches a first-declared-child regression: ungated Hosts
-      // always survives, so keying on "first declared" would re-break DBM-off.
+      // Ungated Hosts always survives, so keying on "first declared" would re-break DBM-off.
       wrapper = mountInfraTile(true);
       expect(tileLink()).toBe("/infra/databases");
     });
@@ -424,8 +420,7 @@ describe("ONavGroup", () => {
     });
 
     it("leaves every other group's tile link byte-identical to its parentLink", () => {
-      // Regression guard on the fallback: the anchor child (logstreams →
-      // /streams) survives, so the existing groups render bit-identically.
+      // The anchor child survives in every existing group, so they render bit-identically.
       wrapper = mount(ONavGroup, {
         props: {
           groupKey: "data",

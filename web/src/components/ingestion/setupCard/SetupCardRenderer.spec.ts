@@ -30,8 +30,7 @@ vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams: vi.fn() }),
 }));
 
-// useStreamDetect's stage-1 existence probe — driven per test for the
-// detected-emit cases; every other suite in this file never clicks Test.
+// Stage-1 existence probe, driven per test for the detected-emit cases only.
 const nameListMock = vi.fn();
 vi.mock("@/services/stream", () => ({
   default: { nameList: (...a: any[]) => nameListMock(...a) },
@@ -268,9 +267,7 @@ describe("SetupCardRenderer — footer doc links", () => {
   });
 });
 
-// T1.2 (design 4.2/§6): the renderer's ONE new emit and the detect-gated
-// step-action button. Existing cards listen to neither, so nothing changes
-// for them — pinned by the last case.
+// T1.2 (design 4.2/§6): the one new emit + detect-gated action; existing cards listen to neither.
 describe("SetupCardRenderer — detected emit & showOnDetect actions", () => {
   let wrapper: VueWrapper<any>;
 

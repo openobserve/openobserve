@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// L0 workload detection over stream names (design 4.6/§6): client-side only,
-// riding the org-scoped stream cache, no module-level state.
+// L0 workload detection over stream names (design 4.6/§6): client-side, no module-level state.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { flushPromises } from "@vue/test-utils";
@@ -119,8 +118,7 @@ describe("useWorkloadDetection", () => {
       const { refresh } = useWorkloadDetection();
       await refresh();
       await flushPromises();
-      // notify=false is the third arg — passing 2 args fires the loading toast
-      // on every empty-state render (the pass-2 finding-4 regression).
+      // notify=false must be the explicit third arg or every empty-state render toasts (pass-2 finding 4).
       expect(getStreams).toHaveBeenCalledWith("metrics", false, false);
       expect(getStreams).toHaveBeenCalledWith("logs", false, false);
       for (const call of getStreams.mock.calls) {

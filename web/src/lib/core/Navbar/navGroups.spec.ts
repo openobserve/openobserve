@@ -440,9 +440,7 @@ describe("groupNavLinks", () => {
     const entries = groupNavLinks([link("home"), link("traces")]);
     const infra = infraGroup(entries);
     expect(infra).toBeTruthy();
-    // The declared child order IS the flyout order (pass-4 finding 4): Hosts
-    // leads even on DBM-enabled orgs. The tile's parentLink stays Databases —
-    // the DBM-off landing fix is render-time (ONavGroup), not data.
+    // Declared child order IS the flyout order (pass-4 finding 4): Hosts leads; parentLink stays Databases.
     expect(infra?.item.link).toBe("/infra/databases");
     expect(infra?.children.map((c) => c.name)).toEqual([
       "infraHosts",
@@ -453,8 +451,7 @@ describe("groupNavLinks", () => {
   });
 
   it("declares the three workload children ungated, with their titleKey/icon/route", () => {
-    // Ungated = always present under Infra; detection changes their page STATE,
-    // never their existence (the spec's Workload Detection nav rule).
+    // Ungated = always present under Infra; detection changes page state, never existence.
     const infra = NAV_GROUPS.find((g) => g.key === "infra");
     const byName = (name: string) => infra?.children.find((c) => c.name === name);
     expect(byName("infraHosts")).toMatchObject({

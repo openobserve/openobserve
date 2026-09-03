@@ -82,8 +82,7 @@ describe("useStreamDetect", () => {
   });
 
   it('keyword "system_" does NOT match an underscore-less near-miss like mysystemd', async () => {
-    // nameList filters by substring server-side; mirror that here so the mock
-    // behaves like the API the keyword actually hits.
+    // nameList filters by substring server-side — the mock must behave like that API.
     nameList.mockImplementation(
       (_org: any, _type: any, _schema: any, _f: any, _t: any, kw: string) => {
         const all = ["mysystemd", "systemdaemon_metrics"];

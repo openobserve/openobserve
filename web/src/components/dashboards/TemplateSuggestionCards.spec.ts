@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Empty-state template cards (design 4.3/§6): bundled Host Metrics card with
-// zero network on render, lazy S3 gallery, detection badge, confirmed replace.
+// Empty-state template cards (design 4.3/§6): zero network on render, lazy gallery, badge, confirmed replace.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
@@ -23,6 +22,7 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import { ref } from "vue";
 import TemplateSuggestionCards from "./TemplateSuggestionCards.vue";
 import dashboardsService from "@/services/dashboards";
+import dashboardJson from "@/assets/dashboards/host_metrics.dashboard.json";
 import i18n from "@/locales";
 
 const { importHostMetricsDashboard, toastMock, refreshMock } = vi.hoisted(() => ({
@@ -31,8 +31,7 @@ const { importHostMetricsDashboard, toastMock, refreshMock } = vi.hoisted(() => 
   refreshMock: vi.fn(),
 }));
 
-// Factories only dereference these at call time (after module init), so the
-// vue refs can live at module scope.
+// Factories dereference these at call time, so the vue refs can live at module scope.
 vi.mock("@/composables/useWorkloadDetection", () => ({
   useWorkloadDetection: () => ({ states: workloadStates, refresh: refreshMock }),
 }));
@@ -72,6 +71,46 @@ vi.mock("@/services/dashboards", () => ({
 
 const t = (key: string) => i18n.global.t(key);
 
+// The house ODialog teleports via DialogPortal — the sibling suites' stub keeps it findable in-wrapper.
+const ODialogStub = {
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "width",
+    "title",
+    "subTitle",
+    "showClose",
+    "persistent",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test-stub="o-dialog"
+      :data-open="open"
+      :data-title="title"
+      :data-primary-label="primaryButtonLabel"
+      :data-secondary-label="secondaryButtonLabel"
+    >
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+    </div>
+  `,
+};
+
 describe("TemplateSuggestionCards", () => {
   let wrapper: VueWrapper<any>;
   let router: any;
@@ -92,7 +131,7 @@ describe("TemplateSuggestionCards", () => {
     vi.spyOn(router, "push");
     return mount(TemplateSuggestionCards, {
       props: { activeFolderId: "default", filterQuery: "", ...props },
-      global: { plugins: [store, router, i18n] },
+      global: { plugins: [store, router, i18n], stubs: { ODialog: ODialogStub } },
     });
   };
 
@@ -211,11 +250,8 @@ describe("TemplateSuggestionCards", () => {
     expect(dashboardsService.create).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(500);
     await flushPromises();
-    expect(dashboardsService.create).toHaveBeenCalledWith(
-      "test-org",
-      expect.objectContaining({ title: "Host Metrics" }),
-      "default",
-    );
+    // §6: the create body IS the bundled JSON, not merely something title-shaped.
+    expect(dashboardsService.create).toHaveBeenCalledWith("test-org", dashboardJson, "default");
   });
 
   it("declining the replace navigates to the existing dashboard untouched", async () => {
@@ -269,7 +305,10 @@ describe("TemplateSuggestionCards", () => {
   });
 
   it("keeps the bundled card standing when the lazy gallery fetch fails", async () => {
-    galleryState.loadDashboards.mockRejectedValue(new Error("offline"));
+    // Pinned contract (useDashboardGallery.spec): loadDashboards never rejects.
+    galleryState.loadDashboards.mockImplementation(async () => {
+      galleryState.error.value = "offline";
+    });
     wrapper = mountCards();
     await wrapper.find('[data-test="template-browse-all"]').trigger("click");
     await flushPromises();

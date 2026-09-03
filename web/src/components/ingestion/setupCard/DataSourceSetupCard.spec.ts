@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// T1.2 wiring (design 4.2/§6): this component owns the host-metrics auto-import
-// on `detected` and the `view-host-dashboard` step action — sole spec cover.
+// T1.2 wiring (design 4.2/§6): auto-import on `detected` + the view-host-dashboard action.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
@@ -55,8 +54,7 @@ const rendererStub = {
   template: '<div data-test="renderer-stub" />',
 };
 
-// Key-pinning trick: compare against the SAME translation the component uses,
-// so a wrong key fails now (key-string mismatch) and after the locale lands.
+// Comparing against the same translation the component uses catches a wrong key either side of the locale landing.
 const t = (key: string) => i18n.global.t(key);
 
 describe("DataSourceSetupCard — host metrics auto-import wiring", () => {

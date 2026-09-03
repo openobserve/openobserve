@@ -210,8 +210,7 @@ describe("OtelCollector.vue", () => {
     });
   });
 
-  // T1.4 (design 4.4/§6): the hostmetrics receiver block renders FIRST, above
-  // the two exporter blocks, and stays in lockstep with the rebuilt dashboard.
+  // T1.4 (design 4.4/§6): the hostmetrics receiver block renders first, above the exporter blocks.
   describe("Host metrics receiver block", () => {
     const hostMetricsContent = () => {
       wrapper = createWrapper();
@@ -241,9 +240,11 @@ describe("OtelCollector.vue", () => {
       expect(content).toContain("otlphttp/openobserve");
     });
 
-    it("interpolates the org id and masks the passcode", () => {
+    it("interpolates the org id and masks the passcode in the hostmetrics block", () => {
       wrapper = createWrapper({ currOrgIdentifier: "my-org" });
       const content = wrapper.findAllComponents(CopyContent)[0].props("content") as string;
+      // Pins the NEW block: today's first block is the HTTP exporter, which lacks this.
+      expect(content).toContain("hostmetrics");
       expect(content).toContain("my-org");
       expect(content).toContain("[BASIC_PASSCODE]");
     });

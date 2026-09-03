@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Thin v1 Kubernetes / AWS workload pages (design 4.9/§6): setup-state vs
-// detected-state, no new data plumbing.
+// Thin v1 Kubernetes / AWS workload pages (design 4.9/§6): setup-state vs detected-state.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
