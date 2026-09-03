@@ -64,9 +64,6 @@ export function experimentEvidence(detail?: ExperimentDetail): ExperimentEvidenc
   if (!detail) return { completedSlots: 0, totalSlots: 0, cost: null, scores: [] };
 
   const executions = detail.results.executions;
-  const costs = executions
-    .map((execution) => execution.cost)
-    .filter((cost): cost is number => typeof cost === "number" && Number.isFinite(cost));
   const numericScores = new Map<string, number[]>();
   const booleanScores = new Map<string, boolean[]>();
   const categoricalScores = new Map<string, string[]>();
@@ -96,7 +93,7 @@ export function experimentEvidence(detail?: ExperimentDetail): ExperimentEvidenc
       executions.map((execution) => `${execution.rowId}:${execution.trialIndex}`),
     ).size,
     totalSlots: detail.preview.slotCount,
-    cost: costs.length ? costs.reduce((total, cost) => total + cost, 0) : null,
+    cost: detail.results.aggregateSummary?.totalCost ?? null,
     scores: [
       ...[...numericScores].map(([name, values]): ExperimentScoreSummary => ({
         name,

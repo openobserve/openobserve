@@ -272,6 +272,9 @@ export interface ExperimentResultPagination {
 export interface ExperimentAggregateSummary {
   p50LatencyMs: number | null;
   totalCost: number;
+  taskCost?: number | null;
+  scoringCost?: number | null;
+  costIncomplete?: boolean;
   incomplete: boolean;
   incompleteTaskSlots: number;
   incompleteScoreDimensions: number;
@@ -584,6 +587,9 @@ function normalizeResults(input: any): ExperimentResults {
     aggregateSummary: {
       p50LatencyMs: value(aggregateSummary, "p50LatencyMs", "p50_latency_ms", null),
       totalCost: Number(value(aggregateSummary, "totalCost", "total_cost", 0)),
+      taskCost: numberOrNull(value(aggregateSummary, "taskCost", "task_cost", null)),
+      scoringCost: numberOrNull(value(aggregateSummary, "scoringCost", "scoring_cost", null)),
+      costIncomplete: Boolean(value(aggregateSummary, "costIncomplete", "cost_incomplete", false)),
       incomplete: Boolean(aggregateSummary.incomplete ?? false),
       incompleteTaskSlots: Number(
         value(aggregateSummary, "incompleteTaskSlots", "incomplete_task_slots", 0),
