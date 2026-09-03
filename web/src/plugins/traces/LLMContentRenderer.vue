@@ -495,6 +495,13 @@ const formatContent = (content: any): string => {
       } else if (part.type === "image" && part.source) {
         // Handle Anthropic-style image content
         parts.push(raw(`[Image: ${part.source.type || "base64"}]`));
+      } else if (part.type === "blob") {
+        // OTel GenAI v5 BlobPart — never show the raw base64 payload.
+        parts.push(raw(`[${part.modality ?? "Blob"}: ${part.mime_type ?? "binary"}]`));
+      } else if (part.type === "file") {
+        parts.push(raw(`[File: ${part.file_id ?? part.mime_type ?? "unknown"}]`));
+      } else if (part.type === "uri") {
+        parts.push(raw(`[${part.modality ?? "Uri"}: ${part.uri ?? ""}]`));
       } else {
         // Fallback for unknown part types
         parts.push(JSON.stringify(part));

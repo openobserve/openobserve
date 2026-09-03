@@ -509,21 +509,60 @@ describe("LLMContentRenderer", () => {
 
     // Preview is a full-fidelity view: unlike the Thread tab, it still shows
     // *something* for a part type with no text representation (blob/file/uri)
-    // instead of leaving the message blank.
-    it("still shows something for a blob part instead of leaving the message blank", () => {
+    // — but a friendly placeholder (matching the existing image_url/image
+    // pattern), not a raw JSON dump of a base64 payload.
+    it("shows a placeholder for a blob part, not the raw base64 payload", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {
           content: JSON.stringify([
             {
               role: "assistant",
-              parts: [{ type: "blob", modality: "image", content: "aGVsbG8=" }],
+              parts: [{ type: "blob", modality: "image", mime_type: "image/png", content: "aGVsbG8=" }],
             },
           ]),
           viewMode: "formatted",
         },
       });
 
-      expect(wrapper.vm.parsedMessages[0].content).toBeTruthy();
+      const content = wrapper.vm.parsedMessages[0].content;
+      expect(content).toBeTruthy();
+      expect(content).not.toContain("aGVsbG8=");
+    });
+
+    it("shows a placeholder for a file part", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            {
+              role: "assistant",
+              parts: [{ type: "file", modality: "document", file_id: "report.pdf" }],
+            },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      const content = wrapper.vm.parsedMessages[0].content;
+      expect(content).toContain("report.pdf");
+      expect(content).not.toContain('"type"');
+    });
+
+    it("shows a placeholder for a uri part", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            {
+              role: "assistant",
+              parts: [{ type: "uri", modality: "image", uri: "https://example.com/x.png" }],
+            },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      const content = wrapper.vm.parsedMessages[0].content;
+      expect(content).toContain("https://example.com/x.png");
+      expect(content).not.toContain('"type"');
     });
   });
 
