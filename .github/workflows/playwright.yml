@@ -8,9 +8,9 @@ on:
   pull_request:
     branches:
       - "**"
-    # labeled/unlabeled so adding or removing the 'e2e' label re-fires the run and
-    # re-evaluates the gate in playwright_summary.
-    types: [opened, reopened, synchronize, labeled, unlabeled]
+    # labeled/unlabeled so adding or removing 'e2e' starts or resets CI.
+    # auto_merge_enabled: the one full-matrix run per PR, at merge time (see generate_matrix).
+    types: [opened, reopened, synchronize, labeled, unlabeled, auto_merge_enabled]
   merge_group:
 
 concurrency:
@@ -70,6 +70,8 @@ env:
 
 jobs:
   check_changes:
+    # Runs only on PRs carrying the 'e2e' label; the merge queue runs unit tests only (see docs/ci).
+    if: ${{ github.event_name != 'merge_group' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e')) }}
     timeout-minutes: 5
     name: check_changes
     runs-on: ubuntu-latest
@@ -78,6 +80,9 @@ jobs:
     outputs:
       has_changes: ${{ steps.check.outputs.has_changes }}
     steps:
+      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
+      - if: github.event_name == 'pull_request'
+        run: sleep 60
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -108,14 +113,7 @@ jobs:
     timeout-minutes: 45
     name: build_binary
     needs: [check_changes]
-    # Run when there are e2e-relevant changes AND either this is not a pull_request
-    # (push to main / merge_group always run) or the PR carries the 'e2e' label.
-    if: >-
-      (github.event_name == 'pull_request' &&
-       (contains(github.event.pull_request.labels.*.name, 'e2e') ||
-        contains(github.event.pull_request.labels.*.name, 'e2e-full'))) ||
-      (github.event_name != 'pull_request' &&
-       needs.check_changes.outputs.has_changes == 'true')
+    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on:
       labels: ubicloud-standard-16
     permissions:
@@ -205,12 +203,7 @@ jobs:
     timeout-minutes: 5
     name: generate_matrix
     needs: [check_changes]
-    if: >-
-      (github.event_name == 'pull_request' &&
-       (contains(github.event.pull_request.labels.*.name, 'e2e') ||
-        contains(github.event.pull_request.labels.*.name, 'e2e-full'))) ||
-      (github.event_name != 'pull_request' &&
-       needs.check_changes.outputs.has_changes == 'true')
+    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -227,12 +220,12 @@ jobs:
         run: node --test .github/scripts/build-ci-matrix.test.js
       - id: gen
         env:
-          # Smoke selection runs only on PRs; merge_group ALWAYS gets the full matrix, so
-          # everything that merges is still covered by all shards. Escape hatches: the
-          # 'e2e-full' PR label forces the full matrix for one PR; the PW_SMOKE_DISABLED
-          # repo variable ('true') turns smoke off everywhere without a code change.
+          # Smoke selection runs on PR pushes; the merge queue no longer runs Playwright, so the
+          # full matrix runs once per PR when auto-merge is enabled ("Merge when ready").
+          # Escape hatches: the 'e2e-full' PR label forces the full matrix on every push; the
+          # PW_SMOKE_DISABLED repo variable ('true') turns smoke off everywhere without a code change.
           IS_PR: ${{ github.event_name == 'pull_request' }}
-          HAS_FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'e2e-full') }}
+          HAS_FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'e2e-full') || github.event.pull_request.auto_merge != null }}
           SMOKE_DISABLED: ${{ vars.PW_SMOKE_DISABLED }}
           BASE_REF: ${{ github.base_ref }}
         run: |
@@ -842,7 +835,7 @@ jobs:
         build_binary,
         ui_integration_tests,
       ]
-    if: always()
+    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e'))
     steps:
       - name: Check test results
         run: |
@@ -853,28 +846,13 @@ jobs:
             exit 1
           fi
 
-          # 2. On a pull_request WITHOUT the 'e2e' label the suite did not run: block (fail)
-          #    when the change is Playwright-relevant so the author opts in, else bypass (pass).
-          #    Adding the 'e2e' label always runs the suite (see build_binary's if).
-          if [ "${{ github.event_name }}" == "pull_request" ] && \
-             [ "${{ contains(github.event.pull_request.labels.*.name, 'e2e') || contains(github.event.pull_request.labels.*.name, 'e2e-full') }}" != "true" ]; then
-            if [ "${{ needs.check_changes.outputs.has_changes }}" == "true" ]; then
-              echo "::error::This PR changes Playwright-relevant files but has no 'e2e' label, so the suite did not run."
-              echo "::error::Add the 'e2e' label to the PR to run the full Playwright suite before merging."
-              exit 1
-            fi
-            echo "✅ No Playwright-relevant changes and no 'e2e' label — suite not required for this PR."
-            exit 0
-          fi
-
-          # 3. Non-PR event (push / merge queue) with nothing relevant → nothing ran → allow.
-          if [ "${{ github.event_name }}" != "pull_request" ] && \
-             [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
+          # 2. Nothing Playwright-relevant changed → nothing ran → allow.
+          if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
             echo "✅ No Playwright-relevant changes — suite not required."
             exit 0
           fi
 
-          # 4. Suite was expected to run — pass only if build + tests actually succeeded.
+          # 3. Suite was expected to run — pass only if build + tests actually succeeded.
           if [ "${{ needs.build_binary.result }}" == "success" ] && \
              [ "${{ needs.ui_integration_tests.result }}" == "success" ]; then
             echo "All Playwright tests completed successfully"

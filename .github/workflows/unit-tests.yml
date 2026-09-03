@@ -1,12 +1,15 @@
 name: Unit tests
 
 on:
+  # Kept as the Rust cache writer on main: caches saved from merge-queue refs are never restored by PRs.
   push:
     branches:
       - "main"
   pull_request:
     branches:
       - "**"
+    # labeled/unlabeled so adding or removing 'e2e' starts or resets CI.
+    types: [opened, reopened, synchronize, labeled, unlabeled]
   merge_group:
 
 concurrency:
@@ -21,6 +24,8 @@ env:
 
 jobs:
   check_changes:
+    # Paid CI runs only on PRs carrying the 'e2e' label; the merge queue runs unit tests on the merged code.
+    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e') }}
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
@@ -29,6 +34,9 @@ jobs:
       has_backend_changes: ${{ steps.check.outputs.has_backend_changes }}
       has_ui_changes: ${{ steps.check.outputs.has_ui_changes }}
     steps:
+      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
+      - if: github.event_name == 'pull_request'
+        run: sleep 60
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -298,7 +306,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     needs: [check_changes, backend_unit_tests, ui_unit_tests, ui_code_quality]
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e'))
     steps:
       - name: Check test results
         run: |
