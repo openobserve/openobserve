@@ -578,10 +578,10 @@ impl Engine {
             selector.matchers = Matchers::empty();
         }
 
-        let value = fused::streaming_fused_agg(
+        let value = fused::stream::fused_agg(
             &ctx,
             &schema,
-            fused::StreamingSelector {
+            fused::stream::StreamingSelector {
                 table_name: &table_name,
                 matchers: &selector.matchers,
                 start: self.eval_ctx.start - offset,
@@ -590,7 +590,7 @@ impl Engine {
                 lookback: micros(range),
                 offset,
             },
-            fused::FusedShape { op, func, range },
+            fused::stream::FusedShape { op, func, range },
             modifier,
             &self.eval_ctx,
             query_ctx.timeout,

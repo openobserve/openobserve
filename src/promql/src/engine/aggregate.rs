@@ -58,7 +58,7 @@ impl Engine {
                 return Ok(value);
             }
             let range_input = self.exec_expr(shape.range_arg).await?;
-            return fused::fused_range_agg(
+            return fused::matrix::fused_agg(
                 modifier,
                 range_input,
                 shape.func,

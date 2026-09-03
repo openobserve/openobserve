@@ -34,12 +34,12 @@ use datafusion::{
 };
 use promql_parser::{label::Matchers, parser::LabelModifier};
 
-use super::fold::{FoldParams, fold_partition, merge_folds, run_folds};
+use super::fold::{FoldParams, fold_sources};
 use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
     fused::FusedAggOp,
     load_series::apply_time_window,
-    series_stream::hash_sorted::{StreamSource, build_shard_inputs},
+    series_source::stream::{StreamSource, build_shard_inputs},
     utils::apply_matchers,
 };
 
@@ -66,7 +66,7 @@ pub(crate) struct FusedShape {
 /// Returns `None` when the layout or query shape rules the streaming plan out
 /// (no ordered table, non-UInt64 hashes, `without` grouping, a plan that would
 /// need an actual sort); the caller then falls back to the materializing path.
-pub(crate) async fn streaming_fused_agg(
+pub(crate) async fn fused_agg(
     ctx: &SessionContext,
     schema: &Schema,
     selector: StreamingSelector<'_>,
@@ -116,28 +116,13 @@ pub(crate) async fn streaming_fused_agg(
         shape.op.name(),
         shape.func.name(),
     );
-    let params = Arc::new(FoldParams {
-        op: shape.op,
-        func: shape.func.clone(),
-        counter_kind: shape.func.counter_extrapolation(),
-        range: shape.range,
-        eval_ctx: eval_ctx.clone(),
-        timestamps: eval_ctx.timestamps(),
-    });
+    let params = FoldParams::new(shape.op, shape.func.clone(), shape.range, eval_ctx);
     let group_cols = Arc::new(group_cols);
-    let offset = selector.offset;
-    let folds = shard_inputs
+    let sources = shard_inputs
         .into_iter()
-        .map(|streams| {
-            let params = params.clone();
-            let group_cols = group_cols.clone();
-            async move {
-                let source = StreamSource::start(streams, group_cols, offset).await?;
-                fold_partition(source, params).await
-            }
-        })
-        .collect::<Vec<_>>();
-    let folds = run_folds(folds, timeout).await?;
+        .map(|streams| StreamSource::start(streams, group_cols.clone(), selector.offset))
+        .collect();
+    let (value, series_count) = fold_sources(sources, params, timeout).await?;
 
     if config::get_config().common.print_key_sql {
         log::info!(
@@ -148,11 +133,6 @@ pub(crate) async fn streaming_fused_agg(
             .indent(true)
         );
     }
-    let series_count: usize = folds.iter().map(|(_, series)| series).sum();
-    let value = merge_folds(
-        folds.into_iter().map(|(groups, _)| groups).collect(),
-        &params.timestamps,
-    );
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) completed in {:?}, folded {series_count} series into {} series",
         shape.op.name(),
@@ -210,7 +190,7 @@ mod tests {
     use itertools::Itertools;
     use promql_parser::label::Labels as ModifierLabels;
 
-    use super::{super::eval::fused_range_agg, *};
+    use super::{super::matrix, *};
     use crate::functions;
 
     type CanonicalSeries = (Vec<(String, String)>, Vec<(i64, u64)>);
@@ -435,7 +415,7 @@ mod tests {
     ) -> Option<Value> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
         let eval_ctx = eval_ctx();
-        streaming_fused_agg(
+        fused_agg(
             ctx,
             &arrow_schema(),
             StreamingSelector {
@@ -510,7 +490,7 @@ mod tests {
                 for modifier in &modifiers {
                     let func: Arc<dyn RangeFunc> =
                         Arc::from(functions::fusable_range_func(func_name).unwrap());
-                    let expected = fused_range_agg(
+                    let expected = matrix::fused_agg(
                         modifier,
                         Value::Matrix(reference_matrix(range)),
                         func,

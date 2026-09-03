@@ -31,28 +31,74 @@ use super::{accumulator::FusedAccumulator, op::FusedAggOp};
 use crate::{
     functions::{RangeFunc, advance_sample_window},
     micros,
-    series_stream::SeriesSource,
+    series_source::SeriesSource,
 };
 
 pub(super) type GroupAccs = HashMap<u64, GroupEntry>;
-
-pub(super) struct FoldParams {
-    pub(super) op: FusedAggOp,
-    pub(super) func: Arc<dyn RangeFunc>,
-    pub(super) counter_kind: Option<ExtrapolationKind>,
-    pub(super) range: Duration,
-    pub(super) eval_ctx: EvalContext,
-    pub(super) timestamps: Vec<i64>,
-}
 
 pub(super) struct GroupEntry {
     labels: Labels,
     acc: FusedAccumulator,
 }
 
+pub(super) struct FoldParams {
+    op: FusedAggOp,
+    func: Arc<dyn RangeFunc>,
+    counter_kind: Option<ExtrapolationKind>,
+    range: Duration,
+    eval_ctx: EvalContext,
+    timestamps: Vec<i64>,
+}
+
+impl FoldParams {
+    pub(super) fn new(
+        op: FusedAggOp,
+        func: Arc<dyn RangeFunc>,
+        range: Duration,
+        eval_ctx: &EvalContext,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            op,
+            counter_kind: func.counter_extrapolation(),
+            func,
+            range,
+            eval_ctx: eval_ctx.clone(),
+            timestamps: eval_ctx.timestamps(),
+        })
+    }
+}
+
+/// Folds every source partition concurrently and merges the groups; returns
+/// the aggregated value and the number of series folded. Each partition's
+/// source is built inside its own task, so streaming sources open lazily.
+pub(super) async fn fold_sources<F, S>(
+    sources: Vec<F>,
+    params: Arc<FoldParams>,
+    timeout: u64,
+) -> Result<(Value, usize)>
+where
+    F: Future<Output = Result<S>> + Send + 'static,
+    S: SeriesSource + 'static,
+{
+    let folds = sources
+        .into_iter()
+        .map(|source| {
+            let params = params.clone();
+            async move { fold_partition(source.await?, params).await }
+        })
+        .collect();
+    let folds = run_folds(folds, timeout).await?;
+    let series_count = folds.iter().map(|(_, series)| series).sum();
+    let value = merge_folds(
+        folds.into_iter().map(|(groups, _)| groups).collect(),
+        &params.timestamps,
+    );
+    Ok((value, series_count))
+}
+
 /// Folds one partition's series into its group accumulators, dropping each
 /// series as soon as it is folded.
-pub(super) async fn fold_partition<S: SeriesSource>(
+async fn fold_partition<S: SeriesSource>(
     mut source: S,
     params: Arc<FoldParams>,
 ) -> Result<(GroupAccs, usize)> {
@@ -122,7 +168,7 @@ fn fold_series(
 
 /// Runs the partition folds concurrently; the first failed partition or the
 /// `timeout` fails the whole fold, and dropping the set aborts the rest.
-pub(super) async fn run_folds<Fut>(folds: Vec<Fut>, timeout: u64) -> Result<Vec<(GroupAccs, usize)>>
+async fn run_folds<Fut>(folds: Vec<Fut>, timeout: u64) -> Result<Vec<(GroupAccs, usize)>>
 where
     Fut: Future<Output = Result<(GroupAccs, usize)>> + Send + 'static,
 {
@@ -158,7 +204,7 @@ where
 /// Merges the partition-local groups in partition order and materializes the
 /// result; groups whose accumulator produced no samples are dropped like the
 /// generic path drops no-output series.
-pub(super) fn merge_folds(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
+fn merge_folds(folds: Vec<GroupAccs>, timestamps: &[i64]) -> Value {
     let mut folds = folds.into_iter();
     let Some(mut merged) = folds.next() else {
         return Value::None;

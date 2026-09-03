@@ -18,8 +18,8 @@
 //! hash-sorted producer streams hash-ordered scans, the matrix producer adapts an
 //! already-materialized matrix behind the same contract.
 
-pub(crate) mod hash_sorted;
 pub(crate) mod matrix;
+pub(crate) mod stream;
 
 use config::meta::promql::value::{Labels, Sample};
 use datafusion::error::Result;
