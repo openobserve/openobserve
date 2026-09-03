@@ -450,7 +450,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -502,7 +502,11 @@ const emit = defineEmits(["update:open", "resource-selected"]);
 const store = useStore();
 const router = useRouter();
 const { t } = useI18nTyped();
-const { resolveTracesStream } = useCorrelatedTracesStream(t);
+const { resolveTracesStream, cancel: cancelCorrelatedTracesStream } =
+  useCorrelatedTracesStream(t);
+
+onUnmounted(() => cancelCorrelatedTracesStream());
+
 const relatedResources = ref<any[]>([]);
 const isLoadingRelatedResources = ref(false);
 const selectedResourceWithTrace = ref<any>(null);

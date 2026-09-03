@@ -238,7 +238,8 @@ export default defineComponent({
     },
     metaData: {
       type: Object as PropType<Record<string, any> | null>,
-      required: true,
+      required: false,
+      default: null,
     },
     data: {
       type: Object,

@@ -62,7 +62,7 @@ vi.mock("@/composables/useStreamingSearch", () => ({
 // individual tests override with per-id streams.
 const mockResolveTracesStreamsBulk = vi.fn().mockResolvedValue({});
 vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
-  default: () => ({ resolveTracesStreamsBulk: mockResolveTracesStreamsBulk }),
+  default: () => ({ resolveTracesStreamsBulk: mockResolveTracesStreamsBulk, cancel: vi.fn() }),
 }));
 
 // ---------------------------------------------------------------------------

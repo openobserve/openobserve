@@ -92,7 +92,7 @@ const mockRelatedResources = [createMockResource(), createMockError()];
 // keep their `stream: "default"` shape; tests override for custom streams.
 const mockResolveTracesStream = vi.fn().mockResolvedValue("default");
 vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
-  default: () => ({ resolveTracesStream: mockResolveTracesStream }),
+  default: () => ({ resolveTracesStream: mockResolveTracesStream, cancel: vi.fn() }),
 }));
 
 // ============================================================================

@@ -258,6 +258,7 @@ import {
   computed,
   nextTick,
   defineAsyncComponent,
+  onUnmounted,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -1731,6 +1732,11 @@ export default defineComponent({
         traceIdMapper.value[field] = [];
       }
     };
+
+    // An open field's value stream outlives this component and retains it via its handler; cancel all on unmount.
+    onUnmounted(() => {
+      Object.keys(traceIdMapper.value).forEach((field) => cancelTraceId(field));
+    });
 
     const cancelValueApi = (value: string) => {
       //remove the field from the openedFilterFields
