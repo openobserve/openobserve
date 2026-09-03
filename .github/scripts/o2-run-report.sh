@@ -74,15 +74,27 @@ fi
 
 WORKFLOW_TAG="test"; [ "$STREAM" = "ci_regression" ] && WORKFLOW_TAG="regression"
 
-# Build-job duration + shard tallies from this attempt's jobs, added to the run doc:
-#   build_duration_sec  — wall-clock of the "build_binary" job (null if absent)
+# Build/runtime-ready duration + shard tallies from this attempt's jobs:
+#   build_duration_sec         — wall-clock of BUILD_JOB_NAME (default
+#                                "build_binary"; empty when built in another run)
+#   runtime_ready_duration_sec — wall-clock of RUNTIME_READY_JOB_NAME when set
 #   shards_total/passed/failed/skipped — counts of the shard jobs by conclusion
 # Shard jobs are matched by the SHARD_PREFIX name prefix (default "e2e /", alpha1 overrides
-# to "alpha1-e2e / "); the build job by exact name "build_binary".
-# Suites without these jobs (e.g. API) get null/0 — harmless, those panels just stay empty.
+# to "alpha1-e2e / "); duration jobs are matched by exact configured names.
+# Suites without a matching job get null — harmless, those panels just stay empty.
 JOBDUR='if (.completed_at and .started_at) then ((.completed_at|fromdateiso8601)-(.started_at|fromdateiso8601)) else null end'
-BUILD_DUR=$(printf '%s' "$THIS_JOBS" | jq "[.jobs[]|select(.name==\"build_binary\")]|.[0]|if . then ($JOBDUR) else null end" 2>/dev/null)
-[ -n "$BUILD_DUR" ] || BUILD_DUR=null
+BUILD_JOB_NAME="\${BUILD_JOB_NAME-build_binary}"
+RUNTIME_READY_JOB_NAME="\${RUNTIME_READY_JOB_NAME:-}"
+BUILD_DUR=null
+if [ -n "$BUILD_JOB_NAME" ]; then
+  BUILD_DUR=$(printf '%s' "$THIS_JOBS" | jq --arg job_name "$BUILD_JOB_NAME" "[.jobs[]|select(.name==\$job_name)]|.[0]|if . then ($JOBDUR) else null end" 2>/dev/null)
+  [ -n "$BUILD_DUR" ] || BUILD_DUR=null
+fi
+RUNTIME_READY_DUR=null
+if [ -n "$RUNTIME_READY_JOB_NAME" ]; then
+  RUNTIME_READY_DUR=$(printf '%s' "$THIS_JOBS" | jq --arg job_name "$RUNTIME_READY_JOB_NAME" "[.jobs[]|select(.name==\$job_name)]|.[0]|if . then ($JOBDUR) else null end" 2>/dev/null)
+  [ -n "$RUNTIME_READY_DUR" ] || RUNTIME_READY_DUR=null
+fi
 SHARDS=$(printf '%s' "$THIS_JOBS" | jq -c --arg pfx "$SHARD_PREFIX" '[.jobs[]|select(.name|startswith($pfx))] as $s
   | {shards_total:($s|length),
      shards_passed:([$s[]|select(.conclusion=="success")]|length),
@@ -95,7 +107,7 @@ printf '%s' "$RUN_JSON" | jq \
   --arg repo "$GITHUB_REPOSITORY" --arg run_id "$GITHUB_RUN_ID" --arg attempt "$ATT" \
   --arg run_url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${ATT}" \
   --argjson final "${FINAL_DUR:-0}" --argjson total "${TOTAL_DUR:-0}" \
-  --argjson build "$BUILD_DUR" --argjson shards "$SHARDS" \
+  --argjson build "$BUILD_DUR" --argjson runtime_ready "$RUNTIME_READY_DUR" --argjson shards "$SHARDS" \
   '($attempt|tonumber) as $a |
    {
      _timestamp: ((.run_started_at // .created_at | fromdateiso8601) * 1000000 | floor),
@@ -109,6 +121,7 @@ printf '%s' "$RUN_JSON" | jq \
      final_duration_sec: ($final|round), total_duration_sec: ($total|round),
      retry_wasted_sec: (($total-$final)|round),
      build_duration_sec: ($build | if .==null then null else round end),
+     runtime_ready_duration_sec: ($runtime_ready | if .==null then null else round end),
      shards_total: ($shards.shards_total // null), shards_passed: ($shards.shards_passed // null),
      shards_failed: ($shards.shards_failed // null), shards_skipped: ($shards.shards_skipped // null)
    }' > "$PAYLOAD_FILE" 2>/dev/null || { echo "::warning::payload build failed"; exit 0; }
