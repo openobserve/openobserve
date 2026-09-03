@@ -585,10 +585,6 @@ impl Engine {
             fused::stream::StreamingSelector {
                 table_name: &table_name,
                 matchers: &selector.matchers,
-                start: self.eval_ctx.start - offset,
-                end: self.eval_ctx.end - offset,
-                step: self.eval_ctx.step,
-                lookback: micros(range),
                 offset,
             },
             fused::stream::FusedShape { op, func, range },
