@@ -32,6 +32,7 @@ Purely presentational — the panel owns the grouped fetch.
           :model-value="filter"
           :options="filterOptions"
           size="sm"
+          class="w-30!"
           :aria-label="t('synthetics.inherited.filterLabel')"
           data-test="synthetics-inherited-filter"
           @update:model-value="filter = String($event)"
@@ -51,7 +52,7 @@ Purely presentational — the panel owns the grouped fetch.
       }}
     </p>
 
-    <ul v-else class="m-0 flex list-none flex-col gap-1 p-0">
+    <ul v-else class="m-0 flex list-none flex-col gap-2 p-0">
       <li
         v-for="row in filteredRows"
         :key="row.name"
@@ -62,7 +63,7 @@ Purely presentational — the panel owns the grouped fetch.
              public = Global, layers = an environment. -->
         <OIcon
           :name="row.global && !row.envs.length ? 'public' : 'layers'"
-          size="xs"
+          size="sm"
           class="text-text-secondary shrink-0"
           role="img"
           :aria-label="sourceLabel(row)"
@@ -72,7 +73,7 @@ Purely presentational — the panel owns the grouped fetch.
              relation and the per-source value hints live on the tooltip. -->
         <span
           class="min-w-0 truncate font-mono"
-          :class="row.overridden ? 'text-text-secondary line-through' : ''"
+          :class="row.overridden ? 'text-text-muted line-through' : 'text-text-secondary'"
           :aria-label="row.overridden ? t('synthetics.inherited.overriddenByCheck') : undefined"
           >{{ row.name }}<OTooltip :content="rowTooltip(row)" side="top"
         /></span>
@@ -83,7 +84,7 @@ Purely presentational — the panel owns the grouped fetch.
           <OTooltip :content="gapText(row)" side="top">
             <OIcon
               name="warning"
-              size="sm"
+              size="xs"
               class="text-warning cursor-help"
               role="img"
               :aria-label="gapText(row)"

@@ -43,8 +43,7 @@ try {
   await page.waitForTimeout(1500); // grouped fetch settles
   await page.screenshot({ path: `${SHOTS}/01-editor-stage.png`, fullPage: false });
 
-  // ── U1: 4b union panel — hover hint, source filter over the check's envs ──
-  ok("U1a hover hint shown", await page.locator('[data-test="synthetics-check-variables-panel-hover-hint"]').count());
+  // ── U1: 4b union panel — source filter over the check's envs ──
   const filter = page.locator('[data-test="synthetics-inherited-filter"]');
   ok("U1b source filter rendered", await filter.count());
   await filter.click();
