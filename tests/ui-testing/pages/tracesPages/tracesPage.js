@@ -76,6 +76,24 @@ export class TracesPage {
     this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
 
+    // ===== LLM PREVIEW PANE (GenAI v5 parts) SELECTORS =====
+    // Source: web/src/plugins/traces/TraceDetailsSidebar.vue + LLMContentRenderer.vue
+    // + TraceTree.vue (span rows/select buttons). Preview tab shown v-if=canPreviewSpan;
+    // Input/Output panes render LLMContentRenderer (messages / tool / json views).
+    // `.tool-content` / `.io-section` / `.thread-view` carry NO data-test in the
+    // Vue source (verified); they are scoped under a stable data-test ancestor
+    // where one exists so the layout-coupled class names can't leak outside the
+    // sidebar / thread surfaces.
+    this.llmPreviewTab = '[data-test="trace-details-sidebar-tabs-preview"]';
+    this.llmObservationBadge = '[data-test="trace-details-sidebar-observation-badge"]';
+    this.llmIoSection = '[data-test="trace-details-sidebar"] .io-container .io-section';
+    this.llmToolContent = '[data-test="trace-details-sidebar"] .tool-content';
+    this.llmExpandBtn = '[data-test="traces-llm-content-renderer-expand-btn"]';
+    // ThreadView.vue root div carries only the semantic `thread-view` class (no
+    // data-test); it is the component root, not a framework-generated utility class.
+    this.llmThreadView = '.thread-view';
+    this.traceTreeSpanContainer = '[data-test^="trace-tree-span-container-"]';
+
     // Service Graph (Enterprise)
     this.serviceGraphChart = '[data-test="service-graph-chart"]';
     this.serviceGraphRefreshButton = '[data-test="service-graph-refresh-btn"]';
@@ -2606,6 +2624,180 @@ export class TracesPage {
    */
   getOrgMenuItemLabels() {
     return this.page.locator('[data-test="organization-menu-item-label-item-label"]');
+  }
+
+  // ===== LLM PREVIEW PANE (GenAI v5 parts) METHODS =====
+
+  /**
+   * Locate the Input pane of the LLM preview (first `.io-section` inside the
+   * sidebar's `.io-container`).
+   */
+  getLlmInputPane() {
+    return this.page.locator(this.llmIoSection).first();
+  }
+
+  /**
+   * Locate the Output pane of the LLM preview (second `.io-section`).
+   */
+  getLlmOutputPane() {
+    return this.page.locator(this.llmIoSection).nth(1);
+  }
+
+  /**
+   * Open the sidebar for the span whose trace-tree operation name contains
+   * `operationName`, by clicking that span row's select button.
+   * @param {string} operationName - span name (e.g. "chat <suffix>")
+   * @returns {Promise<boolean>} true if a matching span was found and clicked
+   */
+  async clickTraceTreeSpanByOperationName(operationName) {
+    // Wait for at least one span row to render before scanning (the tree data
+    // arrives async after the trace result is clicked).
+    await this.page
+      .locator(this.traceTreeSpanContainer)
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .catch(() => {});
+    const containers = this.page.locator(this.traceTreeSpanContainer);
+    const count = await containers.count();
+    for (let i = 0; i < count; i++) {
+      const container = containers.nth(i);
+      const nameEl = container.locator(
+        '[data-test^="trace-tree-span-operation-name-"]:not([data-test*="container"])'
+      );
+      if ((await nameEl.count()) === 0) continue;
+      const txt = (await nameEl.first().textContent().catch(() => '')) || '';
+      if (txt.includes(operationName)) {
+        const selectBtn = container.locator('[data-test^="trace-tree-span-select-btn-"]');
+        await selectBtn.first().waitFor({ state: 'visible', timeout: 10000 });
+        await selectBtn.first().click();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Assert the LLM Preview tab is present (sidebar open on a span with
+   * `hasTracePreview(span)`).
+   */
+  async expectPreviewTabVisible() {
+    await expect(this.page.locator(this.llmPreviewTab)).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Assert the Input pane of the LLM preview contains `text`.
+   */
+  async expectLlmInputContains(text) {
+    await expect(this.getLlmInputPane()).toContainText(text, { timeout: 15000 });
+  }
+
+  /**
+   * Assert the Input pane of the LLM preview does NOT contain `text`.
+   */
+  async expectLlmInputNotContains(text) {
+    await expect(this.getLlmInputPane()).not.toContainText(text);
+  }
+
+  /**
+   * Assert the Output pane of the LLM preview contains `text`.
+   */
+  async expectLlmOutputContains(text) {
+    await expect(this.getLlmOutputPane()).toContainText(text, { timeout: 15000 });
+  }
+
+  /**
+   * Assert the tool-observation view (`.tool-content`) is visible for the
+   * `execute_tool` span.
+   */
+  async expectToolContentVisible() {
+    await expect(this.page.locator(this.llmToolContent).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Assert the tool-observation view contains `text` (e.g. "Tool: calculator").
+   */
+  async expectToolContentContains(text) {
+    await expect(this.page.locator(this.llmToolContent).first()).toContainText(text, { timeout: 15000 });
+  }
+
+  /**
+   * Locate the "System Instructions" collapsible trigger (rendered above the
+   * Input pane when `gen_ai_system_instructions` is present).
+   */
+  getSystemInstructionsTrigger() {
+    return this.page.getByRole('button', { name: /system instructions/i }).first();
+  }
+
+  /**
+   * Assert the "System Instructions" collapsible is present.
+   */
+  async expectSystemInstructionsVisible() {
+    await expect(this.getSystemInstructionsTrigger()).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Expand the "System Instructions" collapsible.
+   */
+  async expandSystemInstructions() {
+    await this.getSystemInstructionsTrigger().click();
+  }
+
+  /**
+   * Assert the expanded "System Instructions" body shows `text` (visible, not
+   * merely present in the DOM).
+   */
+  async expectSystemInstructionsContains(text) {
+    await expect(this.getLlmInputPane().getByText(text, { exact: false }).first()).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Locate the truncation "expand" button inside the Input pane.
+   */
+  getLlmExpandButton() {
+    return this.getLlmInputPane().locator(this.llmExpandBtn);
+  }
+
+  /**
+   * Assert the truncation "expand" button is visible (content > 15 lines).
+   */
+  async expectLlmExpandButtonVisible() {
+    await expect(this.getLlmExpandButton()).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Click the truncation "expand" button to reveal full content.
+   */
+  async clickLlmExpandButton() {
+    await this.getLlmExpandButton().click();
+  }
+
+  /**
+   * Locate the "collapse" button (rendered after expanding; it carries no
+   * data-test, so target by its `traces.lLMContentRenderer.collapse` label).
+   */
+  getLlmCollapseButton() {
+    return this.getLlmInputPane().getByRole('button', { name: /collapse/i });
+  }
+
+  /**
+   * Assert the "collapse" button is visible (full content is shown).
+   */
+  async expectLlmCollapseButtonVisible() {
+    await expect(this.getLlmCollapseButton()).toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Click the "collapse" button to return to the truncated preview.
+   */
+  async clickLlmCollapseButton() {
+    await this.getLlmCollapseButton().click();
+  }
+
+  /**
+   * Assert the Thread tab transcript contains `text`.
+   */
+  async expectThreadViewContains(text) {
+    await expect(this.page.locator(this.llmThreadView)).toContainText(text, { timeout: 15000 });
   }
 
 }
