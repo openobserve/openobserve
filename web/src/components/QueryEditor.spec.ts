@@ -151,6 +151,32 @@ describe("QueryEditor", () => {
         ai_enabled: false,
       });
     });
+
+    it("should NOT show AI bar on auto-detected NL when ai_enabled is false (OSS)", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false });
+
+      wrapper = mountQueryEditor({ hideNlToggle: true });
+      await nextTick();
+
+      wrapper.findComponent(codeQueryEditorStub).vm.$emit("nlpModeDetected", true);
+      await nextTick();
+
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(false);
+    });
+
+    it("should show AI bar on auto-detected NL when ai_enabled is true", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+
+      wrapper = mountQueryEditor({ hideNlToggle: false });
+      await nextTick();
+
+      wrapper.findComponent(codeQueryEditorStub).vm.$emit("nlpModeDetected", true);
+      await nextTick();
+
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(true);
+
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false });
+    });
   });
 
   describe("isAIMode — external control", () => {
