@@ -1012,7 +1012,7 @@ describe("AddDashboardFromGitHub Component", () => {
       wrapper = createWrapper({ modelValue: true, initialSearch: "kubernetes" });
       await flushPromises();
       expect(wrapper.vm.searchQuery).toBe("kubernetes");
-      const input = wrapper.find('[data-test="add-dashboard-github-search"]');
+      const input = wrapper.find('[data-test="add-dashboard-github-search"] input');
       expect((input.element as HTMLInputElement).value).toBe("kubernetes");
     });
   });

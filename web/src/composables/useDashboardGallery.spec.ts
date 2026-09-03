@@ -21,6 +21,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import {
   useDashboardGallery,
   CATEGORY_ORDER,
@@ -149,8 +150,9 @@ describe("useDashboardGallery", () => {
 
   it("is consumed by the drawer instead of a silently re-forked copy", () => {
     const drawerSource = readFileSync(
-      fileURLToPath(
-        new URL("../components/dashboards/AddDashboardFromGitHub.vue", import.meta.url),
+      join(
+        dirname(fileURLToPath(import.meta.url)),
+        "../components/dashboards/AddDashboardFromGitHub.vue",
       ),
       "utf-8",
     );

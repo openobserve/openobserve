@@ -476,15 +476,15 @@ describe("Dashboards.vue", () => {
       await nextTick();
       wrapper.vm.filterQuery = "cpu";
       await nextTick();
-      expect(findCards().exists()).toBe(false);
+      // The cards' own frozen spec pins that this prop suppresses rendering.
+      expect(findCards().props("filterQuery")).toBe("cpu");
     });
 
     it("does not render them on the favorites view", async () => {
       wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(store, router, i18n),
+        global: buildGlobalConfig(store, router, i18n, { folder: "__favorites__" }),
       });
       await nextTick();
-      wrapper.vm.updateActiveFolderId("__favorites__");
       await nextTick();
       expect(findCards().exists()).toBe(false);
     });
