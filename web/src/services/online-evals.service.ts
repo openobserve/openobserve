@@ -273,6 +273,14 @@ const onlineEvalsService = {
     delete: async (orgId: string, providerId: string): Promise<void> => {
       await http().delete(`/api/${orgId}/providers/${providerId}`);
     },
+    // Tests the actual STORED provider (its real, already-encrypted auth) —
+    // the only way to test a saved key without ever exposing it to the client.
+    test: async (orgId: string, providerId: string): Promise<string> =>
+      (await http().post(`/api/${orgId}/providers/${providerId}/test`)).data,
+    // Tests an inline configuration directly, without persisting it — for a
+    // provider that isn't saved yet, or edits not yet saved.
+    testConfig: async (orgId: string, payload: ProviderPayload): Promise<string> =>
+      (await http().post(`/api/${orgId}/providers/test`, payload)).data,
   },
 
   scoreConfigs: {
