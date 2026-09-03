@@ -1920,6 +1920,452 @@ filed as a branch issue. The table's own `:loading` skeleton still covers the co
 
 ---
 
+### 29. Query Management calls `/api/undefined/...` when opened by URL outside the meta org
+
+```
+Module:            Settings -> Query Management (§15.9)
+UI path:           direct URL /web/settings/query_management?org_identifier=<non-meta org>
+What to check:     the request the page fires on mount
+What to expect:    GET /api/_meta/query_manager/status   (what main sends)
+What you get:      GET /api/undefined/query_manager/status -> page renders no table and no toolbar
+```
+
+**Severity: Low.** Real branch regression, but on a path the UI never produces. The Settings sidebar
+entry is `visible: isEnt && meta` (`components/settings/index.vue:328`), so the link only appears
+while in the `_meta` org — and in `_meta` the page works correctly. Reaching the broken state needs a
+hand-edited or bookmarked URL carrying a non-meta `org_identifier`.
+
+**Measured side by side, same backend, same moment:**
+
+```
+branch (:8081)  /web/settings/query_management?org_identifier=default
+                  -> GET /api/undefined/query_manager/status   (reproduced 2/2)
+                  -> no table, no toolbar, no Refresh button; nothing retries
+
+main   (:8083)  same URL
+                  -> GET /api/_meta/query_manager/status
+```
+
+**Cause — a mount-time race on `zoConfig`, not the cache layer.** `RunningQueries.vue:587` passes the
+store value straight into the call with no guard:
+
+```ts
+SearchService.get_running_queries(store.state.zoConfig.meta_org)
+```
+
+Instrumenting the same page *after* it settles shows `zoConfig` **does** arrive — `meta_org: "_meta"`,
+78 keys populated — so the value was simply not there yet when the component mounted. Nothing re-runs
+the read afterwards, and the component renders no toolbar in that state, so there is no Refresh to
+recover with.
+
+**Why it is the branch's, despite the file being untouched.** `RunningQueries.vue` differs from `main`
+by one cosmetic line only — two `zincutils` imports merged into one — which cannot change behaviour:
+
+```
+-import { durationFormatter } from "@/utils/zincutils";
++import { durationFormatter, getDuration } from "@/utils/zincutils";
+-import { getDuration } from "@/utils/zincutils";
+```
+
+What changed is *when* `zoConfig` lands: this branch moved MainLayout's bootstrap onto the cache layer
+(`MainLayout.vue`, +31/−11 vs main — the same file and area as **#25**), which reordered hydration. A
+page that reads `zoConfig` at mount now runs before it is populated.
+
+**Scope — narrow.** 20 `zoConfig.meta_org` reads exist across components, but almost all are either
+equality comparisons (`=== selectedOrganization.identifier`, which is simply false while unhydrated
+and gates the call) or run inside post-mount handlers. `RunningQueries.vue:587` is the one that feeds
+it directly into a service call at mount with no guard. `DomainManagement.vue:638` looks similar but
+is protected by exactly such a comparison first.
+
+**Suggested fix.** Guard the read and re-run it when the org resolves — the same shape used for the
+**#27** fix:
+
+```ts
+watch(
+  () => store.state.zoConfig?.meta_org,
+  (org) => { if (org) getRunningQueries(); },
+  { immediate: true },
+);
+```
+
+**Not fixed** — filed only. Left alone deliberately: it is outside §15.9's stated check, it is not a
+caching defect, and the affected path is unreachable through the UI.
+
+---
+
+### 30. ⏸️ OPEN (deferred) — An ingested stream never appears in the stream dropdown
+
+```
+Module:            anything reading streams via useStreams (§16/§17 RUM, Logs pickers, dashboards, alerts)
+UI path:           create/ingest a new stream, then open a page that lists or detects streams
+What to check:     whether the new stream is visible
+What to expect:    it appears (main re-reads the stream list every time)
+What you get:      the stale localStorage list, served with NO request. Most visible on RUM:
+                   instrumenting an app leaves RUM showing "Instrument a web app" as if disabled.
+```
+
+**Severity: Medium-High.** This is the **third instance of the #27/#28 class and by far the widest**:
+`useStreams` backs the Logs stream picker, RUM enablement detection, dashboard panel editors and alert
+stream selectors. Unlike #27 (unreachable page) and #28 (one list), this one silently hides *data
+that exists*, on surfaces users hit constantly.
+
+**Found while unblocking §17's RUM row.** After ingesting RUM events into a new `_rumdata` logs
+stream, the RUM page kept showing its "not instrumented" onboarding screen.
+
+**Measured on the branch (`:8081`):**
+
+```
+server            _rumdata EXISTS (listed by /api/default/streams?type=logs; schema resolves)
+persisted entry   o2q-["org","default","streams","nameList","logs"]
+                    age 29.44 min   (staleTime = CONFIG_STALE_TIME = 5 min -> long stale)
+                    58 streams, _rumdata ABSENT
+page load         ZERO /api/default/streams requests issued by the app
+UI                "Instrument a web app" / "Enable Session Replay" — RUM reads as disabled
+```
+
+Removing **only** that one localStorage key and reloading fixed it completely: RUM came up with
+Overview / Vitals / Errors / API tabs and live data (`Total Sessions 2`, `Session with Errors 2`).
+That isolates the persisted entry as the sole cause.
+
+**Cause — the same shape as #27/#28.** `streamNameListQuery` (`services/stream.queries.ts:23`) is
+declared with `staleTime: CONFIG_STALE_TIME` **and** `persister: localStoragePersister`, but
+`useStreams.ts:103` (and `:128`) reads it imperatively:
+
+```ts
+queryClient.fetchQuery(
+  streamNameListQuery(store.state.selectedOrganization.identifier, streamType),
+)
+```
+
+`fetchQuery` has no observer, so during hydration the persister's restore satisfies it as a completed
+fetch and `staleTime` is never consulted — the restored entry keeps its original `dataUpdatedAt`.
+Nothing revalidates it, so the stale list is served until something explicitly invalidates the scope
+or the persister's 24 h `maxAge` finally rejects the entry.
+
+**Confirmed branch-caused.** `main` (`:8083`) has no cache layer at all — verified live:
+`hasQueryClient: false` and `streamNameListQuery` does not exist there. It re-reads the stream list on
+every visit, so the same backend and the same `_rumdata` stream show RUM **enabled immediately**.
+(That origin does carry leftover `o2q-` keys from an earlier build, but nothing on `main` reads them.)
+
+**ROOT CAUSE of the whole #27 / #28 / #30 class — found here, in the library.** The persister *does*
+have a revalidate-on-restore feature, and it is on by default (`refetchOnRestore: true`). It never
+fires for these reads because of how it is gated
+(`@tanstack/query-persist-client-core@5.101.4`, `createPersister.js:106`):
+
+```js
+if (refetchOnRestore === "always" || refetchOnRestore === true && query.isStale()) {
+  query.fetch();
+}
+```
+
+and `query.isStale()` in `@tanstack/query-core` (`query.js:130`) is:
+
+```js
+isStale() {
+  if (this.getObserversCount() > 0) {
+    return this.observers.some((observer) => observer.getCurrentResult().isStale);
+  }
+  return this.state.data === void 0 || this.state.isInvalidated;   // <- observerless path
+}
+```
+
+With **zero observers** — which is exactly what `fetchQuery` gives you — a freshly restored entry has
+`data` defined and `isInvalidated` false, so `isStale()` returns **false** and the refetch is skipped.
+`staleTime` is never consulted. So *any* persisted query read imperatively silently serves stale data:
+the defect is structural, not a mistake at any one call site. Note `isStaleByTime()` (the method that
+does honour `staleTime`) is right next to it and is **not** what the gate uses.
+
+**⏸️ DEFERRED — diagnosed and reproduced, fix NOT applied. Tracked for a later pass.**
+
+A fix was written and verified, then **reverted on request** so the team can decide the shape of it.
+The working tree is back at the branch state, i.e. the defect is live. Everything below is the
+handover.
+
+**Reproduce it in the UI (verified end to end).** The essential ordering is that the stream must be
+created *after* the saved copy was written — reload Logs in between and the copy refreshes, hiding it.
+
+```
+1. Open Logs (/web/logs?org_identifier=default) and let it load.   <- writes the saved copy
+2. DevTools > Console — age that copy past the 5-minute window:
+
+   const k = 'o2q-["org","default","streams","nameList","logs"]';
+   const o = JSON.parse(localStorage.getItem(k));
+   o.state.dataUpdatedAt = Date.now() - 20*60*1000;
+   localStorage.setItem(k, JSON.stringify(o));
+
+3. Console — create a NEW stream by INGESTING (never through the UI; a UI action would
+   invalidate and mask the bug). Reads the passcode from the session, nothing to paste:
+
+   (async () => {
+     const API = "http://localhost:5080", org = "default";
+     const stream = "repro_" + Date.now().toString().slice(-6);          // must be a fresh name
+     const email = document.querySelector("#app").__vue_app__.config.globalProperties.$store.state.userInfo.email;
+     const j = await (await fetch(`${API}/api/${org}/passcode`, { credentials: "include" })).json();
+     const r = await fetch(`${API}/api/${org}/${stream}/_json`, {
+       method: "POST",
+       headers: { "Content-Type": "application/json",
+                  Authorization: "Basic " + btoa(email + ":" + j.data.passcode) },
+       body: JSON.stringify([{ level: "info", msg: "repro" }]),
+     });
+     console.log("ingest:", r.status, "| LOOK FOR:", stream);
+   })();
+
+4. Ctrl+Shift+R, open the stream dropdown.
+     -> the new stream is MISSING
+     -> Network shows NO GET /api/{org}/streams?type=logs at all
+5. Application > Local Storage > delete that o2q- key > reload -> it appears, request fires.
+```
+
+Gotchas that cost time: `curl` on Windows PowerShell is an alias for `Invoke-WebRequest` (no `-u`/`-d`)
+and mangles single-quoted JSON — use the Console instead. And a deleted stream name is blocked for a
+while ("stream [x] is being deleted"), so never reuse a name.
+
+**Same root cause, bigger symptom — RUM.** `RealUserMonitoring.vue:290` decides whether RUM is set up
+purely by asking whether a `_rumdata` stream exists. Ingest RUM events, and RUM still shows its
+"Instrument a web app" onboarding screen as though nothing were configured.
+
+**Why `staleTime` never applies — three settings, and the wrong one governs.**
+
+| setting | question it answers | layer | survives reload |
+| --- | --- | --- | --- |
+| `staleTime` (5 min) | is my in-memory data fresh enough to skip fetching? | memory | no |
+| `gcTime` (30 min) | how long do I keep unused data in RAM? | memory | no |
+| `maxAge` (**24 h**) | how old may a **stored** copy be before I refuse it? | **disk** | **yes** |
+
+On a reload the in-memory cache is empty, so `staleTime` correctly says "no data, go fetch" — and then
+the **persister is the fetch**. It compares the entry against `maxAge` (24 h, not the 5-minute
+`staleTime`), finds it acceptable, and returns it. `fetchQuery` treats that as a freshly-fetched
+result; nothing checks the age of a fetch result. The library's own safety net,
+`refetchOnRestore -> query.isStale()`, then also passes, because without an observer `isStale()` only
+reports "data missing" or "invalidated". **`staleTime` is never compared to anything.**
+
+So for an observerless read, `maxAge` is silently promoted from "outer safety bound" to "the only
+freshness policy" — a job it was not designed for, and at 24 hours does badly.
+
+**Why streams specifically, when templates/folders/functions are fine.** Those are all created *by the
+app*, and every mutation declares `meta: { invalidates: [...] }`; invalidation sets `isInvalidated`,
+which is the other half of `isStale()`'s observerless check — so the refetch fires and the disk copy is
+rewritten correctly. Stream invalidation exists too (`useStreams.ts:70`, `:495`, `LogStream.vue:979`) —
+but only for what the app *does*: force-refresh and delete. A stream created by **ingestion** happens
+entirely outside the browser, so there is no mutation, no event, and nothing that could ever invalidate.
+It is a missing *event*, not a missing mechanism.
+
+**Recommended fix (written and verified before reverting).** Add a persister tier whose `maxAge`
+matches the freshness window, and point `streamNameListQuery` at it:
+
+```ts
+export const configWindowPersister = experimental_createQueryPersister<string>({
+  storage: safeLocalStorage,
+  maxAge: CONFIG_STALE_TIME,   // 5 min — NOT the 24 h the other tiers use
+  prefix: LS_PREFIX,
+  buster: PERSIST_BUSTER,
+});
+```
+
+`maxAge` is checked in `isExpiredOrBusted` unconditionally, with no observer required, so past the
+window the entry is discarded and the real `queryFn` runs. Measured, both halves:
+
+```
+fresh entry (< 5 min), hard reload  -> 0 stream requests, picker painted from disk
+stale entry (12 min) + new stream   -> 1 GET /streams?type=logs, new stream VISIBLE
+```
+
+Better than the two alternatives: the current code does 0 requests but serves stale data; simply
+deleting the persister is correct but costs a request on *every* reload.
+
+**The ideal version, for the later pass.** The mismatch is possible because `staleTime` and `maxAge`
+are authored independently and nothing records how a query is meant to be read. Encoding that in the
+declaration removes the whole class:
+
+```ts
+observedConfigQuery({...})    // read with useQuery      -> long maxAge, observer revalidates
+imperativeConfigQuery({...})  // read with fetchQuery    -> maxAge === staleTime
+```
+
+plus a test that fails when a query declared for `useQuery` is passed to
+`fetchQuery`/`prefetchQuery`/`ensureQueryData`. That test would have caught **#27, #28 and #30** before
+any of them shipped — all four were this same mismatch. Degrades correctly for the session tier:
+`traceDagQuery` has `staleTime: Infinity`, so a matched `maxAge` is infinite too and the immutable
+trace copy is kept forever, which is right.
+
+**Not recommended:** converting `useStreams` to `useQuery`. `getStreams()` has **52 call sites**, all
+imperative and awaited, many inside loops, conditionals and event handlers where a composable cannot be
+called. The refactor carries far more risk than the defect.
+
+**Known residual, whatever fix is chosen:** none of this covers changes made outside the tab — another
+user, the API, Terraform. Those wait out the freshness window. Normal cache behaviour, but worth being
+a stated decision rather than a later surprise.
+
+---
+
+#### 30a. The same class — six more `persister` + `fetchQuery` pairs, DEFERRED with #30
+
+**Not fixed. Recorded here so #30 and these are reviewed together.**
+
+The defect needs **three** ingredients, not two:
+
+1. the query declares a **`persister`** — a copy is restored from storage on load;
+2. it is read through an imperative **`fetchQuery`** — no observer;
+3. **nothing invalidates that scope when the data changes.**
+
+(1)+(2) alone remove the safety net: on restore, the persister's revalidation check is
+`query.isStale()`, which without observers only asks *"data missing?"* / *"invalidated?"* and never
+consults `staleTime`. (3) is what decides whether anyone notices — an `invalidateQueries` sets
+`isInvalidated`, which **is** one of the two things that check looks at, so the refetch fires and the
+on-disk copy is rewritten correctly.
+
+`fetchQuery` on its own is **not** the bug: it honours `staleTime` correctly for data already in
+memory, which is why warm navigation behaves. Only the restore-from-disk path bypasses it.
+
+| Query | persisted | read via | invalidated on write | status |
+| --- | --- | --- | --- | --- |
+| `streamNameListQuery` | ✅ | `fetchQuery` | ❌ **impossible** — a stream is created by *ingestion*, outside the browser | **#30, live defect** |
+| `providersQuery` | was ✅ | `fetchQuery` | ❌ create/update/delete are direct service calls (`ProviderFormPage.vue:314/316`, `LlmProvidersSettings.vue:353`) | **fixed under #31** — persister dropped |
+| `templatesQuery` | ✅ | `fetchQuery` ×5 | ✅ template mutations declare `invalidates` | at risk, currently masked |
+| `foldersQuery` | ✅ | `fetchQuery` ×2 | ✅ `refreshFolderLists()` (`commons.ts:988`) | at risk, currently masked |
+| `functionsQuery` | ✅ | `fetchQuery` | ✅ 3 jstransform mutations | at risk, currently masked |
+| `queryFunctionsQuery` | ✅ | `fetchQuery` | ✅ shares the `orgKey(org,"functions")` root with `functionKeys.all`, so it is swept by prefix | at risk, currently masked |
+| `settingQuery` | ✅ | `fetchInto` | ✅ favourites invalidate; home dashboard write-throughs | at risk, currently masked |
+| `resourcesQuery` | ✅ | `fetchQuery` ×2 | ❌ `iamKeys.resources` is a sibling of `roles`/`groups`, not covered by their invalidations | no practical risk — RBAC resource *types* are static |
+
+"Currently masked" means the bug is present but invisible **only because every writer happens to
+invalidate**. Each is one refactor — a write moved off the mutation helper, a new writer added — away
+from behaving exactly like #30.
+
+**Two ways this was demonstrated for real, not theorised:**
+
+- **#30** — a stream created by ingestion never appeared in the Logs picker or RUM.
+- **#31** — removing an unrelated forced reload immediately exposed `providersQuery`, because that
+  force was the only thing refreshing it. A newly created LLM provider would have stayed invisible on
+  the Evaluations page. The persister had to be dropped there in the same change.
+
+**The rule worth adopting, whatever is done about the individual entries:** *never pair `persister:`
+with an imperative `fetchQuery` read unless every writer of that data invalidates the scope — and
+never when the data can be created outside the app.* A unit test asserting that pairing would have
+caught **#27, #28, #30 and #31** before any shipped.
+
+---
+
+### 31. ⏸️ OPEN (deferred) — Evaluations cold load fetches three lists twice (§22.1 C1)
+
+```
+Module:            AI -> Evaluations (§22.1)
+UI path:           /web/ai/evaluations?org_identifier=<org>  (a cold load)
+What to check:     Network — request count per list on the first load
+What to expect:    1 request per list  (what main does)
+What you get:      score_configs, scorers and eval_jobs each fetched TWICE; providers once
+```
+
+**Severity: Low.** Three redundant requests on each cold load of the page. No stale or wrong data —
+both rounds hit the server and the second wins — so this is waste, not incorrectness. It is however
+exactly the "two identical requests" pattern §1.1 of the plan calls out as the double-fire signature.
+
+**Measured, branch vs `main`, same backend, reproduced twice:**
+
+```
+branch (:8081)   /api/default/score_configs   x2      (~845 ms and ~1395 ms)
+                 /api/default/scorers         x2
+                 /api/default/eval_jobs       x2
+                 /api/default/providers       x1
+
+main   (:8083)   each of the four             x1
+```
+
+The two rounds are distinguishable: the first carries **only the three lists**, the second carries
+**providers + the same three**. The second matches `useOnlineEvalsData.loadAll()`, which fetches all
+four together via `Promise.allSettled` (`useOnlineEvalsData.ts:50-53`) and is called un-forced from
+`OnlineEvals.vue:832` (`onBeforeMount`). The first round's caller was **not** isolated — see below.
+
+**Warm behaviour is correct**, which is what makes this waste rather than a cache defect:
+
+```
+revisit (past staleTime)  -> 3 requests   (the three lists; providers still cached)
+revisit (within 30 s)     -> 0 requests
+refresh button x2         -> 4 requests each click  (forced read, correct)
+```
+
+**ROOT CAUSE — `loadAll()` runs twice on mount, and the second run forces.** Found by temporarily
+wrapping `queryClient.fetchQuery`/`invalidateQueries` and `loadAll` to capture caller stacks (the XHR
+hook alone only reaches the axios chunk, and cache introspection is unavailable on this page — the §19
+different-module-instance trap):
+
+```
+t=0      loadAll(org, force=false)   <- OnlineEvals.vue onBeforeMount
+t=1552   loadAll(org, force=TRUE)    <- QualityPage.vue refreshAll() -> emit("reload-configs")
+                                        <- parent @reload-configs="loadAll(orgId, true)"
+                                        <- reloadQuality() <- @ready (QualityPage onMounted)
+```
+
+Both call sites are individually reasonable. `onBeforeMount` loads the four shared lists; QualityPage's
+`refreshAll()` asks the parent to re-read the score-configs list first, because its aggregates "bail
+out early when the list is empty" (its own comment). But on **mount** that list is already being
+fetched, and `force: true` invalidates the entries the first call just wrote — so all four are fetched
+again.
+
+**⏸️ FIX WRITTEN AND VERIFIED, THEN REVERTED ON REQUEST.** The working tree is back at branch state, so
+the duplicate is live. Everything below is the handover — the change was measured working before it was
+backed out, and it is two small edits plus one line.
+
+**The fix — the mount trigger no longer forces.** A user-initiated Refresh still must force; only the
+`@ready` mount path should not:
+
+```ts
+// QualityPage.vue
+async function refreshAll(reloadConfigs?: boolean) {
+  if (reloadConfigs !== false) emit("reload-configs");   // `!== false`: a stray event arg still reloads
+  ...
+}
+
+// OnlineEvals.vue
+async function reloadQuality(onMount = false) { ... await qualityPageRef.value?.refreshAll?.(!onMount); }
+// template:  @ready="reloadQuality(true)"
+```
+
+`reloadQuality()` from the Refresh button and from the date-window watcher still pass `onMount = false`,
+so both still force. The ref's exposed type needed widening to `(reloadConfigs?: boolean)`.
+
+**A second change is required with it — the first version introduced a stale-data risk.** With the forced round
+removed, `providers` stopped being refetched on mount and was instead **restored from its persisted
+entry**. `providersQuery` was declared `staleTime: CONFIG_STALE_TIME` **+ `persister:
+localStoragePersister`**, and it is read observerless through `fetchInto` — the exact **#30** shape, so
+a restored entry is served past `staleTime` without revalidation.
+
+That would normally be covered by write-invalidation, but nothing invalidates this scope:
+
+```
+ProviderFormPage.vue:314/316   providers.update / providers.create   direct service calls
+LlmProvidersSettings.vue:353   providers.delete                      direct service call
+online-evals.service.queries.ts  only 2 mutations declare `invalidates`, both job-active
+```
+
+So a newly created LLM provider could have stayed invisible on the Evaluations page — a regression the
+forced round had been masking. The persister was therefore dropped from `providersQuery` (its
+`staleTime` is unchanged, so warm navigation still costs nothing):
+
+```ts
+staleTime: CONFIG_STALE_TIME,
+gcTime: LONG_GC_TIME,
+// Not persisted: read observerless via `fetchInto`, and no provider write
+// invalidates this scope — a restored entry would outlive `staleTime`.
+```
+
+**Verified live on `:8081` — the fix, and the three behaviours it must not break:**
+
+```
+cold load      7 requests -> 4   one per list (score_configs · scorers · eval_jobs · providers)
+                                  — the same shape `main` issues
+Refresh button 4 requests -> 4   still forces all four, unchanged
+warm revisit   0 requests -> 0   unchanged
+page renders clean, 0 error notifications
+```
+
+`vue-tsc --noEmit` exits 0; **1822/1822** specs pass across the online-evals and services suites.
+
+⚠️ The old `o2q-["org","default","onlineEvals","providers"]` key remains in `localStorage` as inert
+residue — nothing reads or writes it now, exactly as with the streams entry in #30.
+
+---
+
 ### Verified fixed — not filed
 
 - **AI -> Evaluations force-refetching on every visit** (originally #2 in the parallel run)
