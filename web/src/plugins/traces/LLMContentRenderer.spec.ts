@@ -918,7 +918,9 @@ describe("LLMContentRenderer", () => {
       expect(result).toContain("[Image: https://example.com/image.png]");
     });
 
-    it("should handle unknown part types gracefully", () => {
+    // Same "[type]" marker as the Thread tab (threadView.utils.ts) for a
+    // part type neither side has been taught about — never a raw JSON dump.
+    it("shows a [type] marker for unknown part types, matching the Thread tab", () => {
       const content = [{ type: "unknown_type", data: "some data" }];
 
       wrapper = mount(LLMContentRenderer, {
@@ -929,7 +931,18 @@ describe("LLMContentRenderer", () => {
       });
 
       const result = wrapper.vm.formatContent(content);
-      expect(result).toBeTruthy();
+      expect(result).toBe("[unknown_type]");
+    });
+
+    // A malformed array item with no `type` at all can't build a marker —
+    // raw JSON stays the last-resort fallback so nothing is silently lost.
+    it("still dumps raw JSON for a typeless/malformed array item", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "dummy", viewMode: "formatted" },
+      });
+
+      const result = wrapper.vm.formatContent([{ random: "field" }]);
+      expect(result).toContain('"random"');
     });
 
     it("formats a v5 text part keyed by `content` (not just legacy `text`)", () => {

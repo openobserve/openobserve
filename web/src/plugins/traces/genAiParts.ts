@@ -48,10 +48,12 @@ function safeStringify(value: unknown): string {
   }
 }
 
+/** True for part types with no text representation (binary/reference payloads) that callers should drop rather than render. */
 export function isSuppressedGenAiPartType(type: string): boolean {
   return SUPPRESSED_PART_TYPES.has(type);
 }
 
+/** Returns null when the part has no textual representation at all (unknown/suppressed type); "" is a valid result (e.g. an empty tool_call_response). */
 export function extractGenAiPartText(part: unknown): string | null {
   if (!isRecord(part)) return null;
   const type = typeof part.type === "string" ? part.type : "";

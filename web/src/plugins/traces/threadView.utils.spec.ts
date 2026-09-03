@@ -397,6 +397,12 @@ describe("extractContent", () => {
     expect(extractContent([{ type: "some_new_part_type", data: 1 }])).toBe("[some_new_part_type]");
   });
 
+  // The same marker applies to a *recognised* type with nothing to render
+  // (empty content) — not just genuinely unrecognised ones.
+  it("renders a generic marker for a recognised type that yields no text", () => {
+    expect(extractContent([{ type: "text" }])).toBe("[text]");
+  });
+
   // Real-world SDK field-name aliases (verified against actual instrumentation
   // source, not the spec doc) — same coverage as genAiParts.spec.ts, exercised
   // through the Thread tab's actual entry point so a regression is caught here too.

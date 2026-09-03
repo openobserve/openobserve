@@ -502,8 +502,12 @@ const formatContent = (content: any): string => {
         parts.push(raw(`[File: ${part.file_id ?? part.mime_type ?? "unknown"}]`));
       } else if (part.type === "uri") {
         parts.push(raw(`[${part.modality ?? "Uri"}: ${part.uri ?? ""}]`));
+      } else if (typeof part?.type === "string") {
+        // Unrecognised part type — same "[type]" marker as the Thread tab
+        // (threadView.utils.ts), not a raw JSON dump.
+        parts.push(raw(`[${part.type}]`));
       } else {
-        // Fallback for unknown part types
+        // No `type` at all to build a marker from — last-resort raw dump.
         parts.push(JSON.stringify(part));
       }
     }

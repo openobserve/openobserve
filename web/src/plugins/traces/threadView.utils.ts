@@ -205,8 +205,9 @@ export function normalizeRole(raw: unknown): Role {
  * parts render as text, including real-world SDK field-name aliases
  * (`thinking`/`result`) that don't match the spec's own names — kept in
  * sync with LLMContentRenderer.vue via genAiParts.ts. `blob`/`file`/`uri`
- * stay suppressed (first-class rendering elsewhere), and any other
- * unrecognised type falls back to a `[type]` marker instead of vanishing.
+ * stay suppressed (first-class rendering elsewhere), and any part type that
+ * yields no text (unrecognised, or recognised but empty) falls back to a
+ * `[type]` marker instead of vanishing.
  *
  * @example extractContent("hello")                 // "hello"
  * @example extractContent([{ text: "a" },
