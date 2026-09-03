@@ -1,6 +1,0 @@
-{
-  "group": "Alerts",
-  "spec_filename": "alerts-add-alert-org-identifier.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}
