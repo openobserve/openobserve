@@ -46,18 +46,20 @@ test.describe('Alert Library', () => {
 
     // Deterministic gallery: 1 ready card, 1 not-ready (missing) card, and a
     // bulk pack of 51 ready cards (> LARGE_BATCH=50) for the large-batch guard.
+    // All installable names share the pw_lib_ prefix so cleanup.spec.js sweeps
+    // the alerts they create (see apiCleanup alertPrefixes).
     const ready = makeEntry(1, {
-      name: `pw_ready_${rand}`, title: 'PW Ready Alert', severity: 'critical',
+      name: `pw_lib_ready_${rand}`, title: 'PW Ready Alert', severity: 'critical',
       pack: 'observability', category: 'ready-signals', stream: readyStream,
       required_streams: [readyStream],
     });
     const missing = makeEntry(2, {
-      name: `pw_missing_${rand}`, title: 'PW Missing Alert', severity: 'info',
+      name: `pw_lib_missing_${rand}`, title: 'PW Missing Alert', severity: 'info',
       pack: 'observability', category: 'absent-signals', stream: missingStream,
       required_streams: [missingStream],
     });
     const bulk = makeEntries(51, {
-      namePrefix: `pw_bulk_${rand}`, pack: 'infrastructure', category: 'bulk-signals',
+      namePrefix: `pw_lib_bulk_${rand}`, pack: 'infrastructure', category: 'bulk-signals',
       severity: 'warning', stream: readyStream, required_streams: [readyStream],
     });
     entries = [ready, missing, ...bulk];
