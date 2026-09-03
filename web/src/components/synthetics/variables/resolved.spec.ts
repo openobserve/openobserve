@@ -17,12 +17,11 @@ import { describe, expect, it } from "vitest";
 import type { ResolvedVariable } from "./resolved";
 import {
   applyPlaceholder,
-  canOverride,
+  coverageGaps,
   effectiveVariables,
   inheritedVariables,
   placeholderAtCursor,
   suggestPlaceholders,
-  unboundPlaceholders,
 } from "./resolved";
 
 function v(over: Partial<ResolvedVariable> = {}): ResolvedVariable {
@@ -42,23 +41,6 @@ describe("inheritedVariables", () => {
   it("excludes the check's own rows", () => {
     const rows = [v({ name: "A" }), v({ name: "B", scope: "check" })];
     expect(inheritedVariables(rows).map((r) => r.name)).toEqual(["A"]);
-  });
-});
-
-describe("canOverride", () => {
-  it("refuses a secret", () => {
-    // A check-tier override lands in the old `secure` model, which is a display
-    // hint and not a storage property — so the value would become readable
-    // through get_synthetic, undoing the write-only guarantee.
-    expect(canOverride(v({ kind: "secret" }))).toBe(false);
-  });
-
-  it("refuses one already overridden", () => {
-    expect(canOverride(v({ overridden: true }))).toBe(false);
-  });
-
-  it("allows a plain inherited variable", () => {
-    expect(canOverride(v())).toBe(true);
   });
 });
 
@@ -148,22 +130,50 @@ describe("applyPlaceholder", () => {
   });
 });
 
-describe("unboundPlaceholders", () => {
-  it("names what nothing binds, deduplicated and sorted", () => {
-    const bound = [v({ name: "BASE_URL" })];
-    expect(unboundPlaceholders(["BASE_URL", "TYPO", "TYPO", "OTHER"], bound)).toEqual([
-      "OTHER",
-      "TYPO",
-    ]);
+describe("coverageGaps", () => {
+  it("names every environment a name fails to resolve in", () => {
+    const gaps = coverageGaps({
+      environments: ["staging", "qa", "dev"],
+      resolved: {
+        staging: [v({ name: "ORG" }), v({ name: "API_KEY", scope: "staging" })],
+        qa: [v({ name: "ORG" })],
+        dev: [v({ name: "ORG" })],
+      },
+    });
+    expect(gaps.get("API_KEY")).toEqual(["qa", "dev"]);
+    expect(gaps.has("ORG")).toBe(false);
   });
 
-  it("counts a check's own variable as bound", () => {
-    const bound = [v({ name: "LOCAL", scope: "check" })];
-    expect(unboundPlaceholders(["LOCAL"], bound)).toEqual([]);
+  it("counts a check-tier variable as present everywhere", () => {
+    const gaps = coverageGaps({
+      environments: ["staging", "qa"],
+      resolved: {
+        staging: [v({ name: "TOKEN", scope: "check" })],
+        qa: [v({ name: "TOKEN", scope: "check" })],
+      },
+    });
+    expect(gaps.size).toBe(0);
   });
 
-  it("is case-sensitive, because substitution is", () => {
-    const bound = [v({ name: "BASE_URL" })];
-    expect(unboundPlaceholders(["base_url"], bound)).toEqual(["base_url"]);
+  it("measures the effective set, so a shadowed row still counts as its name resolving", () => {
+    const gaps = coverageGaps({
+      environments: ["staging", "qa"],
+      resolved: {
+        staging: [
+          v({ name: "USER", scope: "staging", overridden: true }),
+          v({ name: "USER", scope: "check" }),
+        ],
+        qa: [v({ name: "USER", scope: "check" })],
+      },
+    });
+    expect(gaps.size).toBe(0);
+  });
+
+  it("has nothing to warn about below two environments", () => {
+    const gaps = coverageGaps({
+      environments: ["staging"],
+      resolved: { staging: [v({ name: "ONLY_HERE", scope: "staging" })] },
+    });
+    expect(gaps.size).toBe(0);
   });
 });
