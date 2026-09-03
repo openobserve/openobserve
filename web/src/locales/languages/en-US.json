@@ -13154,6 +13154,10 @@
     "environments": {
       "newButton": "New Environment",
       "backToList": "All environments",
+      "capReached": "A check can target at most {cap} environments.",
+      "cardEmpty": "No environments yet. Create them under Synthetics → Variables.",
+      "cardLocked": "Selected by a user with access. You can't change it — the check keeps running there.",
+      "cardTitle": "Environments",
       "checks": "Checks",
       "checksCount": "Unused | {count} check | {count} checks",
       "createTitle": "Add Environment",
@@ -13203,11 +13207,10 @@
       "title": "Duplicate {name}"
     },
     "inherited": {
-      "overriddenHere": "Overridden here",
-      "override": "Override",
-      "overrideSecretBlocked": "A secret cannot be overridden on a check — the override would be readable. Use a different value in the environment instead.",
-      "title": "Inherited",
-      "unbound": "Not defined anywhere: {names}. These are typed as literal text when the check runs."
+      "notIn": "Not in {envs}",
+      "notInMany": "Not in {count} environments",
+      "overriddenByCheck": "Overridden by local variable",
+      "title": "Inherited"
     },
     "promote": {
       "done": "Variable is now global",
@@ -13322,7 +13325,12 @@
       "openPanel": "Show variables",
       "removeTitle": "Remove variable?",
       "removeBody": "{name} will be removed from this check.",
-      "removeWarning": "It is referenced by {count} step, which will no longer resolve. | It is referenced by {count} steps, which will no longer resolve."
+      "removeWarning": "It is referenced by {count} step, which will no longer resolve. | It is referenced by {count} steps, which will no longer resolve.",
+      "removeOverrideNote": "Steps using {name} will now get the {scope} value.",
+      "thisCheck": "This check",
+      "resolveAs": "Resolve as",
+      "noEnvironment": "No environment",
+      "countOfCap": "{count} of {cap}"
     },
     "browserDevices": {
       "desktop": "Desktop",

@@ -309,6 +309,10 @@ const syntheticsService = {
   resolvedVariables: (orgIdentifier: string, checkId: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/${checkId}/resolved-variables`),
 
+  /** Every environment's resolved set in one call, keyed by environment name. */
+  resolvedVariablesGrouped: (orgIdentifier: string, checkId: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/${checkId}/resolved-variables?envs=all`),
+
   // ── Scope moves ────────────────────────────────────────────────────────
   //
   // Each authorizes the scope being left; the server checks the one being

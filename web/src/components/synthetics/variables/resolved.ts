@@ -31,19 +31,6 @@ export function inheritedVariables(resolved: ResolvedVariable[]): ResolvedVariab
 }
 
 /**
- * Can this inherited variable be overridden on the check?
- *
- * Not for a secret. A check-tier override lands in the old `secure` model,
- * which is a display hint rather than a storage property - so the value would
- * become readable through `get_synthetic`, quietly undoing the write-only
- * guarantee the shared secret was created with. A different credential per
- * check belongs at environment scope.
- */
-export function canOverride(variable: ResolvedVariable): boolean {
-  return variable.kind !== "secret" && !variable.overridden;
-}
-
-/**
  * What actually resolves, once the check's own names shadow the shared ones.
  *
  * The shared row still exists - `overridden` marks it - so this is the view the
@@ -122,14 +109,34 @@ export function applyPlaceholder(
   };
 }
 
+/** Mirrors the server's cap on one run's resolved set (MAX_VARIABLES). */
+export const RESOLVED_VARIABLE_CAP = 50;
+
 /**
- * Names a check references that nothing binds.
- *
- * Surfaced in the editor rather than at run time, where an unbound `{{NAME}}`
- * is now typed verbatim - which is right, because `{{...}}` is not necessarily
- * a variable reference, but it does mean a typo is only visible here.
+ * Every environment's resolved set in one response, keyed by environment name.
+ * Mirrors the server's ResolvedVariablesGrouped; `""` keys an unscoped check.
  */
-export function unboundPlaceholders(referenced: string[], resolved: ResolvedVariable[]): string[] {
-  const bound = new Set(effectiveVariables(resolved).map((v) => v.name));
-  return [...new Set(referenced.filter((name) => !bound.has(name)))].sort();
+export interface ResolvedVariablesGrouped {
+  environments: string[];
+  resolved: Record<string, ResolvedVariable[]>;
+}
+
+/**
+ * Environments in which a name fails to resolve, for the coverage warning.
+ *
+ * Computed over the effective sets, so a check-tier variable counts as present
+ * everywhere. A single-environment check has no gap to warn about.
+ */
+export function coverageGaps(grouped: ResolvedVariablesGrouped): Map<string, string[]> {
+  const gaps = new Map<string, string[]>();
+  if (grouped.environments.length < 2) return gaps;
+  const perEnv = grouped.environments.map(
+    (env) => new Set(effectiveVariables(grouped.resolved[env] ?? []).map((v) => v.name)),
+  );
+  const names = new Set(perEnv.flatMap((set) => [...set]));
+  for (const name of names) {
+    const missing = grouped.environments.filter((_, i) => !perEnv[i].has(name));
+    if (missing.length) gaps.set(name, missing);
+  }
+  return gaps;
 }

@@ -14,15 +14,23 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 // Real i18n plugin — the panel's hint line uses <i18n-t>, which the mocked
 // useI18n() of sibling specs cannot resolve.
 import i18n from "@/locales";
 import { mockMonitorHttp } from "@/test/unit/mockData/synthetics";
 import type { BrowserCheck, BrowserStep } from "@/types/synthetics";
+import type { ResolvedVariable } from "@/components/synthetics/variables/resolved";
 
 vi.mock("@/utils/uuid", () => ({ getUUID: vi.fn(() => "uuid-123") }));
+
+const { resolvedVariablesGroupedMock } = vi.hoisted(() => ({
+  resolvedVariablesGroupedMock: vi.fn(() => Promise.reject(new Error("no backend in specs"))),
+}));
+vi.mock("@/services/synthetics", () => ({
+  default: { resolvedVariablesGrouped: resolvedVariablesGroupedMock },
+}));
 
 import CheckVariablesPanel from "./CheckVariablesPanel.vue";
 
@@ -92,6 +100,14 @@ const ODialogStub = {
   </div>`,
 };
 
+const OSelectStub = {
+  props: ["modelValue", "options", "label", "size"],
+  emits: ["update:modelValue"],
+  template: `<select v-bind="$attrs" :value="modelValue" @change="$emit('update:modelValue', $event.target.value)">
+    <option v-for="o in options" :key="o.value" :value="o.value">{{ o.label }}</option>
+  </select>`,
+};
+
 const STUBS = {
   ODialog: ODialogStub,
   OInput: OInputStub,
@@ -99,6 +115,7 @@ const STUBS = {
   OButton: OButtonStub,
   OBadge: OBadgeStub,
   OIcon: OIconStub,
+  OSelect: OSelectStub,
   OTooltip: OTooltipStub,
   OEmptyState: OEmptyStateStub,
 };
@@ -126,7 +143,12 @@ function checkWith(
 function mountPanel(props: Record<string, unknown> = {}) {
   return mount(CheckVariablesPanel, {
     props: { check: mockMonitorHttp, ...props },
-    global: { plugins: [i18n], stubs: STUBS },
+    global: {
+      plugins: [i18n],
+      stubs: STUBS,
+      // Vuex 4's useStore() injects by the string key "store".
+      provide: { store: { state: { selectedOrganization: { identifier: "default" } } } },
+    },
   }) as VueWrapper;
 }
 
@@ -400,18 +422,17 @@ describe("CheckVariablesPanel", () => {
 
   // ── Secure variables ──────────────────────────────────────────────────────
   describe("secure variables", () => {
-    it("should mask a secure variable's value and never show the raw value", () => {
+    it("should show no value on any row, and never the raw secret", () => {
       wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
 
-      const masked = wrapper.find(sel("-value-1"));
-      expect(masked.text()).toBe("••••••••");
+      expect(wrapper.find(sel("-value-1")).exists()).toBe(false);
       expect(wrapper.text()).not.toContain("supersecret");
     });
 
-    it("should show a non-secure variable's value in the clear", () => {
+    it("should keep a plain variable's value off the row too", () => {
       wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
 
-      expect(wrapper.find(sel("-value-0")).text()).toBe("https://example.com");
+      expect(wrapper.text()).not.toContain("https://example.com");
     });
   });
 
@@ -515,6 +536,100 @@ describe("CheckVariablesPanel", () => {
       vi.advanceTimersByTime(1);
       await nextTick();
       expect(wrapper.find(sel("-undo-row")).exists()).toBe(false);
+    });
+  });
+
+  // ── Environment resolution ────────────────────────────────────────────────
+  describe("environment resolution", () => {
+    function row(over: Partial<ResolvedVariable> = {}): ResolvedVariable {
+      return {
+        name: "ORG",
+        kind: "plain",
+        scope: "global",
+        overridden: false,
+        example: "",
+        description: "",
+        has_value: true,
+        ...over,
+      };
+    }
+
+    const grouped = {
+      environments: ["staging", "qa"],
+      resolved: {
+        staging: [
+          row(),
+          row({ name: "BASE_URL", scope: "staging", overridden: true }),
+          row({ name: "BASE_URL", scope: "check" }),
+          row({ name: "TOKEN", scope: "check" }),
+        ],
+        qa: [
+          row(),
+          row({ name: "BASE_URL", scope: "check" }),
+          row({ name: "TOKEN", scope: "check" }),
+        ],
+      },
+    };
+
+    it("fetches once and offers exactly the check's environments", async () => {
+      resolvedVariablesGroupedMock.mockResolvedValueOnce({ data: grouped } as never);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
+      await flushPromises();
+
+      const options = wrapper.find(sel("-resolve-as")).findAll("option");
+      expect(options.map((o) => o.text())).toEqual(["staging", "qa"]);
+      expect(resolvedVariablesGroupedMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("switches environments client-side, without a second fetch", async () => {
+      resolvedVariablesGroupedMock.mockResolvedValueOnce({ data: grouped } as never);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
+      await flushPromises();
+
+      // staging shows the shadowed inherited BASE_URL; qa has no such row.
+      expect(wrapper.find("span.line-through").exists()).toBe(true);
+      await wrapper.find(sel("-resolve-as")).setValue("qa");
+      expect(wrapper.find("span.line-through").exists()).toBe(false);
+      expect(resolvedVariablesGroupedMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("counts the resolved set for the selected environment, not declarations", async () => {
+      resolvedVariablesGroupedMock.mockResolvedValueOnce({ data: grouped } as never);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
+      await flushPromises();
+
+      // staging: ORG + effective BASE_URL + TOKEN — the shadowed row not counted.
+      expect(wrapper.find(sel("-count")).text()).toBe("3");
+    });
+
+    it("shows the cap once the resolved count approaches it", async () => {
+      const many = Array.from({ length: 41 }, (_, i) => row({ name: `VAR_${i}` }));
+      resolvedVariablesGroupedMock.mockResolvedValueOnce({
+        data: { environments: ["staging"], resolved: { staging: many } },
+      } as never);
+      wrapper = mountPanel({ check: checkWith([]) });
+      await flushPromises();
+
+      expect(wrapper.find(sel("-count")).text()).toBe("41 of 50");
+    });
+
+    it("falls back to the declaration count while nothing is resolved", async () => {
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
+      await flushPromises();
+
+      expect(wrapper.find(sel("-count")).text()).toBe("2");
+    });
+
+    it("notes the fallback value when removing an override", async () => {
+      resolvedVariablesGroupedMock.mockResolvedValueOnce({ data: grouped } as never);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
+      await flushPromises();
+
+      // varBaseUrl shadows staging's BASE_URL — removing it falls back there.
+      await wrapper.find(sel("-remove-0-btn")).trigger("click");
+      expect(wrapper.find(sel("-remove-dialog")).text()).toContain(
+        "Steps using BASE_URL will now get the staging value.",
+      );
     });
   });
 });
