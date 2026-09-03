@@ -662,6 +662,7 @@ import { formatDistanceToNowStrict } from "date-fns";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -715,7 +716,7 @@ const queue = ref<LlmQueue | null>(null);
 // the queue detail, which is the natural parent.
 const cameFromList = computed(() => route.query.from === "queues");
 
-const backTarget = computed(() =>
+const backRoute = computed(() =>
   cameFromList.value
     ? {
         label: t("aiObservability.nav.queues"),
@@ -732,6 +733,13 @@ const backTarget = computed(() =>
         },
       },
 );
+// Real browser back when there's history to pop; the fallback above only
+// fires with no history to pop (direct link / reload).
+const { goBack: backToParent } = useSmartBack(() => backRoute.value.to);
+const backTarget = computed(() => ({
+  label: backRoute.value.label,
+  onClick: backToParent,
+}));
 const items = ref<LlmQueueItem[]>([]);
 const configOptions = ref<LlmScoreConfigOption[]>([]);
 const currentDetail = ref<LlmQueueItemDetail | null>(null);

@@ -347,6 +347,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { formatDistanceToNowStrict } from "date-fns";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -415,9 +416,14 @@ const pageSizeOptions = [20, 50, DATASET_ITEMS_MAX_PAGE_SIZE];
  *  item detail drawer. */
 const versionLabel = (version: number) => raw(`v${version}`);
 
+// Real browser back when there's history to pop.
+const { goBack: backToDatasets } = useSmartBack(() => ({
+  name: "aiDatasets",
+  query: { org_identifier: orgId.value },
+}));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.datasets"),
-  to: { name: "aiDatasets", query: { org_identifier: orgId.value } },
+  onClick: backToDatasets,
 }));
 
 const metaSubtitle = computed(() => {

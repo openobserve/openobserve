@@ -224,6 +224,7 @@ import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -265,9 +266,14 @@ const loading = ref(false);
 const search = ref("");
 const statusFilter = ref<LlmQueueItemStatus | "all">("all");
 
+// Real browser back when there's history to pop.
+const { goBack: backToQueues } = useSmartBack(() => ({
+  name: "aiQueues",
+  query: orgQuery.value,
+}));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.queues"),
-  to: { name: "aiQueues", query: orgQuery.value },
+  onClick: backToQueues,
 }));
 
 const pendingCount = computed(() => items.value.filter((i) => i.status === "pending").length);
