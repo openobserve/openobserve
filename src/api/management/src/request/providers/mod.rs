@@ -346,8 +346,8 @@ async fn test_provider_connection_config(
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = inline(ProviderRequestBody), description = "Provider configuration to test"),
     responses(
-        (status = 200, description = "Test result", body = String),
-        (status = 400, description = "Bad Request", body = ()),
+        (status = 200, description = "Connection succeeded", body = inline(MetaHttpResponse)),
+        (status = 400, description = "Invalid configuration or connection failed", body = inline(MetaHttpResponse)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "test"})),
@@ -370,14 +370,14 @@ async fn test_provider_connection_config(
     #[cfg(feature = "enterprise")]
     {
         let provider =
-            o2_enterprise::enterprise::llm_evaluations::provider::PreparedProvider::parse(
+            o2_enterprise::enterprise::llm_evaluations::providers::PreparedProvider::parse(
                 (&provider).into(),
             )
             .map_err(|e| ProviderError::InvalidConfig(e.to_string()))?;
         provider
             .test_connection()
             .await
-            .map_err(|e| ProviderError::InfraError(infra::errors::Error::Message(e.to_string())))
+            .map_err(|e| ProviderError::InvalidConfig(e.to_string()))
     }
     #[cfg(not(feature = "enterprise"))]
     {
