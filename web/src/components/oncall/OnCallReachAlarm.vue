@@ -22,8 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   matters — nobody has seen this — nor the reason, which is usually a missing
   transport rather than anything about this page.
 
-  Silent unless every attempt failed. A banner that also appears when one send
-  of five bounced is a banner people learn to scroll past.
+  Silent unless every attempt since the last landed send failed. A banner
+  that also appears when one send of five bounced — or that still remembers
+  a lucky send from days ago while everything since has failed — is a banner
+  people learn to scroll past.
 -->
 <template>
   <OBanner
@@ -126,8 +128,22 @@ const personSends = computed(() =>
   props.deliveries.filter((d) => d.channel !== "chat" && d.channel !== "webhook"),
 );
 
-const failed = computed(() => personSends.value.filter((d) => d.delivered === false));
-const landed = computed(() => personSends.value.filter((d) => d.delivered === true));
+/// Only what has happened since the last time anyone was actually reached. A
+/// send that landed hours or days ago and drew no acknowledgment does not
+/// vouch for the attempts made since — a ladder keeps failing long after
+/// whatever reached somebody once, including across a handoff that restarts
+/// it under a new team (a later run's deliveries are, by construction,
+/// chronologically after an earlier run's).
+const sinceLastLanded = computed(() => {
+  const lastLandedAt = Math.max(
+    -Infinity,
+    ...personSends.value.filter((d) => d.delivered === true).map((d) => d.at),
+  );
+  return personSends.value.filter((d) => d.at > lastLandedAt);
+});
+
+const failed = computed(() => sinceLastLanded.value.filter((d) => d.delivered === false));
+const landed = computed(() => sinceLastLanded.value.filter((d) => d.delivered === true));
 
 /// A truncated ledger cannot support "all of them failed" — the send that
 /// landed may be on the page nobody fetched. Withholding the banner is the

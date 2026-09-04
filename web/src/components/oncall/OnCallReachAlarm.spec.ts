@@ -81,11 +81,47 @@ describe("OnCallReachAlarm", () => {
 
   /// A banner that also fires when one send of five bounced is a banner people
   /// learn to scroll past.
-  it("stays silent when any send landed", () => {
+  it("stays silent when a send in the same wave landed", () => {
     const wrapper = render({
       deliveries: [delivery(), delivery({ recipient: "bo@o2.ai", delivered: true })],
     });
     expect(wrapper.find('[data-test="oncall-reach-alarm"]').exists()).toBe(false);
+  });
+
+  /// Regression: a single landed send anywhere in the page's history used to
+  /// silence the banner forever, even after every attempt made since kept
+  /// failing for days. This is the common shape in production: one ladder,
+  /// no handoff, just a lucky early send followed by a long run of failures
+  /// nobody ever saw flagged.
+  it("stops crediting an earlier landing once every attempt made since has failed", () => {
+    const wrapper = render({
+      deliveries: [
+        delivery({ delivered: true, at: 100 }), // ana — the last time anyone was reached
+        delivery({ recipient: "carl@o2.ai", delivered: false, at: 50 }), // failed before that — history
+        delivery({ recipient: "bo@o2.ai", delivered: false, at: 200 }), // failed after — the current silence
+      ],
+      progress: { exhausted: true },
+    });
+
+    expect(wrapper.find('[data-test="oncall-reach-alarm"]').exists()).toBe(true);
+    const detail = wrapper.find('[data-test="oncall-reach-alarm-detail"]').text();
+    expect(detail).toContain("bo@o2.ai");
+    expect(detail).not.toContain("carl@o2.ai");
+    expect(detail).not.toContain("ana@o2.ai");
+  });
+
+  /// The scoping fix must not depend on the ladder having finished — a
+  /// ladder still retrying, with nothing landed since, is already the fact
+  /// this banner exists to say.
+  it("does not wait for exhaustion once the failures since the last landing alone qualify", () => {
+    const wrapper = render({
+      deliveries: [
+        delivery({ delivered: true, at: 100 }), // landed — history
+        delivery({ recipient: "bo@o2.ai", delivered: false, at: 200 }), // failed after
+      ],
+      progress: { next_at: (Date.now() + 10 * 60_000) * 1000 },
+    });
+    expect(wrapper.find('[data-test="oncall-reach-alarm"]').exists()).toBe(true);
   });
 
   /// A page somebody owns has been seen by definition, whatever the transport
