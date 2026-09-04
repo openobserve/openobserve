@@ -572,6 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { raw } from "@/types/i18n";
 import { defineComponent, computed, watch, provide, ref } from "vue";
+import { useStore } from "vuex";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -662,6 +663,7 @@ export default defineComponent({
     CompositeAlertForm,
   },
   setup(props, { emit }) {
+    const store = useStore();
     const alertForm = useAlertForm(props, emit);
 
     // Share server SQL-validation squiggle ranges with the descendant query
@@ -844,6 +846,7 @@ export default defineComponent({
         path: "/alerts",
         query: {
           folder: alertForm.activeFolderId.value ?? "default",
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     };
