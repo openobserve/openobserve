@@ -13,11 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The curated engine's orchestration layer (design §5.1-§5.6): tiered fetches,
-// the probe candidate ladder under a client budget, the semantic-groups error
-// ladder, force propagation, generations and an identity-stable dashboard ref.
+// The curated engine's orchestration layer (design §5.1-§5.6): tiered fetches, the probe ladder, generations.
 
-import { computed, ref, shallowRef, type ComputedRef, type Ref } from "vue";
+import {
+  computed,
+  ref,
+  shallowRef,
+  toValue,
+  type ComputedRef,
+  type MaybeRefOrGetter,
+  type Ref,
+} from "vue";
 import { useStore } from "vuex";
 import type { FieldAlias } from "@/services/service_streams";
 import useStreams from "@/composables/useStreams";
@@ -65,10 +71,17 @@ export interface UseCuratedPageResult {
 
 export function useCuratedPage(
   manifest: CuratedPageManifest,
-  opts?: { pins?: CuratedPagePins; lastSeenUs?: number },
+  opts?: {
+    pins?: MaybeRefOrGetter<CuratedPagePins | undefined>;
+    lastSeenUs?: MaybeRefOrGetter<number | undefined>;
+  },
 ): UseCuratedPageResult {
   const store = useStore();
   const { getStreams, getStream } = useStreams(gt);
+
+  // Read per refresh, never snapshotted: the drawer is reused across ?host= switches and lastSeenUs lands after mount.
+  const readPins = (): CuratedPagePins => toValue(opts?.pins) ?? {};
+  const readLastSeenUs = (): number | undefined => toValue(opts?.lastSeenUs);
 
   const loadError = ref(false);
   const dashboard = shallowRef<Record<string, unknown> | null>(null);
@@ -76,8 +89,7 @@ export function useCuratedPage(
   const partialGroups = ref<PartialGroupInfo[]>([]);
   const staleGroups = ref<StaleGroupInfo[]>([]);
   const warnings = ref<CuratedWarning[]>([]);
-  // Raised outside resolveManifest (probe, schema, dictionary), so a re-resolve
-  // replaces the resolver's half without dropping these.
+  // Raised outside resolveManifest, so a re-resolve replaces the resolver's half without dropping these.
   let ioWarnings: CuratedWarning[] = [];
   const lastDataUs = ref<number | null>(null);
   const stripAutoExpand = ref(false);
@@ -86,39 +98,45 @@ export function useCuratedPage(
   const presentGroupIds = ref<string[]>([]);
   const settledGroupIds = ref<string[]>([]);
 
-  // Every refresh increments this; responses tagged with a superseded value are
-  // dropped on arrival (none of these calls take an AbortSignal).
+  // Responses tagged with a superseded value are dropped on arrival (none of these calls take an AbortSignal).
   let generation = 0;
   let resolutionKey = "";
   const probeCache = new Map<string, ProbeVerdict>();
-  // Session state, so a range-only refresh costs nothing: presence and concept
-  // passes never re-run without `force` (§5.6 warm-path budget).
+  // Session state: presence and concept passes never re-run without `force` (§5.6 warm-path budget).
   let cachedLists: Record<string, StreamListEntry[]> | null = null;
   let cachedGroups: FieldAlias[] | null = null;
   let dictionaryUnavailable = false;
-  // Schemas read this SESSION, held as PROMISES: the candidate walks run
-  // concurrently, so N groups sharing one candidate share one in-flight read,
-  // and a range-only refresh re-reads nothing (§5.6 warm-path budget).
+  // Held as PROMISES so concurrent walks share one in-flight read; keyed by ORG+TYPE+NAME so no org is served another's schema.
   const schemaReads = new Map<string, Promise<StreamListEntry | undefined>>();
-  // Orgs whose semantic-groups read returned 403. The shared cache writes on
-  // success ONLY, so without this every refresh re-fires the doomed request.
+  const schemaKey = (orgId: string, type: string, name: string) => `${orgId}:${type}:${name}`;
+  // The shared cache writes on success ONLY, so without this every refresh re-fires the doomed 403.
   const forbiddenOrgs = new Set<string>();
   let cachedOrgId = "";
 
   const probeGroups = manifest.groups.filter((group) => group.probe);
 
+  /** Back to `unknown`: what was resolved describes an org or a list we no longer trust. */
+  const resetResolution = () => {
+    presentGroupIds.value = [];
+    settledGroupIds.value = [];
+    listsLoaded.value = false;
+    dashboard.value = null;
+    resolutionKey = "";
+    hiddenGroups.value = [];
+    partialGroups.value = [];
+    staleGroups.value = [];
+    lastDataUs.value = null;
+  };
+
   const face = computed<"unknown" | "undetected" | "ready">(() => {
-    // `ready` claims only "here is some data" — nothing arriving later can
-    // falsify it, so it flips on the FIRST passing group. `undetected` claims
-    // ABSENCE, so it waits for every ladder to settle.
+    // `ready` flips on the FIRST passing group; `undetected` claims ABSENCE, so it waits for every ladder to settle.
     if (presentGroupIds.value.length > 0) return "ready";
     if (!listsLoaded.value) return "unknown";
     if (settledGroupIds.value.length < manifest.groups.length) return "unknown";
     return "undetected";
   });
 
-  // L0 is derived from the lists tier 1 already read — the same signature
-  // useWorkloadDetection applies, at zero extra request cost.
+  // L0 derives from the lists tier 1 already read — the same signature useWorkloadDetection applies, at zero extra cost.
   const l0State = ref<WorkloadState>("unknown");
 
   /** The types the pack's own groups query — the page cannot resolve without these. */
@@ -151,6 +169,8 @@ export function useCuratedPage(
       cachedGroups = null;
       schemaReads.clear();
       probeCache.clear();
+      // Without this the previous org's dashboard stays mounted, firing its queries against the NEW org id.
+      resetResolution();
     }
 
     // ── Tier 1: the stream lists — the one hard dependency ──────────────────
@@ -171,17 +191,14 @@ export function useCuratedPage(
         );
       } catch {
         if (gen !== generation) return;
-        // `unknown` alone means loading; `unknown` + loadError means the lists
-        // themselves failed, and the view swaps the spinner for a Retry.
+        // `unknown` + loadError is the lists-failed state; the previous resolution goes with it rather than standing stale.
         cachedLists = null;
+        resetResolution();
         loadError.value = true;
-        listsLoaded.value = false;
         return;
       }
       cachedLists = lists;
-      // The L0-only lists are best-effort and DELIBERATELY not awaited: they
-      // only colour the setup face's copy, so neither their latency nor their
-      // failure may hold or break a page that can already resolve.
+      // DELIBERATELY not awaited: these only colour the setup face's copy and must never hold a page that can resolve.
       const settled = lists;
       for (const type of l0OnlyTypes) {
         void getStreams(type, false, false, force)
@@ -199,22 +216,18 @@ export function useCuratedPage(
     if (gen !== generation) return;
     l0State.value = workloadStateFromNames(manifest.id, listNames(lists));
 
-    // A first pass off the lists alone tells us which schemas and whether the
-    // dictionary are needed at all — the hosts pack answers "neither".
+    // A first pass off the lists alone tells us which schemas and whether the dictionary are needed at all.
     const dryRun = resolveManifest({
       manifest,
       streams: lists,
       semanticGroups: [],
       range: { start: args.start, end: args.end },
       now: args.end,
-      pins: opts?.pins,
-      lastSeenUs: opts?.lastSeenUs,
+      pins: readPins(),
+      lastSeenUs: readLastSeenUs(),
     });
 
-    // ── Tier 2: panel schemas and the dictionary, concurrently ─────────────
-    // Probe-candidate schemas are NOT fetched here: the walk stops at its first
-    // viable candidate, so reading them all up front would spend requests on
-    // candidates the ladder never reaches.
+    // Probe-candidate schemas are NOT fetched here: the walk stops at its first viable candidate.
     let groups = cachedGroups;
     await Promise.all([
       (async () => {
@@ -228,15 +241,29 @@ export function useCuratedPage(
         );
         if (groups.length > 0) cachedGroups = groups;
       })(),
-      loadSchemas(dryRun.schemasNeeded, lists, force),
+      loadSchemas(dryRun.schemasNeeded, lists, force, args.orgId, gen),
     ]);
     if (gen !== generation) return;
     const dictionary: FieldAlias[] = groups ?? [];
 
+    // Resolve BEFORE marking the ladders settled, or presentGroupIds is still empty and the face reads absence.
+    applyResolution(
+      resolveManifest({
+        manifest,
+        streams: lists,
+        semanticGroups: dictionary,
+        range: { start: args.start, end: args.end },
+        now: args.end,
+        pins: readPins(),
+        lastSeenUs: readLastSeenUs(),
+        // An EMPTY map, not `undefined`: undefined lets a probe group resolve present off its candidate alone.
+        probeVerdicts: {},
+        dictionaryUnavailable,
+      }),
+    );
     settledGroupIds.value = manifest.groups
       .filter((group) => !group.probe)
       .map((group) => group.id);
-    listsLoaded.value = true;
 
     // ── Tier 3: the probe COUNTs, all concurrent under one shared budget ────
     const verdicts = await runProbes({
@@ -256,8 +283,8 @@ export function useCuratedPage(
             semanticGroups: dictionary,
             range: { start: args.start, end: args.end },
             now: args.end,
-            pins: opts?.pins,
-            lastSeenUs: opts?.lastSeenUs,
+            pins: readPins(),
+            lastSeenUs: readLastSeenUs(),
             probeVerdicts: { ...collected, [groupId]: verdict },
             dictionaryUnavailable,
           }),
@@ -277,8 +304,8 @@ export function useCuratedPage(
         semanticGroups: dictionary,
         range: { start: args.start, end: args.end },
         now: args.end,
-        pins: opts?.pins,
-        lastSeenUs: opts?.lastSeenUs,
+        pins: readPins(),
+        lastSeenUs: readLastSeenUs(),
         probeVerdicts: verdicts,
         dictionaryUnavailable,
       }),
@@ -293,9 +320,10 @@ export function useCuratedPage(
     names: string[],
     lists: Record<string, StreamListEntry[]>,
     force: boolean,
+    orgId: string,
+    gen: number,
   ): Promise<void> => {
-    // Absent names are skipped: a schema read against a stream the list already
-    // proved absent spends a request to learn what we know.
+    // Absent names are skipped: a schema read against a proven-absent stream spends a request to learn what we know.
     const present = names.filter((name) =>
       Object.entries(lists).some(([, entries]) => entries.some((entry) => entry.name === name)),
     );
@@ -306,18 +334,19 @@ export function useCuratedPage(
             entries.some((entry) => entry.name === name),
           )?.[0] ?? "metrics";
         try {
-          let read = schemaReads.get(name);
+          const key = schemaKey(orgId, type, name);
+          let read = schemaReads.get(key);
           if (!read) {
             read = getStream(name, type, true, force) as Promise<StreamListEntry | undefined>;
-            schemaReads.set(name, read);
+            // A superseded generation must not repopulate the map the org change just cleared.
+            if (gen === generation) schemaReads.set(key, read);
           }
           const fetched = await read;
           if (!fetched?.schema?.length) return;
           const entries = lists[type] ?? [];
           const index = entries.findIndex((entry) => entry.name === name);
           if (index < 0) return;
-          // UNION, never replace: the list entry and the fetched schema are two
-          // reads of one stream, and dropping either loses a real column.
+          // UNION, never replace: the list entry and the fetched schema are two reads of one stream.
           const merged = [...(entries[index].schema ?? []), ...fetched.schema];
           const unique = new Map(merged.map((field) => [field.name, field]));
           entries[index] = { ...entries[index], schema: [...unique.values()] };
@@ -349,8 +378,7 @@ export function useCuratedPage(
     const bucket = `${args.orgId}:${Math.floor(args.start / BUCKET_US)}:${Math.floor(args.end / BUCKET_US)}`;
 
     const settle = (groupId: string, verdict: ProbeVerdict) => {
-      // A verdict from a superseded refresh must not reach the cache: it was
-      // computed against the previous org's or range's lists.
+      // A verdict from a superseded refresh was computed against the previous org's or range's lists.
       if (args.gen !== generation) return;
       args.collect(groupId, verdict);
       probeCache.set(`${bucket}:${groupId}`, verdict);
@@ -367,12 +395,19 @@ export function useCuratedPage(
         return;
       }
 
-      const walk = await walkCandidates(group, args.lists, args.force, args.now, args.start);
+      const walk = await walkCandidates(
+        group,
+        args.lists,
+        args.force,
+        args.now,
+        args.start,
+        args.orgId,
+        args.gen,
+      );
       if (!walk.stream) {
         settle(group.id, {
           passed: false,
-          // A column miss on a stream that IS present is different evidence from
-          // a name nothing in the list carries — the strip copy differs too.
+          // A column miss on a present stream is different evidence from a name nothing in the list carries.
           reason: walk.furthest ? "probe-empty" : "streams-missing",
           stream: walk.furthest,
           ...(walk.furthest ? { missingFields: walk.missingFields } : {}),
@@ -407,8 +442,7 @@ export function useCuratedPage(
       } catch (error) {
         const unknownField = unknownFieldFrom(error);
         if (unknownField) {
-          // Deterministic schema evidence arriving over the query channel — not
-          // a transport failure, so it hides rather than rendering a banner.
+          // Deterministic schema evidence over the query channel, so it hides rather than rendering a banner.
           settle(group.id, {
             stream: resolved,
             passed: false,
@@ -421,8 +455,7 @@ export function useCuratedPage(
       }
     });
 
-    // One shared client budget: expiry takes the transport-failure path so a
-    // hung probe cannot hold the face indefinitely.
+    // One shared client budget, so a hung probe cannot hold the face indefinitely.
     let expire!: () => void;
     const budget = new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, PROBE_TIMEOUT_MS);
@@ -451,17 +484,15 @@ export function useCuratedPage(
     for (const warning of resolution.warnings) merged = pushWarning(merged, warning);
     warnings.value = merged;
 
-    // RenderDashboardCharts re-inits its whole variables manager on ANY new
-    // object, so the reference is swapped only when resolution output changed.
-    const key = resolutionHash(resolution);
+    // Swapped only when resolution output changed (the renderer re-inits on ANY new object); pins are hashed because they substitute INTO the queries.
+    const key = resolutionHash(resolution, readPins());
     if (key !== resolutionKey || dashboard.value === null) {
       resolutionKey = key;
-      const built = buildDashboard(manifest, resolution, opts?.pins ?? {}, {
+      const built = buildDashboard(manifest, resolution, readPins(), {
         timezone: store.state.timezone ?? "UTC",
+        nowUs: Date.now() * 1000,
       });
-      // buildDashboard is pure and i18n-free, so it emits KEYS; the renderer
-      // prints titles verbatim, so they are resolved here — outside the pure
-      // layer, and once per build rather than per render.
+      // buildDashboard emits KEYS, so titles are resolved here — outside the pure layer, once per build.
       dashboard.value = translateTitles(built, manifest);
     }
   };
@@ -489,8 +520,7 @@ export function useCuratedPage(
 
     const status = failure?.response?.status;
     if (status === 403) {
-      // Expected on OSS until the groups are exposed there: silent, and
-      // negative-cached so a refresh does not re-fire the doomed request.
+      // Expected on OSS until the groups are exposed there: silent, and negative-cached against a re-fire.
       forbiddenOrgs.add(orgId);
       dictionaryUnavailable = true;
       return [];
@@ -504,8 +534,7 @@ export function useCuratedPage(
       return [];
     }
     if (groups.length === 0) {
-      // A 200 with no dictionary is a real misconfiguration, and unlike a 403
-      // it can fix itself — so it warns and is not negative-cached.
+      // A 200 with no dictionary is a real misconfiguration and, unlike a 403, it can fix itself.
       ioWarnings = pushWarning(ioWarnings, {
         kind: "groups-missing",
         message: raw("this org has no semantic field groups"),
@@ -525,6 +554,8 @@ export function useCuratedPage(
     force: boolean,
     now: number,
     rangeStart: number,
+    orgId: string,
+    gen: number,
   ): Promise<{ stream?: string; furthest?: string; missingFields?: string[] }> => {
     const entries = lists[group.streamType] ?? [];
     const floor = Math.min(rangeStart, now - STALENESS_24H_US);
@@ -538,17 +569,16 @@ export function useCuratedPage(
       if (typeof seen === "number" && seen !== 0 && seen < floor) continue;
       furthest = name;
 
-      // A probe pre-check always reads the schema through getStream: the
-      // name list is a NAME list (getStreams hard-forces schema=false), and
-      // hiding a group is too strong a call to make on a maybe-stale entry.
+      // The name list is a NAME list (getStreams forces schema=false), and hiding a group is too strong a call on a maybe-stale entry.
       let schema: StreamListEntry["schema"];
       try {
-        let read = schemaReads.get(name);
+        const key = schemaKey(orgId, group.streamType, name);
+        let read = schemaReads.get(key);
         if (!read) {
           read = getStream(name, group.streamType, true, force) as Promise<
             StreamListEntry | undefined
           >;
-          schemaReads.set(name, read);
+          if (gen === generation) schemaReads.set(key, read);
         }
         const fetched = await read;
         schema = fetched?.schema ?? null;
@@ -625,9 +655,10 @@ function unknownFieldFrom(error: any): string | null {
   return match ? (match[1] ?? match[2]) : null;
 }
 
-/** Selected variants + resolved fields + surviving pickers/sections + badges. */
-function resolutionHash(resolution: CuratedResolution): string {
+/** Selected variants + resolved fields + surviving pickers/sections + badges + pins. */
+function resolutionHash(resolution: CuratedResolution, pins: CuratedPagePins): string {
   return JSON.stringify({
+    pins,
     panels: resolution.panels
       .filter((panel) => !panel.hidden)
       .map((panel) => [panel.id, panel.queryStream, panel.unit, panel.resolvedFields]),

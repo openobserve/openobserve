@@ -76,9 +76,10 @@ const activeTab = ref<string | number>("metrics");
 // Seeded from the page picker — the drawer opens on the window the row was computed over.
 const drawerRange = ref({ ...props.range });
 
+// GETTERS, not snapshots: this instance is reused across ?host= switches and lastSeenUs lands after mount (§7.3).
 const curated = useCuratedPage(hostsPage, {
-  pins: { [GROUP.host]: props.hostName },
-  lastSeenUs: props.lastSeenUs ?? undefined,
+  pins: () => ({ [GROUP.host]: props.hostName }),
+  lastSeenUs: () => props.lastSeenUs ?? undefined,
 });
 
 const resolveMetrics = (force = false) =>
@@ -181,6 +182,15 @@ watch(
     logsLoaded.value = false;
     void resolveMetrics(true);
     if (activeTab.value === "logs") fetchLogs();
+  },
+);
+
+// The list is still in flight at mount, so without this the late last-seen never engages the badge override.
+watch(
+  () => props.lastSeenUs,
+  (next, prev) => {
+    if (next == null || next === prev) return;
+    void resolveMetrics(false);
   },
 );
 

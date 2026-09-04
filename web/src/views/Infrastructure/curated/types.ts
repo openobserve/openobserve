@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Curated page manifest types (design §4.1). There is deliberately NO concept
-// table here — the org's semantic field groups JSON is the dictionary (§3.3).
+// Curated page manifest types (design §4.1): no concept table here — the org's semantic field groups JSON is the dictionary (§3.3).
 
 import type { I18nKey } from "@/types/i18n";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";

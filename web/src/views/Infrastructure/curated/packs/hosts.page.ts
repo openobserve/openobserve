@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Hosts content pack (design §7.3) — the drawer's 8-panel grid, always rendered
-// pinned. Ids, titles, units and query text are frozen against the pre-retrofit
-// builder; `hostDashboard.golden.json` is the behavioural half of that contract.
+// Hosts content pack (design §7.3): ids, titles, units and query text frozen against the pre-retrofit builder.
 
 import { HOSTS_DEVICE_EXCLUSION } from "../../hostsQueries";
 import { GROUP, STALENESS_24H_US, type CuratedPageManifest } from "../types";
@@ -39,9 +37,7 @@ export const hostsPage: CuratedPageManifest = {
       setupHintKey: "infra.hosts.group.hostMetricsHint",
       setup: { kind: "card", slug: "linux" },
       streamType: "metrics",
-      // Not merely an optimisation: the `host` group lists `host_name` FIFTH, so
-      // rung 2 on a stream also carrying a bare `host` would rewrite all 8
-      // queries. Rung 1 also keeps the drawer's open synchronous (§7.3).
+      // Not an optimisation: the `host` group lists `host_name` FIFTH, so rung 2 would rewrite all 8 queries (§7.3).
       fieldOverrides: { [GROUP.host]: "host_name" },
       anchorStream: "system_cpu_time",
     },

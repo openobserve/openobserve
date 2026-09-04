@@ -54,6 +54,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ props.data.title }}
         </div>
+        <span
+          v-if="curatedSubtitle"
+          class="text-text-muted truncate text-xs"
+          data-test="dashboard-panel-curated-subtitle"
+        >
+          {{ t(curatedSubtitle) }}
+        </span>
         <OTag
           v-if="curatedBadge"
           variant="amber-soft"
@@ -62,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-tooltip-key="infra.curated.staleBadgeTooltip"
           :title="t('infra.curated.staleBadgeTooltip')"
         >
-          {{ t(curatedBadge.key, { duration: curatedBadge.duration, date: curatedBadge.date }) }}
+          {{ t(curatedBadge.key, curatedBadgeParams) }}
         </OTag>
         <div class="flex-1" />
 
@@ -340,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div
-      class="min-h-0 flex-1"
+      class="relative min-h-0 flex-1"
       :class="curatedBadge ? 'opacity-60' : undefined"
       data-test="dashboard-panel-body"
       :data-curated-stale="curatedBadge ? 'true' : 'false'"
@@ -387,7 +394,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :allowAlertCreation="allowAlertCreation"
         @show-legends="showLegendsDialog = true"
         :showLegendsButton="props.showLegendsButton"
+        @series-data-update="onCuratedSeriesData"
       ></PanelSchemaRenderer>
+
+      <!-- A wrong label VALUE leaves the panel present, fresh and blank, and a
+           blank tile is read as a zero — so it refuses to imply a number. -->
+      <div
+        v-if="curatedNoData"
+        class="text-text-muted absolute inset-0 flex items-center justify-center text-sm italic"
+        data-test="dashboard-panel-curated-no-data"
+      >
+        {{ t("infra.curated.tileNoData") }}
+      </div>
     </div>
 
     <QueryInspector
@@ -533,7 +551,35 @@ export default defineComponent({
     const curatedBadge = computed(
       () =>
         props.data?.config?.curated_badge as
-          { key: string; duration: string; date: string } | undefined,
+          | {
+              key: string;
+              date: string;
+              duration: { key: string; count: number };
+            }
+          | undefined,
+    );
+    // The duration arrives as a KEY + count, so the elapsed time is pluralized
+    // and localized here rather than baked into a string at build time.
+    const curatedBadgeParams = computed(() => {
+      const badge = curatedBadge.value;
+      if (!badge) return {};
+      const duration = badge.duration
+        ? t(`infra.curated.${badge.duration.key}` as never, { count: badge.duration.count })
+        : "";
+      return { duration, date: badge.date };
+    });
+    const curatedSubtitle = computed(
+      () => props.data?.config?.curated_subtitle_key as string | undefined,
+    );
+
+    const curatedSeriesCount = ref<number | null>(null);
+    const onCuratedSeriesData = (data: any) => {
+      if (!props.data?.config?.curated_no_data_eligible) return;
+      curatedSeriesCount.value = Array.isArray(data) ? data.length : data == null ? 0 : 1;
+    };
+    /** Only ever claimed after a load actually settled — never while pending. */
+    const curatedNoData = computed(
+      () => props.data?.config?.curated_no_data_eligible === true && curatedSeriesCount.value === 0,
     );
     const metaData = ref();
     const showViewPanel = ref(false);
@@ -990,6 +1036,10 @@ export default defineComponent({
     return {
       props,
       curatedBadge,
+      curatedBadgeParams,
+      curatedSubtitle,
+      curatedNoData,
+      onCuratedSeriesData,
       alertDisabledReason,
       onEditPanel,
       onLogPanel,

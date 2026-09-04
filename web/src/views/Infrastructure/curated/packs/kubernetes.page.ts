@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Kubernetes content pack (design §4.2). Node CPU/memory carry drift variants
-// because both collector spellings exist in the wild; inventory tables are
-// instant-vector shaped so their topk(20) is a real row cap, not a per-step
-// selector (dry run finding 7).
+// Kubernetes content pack (design §4.2): drift variants where both collector spellings exist, instant-vector inventory tables.
 
 import { GROUP, STALENESS_24H_US, type CuratedPageManifest, type CuratedPanelDef } from "../types";
 import { explorerDrilldown } from "./drilldown";
@@ -50,8 +47,7 @@ export const kubernetesPage: CuratedPageManifest = {
       setupHintKey: "infra.k8s.group.nodeMetricsHint",
       setup: { kind: "card", slug: "kubernetes" },
       streamType: "metrics",
-      // The rung-4a net for an org whose saved override dropped the group, and
-      // for OSS until the semantic groups are exposed there.
+      // The rung-4a net for an org whose saved override dropped the group, and for OSS until the groups are exposed.
       probeFields: {
         [GROUP.node]: ["k8s_node_name", "k8s_node", "node"],
         [GROUP.cluster]: ["k8s_cluster_name", "k8s_cluster", "cluster"],
@@ -77,9 +73,7 @@ export const kubernetesPage: CuratedPageManifest = {
       setupHintKey: "infra.k8s.group.kubeStateHint",
       setup: { kind: "card", slug: "kubernetes" },
       streamType: "metrics",
-      // Per-panel correctness where this group's streams disagree:
-      // kube_pod_status_phase carries no node field at all, while the node
-      // panels query kube_node_status_condition, which does.
+      // kube_pod_status_phase carries no node field at all, while the node panels query kube_node_status_condition, which does.
       fieldOverrides: {
         [GROUP.namespace]: "namespace",
         [GROUP.pod]: "pod",
@@ -92,8 +86,7 @@ export const kubernetesPage: CuratedPageManifest = {
     {
       name: "cluster",
       group: GROUP.cluster,
-      // The dead utilization spelling returned 0 values where the live usage
-      // stream returned all 10 clusters (dry run finding 6).
+      // The dead utilization spelling returned 0 values where the live usage stream returned all 10 clusters (dry run finding 6).
       valuesFrom: { groupId: "kubelet-node", stream: "k8s_node_cpu_usage", streamType: "metrics" },
       multiSelect: true,
       omitWhenFieldAbsent: true,
@@ -148,8 +141,7 @@ export const kubernetesPage: CuratedPageManifest = {
           "k8s_node_cpu_utilization",
         ),
 
-        // `status="true"` selects series; the assertion lives in the series
-        // VALUE, so counting READY nodes needs the `== 1` test.
+        // `status="true"` selects series; the assertion lives in the series VALUE, so counting READY nodes needs `== 1`.
         panel(
           {
             id: "k8s_ov_nodes_ready",
@@ -261,8 +253,7 @@ export const kubernetesPage: CuratedPageManifest = {
           "k8s_node_cpu_utilization",
         ),
 
-        // Five phases exist on a live org, so this chart is deliberately
-        // unfiltered — the honest superset the three tiles are drawn from.
+        // Five phases exist on a live org, so this chart is deliberately unfiltered — the superset the three tiles draw from.
         panel(
           {
             id: "k8s_ov_pods_by_phase",
@@ -317,8 +308,7 @@ export const kubernetesPage: CuratedPageManifest = {
           "k8s_node_cpu_utilization",
         ),
 
-        // The inventory the tiles above imply. Instant-vector shaped, so the
-        // outer topk(20) really does return twenty rows.
+        // The inventory the tiles above imply, instant-vector shaped so the outer topk(20) really returns twenty rows.
         panel(
           {
             id: "k8s_ov_unhealthy_pods",
@@ -467,9 +457,7 @@ export const kubernetesPage: CuratedPageManifest = {
           "k8s_node_network_io",
         ),
 
-        // `condition!="Ready"` selected the 13 unrelated node-problem-detector
-        // conditions; `{condition="Ready"} == 0` is the one form that stays
-        // correct when a node reports Ready="unknown" (kubelet unreachable).
+        // `condition!="Ready"` selected 13 unrelated conditions; `{condition="Ready"} == 0` stays correct when Ready="unknown".
         panel(
           {
             id: "k8s_nd_not_ready",

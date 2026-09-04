@@ -1708,9 +1708,11 @@ describe("PanelContainer", () => {
   // Additive: stored dashboards never carry config.curated_badge, so every case
   // below is asserted BOTH ways — the absent half is the regression guard.
   describe("curated stale badge", () => {
+    // The duration arrives as a KEY + count, never formatted copy: a string baked
+    // in the pure layer would freeze at build time and speak English only.
     const CURATED_BADGE = {
       key: "infra.curated.staleBadge",
-      duration: "3 days",
+      duration: { key: "durationDays", count: 3 },
       date: "Sep 1, 14:20",
     };
     const badgedPanel = (over = {}) => ({
@@ -1759,6 +1761,21 @@ describe("PanelContainer", () => {
       expect(body.attributes("data-curated-stale")).not.toBe("true");
     });
 
+    it("localizes the duration KEY through i18n rather than printing a baked string", () => {
+      // The pure layer emits {key,count}; pluralization and localization are the
+      // renderer's job, so a badge carrying a count of 1 must read "1 day".
+      wrapper = createWrapper({
+        data: badgedPanel({
+          curated_badge: { ...CURATED_BADGE, duration: { key: "durationDays", count: 1 } },
+        }),
+        viewOnly: true,
+      });
+      const text = wrapper.find('[data-test="dashboard-panel-curated-badge"]').text();
+      expect(text).toContain("1 day");
+      expect(text).not.toContain("1 days");
+      expect(text).not.toContain("durationDays");
+    });
+
     it("leaves the description-icon behavior unchanged in both states", () => {
       wrapper = createWrapper({ data: badgedPanel(), viewOnly: false });
       expect(wrapper.find('[data-test="dashboard-panel-description-info"]').exists()).toBe(true);
@@ -1766,6 +1783,64 @@ describe("PanelContainer", () => {
 
       wrapper = createWrapper({ data: badgedPanel(), viewOnly: true });
       expect(wrapper.find('[data-test="dashboard-panel-description-info"]').exists()).toBe(false);
+    });
+  });
+
+  // ── Curated tile no-data + subtitle (design §6.3) ──────────────────────────
+  describe("curated tile no-data and subtitle", () => {
+    const eligible = (over = {}) => ({
+      ...mockPanelData,
+      config: { curated_no_data_eligible: true, ...over },
+    });
+
+    it("an eligible tile whose series result is EMPTY renders tileNoData ON the tile", async () => {
+      // A wrong label value leaves the panel present, fresh and blank, and a blank
+      // tile is read as a zero — the engine's worst possible output.
+      wrapper = createWrapper({ data: eligible(), viewOnly: true });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await renderer.vm.$emit("series-data-update", []);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(true);
+    });
+
+    it("a tile resolving to a REAL 0 renders no no-data state — the two must look different", async () => {
+      wrapper = createWrapper({ data: eligible(), viewOnly: true });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await renderer.vm.$emit("series-data-update", [{ name: "pods", data: [[0, 0]] }]);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
+    });
+
+    it("claims nothing before a load has settled — pending is not the same as empty", () => {
+      wrapper = createWrapper({ data: eligible(), viewOnly: true });
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
+    });
+
+    it("a panel WITHOUT curated_no_data_eligible never renders the state", async () => {
+      wrapper = createWrapper({ data: mockPanelData, viewOnly: true });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await renderer.vm.$emit("series-data-update", []);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
+    });
+
+    it("renders curated_subtitle_key beside the title, and nothing when it is absent", () => {
+      // Three phase tiles that visibly fail to sum to the fleet read as a page bug
+      // unless the tiles say they are three of five phases.
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          config: { curated_subtitle_key: "infra.k8s.panel.podsFailedSub" },
+        },
+        viewOnly: true,
+      });
+      const subtitle = wrapper.find('[data-test="dashboard-panel-curated-subtitle"]');
+      expect(subtitle.exists()).toBe(true);
+      expect(subtitle.text()).toContain("Three of five phases");
+      wrapper.unmount();
+
+      wrapper = createWrapper({ data: mockPanelData, viewOnly: true });
+      expect(wrapper.find('[data-test="dashboard-panel-curated-subtitle"]').exists()).toBe(false);
     });
   });
 });

@@ -14,11 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  CuratedPageView — one renderer for every curated workload page (design §6).
-  Three faces (checking / setup / charts), a capability-led explainer strip, the
-  stale banner and badges, and scope pickers that dim where they do not apply.
--->
+<!-- One renderer for every curated workload page: three faces, the explainer strip, badges and scope pickers (design §6). -->
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 import { useStore } from "vuex";
@@ -27,6 +23,9 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import DateTime from "@/components/DateTime.vue";
@@ -45,7 +44,10 @@ const route = useRoute();
 const router = useRouter();
 const { t } = useI18nTyped();
 
-const manifest = computed(() => curatedPacks[props.workload] ?? curatedPacks.kubernetes!);
+// No fallback: an AWS route rendering the Kubernetes manifest is a lie, not a degradation.
+const pack = curatedPacks[props.workload];
+const hasPack = computed(() => pack != null);
+const manifest = computed(() => pack ?? curatedPacks.kubernetes!);
 
 const page = useCuratedPage(manifest.value);
 const {
@@ -77,6 +79,8 @@ const currentTimeObj = computed(() => ({
 }));
 
 const runRefresh = async (force = false) => {
+  // An unregistered workload resolves nothing, so it must also fetch nothing.
+  if (!hasPack.value) return;
   await refresh({ orgId: orgId.value, start: range.value.from, end: range.value.to, force });
   checkedAtUs.value = Date.now() * 1000;
 };
@@ -119,10 +123,6 @@ watch(
   },
   { immediate: true },
 );
-
-const sectionTitleKey = (tabId: string) =>
-  manifest.value.sections.find((section) => section.id === tabId)?.titleKey ??
-  manifest.value.titleKey;
 
 // ── Explainer strip ─────────────────────────────────────────────────────────
 
@@ -177,8 +177,7 @@ const lastDataDuration = computed(() =>
 );
 
 function humanDuration(sinceUs: number): string {
-  // Measured against whichever is later — the page's window end or the wall
-  // clock — so a range that trails the data never reports a negative age.
+  // Measured against the later of window-end and wall clock, so a trailing range never reports a negative age.
   const reference = Math.max(range.value.to, Date.now() * 1000);
   const minutes = Math.max(1, Math.floor((reference - sinceUs) / 60_000_000));
   if (minutes < 60) return t("infra.curated.durationMinutes", { count: minutes });
@@ -189,7 +188,15 @@ function humanDuration(sinceUs: number): string {
 
 // ── Warnings ────────────────────────────────────────────────────────────────
 
-const probeWarnings = computed(() => warnings.value.filter((entry) => entry.kind === "probe"));
+// The composable can only name the group by ID; this banner is user-facing copy.
+const probeWarnings = computed(() =>
+  warnings.value
+    .filter((entry) => entry.kind === "probe")
+    .map((entry) => {
+      const group = manifest.value.groups.find((candidate) => candidate.id === entry.message);
+      return { key: entry.message, label: group ? t(group.labelKey) : raw(entry.message) };
+    }),
+);
 const statsWarning = computed(() => warnings.value.some((entry) => entry.kind === "stats"));
 /** schema, semantic-groups and groups-missing are one event to a user (§8.4). */
 const defaultFieldNamesWarning = computed(() =>
@@ -200,14 +207,6 @@ const defaultFieldNamesWarning = computed(() =>
 
 // ── Scope pickers ───────────────────────────────────────────────────────────
 
-interface PickerRuntime {
-  values: string[] | null;
-  omitted: boolean;
-  selection: string;
-}
-
-const pickerRuntime = ref<Record<string, PickerRuntime>>({});
-
 const variableList = computed(() => ((dashboard.value as any)?.variables?.list ?? []) as any[]);
 
 const activeScopedBy = computed(
@@ -215,90 +214,35 @@ const activeScopedBy = computed(
     manifest.value.sections.find((section) => section.id === selectedTabId.value)?.scopedBy ?? [],
 );
 
-const visiblePickers = computed(() =>
-  variableList.value.filter((variable) => {
-    const runtime = pickerRuntime.value[variable.name];
-    if (!runtime) return true;
-    // Schema presence is not resolvability: an enabled empty dropdown reads as
-    // a broken page, so a zero-values picker is removed rather than disabled.
-    if (variable.omitWhenValuesEmpty && runtime.values?.length === 0) return false;
-    return !runtime.omitted;
-  }),
-);
-
 const isPickerApplicable = (name: string) => activeScopedBy.value.includes(name);
 
-const cappedPickers = computed(() =>
-  Object.fromEntries(
-    variableList.value.map((variable) => {
-      const runtime = pickerRuntime.value[variable.name];
-      const cap = variable.query_data?.max_record_size ?? 0;
-      return [variable.name, Boolean(runtime?.values && cap && runtime.values.length === cap)];
-    }),
-  ),
+/**
+ * The renderer owns the pickers, so the disabled state is stamped onto the live
+ * variable objects it already renders rather than duplicated into a shadow row.
+ */
+watch(
+  [variableList, activeScopedBy, selectedTabId],
+  () => {
+    for (const variable of variableList.value) {
+      variable.curatedDisabled = !isPickerApplicable(variable.name);
+      variable.curatedDisabledTooltipKey = variable.curatedDisabled
+        ? "infra.curated.pickerNotApplicable"
+        : undefined;
+    }
+  },
+  { immediate: true, deep: true },
 );
-
-const parentOf = (name: string) =>
-  manifest.value.scopePickers.find((picker) => picker.name === name)?.chainedOn?.[0]?.picker ?? "";
 
 /** A single-cluster org loses its picker, so the name renders as static text. */
 const singleClusterName = computed(() => {
-  const runtime = pickerRuntime.value.cluster;
-  if (!runtime?.omitted || runtime.values?.length !== 1) return null;
-  return runtime.values[0];
+  const cluster = variableList.value.find((variable) => variable.name === "cluster");
+  if (!cluster?.omitWhenValuesEmpty) return null;
+  const values = cluster.options as { value: string }[] | undefined;
+  if (!Array.isArray(values) || values.length !== 1) return null;
+  return values[0]?.value ?? null;
 });
 
-const onValuesLoaded = (payload: { name: string; values: string[] }) => {
-  const current = pickerRuntime.value[payload.name];
-  pickerRuntime.value = {
-    ...pickerRuntime.value,
-    [payload.name]: {
-      values: payload.values,
-      omitted: current?.omitted ?? false,
-      selection: current?.selection ?? "",
-    },
-  };
-};
-
-const onVariableOmitted = (payload: { name: string }) => {
-  const current = pickerRuntime.value[payload.name];
-  pickerRuntime.value = {
-    ...pickerRuntime.value,
-    [payload.name]: {
-      values: current?.values ?? null,
-      omitted: true,
-      selection: current?.selection ?? "",
-    },
-  };
-};
-
-const onPickerChange = (name: string) => {
-  const current = pickerRuntime.value[name];
-  pickerRuntime.value = {
-    ...pickerRuntime.value,
-    [name]: {
-      values: current?.values ?? null,
-      omitted: current?.omitted ?? false,
-      selection: current?.selection || raw("selected"),
-    },
-  };
-};
-
-// ── Tile no-data (§6.3 finding 2a) ──────────────────────────────────────────
-
-const emptyTiles = ref<Record<string, boolean>>({});
-const emptyTilePanelIds = computed(() =>
-  Object.entries(emptyTiles.value)
-    .filter(([, isEmpty]) => isEmpty)
-    .map(([panelId]) => panelId),
-);
-const onPanelSeriesLoaded = (payload: { panelId: string; seriesCount: number }) => {
-  const panel = visibleTabs.value
-    .flatMap((tab) => tab.panels ?? [])
-    .find((entry: any) => entry.id === payload.panelId);
-  if (!panel?.config?.curated_no_data_eligible) return;
-  emptyTiles.value = { ...emptyTiles.value, [payload.panelId]: payload.seriesCount === 0 };
-};
+// The "no data" state and the phase-tile subtitle both render ON the tile (§6.3), so PanelContainer owns them.
 
 // ── Footer ──────────────────────────────────────────────────────────────────
 
@@ -326,15 +270,13 @@ const onDateChange = (date: { startTime: number; endTime: number; userChangedVal
   // DateTime replays on mount with userChangedValue:false — "do not fetch".
   if (date.userChangedValue === false) return;
   range.value = { from: date.startTime, to: date.endTime };
-  // The ONE debounce seam: refresh() itself is never delayed, so org switches,
-  // @detected and Retry stay immediate while scrubbing cannot stack bursts.
+  // The ONE debounce seam: refresh() itself is never delayed, so org switches and Retry stay immediate.
   if (rangeTimer) clearTimeout(rangeTimer);
   rangeTimer = setTimeout(() => void runRefresh(false), 300);
 };
 
 const onWindowFocus = () => {
-  // Returning from a provider console must re-check without a reload — but only
-  // while the setup face shows, so a healthy page never storms on focus.
+  // Only while the setup face shows, so a healthy page never storms on focus.
   if (face.value === "undetected") void runRefresh(true);
 };
 
@@ -358,8 +300,6 @@ watch(
       if (key.startsWith("var-")) delete query[key];
     }
     void router.replace({ query });
-    pickerRuntime.value = {};
-    emptyTiles.value = {};
     void runRefresh(true);
   },
 );
@@ -373,6 +313,7 @@ watch(
           auto-apply
           menu-align="end"
           :default-type="'relative'"
+          :default-relative-time="manifest.defaultRelativePeriod"
           data-test-name="curated-date-time"
           @on:date-change="onDateChange"
         />
@@ -388,9 +329,28 @@ watch(
       </div>
     </template>
 
+    <div
+      v-if="!hasPack"
+      class="flex min-h-60 flex-col items-center justify-center gap-2"
+      data-test="curated-pack-unavailable"
+    >
+      <OText tag="h2" class="text-base font-semibold">{{
+        t("infra.curated.packUnavailable")
+      }}</OText>
+      <OText variant="meta">{{ t("infra.curated.packUnavailableHint") }}</OText>
+      <OButton
+        variant="outline"
+        size="sm-action"
+        data-test="curated-pack-unavailable-build"
+        @click="openDashboardsList"
+      >
+        {{ t("infra.curated.buildOwnDashboard") }}
+      </OButton>
+    </div>
+
     <!-- `unknown` + loadError is the lists-failed state, never an endless spinner. -->
     <div
-      v-if="face === 'unknown' && loadError"
+      v-else-if="face === 'unknown' && loadError"
       class="flex min-h-60 flex-col items-center justify-center gap-2"
       data-test="curated-error"
     >
@@ -444,44 +404,8 @@ watch(
     </div>
 
     <div v-else-if="dashboard" class="flex min-h-0 flex-1 flex-col">
-      <div
-        v-if="visiblePickers.length || singleClusterName"
-        class="flex flex-wrap items-end gap-3 pb-2"
-      >
-        <div
-          v-for="variable in visiblePickers"
-          :key="variable.name"
-          class="flex flex-col gap-1"
-          :data-test="`curated-picker-${variable.name}`"
-          :data-disabled="String(!isPickerApplicable(variable.name))"
-          :data-value="pickerRuntime[variable.name]?.selection ?? ''"
-          :data-tooltip-key="
-            isPickerApplicable(variable.name) ? undefined : 'infra.curated.pickerNotApplicable'
-          "
-          :title="
-            isPickerApplicable(variable.name)
-              ? undefined
-              : t('infra.curated.pickerNotApplicable', {
-                  picker: variable.label,
-                  section: t(sectionTitleKey(selectedTabId ?? '')),
-                })
-          "
-          @change="onPickerChange(variable.name)"
-        >
-          <OText variant="meta">{{ raw(variable.label) }}</OText>
-          <OText
-            v-if="cappedPickers[variable.name]"
-            variant="meta"
-            :data-test="`curated-values-capped-${variable.name}`"
-            >{{
-              t("infra.curated.valuesCapped", {
-                count: variable.query_data?.max_record_size ?? 0,
-                parent: parentOf(variable.name) || variable.label,
-              })
-            }}</OText
-          >
-        </div>
-        <OText v-if="singleClusterName" variant="meta" data-test="curated-single-cluster">{{
+      <div v-if="singleClusterName" class="flex flex-wrap items-end gap-3 pb-2">
+        <OText variant="meta" data-test="curated-single-cluster">{{
           raw(singleClusterName)
         }}</OText>
       </div>
@@ -493,9 +417,6 @@ watch(
         searchType="dashboards"
         :showTabs="showTabs"
         :frame="false"
-        @variable-values-loaded="onValuesLoaded"
-        @variable-omitted="onVariableOmitted"
-        @panel-series-loaded="onPanelSeriesLoaded"
       >
         <template #before_panels>
           <div class="flex flex-col gap-2 pb-2">
@@ -516,11 +437,11 @@ watch(
 
             <OBanner
               v-for="warning in probeWarnings"
-              :key="warning.message"
+              :key="warning.key"
               variant="info"
               dense
               data-test="curated-warning-probe"
-              :content="t('infra.curated.warnBanner.probe', { label: raw(warning.message) })"
+              :content="t('infra.curated.warnBanner.probe', { label: warning.label })"
             />
             <OBanner
               v-if="defaultFieldNamesWarning"
@@ -544,25 +465,14 @@ watch(
               >{{ t("infra.curated.lastData", { duration: lastDataDuration }) }}</OText
             >
 
-            <div
+            <OCollapsible
               v-if="hasStrip"
+              v-model="stripExpanded"
               class="border-border-default rounded-surface border p-3"
               data-test="curated-strip"
+              :label="collapsedCapabilities"
             >
-              <button
-                type="button"
-                class="text-text-body flex w-full items-center justify-between gap-2 text-start text-sm"
-                data-test="curated-strip-summary"
-                @click="stripExpanded = !stripExpanded"
-              >
-                <span>{{ raw(collapsedCapabilities) }}</span>
-              </button>
-
-              <div
-                v-if="stripExpanded"
-                class="flex flex-col gap-3 pt-3"
-                data-test="curated-strip-expanded"
-              >
+              <div class="flex flex-col gap-3 pt-3" data-test="curated-strip-expanded">
                 <div
                   v-for="hidden in hiddenGroups"
                   :key="hidden.group.id"
@@ -677,15 +587,7 @@ watch(
                   >{{ t("infra.curated.hiddenFootnote") }}</OText
                 >
               </div>
-            </div>
-
-            <OText
-              v-for="panelId in emptyTilePanelIds"
-              :key="panelId"
-              variant="meta"
-              :data-test="`curated-tile-no-data-${panelId}`"
-              >{{ t("infra.curated.tileNoData") }}</OText
-            >
+            </OCollapsible>
           </div>
         </template>
       </RenderDashboardCharts>
@@ -695,12 +597,18 @@ watch(
           <OText variant="meta">{{
             t("infra.curated.footer", { time: raw(checkedAtLabel) })
           }}</OText>
-          <OText
-            variant="meta"
-            data-test="curated-footer-version"
-            :title="t('infra.curated.footerVersionTooltip', { version: manifest.contentVersion })"
-            >{{ raw("i") }}</OText
+          <OTooltip
+            :content="t('infra.curated.footerVersionTooltip', { version: manifest.contentVersion })"
           >
+            <OIcon
+              name="info"
+              size="sm"
+              data-test="curated-footer-version"
+              :aria-label="
+                t('infra.curated.footerVersionTooltip', { version: manifest.contentVersion })
+              "
+            />
+          </OTooltip>
         </div>
         <OButton
           variant="ghost"

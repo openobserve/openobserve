@@ -23,6 +23,8 @@ import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
 import { defineComponent, ref, isRef, inject, watchEffect, type Ref } from "vue";
 import CuratedPageView from "./CuratedPageView.vue";
+import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
+import { kubernetesPage } from "./packs/kubernetes.page";
 import i18n from "@/locales";
 
 const { useCuratedPageMock } = vi.hoisted(() => ({ useCuratedPageMock: vi.fn() }));
@@ -73,6 +75,21 @@ const injectedTabIds: string[] = [];
 const renderChartsStub = defineComponent({
   name: "RenderDashboardCharts",
   props: ["dashboardData", "currentTimeObj", "viewOnly", "searchType", "showTabs", "frame"],
+  // The REAL component's emits, verbatim. A stub that invents events lets the
+  // view bind handlers to a contract nothing implements and still go green.
+  emits: [
+    "onDeletePanel",
+    "onViewPanel",
+    "variablesData",
+    "refreshedVariablesDataUpdated",
+    "updated:data-zoom",
+    "refreshPanelRequest",
+    "refresh",
+    "onMovePanel",
+    "panelsValues",
+    "searchRequestTraceIds",
+    "variablesManagerReady",
+  ],
   setup() {
     const selectedTabId = inject<Ref<string | null>>("selectedTabId", ref(null));
     watchEffect(() => {
@@ -96,15 +113,25 @@ const setupCardStub = defineComponent({
   template: "<div data-test='setup-card-stub' :data-slug='slug' />",
 });
 
+// Declares the REAL DateTime props under test, so an unpassed one is observable
+// rather than swallowed into $attrs by inheritAttrs:false.
 const dateTimeStub = defineComponent({
   name: "DateTime",
   inheritAttrs: false,
+  props: ["defaultType", "defaultRelativeTime", "autoApply", "menuAlign"],
   emits: ["on:date-change"],
   template: "<div data-test='curated-datetime-stub' />",
 });
 
 const passthrough = (name: string) =>
   defineComponent({ name, template: "<div><slot name='actions' /><slot /></div>" });
+
+/** Stands in for the OSelect tree only — the props under test stay real. */
+const querySelectorStub = defineComponent({
+  name: "VariableQueryValueSelector",
+  props: ["modelValue", "variableItem", "loadOptions", "disabled", "disabledTooltipKey"],
+  template: "<div class='qvs-stub' />",
+});
 
 describe("CuratedPageView", () => {
   let wrapper: VueWrapper<any>;
@@ -225,12 +252,11 @@ describe("CuratedPageView", () => {
 
     it("a ROUTE-kind undetected face renders a CTA that pushes the route, not an inline card", async () => {
       // Successor to the deleted WorkloadStubPage.spec's AWS route-CTA case. The
-      // AWS pack CONTENT is deferred, but the undetected face's route-kind branch
-      // is engine behavior, so it is pinned against a minimal route-kind manifest
-      // rather than left uncovered until the pack lands. The strip's Set-up button
-      // is a different code path and does not cover this one.
+      // undetected face's route-kind branch is engine behavior, so it is driven
+      // through a REGISTERED workload's setupDoor — `aws` has no pack, and a page
+      // with no pack renders the unavailable face, never a setup face.
       wrapper = await mountView(
-        { workload: "aws" },
+        { workload: "kubernetes" },
         {
           face: ref("undetected"),
           dashboard: ref(null),
@@ -251,7 +277,7 @@ describe("CuratedPageView", () => {
       // §6.1: route-kind pages re-check on remount/focus, so wiring a card hook
       // here would be dead code.
       wrapper = await mountView(
-        { workload: "aws" },
+        { workload: "kubernetes" },
         {
           face: ref("undetected"),
           dashboard: ref(null),
@@ -259,6 +285,28 @@ describe("CuratedPageView", () => {
         },
       );
       expect(wrapper.findComponent({ name: "DataSourceSetupCard" }).exists()).toBe(false);
+    });
+
+    it("a workload with NO registered pack renders the unavailable face, never another pack's page", async () => {
+      // The AWS pack is deferred. Falling back to `curatedPacks.kubernetes` put
+      // the Kubernetes manifest — its title, its panels, its queries — behind
+      // /infra/aws, which is the most confident kind of wrong a page can be.
+      wrapper = await mountView({ workload: "aws" });
+      expect(wrapper.find('[data-test="curated-pack-unavailable"]').exists()).toBe(true);
+
+      const text = wrapper.text();
+      for (const title of ["Kubernetes", "Pods running", "Nodes ready"]) {
+        expect(text).not.toContain(title);
+      }
+      expect(wrapper.findComponent({ name: "RenderDashboardCharts" }).exists()).toBe(false);
+      expect(wrapper.find('[data-test="curated-setup-state"]').exists()).toBe(false);
+    });
+
+    it("a packless workload fetches NOTHING — it cannot resolve, so it must not ask", async () => {
+      refreshSpy.mockClear();
+      wrapper = await mountView({ workload: "aws" });
+      await flushPromises();
+      expect(refreshSpy).not.toHaveBeenCalled();
     });
 
     it("`ready` renders viewOnly, frameless, searchType=dashboards charts", async () => {
@@ -414,10 +462,11 @@ describe("CuratedPageView", () => {
     it("the COLLAPSED line carries capability sentences and NO panel count", async () => {
       // "8 panels hidden" understates losing every health signal on the page.
       wrapper = await mountView({}, { hiddenGroups: ref([hiddenGroup()]) });
-      const summary = wrapper.find('[data-test="curated-strip-summary"]');
-      expect(summary.exists()).toBe(true);
-      expect(summary.text()).not.toMatch(/\b8\b/);
-      expect(summary.text()).not.toMatch(/panels?\s+hidden/i);
+      // The disclosure is an OCollapsible, so the collapsed line is its trigger.
+      const trigger = wrapper.find('[data-test="curated-strip"] button');
+      expect(trigger.exists()).toBe(true);
+      expect(trigger.text()).not.toMatch(/\b8\b/);
+      expect(trigger.text()).not.toMatch(/panels?\s+hidden/i);
     });
 
     it("the panel COUNT and the not-found stream list render on the EXPANDED row only", async () => {
@@ -671,72 +720,9 @@ describe("CuratedPageView", () => {
       );
     });
 
-    it("finding 2a: an eligible metric tile returning ZERO series renders tileNoData, not a blank", async () => {
-      // The engine's worst possible output is a confident wrong answer: "Pods
-      // Failed: (blank)" is read as zero. It cannot self-diagnose a wrong label
-      // value, but it can refuse to assert a number it does not have.
-      wrapper = await mountView(
-        {},
-        {
-          dashboard: ref({
-            ...dashboardFixture(["overview"]),
-            tabs: [
-              {
-                tabId: "overview",
-                name: "overview",
-                panels: [
-                  {
-                    id: "k8s_ov_pods_failed",
-                    type: "metric",
-                    layout: { x: 0, y: 0, w: 32, h: 6 },
-                    config: { curated_no_data_eligible: true },
-                  },
-                ],
-              },
-            ],
-          }),
-        },
-      );
-      wrapper
-        .findComponent({ name: "RenderDashboardCharts" })
-        .vm.$emit("panel-series-loaded", { panelId: "k8s_ov_pods_failed", seriesCount: 0 });
-      await flushPromises();
-      expect(wrapper.find('[data-test="curated-tile-no-data-k8s_ov_pods_failed"]').exists()).toBe(
-        true,
-      );
-    });
-
-    it("a tile resolving to a REAL 0 renders no tileNoData state — the two must look different", async () => {
-      wrapper = await mountView(
-        {},
-        {
-          dashboard: ref({
-            ...dashboardFixture(["overview"]),
-            tabs: [
-              {
-                tabId: "overview",
-                name: "overview",
-                panels: [
-                  {
-                    id: "k8s_ov_pods_failed",
-                    type: "metric",
-                    layout: { x: 0, y: 0, w: 32, h: 6 },
-                    config: { curated_no_data_eligible: true },
-                  },
-                ],
-              },
-            ],
-          }),
-        },
-      );
-      wrapper
-        .findComponent({ name: "RenderDashboardCharts" })
-        .vm.$emit("panel-series-loaded", { panelId: "k8s_ov_pods_failed", seriesCount: 1 });
-      await flushPromises();
-      expect(wrapper.find('[data-test="curated-tile-no-data-k8s_ov_pods_failed"]').exists()).toBe(
-        false,
-      );
-    });
+    // The "— no data" tile state and the phase-tile subtitle both render ON the
+    // tile (§6.3), so they are pinned in PanelContainer.spec.ts against the real
+    // series-data-update seam rather than a page-level footnote list.
 
     it("the positive freshness line renders on a healthy page and is ABSENT when anything is stale", async () => {
       wrapper = await mountView();
@@ -784,116 +770,153 @@ describe("CuratedPageView", () => {
   // ── Pickers (§6.4) ───────────────────────────────────────────────────────
 
   describe("scope pickers", () => {
-    const withPickers = () => ({
+    // These mount the REAL VariablesValueSelector, not a stub that hand-emits a
+    // contract nothing implements: the disabled/cap/omission affordances live in
+    // that component, so a pin that fakes them proves nothing about the page.
+    const pickerVariables = () => [
+      {
+        name: "cluster",
+        label: "K8s Cluster",
+        type: "query_values",
+        multiSelect: true,
+        omitWhenValuesEmpty: true,
+        curatedOmitWhenValuesEmpty: true,
+        curatedCapNotice: true,
+        curatedNarrowBy: "",
+        options: [],
+        isLoading: false,
+        value: [],
+        query_data: { max_record_size: 100 },
+      },
+      {
+        name: "namespace",
+        label: "K8s Namespace",
+        type: "query_values",
+        multiSelect: true,
+        omitWhenValuesEmpty: true,
+        curatedOmitWhenValuesEmpty: true,
+        curatedCapNotice: true,
+        curatedNarrowBy: "K8s Cluster",
+        options: new Array(100).fill(0).map((_, i) => ({ label: `ns${i}`, value: `ns${i}` })),
+        isLoading: false,
+        value: [],
+        query_data: { max_record_size: 100 },
+      },
+    ];
+
+    const withPickers = (over: any[] = []) => ({
       dashboard: ref({
         ...dashboardFixture(["overview", "workloads"]),
         variables: {
           showDynamicFilters: false,
-          list: [
-            {
-              name: "cluster",
-              label: "K8s Cluster",
-              type: "query_values",
-              multiSelect: true,
-              omitWhenValuesEmpty: true,
-              query_data: { max_record_size: 100 },
-            },
-            {
-              name: "namespace",
-              label: "K8s Namespace",
-              type: "query_values",
-              multiSelect: true,
-              omitWhenValuesEmpty: true,
-              query_data: { max_record_size: 100 },
-            },
-          ],
+          list: over.length ? over : pickerVariables(),
         },
       }),
     });
 
-    it("a picker the ACTIVE section's scopedBy omits is disabled with the not-applicable tooltip", async () => {
-      // A page-level dropdown that accepts a selection and changes nothing is the
-      // exact "I applied a filter and nothing happened" complaint this retires.
-      wrapper = await mountView({}, withPickers());
-      const picker = wrapper.find('[data-test="curated-picker-namespace"]');
-      expect(picker.exists()).toBe(true);
-      expect(picker.attributes("data-disabled")).toBe("true");
-      expect(picker.attributes("data-tooltip-key")).toBe("infra.curated.pickerNotApplicable");
+    /**
+     * The REAL VariablesValueSelector with its list seeded directly: the manager
+     * that normally fills it needs a live store, and the seam under test is the
+     * template's forwarding, not the manager.
+     */
+    const mountRealSelector = async (variables: any[]) => {
+      const store = createStore({
+        state: { selectedOrganization: { identifier: "test-org" }, timezone: "UTC" },
+      });
+      const selector = mount(VariablesValueSelector, {
+        props: { variablesConfig: { list: variables }, showDynamicFilters: false },
+        global: {
+          plugins: [store, i18n],
+          stubs: { VariableQueryValueSelector: querySelectorStub },
+        },
+      });
+      (selector.vm as any).variablesData.values = variables;
+      await flushPromises();
+      return selector;
+    };
+
+    it("the view stamps curatedDisabled on a variable the ACTIVE section's scopedBy omits", async () => {
+      // Overview declares `cluster` only, so `namespace` is inapplicable there.
+      const variables = pickerVariables();
+      wrapper = await mountView({}, withPickers(variables));
+      const namespace = variables.find((v) => v.name === "namespace") as any;
+      expect(namespace.curatedDisabled).toBe(true);
+      expect(namespace.curatedDisabledTooltipKey).toBe("infra.curated.pickerNotApplicable");
     });
 
-    it("switching to a section that DECLARES it re-enables it with the SELECTION PRESERVED", async () => {
-      // The preservation half is the reason dim beat vanish. The section change is
-      // driven through the INJECTED selectedTabId — the design puts the tab bar
-      // inside RenderDashboardCharts (showTabs + provide), so clicking a
-      // `curated-tab-*` element in the view would fail a conformant
-      // implementation that correctly delegates tabs to the renderer.
-      wrapper = await mountView({}, withPickers());
-      const picker = wrapper.find('[data-test="curated-picker-namespace"]');
-      await picker.trigger("change");
-      const selected = picker.attributes("data-value");
+    it("switching to a section that DECLARES it clears curatedDisabled — selection untouched", async () => {
+      const variables = pickerVariables();
+      wrapper = await mountView({}, withPickers(variables));
+      const namespace = variables.find((v) => v.name === "namespace") as any;
+      namespace.value = ["kube-system"];
 
-      // Read the ref off the renderer's PROVIDES, not off its instance proxy:
-      // Vue unwraps refs returned from setup(), so `vm.selectedTabId` is the
-      // plain string "overview" with no `.value` to read or assign. `$.provides`
-      // hands back the ref the view actually provided — which is what §3.1
-      // requires, so this still fails any implementation that provides a
-      // non-ref or nothing at all.
       const injected = (wrapper.findComponent({ name: "RenderDashboardCharts" }).vm as any).$
         .provides["selectedTabId"] as Ref<string | null>;
       expect(isRef(injected)).toBe(true);
-      expect(injected.value).toBe("overview");
       injected.value = "workloads";
       await flushPromises();
 
-      const after = wrapper.find('[data-test="curated-picker-namespace"]');
-      expect(after.attributes("data-disabled")).toBe("false");
-      expect(after.attributes("data-value")).toBe(selected);
+      expect(namespace.curatedDisabled).toBe(false);
+      expect(namespace.value).toEqual(["kube-system"]);
     });
 
-    it("values length === cap renders the valuesCapped copy; below the cap it is absent", async () => {
+    it("the REAL selector forwards curatedDisabled + tooltip key to VariableQueryValueSelector", async () => {
+      const variables = pickerVariables();
+      (variables[1] as any).curatedDisabled = true;
+      (variables[1] as any).curatedDisabledTooltipKey = "infra.curated.pickerNotApplicable";
+      const selector = await mountRealSelector(variables);
+      const inner = selector
+        .findAllComponents({ name: "VariableQueryValueSelector" })
+        .find((c: any) => c.props("variableItem")?.name === "namespace") as any;
+      expect(inner.props("disabled")).toBe(true);
+      expect(inner.props("disabledTooltipKey")).toBe("infra.curated.pickerNotApplicable");
+      selector.unmount();
+    });
+
+    it("values length === cap renders valuesCapped in the REAL selector; below the cap it is absent", async () => {
       // Truncation is undetectable (no_count:true), so length===cap is the only
       // inference available and it errs toward disclosure.
-      wrapper = await mountView({}, withPickers());
-      wrapper.findComponent({ name: "RenderDashboardCharts" }).vm.$emit("variable-values-loaded", {
-        name: "namespace",
-        values: new Array(100).fill("ns"),
-      });
-      await flushPromises();
-      expect(wrapper.find('[data-test="curated-values-capped-namespace"]').exists()).toBe(true);
-
-      wrapper
-        .findComponent({ name: "RenderDashboardCharts" })
-        .vm.$emit("variable-values-loaded", { name: "cluster", values: new Array(3).fill("c") });
-      await flushPromises();
-      expect(wrapper.find('[data-test="curated-values-capped-cluster"]').exists()).toBe(false);
+      const variables = pickerVariables();
+      const selector = await mountRealSelector(variables);
+      expect(selector.find('[data-test="variable-values-capped-namespace"]').exists()).toBe(true);
+      expect(selector.find('[data-test="variable-values-capped-cluster"]').exists()).toBe(false);
+      selector.unmount();
     });
 
-    it("DRY-RUN finding 6: an omitWhenValuesEmpty picker with ZERO values is REMOVED from the DOM", async () => {
+    it("DRY-RUN finding 6: an omitWhenValuesEmpty picker with ZERO values is hidden by the REAL selector", async () => {
       // Not rendered disabled, not rendered with an empty-state string — an enabled
       // empty dropdown reads as a broken page.
-      wrapper = await mountView({}, withPickers());
-      wrapper
-        .findComponent({ name: "RenderDashboardCharts" })
-        .vm.$emit("variable-values-loaded", { name: "cluster", values: [] });
-      await flushPromises();
-      expect(wrapper.find('[data-test="curated-picker-cluster"]').exists()).toBe(false);
-      // …and the same picker with ≥1 value renders normally.
-      expect(wrapper.find('[data-test="curated-picker-namespace"]').exists()).toBe(true);
+      const variables = pickerVariables();
+      const selector = await mountRealSelector(variables);
+      const vm = selector.vm as any;
+      expect(vm.isVariableOmitted(variables[0])).toBe(true);
+      expect(vm.isVariableOmitted(variables[1])).toBe(false);
+      // A still-loading empty list is NOT an omission — the picker would flicker.
+      expect(vm.isVariableOmitted({ ...variables[0], isLoading: true })).toBe(false);
+      selector.unmount();
     });
 
     it("finding 23b: an omitted cluster picker with ONE resolvable value renders the name as static text", async () => {
-      wrapper = await mountView({}, withPickers());
-      wrapper
-        .findComponent({ name: "RenderDashboardCharts" })
-        .vm.$emit("variable-values-loaded", { name: "cluster", values: ["production"] });
-      await wrapper
-        .findComponent({ name: "RenderDashboardCharts" })
-        .vm.$emit("variable-omitted", { name: "cluster", reason: "field-absent" });
+      const variables = pickerVariables();
+      (variables[0] as any).options = [{ label: "production", value: "production" }];
+      wrapper = await mountView({}, withPickers(variables));
       await flushPromises();
       const label = wrapper.find('[data-test="curated-single-cluster"]');
       expect(label.exists()).toBe(true);
       expect(label.text()).toContain("production");
     });
+  });
+
+  // ── Time picker (§6.4) ───────────────────────────────────────────────────
+
+  it("the picker opens on the manifest's defaultRelativePeriod, not DateTime's 15m default", async () => {
+    // manifest.defaultRelativePeriod was declared and never read, so the header
+    // said 15m while every panel query ran over the page's 3h window.
+    wrapper = await mountView();
+    const picker = wrapper.findComponent({ name: "DateTime" });
+    expect(picker.exists()).toBe(true);
+    expect(picker.props("defaultRelativeTime")).toBe(kubernetesPage.defaultRelativePeriod);
+    expect(picker.props("defaultRelativeTime")).toBe("3h");
   });
 
   // ── Footer (§6.5) ────────────────────────────────────────────────────────

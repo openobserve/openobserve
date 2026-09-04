@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The "Open in Metrics explorer" drilldown every non-probe chart panel declares
-// (design §6.6). On a viewOnly page the description icon is hidden, so this is
-// the only path from a number to the query behind it.
+// The "Open in Metrics explorer" drilldown (design §6.6) — on a viewOnly page it is the only path to the query.
 
 import { b64EncodeUnicode } from "@/utils/formatters";
 
