@@ -119,6 +119,12 @@ export interface ResolvedPicker {
   def: CuratedPageManifest["scopePickers"][number];
   field: string;
   label: string;
+  /**
+   * The PARENT concept's field as spelled on THIS picker's own values stream.
+   * The chain filter runs against the child's stream, so the parent's own
+   * spelling can name a column that stream does not have (§5.4 drift).
+   */
+  parentField?: string;
 }
 
 export interface PickerOption {
@@ -590,7 +596,26 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     );
     if (!field) continue;
     if (picker.omitWhenFieldAbsent && schemaFields && !schemaFields.has(field)) continue;
-    pickers.push({ def: picker, field, label: display });
+
+    // The chain filter is applied to THIS picker's values stream, so the parent
+    // concept must be spelled the way that stream spells it — the parent's own
+    // field comes from a different stream and can name a column missing here,
+    // which returns an empty list rather than an error.
+    const parentName = picker.chainedOn?.[0]?.picker;
+    const parentDef = parentName
+      ? manifest.scopePickers.find((entry) => entry.name === parentName)
+      : undefined;
+    const parentField = parentDef
+      ? resolveConcept(
+          parentDef.group,
+          group,
+          schemaFields,
+          source.stream,
+          schemaFields !== undefined,
+        ).field
+      : undefined;
+
+    pickers.push({ def: picker, field, label: display, ...(parentField ? { parentField } : {}) });
   }
 
   const overviewSectionId = manifest.sections[0]?.id;
@@ -1088,7 +1113,14 @@ function buildVariable(
       field: picker.field,
       max_record_size: 100,
       filter: parentPicker
-        ? [{ name: parentPicker.field, operator: "IN", value: `$${parent}` }]
+        ? [
+            {
+              // Spelled for the stream the filter RUNS on, not the parent's own.
+              name: picker.parentField ?? parentPicker.field,
+              operator: "IN",
+              value: `$${parent}`,
+            },
+          ]
         : [],
     },
   };

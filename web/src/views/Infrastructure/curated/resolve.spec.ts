@@ -96,8 +96,19 @@ const K8S_FULL_DICT = dictionary(
 );
 
 // Schema sets measured on the live enterprise org (dry run findings 5, 12).
+// The node fixture keeps the k8s_cluster_name spelling deliberately: it is the
+// drift case that proves the cluster token resolves per PANEL STREAM rather than
+// once per pack, and the substitution tests below assert both spellings appear.
 const KUBELET_NODE_SCHEMA = ["k8s_node_name", "k8s_cluster_name", "_timestamp", "value"];
-const KUBELET_POD_SCHEMA = ["k8s_namespace_name", "k8s_pod_name", "_timestamp", "value"];
+// Re-measured 2026-09-05: every kubeletstats POD stream carries a cluster field,
+// so the Workloads panels can scope by cluster — they were simply never asked to.
+const KUBELET_POD_SCHEMA = [
+  "k8s_namespace_name",
+  "k8s_pod_name",
+  "k8s_cluster",
+  "_timestamp",
+  "value",
+];
 // kube-state carries the UNSUFFIXED k8s_cluster where kubeletstats carries
 // k8s_cluster_name — measured on the live org, and the reason the cluster token
 // must resolve per panel stream rather than once per pack.
@@ -1705,7 +1716,7 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
       // Independent pickers are the ones that regressed; assert them by name so a
       // pack that later drops the chain cannot make this pass vacuously.
       const independent = managed.filter((v) => !v.query_data?.filter?.length);
-      expect(independent.map((v) => v.name)).toContain("namespace");
+      expect(independent.map((v) => v.name)).toContain("cluster");
       for (const variable of independent) {
         expect(
           variable.isVariableLoadingPending,
@@ -1714,9 +1725,11 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
       }
 
       // A chained child WAITS: firing it now would race its parent and ship the
-      // filter with `$namespace` unsubstituted, yielding no values at all.
+      // filter with `$namespace` unsubstituted, yielding no values at all. The
+      // chain is three deep (cluster → namespace → pod), so the MIDDLE link must
+      // wait as a child and still be waited ON as a parent.
       const chained = managed.filter((v) => v.query_data?.filter?.length);
-      expect(chained.map((v) => v.name)).toContain("pod");
+      expect(chained.map((v) => v.name)).toEqual(expect.arrayContaining(["namespace", "pod"]));
       for (const variable of chained) {
         expect(
           variable.isVariableLoadingPending,
@@ -1790,8 +1803,11 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
         built.variables.list.map((v: any) => ({ ...v, scope: "global" })),
         {},
       );
+      // Three deep: the middle link is both a child and a parent, and only the
+      // root is independent.
       expect(graph["pod@global"].parents).toEqual(["namespace@global"]);
-      expect(graph["namespace@global"].parents).toEqual([]);
+      expect(graph["namespace@global"].parents).toEqual(["cluster@global"]);
+      expect(graph["cluster@global"].parents).toEqual([]);
     });
 
     // A picker can be dropped after its child declared chainedOn it (the cluster
@@ -2097,9 +2113,42 @@ describe("the built dashboard does not depend on the selected tab", () => {
     const byName = Object.fromEntries(
       dashboard.variables.list.map((v: any) => [v.name, v.curatedTabs]),
     );
-    expect(byName.cluster).toEqual(["overview", "nodes"]);
+    // Cluster renders on ALL THREE tabs: a Workloads without it answered a
+    // per-cluster question with every cluster's pods, silently.
+    expect(byName.cluster).toEqual(["overview", "nodes", "workloads"]);
     expect(byName.namespace).toEqual(["workloads"]);
     expect(byName.pod).toEqual(["workloads"]);
+  });
+
+  it("the namespace picker narrows by cluster, naming a field its OWN stream carries", () => {
+    // The chain filter is applied to the CHILD's values stream, but the field name
+    // comes from the PARENT, which resolves against a different stream
+    // (k8s_node_cpu_usage vs k8s_pod_memory_usage). If the two streams spell the
+    // cluster differently the filter names a column the query cannot see and the
+    // namespace list comes back EMPTY — a silent failure that looks like "this
+    // cluster has no namespaces". Live check 2026-09-05 on the introspect org:
+    // both streams carry a populated `k8s_cluster` (k8s_cluster_name exists in the
+    // schema but no series sets it), so one spelling covers the chain.
+    const dashboard: any = build(resolve({}));
+    const byName = Object.fromEntries(dashboard.variables.list.map((v: any) => [v.name, v]));
+
+    const namespaceVar = byName.namespace;
+    expect(namespaceVar.query_data.filter).toHaveLength(1);
+    const [filter] = namespaceVar.query_data.filter;
+    expect(filter.operator).toBe("IN");
+    expect(filter.value).toBe("$cluster");
+
+    // The filter field must be a real column of the stream the child queries.
+    const podStreamFields = new Set(KUBELET_POD_SCHEMA);
+    expect(namespaceVar.query_data.stream).toBe("k8s_pod_memory_usage");
+    expect(
+      podStreamFields.has(filter.name),
+      `namespace narrows by "${filter.name}", which k8s_pod_memory_usage does not carry`,
+    ).toBe(true);
+
+    // And the chain stays three deep, each link naming its own parent.
+    expect(byName.pod.query_data.filter[0].value).toBe("$namespace");
+    expect(byName.cluster.query_data.filter).toEqual([]);
   });
 
   it("the declared sections match the manifest's scopedBy exactly", () => {
