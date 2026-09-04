@@ -121,7 +121,7 @@ Enrich, redact, reduce, or normalize data on ingest. Stream processing for logs-
 ## Getting Started
 
 ### OpenObserve Cloud (Fastest Way)
-Get started in minutes without managing infrastructure. Free tier includes up to 200 GB/day ingestion.
+Get started in minutes without managing infrastructure. Free tier includes up to 50 GB/day ingestion.
 [Get Started Free →](https://cloud.openobserve.ai/)
 
 ### 🐳 Docker:
@@ -157,7 +157,7 @@ For installing OpenObserve in High Availability mode, check [High Availability d
 | *Aspect* | *OpenObserve* | *Datadog* |
 | ----- | ----- | ----- |
 | *Deployment* | *Self-hosted or Cloud* | *SaaS only* |
-| *Pricing model* | *Per-GB (free up to 200GB/day)* | *Per-host \+ per-GB* |
+| *Pricing model* | *Per-GB (free up to 50GB/day)* | *Per-host \+ per-GB* |
 | *Open source* | *Yes (AGPL-3.0)* | *No* |
 | *OpenTelemetry* | *Native OTLP* | *Supported* |
 | *Query language* | *SQL \+ PromQL* | *Proprietary* |
@@ -310,7 +310,7 @@ For organizations requiring enterprise-grade features and support, we offer an E
 - Training and onboarding programs
 
 **Pricing:**
-- **Free tier**: Up to 200 GB/day of ingestion (roughly 6 TB/month), including full commercial use
+- **Free tier**: Up to 50 GB/day of ingestion (roughly 1.5 TB/month), including full commercial use
 - *Registration required at 100 GB/day*
 - Volume discounts and multi-year contracts available
 - [View complete feature comparison →](https://openobserve.ai/downloads/)
