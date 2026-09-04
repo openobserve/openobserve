@@ -420,6 +420,111 @@ describe("CuratedPageView", () => {
     });
   });
 
+  // ── Relative vs absolute window (§6.4) ───────────────────────────────────
+
+  describe("the window a refresh queries", () => {
+    const globalOf = () => captured.currentTimeObj.__global;
+    const boundsUs = () => ({
+      from: globalOf().start_time.getTime() * 1000,
+      to: globalOf().end_time.getTime() * 1000,
+    });
+
+    it("a RELATIVE selection re-anchors its window to NOW on every refresh", async () => {
+      // The live bug: `range` was materialized once at setup and the mount
+      // replay was dropped whole, so `to` froze at page-load time and every
+      // range-plotted panel emptied out as the wall clock walked past it.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_US / 1000));
+      wrapper = await mountView();
+      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+        startTime: NOW_US - 3 * HOUR_US,
+        endTime: NOW_US,
+        relativeTimePeriod: "3h",
+        valueType: "relative",
+        userChangedValue: false,
+      });
+      await flushPromises();
+      const first = boundsUs();
+      expect(first.to).toBe(NOW_US);
+
+      vi.setSystemTime(new Date((NOW_US + 11 * 60 * 1_000_000) / 1000));
+      refreshSpy.mockClear();
+      await wrapper.find('[data-test="curated-refresh"]').trigger("click");
+      await flushPromises();
+
+      const after = boundsUs();
+      expect(after.to).toBe(NOW_US + 11 * 60 * 1_000_000);
+      // The width the user chose is preserved, so it is a slide and not a stretch.
+      expect(after.to - after.from).toBe(first.to - first.from);
+      expect(refreshSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ start: after.from, end: after.to, force: true }),
+      );
+    });
+
+    it("an ABSOLUTE selection does NOT move when the clock advances", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_US / 1000));
+      wrapper = await mountView();
+      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+        startTime: NOW_US - 5 * HOUR_US,
+        endTime: NOW_US - 2 * HOUR_US,
+        relativeTimePeriod: null,
+        valueType: "absolute",
+        userChangedValue: true,
+      });
+      vi.advanceTimersByTime(400);
+      await flushPromises();
+      const pinned = boundsUs();
+      expect(pinned).toEqual({ from: NOW_US - 5 * HOUR_US, to: NOW_US - 2 * HOUR_US });
+
+      vi.setSystemTime(new Date((NOW_US + 11 * 60 * 1_000_000) / 1000));
+      refreshSpy.mockClear();
+      await wrapper.find('[data-test="curated-refresh"]').trigger("click");
+      await flushPromises();
+
+      expect(boundsUs()).toEqual(pinned);
+      expect(refreshSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ start: pinned.from, end: pinned.to }),
+      );
+    });
+
+    it("re-anchoring hands the renderer new BOUNDS without churning dashboardData identity", async () => {
+      // A moving `to` that remounted every panel each refresh would trade an
+      // empty chart for a flashing one.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_US / 1000));
+      wrapper = await mountView();
+      const dashboardBefore = captured.dashboardData;
+      const before = boundsUs();
+
+      vi.setSystemTime(new Date((NOW_US + 11 * 60 * 1_000_000) / 1000));
+      await wrapper.find('[data-test="curated-refresh"]').trigger("click");
+      await flushPromises();
+
+      expect(captured.dashboardData).toBe(dashboardBefore);
+      expect(boundsUs().to).toBeGreaterThan(before.to);
+    });
+
+    it("the mount replay sets the window without fetching — mount's own refresh carries it", async () => {
+      // `userChangedValue: false` means "do not fetch", NOT "do not record".
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_US / 1000));
+      wrapper = await mountView();
+      refreshSpy.mockClear();
+      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+        startTime: NOW_US - 6 * HOUR_US,
+        endTime: NOW_US,
+        relativeTimePeriod: "6h",
+        valueType: "relative",
+        userChangedValue: false,
+      });
+      vi.advanceTimersByTime(500);
+      await flushPromises();
+      expect(refreshSpy).not.toHaveBeenCalled();
+      expect(boundsUs().to - boundsUs().from).toBe(6 * HOUR_US);
+    });
+  });
+
   // ── Explainer strip (§6.2) ───────────────────────────────────────────────
 
   describe("explainer strip", () => {
