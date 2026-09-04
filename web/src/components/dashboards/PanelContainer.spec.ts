@@ -1704,4 +1704,68 @@ describe("PanelContainer", () => {
       expect(wrapper.vm.showLegendsDialog).toBe(false);
     });
   });
+  // ── Curated-page stale badge (curated-pages design §6.3) ───────────────────
+  // Additive: stored dashboards never carry config.curated_badge, so every case
+  // below is asserted BOTH ways — the absent half is the regression guard.
+  describe("curated stale badge", () => {
+    const CURATED_BADGE = {
+      key: "infra.curated.staleBadge",
+      duration: "3 days",
+      date: "Sep 1, 14:20",
+    };
+    const badgedPanel = (over = {}) => ({
+      ...mockPanelData,
+      config: { curated_badge: CURATED_BADGE, ...over },
+    });
+
+    it("renders the badge tag when config.curated_badge is set, UNDER viewOnly:true", () => {
+      // viewOnly hides the description icon, so the badge cannot ride description.
+      wrapper = createWrapper({ data: badgedPanel(), viewOnly: true });
+      expect(wrapper.find('[data-test="dashboard-panel-curated-badge"]').exists()).toBe(true);
+    });
+
+    it("the label leads with the DURATION — elapsed time is what tells the user to care", () => {
+      wrapper = createWrapper({ data: badgedPanel(), viewOnly: true });
+      const badge = wrapper.find('[data-test="dashboard-panel-curated-badge"]');
+      const text = badge.text();
+      expect(text).toContain("3 days");
+      expect(text).toContain("Sep 1, 14:20");
+      expect(text.indexOf("3 days")).toBeLessThan(text.indexOf("Sep 1, 14:20"));
+    });
+
+    it("the 'as of the last stream-list refresh' caveat is TOOLTIP-only, never in the label", () => {
+      wrapper = createWrapper({ data: badgedPanel(), viewOnly: true });
+      const badge = wrapper.find('[data-test="dashboard-panel-curated-badge"]');
+      expect(badge.text()).not.toContain("last stream-list refresh");
+      expect(badge.attributes("data-tooltip-key")).toBe("infra.curated.staleBadgeTooltip");
+    });
+
+    it("dims the panel BODY wrapper when badged — a full-contrast number reads as current", () => {
+      // The badge alone loses on a `metric` tile: "Pods Failed: 0" in confident
+      // large type is read as zero. Badge and de-emphasis are ONE change.
+      wrapper = createWrapper({ data: badgedPanel(), viewOnly: true });
+      const body = wrapper.find('[data-test="dashboard-panel-body"]');
+      expect(body.exists()).toBe(true);
+      expect(body.attributes("data-curated-stale")).toBe("true");
+    });
+
+    it("renders NO badge and NO dimming when config.curated_badge is absent", () => {
+      // Stored dashboards never carry the key, so the change must be invisible
+      // outside curated pages — asserted both ways so a blanket dim can't ship.
+      wrapper = createWrapper({ data: mockPanelData, viewOnly: true });
+      expect(wrapper.find('[data-test="dashboard-panel-curated-badge"]').exists()).toBe(false);
+      const body = wrapper.find('[data-test="dashboard-panel-body"]');
+      expect(body.exists()).toBe(true);
+      expect(body.attributes("data-curated-stale")).not.toBe("true");
+    });
+
+    it("leaves the description-icon behavior unchanged in both states", () => {
+      wrapper = createWrapper({ data: badgedPanel(), viewOnly: false });
+      expect(wrapper.find('[data-test="dashboard-panel-description-info"]').exists()).toBe(true);
+      wrapper.unmount();
+
+      wrapper = createWrapper({ data: badgedPanel(), viewOnly: true });
+      expect(wrapper.find('[data-test="dashboard-panel-description-info"]').exists()).toBe(false);
+    });
+  });
 });
