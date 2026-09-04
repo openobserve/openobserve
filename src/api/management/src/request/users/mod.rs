@@ -50,6 +50,8 @@ use {
 
 #[cfg(feature = "enterprise")]
 use crate::common::meta::user::UserResponse;
+#[cfg(feature = "enterprise")]
+use crate::request::password_policy::password_rotation;
 use crate::{
     common::meta::{
         self,
@@ -59,7 +61,7 @@ use crate::{
             UserOrgRole, UserRequest, UserRoleRequest, UserUpdateMode, get_roles,
         },
     },
-    request::{BulkDeleteRequest, BulkDeleteResponse, password_policy::password_rotation},
+    request::{BulkDeleteRequest, BulkDeleteResponse},
 };
 
 pub mod service_accounts;
@@ -754,7 +756,10 @@ pub async fn authentication(
     if resp.status {
         let cfg = get_config();
 
-        resp.password_rotation_warning = password_rotation::warning_days(&auth.name).await;
+        #[cfg(feature = "enterprise")]
+        {
+            resp.password_rotation_warning = password_rotation::warning_days(&auth.name).await;
+        }
 
         let access_token = format!(
             "Basic {}",

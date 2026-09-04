@@ -13,48 +13,31 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Access-time enforcement of the instance password policy.
+//! The axum layer that applies the instance password policy.
 //!
-//! Enforcement deliberately sits here rather than at the login endpoint: blocking authentication
-//! itself would lock every user out at once the moment a policy tightened, with no way back in.
-//! A flagged user can still log in, and is refused resources until they set a compliant password.
-//!
-//! Two things are enforced here. A stored `must_reset_password` flag, set by the complexity sweep
-//! when the policy tightened; and password rotation, which stores nothing and is recomputed from
-//! `password_updated_at` on every request, so a change to `rotation_days` takes effect at once.
-//!
-//! Only the block lives here. The advance warning that a password is nearing expiry is handed out
-//! once per session by the sign-in handler (`openobserve_core::password_rotation`).
+//! The decision itself is `o2_enterprise::enterprise::password_policy::enforcement`; this is the
+//! glue that finds the user, reads the live policy, and turns a refusal into a response. Without
+//! the enterprise feature there is no policy to apply and the layer passes everything through,
+//! so the routers can install it unconditionally.
 
-use axum::{
-    body::Body,
-    extract::Request,
-    http::{Method, StatusCode, Uri, header},
-    middleware::Next,
-    response::Response,
+use axum::{extract::Request, middleware::Next, response::Response};
+#[cfg(feature = "enterprise")]
+use {
+    axum::{
+        body::Body,
+        http::{Method, StatusCode, Uri, header},
+    },
+    chrono::Utc,
+    common::infra::config::USERS,
+    o2_enterprise::enterprise::password_policy::enforcement::{
+        PolicyDecision, RESET_REQUIRED_CODE, decide,
+    },
 };
-use chrono::{DateTime, Utc};
-use common::infra::config::USERS;
-use config::meta::password_policy::{
-    EnforcementMode, PasswordPolicy, PasswordResetReason, RotationStatus,
-};
-use infra::table::users::UserRecord;
-
-/// A distinct code so the console can route to a reset screen. A generic 401/403 would be
-/// indistinguishable from an expired session and send the user back through login, which cannot
-/// clear the flag and so would loop.
-const RESET_REQUIRED_CODE: &str = "password_reset_required";
 
 /// The header `auth_middleware` writes the authenticated email into. Reading it here rather than
 /// re-validating is what keeps this a layer of its own; `audit_middleware` consumes the same one.
+#[cfg(feature = "enterprise")]
 const USER_ID_HEADER: &str = "user_id";
-
-/// What the policy says about a request.
-#[derive(Debug, PartialEq, Eq)]
-enum PolicyDecision {
-    Allow,
-    Block { reason: String },
-}
 
 /// Refuse a request whose user owes the instance a new password.
 ///
@@ -63,130 +46,22 @@ enum PolicyDecision {
 /// arriving without that header is passed straight through — this layer authenticates nobody and
 /// must not appear to.
 pub async fn password_policy_middleware(request: Request, next: Next) -> Response {
-    let Some(user_email) = request
+    #[cfg(feature = "enterprise")]
+    if let Some(user_email) = request
         .headers()
         .get(USER_ID_HEADER)
         .and_then(|value| value.to_str().ok())
         .map(str::to_string)
-    else {
-        return next.run(request).await;
-    };
-
-    if let Some(blocked) = check_request(&user_email, request.uri(), request.method()).await {
+        && let Some(blocked) = check_request(&user_email, request.uri(), request.method()).await
+    {
         return blocked;
     }
 
     next.run(request).await
 }
 
-/// Decide whether a request may proceed.
-///
-/// Split from the middleware so it is testable without axum's `Next` machinery; the middleware
-/// above is only the glue that turns [`PolicyDecision`] into a response.
-fn decide(
-    user: &UserRecord,
-    uri: &Uri,
-    method: &Method,
-    policy: &PasswordPolicy,
-    now: DateTime<Utc>,
-) -> PolicyDecision {
-    // Root is exempt unless the policy says otherwise
-    if user.is_root && !policy.apply_to_root {
-        return PolicyDecision::Allow;
-    }
-
-    // The stored flag wins over rotation: it is the more specific reason, and both lead to the same
-    // remediation anyway.
-    let reason = if user.must_reset_password {
-        user.password_reset_reason
-            .clone()
-            .unwrap_or_else(|| PasswordResetReason::PolicyTightened.as_str().to_string())
-    } else {
-        // An unrepresentable stored timestamp lands on the same never-expired reading as no
-        // timestamp at all.
-        let set_at = user
-            .password_updated_at
-            .and_then(DateTime::from_timestamp_micros);
-        match policy.rotation_status(set_at, now) {
-            // Warning is the sign-in handler's business; nothing is refused until expiry.
-            RotationStatus::Current | RotationStatus::Warning { .. } => {
-                return PolicyDecision::Allow;
-            }
-            RotationStatus::Expired => PasswordResetReason::RotationExpired.as_str().to_string(),
-        }
-    };
-
-    // Checked before the block so the user has a route out. Without this the flag is a trap: every
-    // request refused, including the one that would clear it.
-    if is_remediation_route(uri, method, &user.email) {
-        return PolicyDecision::Allow;
-    }
-
-    if policy.enforcement_mode == EnforcementMode::RestrictWrites && is_read_only(method) {
-        return PolicyDecision::Allow;
-    }
-
-    PolicyDecision::Block { reason }
-}
-
-/// Routes a blocked user must still reach: the complexity requirements they are being held to, and
-/// their own password change.
-///
-/// `/config` and `/config/logout` are not listed. They live in a separate nest, and only
-/// `/config/reload` within it is behind `auth_middleware` at all, so neither ever reaches here.
-fn is_remediation_route(uri: &Uri, method: &Method, user_email: &str) -> bool {
-    let segments = route_segments(uri.path());
-
-    if method == Method::GET && is_complexity_route(&segments) {
-        return true;
-    }
-
-    // The caller's own account only. Matched on path alone — the body is not readable at this
-    // layer, so a request that turns out not to be a password change simply proceeds and is
-    // rejected downstream on its own merits.
-    if method == Method::PUT
-        && let Some(email) = users_route_email(&segments)
-    {
-        return email.eq_ignore_ascii_case(user_email);
-    }
-
-    false
-}
-
-/// Split a request path into non-empty segments.
-///
-/// The `/api` prefix is deliberately NOT assumed. `auth_middleware` runs inside
-/// `nest("/api", service_routes())`, and axum strips the matched prefix before inner services see
-/// the request, so the path here is `/{org}/…`. The matchers below accept the prefixed form too,
-/// which keeps them correct if this middleware is ever mounted outside that nest.
-fn route_segments(path: &str) -> Vec<&str> {
-    path.split('/').filter(|s| !s.is_empty()).collect()
-}
-
-/// `{org}/password_complexity`, with or without a leading `api`.
-fn is_complexity_route(segments: &[&str]) -> bool {
-    matches!(
-        segments,
-        [_org, "password_complexity"] | ["api", _org, "password_complexity"]
-    )
-}
-
-/// The `{email_id}` of `{org}/users/{email_id}`, with or without a leading `api`.
-///
-/// Deeper paths are rejected so a sub-resource cannot ride in on the same prefix.
-fn users_route_email<'a>(segments: &[&'a str]) -> Option<&'a str> {
-    match segments {
-        [_org, "users", email] => Some(email),
-        ["api", _org, "users", email] => Some(email),
-        _ => None,
-    }
-}
-
-fn is_read_only(method: &Method) -> bool {
-    matches!(*method, Method::GET | Method::HEAD | Method::OPTIONS)
-}
-
 /// Look the user up and apply the policy, returning the refusal when there is one.
+#[cfg(feature = "enterprise")]
 async fn check_request(user_email: &str, uri: &Uri, method: &Method) -> Option<Response> {
     // Served from the cluster-consistent users cache, so this costs no database round trip on the
     // authenticated hot path.
@@ -203,6 +78,7 @@ async fn check_request(user_email: &str, uri: &Uri, method: &Method) -> Option<R
     }
 }
 
+#[cfg(feature = "enterprise")]
 fn blocked_response(reason: &str) -> Response {
     let body = serde_json::json!({
         "code": RESET_REQUIRED_CODE,
@@ -218,10 +94,12 @@ fn blocked_response(reason: &str) -> Response {
 }
 
 /// Infallible fallback so a malformed header can never turn a policy block into a panic.
+#[cfg(feature = "enterprise")]
 trait InfallibleResponse {
     fn into_response_fallback(self) -> Response;
 }
 
+#[cfg(feature = "enterprise")]
 impl InfallibleResponse for StatusCode {
     fn into_response_fallback(self) -> Response {
         let mut response = Response::new(Body::empty());
@@ -232,414 +110,13 @@ impl InfallibleResponse for StatusCode {
 
 #[cfg(test)]
 mod tests {
-    use chrono::TimeDelta;
-    use config::meta::user::UserType;
+    use axum::{Router, body::Body, http::StatusCode, routing::get};
+    use tower::ServiceExt;
 
     use super::*;
 
-    fn user(email: &str) -> UserRecord {
-        UserRecord {
-            email: email.to_string(),
-            first_name: "T".to_string(),
-            last_name: "U".to_string(),
-            password: "hash".to_string(),
-            salt: "salt".to_string(),
-            is_root: false,
-            password_ext: None,
-            user_type: UserType::Internal,
-            created_at: 0,
-            updated_at: 0,
-            must_reset_password: true,
-            password_reset_reason: Some("policy_tightened".to_string()),
-            flagged_at: Some(1),
-            password_updated_at: Some(1),
-        }
-    }
-
-    fn uri(path: &str) -> Uri {
-        path.parse().unwrap()
-    }
-
-    /// Rotation off, hard block — the default policy, under which only the stored flag matters.
-    fn decide_hard(u: &UserRecord, path: &str, m: Method) -> PolicyDecision {
-        decide(u, &uri(path), &m, &PasswordPolicy::default(), now())
-    }
-
-    fn rotating(days: u32, warning_days: u32) -> PasswordPolicy {
-        PasswordPolicy {
-            rotation_days: days,
-            rotation_warning_days: warning_days,
-            ..PasswordPolicy::default()
-        }
-    }
-
-    fn now() -> DateTime<Utc> {
-        DateTime::from_timestamp(1_700_000_000, 0).unwrap()
-    }
-
-    /// A compliant user whose password was set `n` days ago, so rotation is the only thing that
-    /// can act on them.
-    fn unflagged(email: &str, password_age_days: i64) -> UserRecord {
-        let mut u = user(email);
-        u.must_reset_password = false;
-        u.password_reset_reason = None;
-        u.flagged_at = None;
-        u.password_updated_at =
-            Some((now() - TimeDelta::days(password_age_days)).timestamp_micros());
-        u
-    }
-
-    #[test]
-    fn flagged_user_is_blocked() {
-        let d = decide_hard(&user("a@b.com"), "/api/default/streams", Method::GET);
-        assert_eq!(
-            d,
-            PolicyDecision::Block {
-                reason: "policy_tightened".to_string()
-            }
-        );
-    }
-
-    #[test]
-    fn unflagged_user_passes() {
-        let mut u = user("a@b.com");
-        u.must_reset_password = false;
-        assert_eq!(
-            decide_hard(&u, "/api/default/streams", Method::GET),
-            PolicyDecision::Allow
-        );
-    }
-
-    #[test]
-    fn root_is_never_blocked() {
-        // Root stays flagged in the row but must always be let through: it is the only account
-        // that can undo a bad policy, and nothing else can unblock it.
-        let mut u = user("root@b.com");
-        u.is_root = true;
-        assert_eq!(
-            decide_hard(&u, "/api/default/streams", Method::POST),
-            PolicyDecision::Allow
-        );
-    }
-
-    #[test]
-    fn own_password_change_is_allowed() {
-        let u = user("a@b.com");
-        // Stripped form first — this is what the middleware actually receives, since it runs
-        // inside nest("/api", ..). Asserting only the prefixed form is what let a matcher that
-        // never fired in production pass its tests.
-        for path in ["/default/users/a@b.com", "/api/default/users/a@b.com"] {
-            assert_eq!(
-                decide_hard(&u, path, Method::PUT),
-                PolicyDecision::Allow,
-                "{path} must stay reachable"
-            );
-        }
-    }
-
-    #[test]
-    fn own_password_change_matches_case_insensitively() {
-        let u = user("a@b.com");
-        assert_eq!(
-            decide_hard(&u, "/default/users/A@B.com", Method::PUT),
-            PolicyDecision::Allow
-        );
-    }
-
-    #[test]
-    fn another_users_password_change_is_still_blocked() {
-        // Otherwise a flagged user could reset someone else's password while refusing to fix
-        // their own.
-        let u = user("a@b.com");
-        assert!(matches!(
-            decide_hard(&u, "/default/users/victim@b.com", Method::PUT),
-            PolicyDecision::Block { .. }
-        ));
-    }
-
-    #[test]
-    fn users_subresource_does_not_inherit_the_bypass() {
-        let u = user("a@b.com");
-        assert!(matches!(
-            decide_hard(&u, "/default/users/a@b.com/roles", Method::PUT),
-            PolicyDecision::Block { .. }
-        ));
-    }
-
-    #[test]
-    fn complexity_route_is_allowed() {
-        let u = user("a@b.com");
-        // The stripped form is the one that matters — see own_password_change_is_allowed.
-        for path in [
-            "/default/password_complexity",
-            "/api/default/password_complexity",
-            // A trailing slash is still the same route.
-            "/default/password_complexity/",
-        ] {
-            assert_eq!(
-                decide_hard(&u, path, Method::GET),
-                PolicyDecision::Allow,
-                "{path} must stay reachable"
-            );
-        }
-    }
-
-    #[test]
-    fn complexity_route_bypass_is_get_only() {
-        let u = user("a@b.com");
-        assert!(matches!(
-            decide_hard(&u, "/default/password_complexity", Method::POST),
-            PolicyDecision::Block { .. }
-        ));
-    }
-
-    #[test]
-    fn an_org_named_api_is_not_mistaken_for_the_prefix() {
-        let u = user("a@b.com");
-        assert_eq!(
-            decide_hard(&u, "/api/password_complexity", Method::GET),
-            PolicyDecision::Allow,
-            "org 'api' must resolve as an org, not as the route prefix"
-        );
-    }
-
-    #[test]
-    fn restrict_writes_allows_reads_and_refuses_writes() {
-        let u = user("a@b.com");
-        let path = "/api/default/streams";
-        let policy = PasswordPolicy {
-            enforcement_mode: EnforcementMode::RestrictWrites,
-            ..PasswordPolicy::default()
-        };
-        for m in [Method::GET, Method::HEAD, Method::OPTIONS] {
-            assert_eq!(
-                decide(&u, &uri(path), &m, &policy, now()),
-                PolicyDecision::Allow,
-                "{m} should read"
-            );
-        }
-        for m in [Method::POST, Method::PUT, Method::DELETE] {
-            assert!(
-                matches!(
-                    decide(&u, &uri(path), &m, &policy, now()),
-                    PolicyDecision::Block { .. }
-                ),
-                "{m} should be refused"
-            );
-        }
-    }
-
-    #[test]
-    fn expired_password_is_blocked_with_its_own_reason() {
-        let u = unflagged("a@b.com", 91);
-        assert_eq!(
-            decide(
-                &u,
-                &uri("/default/streams"),
-                &Method::GET,
-                &rotating(90, 7),
-                now()
-            ),
-            PolicyDecision::Block {
-                reason: "rotation_expired".to_string()
-            }
-        );
-    }
-
-    #[test]
-    fn expiry_lands_exactly_on_the_threshold() {
-        let mut u = unflagged("a@b.com", 90);
-        let policy = rotating(90, 7);
-        assert!(matches!(
-            decide(&u, &uri("/default/streams"), &Method::GET, &policy, now()),
-            PolicyDecision::Block { .. }
-        ));
-
-        u.password_updated_at = u.password_updated_at.map(|t| t + 1);
-        assert_eq!(
-            decide(&u, &uri("/default/streams"), &Method::GET, &policy, now()),
-            PolicyDecision::Allow
-        );
-    }
-
-    #[test]
-    fn expired_user_can_still_reach_the_remediation_routes() {
-        // The whole point of blocking at access time rather than at login: the way out stays open.
-        let u = unflagged("a@b.com", 91);
-        let policy = rotating(90, 7);
-        assert_eq!(
-            decide(
-                &u,
-                &uri("/default/users/a@b.com"),
-                &Method::PUT,
-                &policy,
-                now()
-            ),
-            PolicyDecision::Allow
-        );
-        assert_eq!(
-            decide(
-                &u,
-                &uri("/default/password_complexity"),
-                &Method::GET,
-                &policy,
-                now()
-            ),
-            PolicyDecision::Allow
-        );
-    }
-
-    #[test]
-    fn a_password_inside_the_warning_window_is_not_blocked() {
-        // The countdown itself is the sign-in handler's; nothing about it may refuse a request.
-        let u = unflagged("a@b.com", 85);
-        assert_eq!(
-            decide(
-                &u,
-                &uri("/default/streams"),
-                &Method::POST,
-                &rotating(90, 7),
-                now()
-            ),
-            PolicyDecision::Allow
-        );
-    }
-
-    #[test]
-    fn root_is_exempt_from_rotation() {
-        let mut u = unflagged("root@b.com", 10_000);
-        u.is_root = true;
-        assert_eq!(
-            decide(
-                &u,
-                &uri("/default/streams"),
-                &Method::POST,
-                &rotating(90, 7),
-                now()
-            ),
-            PolicyDecision::Allow
-        );
-    }
-
-    #[test]
-    fn root_is_blocked_by_rotation_when_the_policy_applies_to_root() {
-        let mut u = unflagged("root@b.com", 10_000);
-        u.is_root = true;
-        let mut policy = rotating(90, 7);
-        policy.apply_to_root = true;
-
-        assert_eq!(
-            decide(&u, &uri("/default/streams"), &Method::POST, &policy, now()),
-            PolicyDecision::Block {
-                reason: "rotation_expired".to_string()
-            }
-        );
-    }
-
-    /// The sweep never flags root, so this column should not be set for it — but the middleware is
-    /// not the place that assumes so. If it ever is set, the block applies like anyone else's.
-    #[test]
-    fn root_is_blocked_by_a_stored_flag_when_the_policy_applies_to_root() {
-        let mut u = user("root@b.com");
-        u.is_root = true;
-        let policy = PasswordPolicy {
-            apply_to_root: true,
-            ..PasswordPolicy::default()
-        };
-
-        assert_eq!(
-            decide(&u, &uri("/default/streams"), &Method::POST, &policy, now()),
-            PolicyDecision::Block {
-                reason: "policy_tightened".to_string()
-            }
-        );
-    }
-
-    #[test]
-    fn root_reaches_its_own_password_change_even_when_blocked() {
-        let mut u = unflagged("root@b.com", 10_000);
-        u.is_root = true;
-        let mut policy = rotating(90, 7);
-        policy.apply_to_root = true;
-
-        assert_eq!(
-            decide(
-                &u,
-                &uri("/api/default/users/root@b.com"),
-                &Method::PUT,
-                &policy,
-                now()
-            ),
-            PolicyDecision::Allow,
-            "root must always keep the route that clears its own block"
-        );
-    }
-
-    #[test]
-    fn a_password_with_no_recorded_age_is_never_expired() {
-        // Should not survive the backfill, but reading None as the epoch would expire the whole
-        // instance at once.
-        let mut u = unflagged("a@b.com", 0);
-        u.password_updated_at = None;
-        assert_eq!(
-            decide(
-                &u,
-                &uri("/default/streams"),
-                &Method::POST,
-                &rotating(1, 0),
-                now()
-            ),
-            PolicyDecision::Allow
-        );
-    }
-
-    #[test]
-    fn rotation_off_ignores_an_ancient_password() {
-        let u = unflagged("a@b.com", 10_000);
-        assert_eq!(
-            decide_hard(&u, "/default/streams", Method::POST),
-            PolicyDecision::Allow
-        );
-    }
-
-    #[test]
-    fn the_stored_flag_outranks_rotation() {
-        // Both apply; the reason reported is the one that was actually recorded.
-        let mut u = user("a@b.com");
-        u.password_updated_at = Some((now() - TimeDelta::days(91)).timestamp_micros());
-        assert_eq!(
-            decide(
-                &u,
-                &uri("/default/streams"),
-                &Method::GET,
-                &rotating(90, 7),
-                now()
-            ),
-            PolicyDecision::Block {
-                reason: "policy_tightened".to_string()
-            }
-        );
-    }
-
-    #[test]
-    fn restrict_writes_applies_to_rotation_too() {
-        let u = unflagged("a@b.com", 91);
-        let policy = PasswordPolicy {
-            rotation_days: 90,
-            enforcement_mode: EnforcementMode::RestrictWrites,
-            ..PasswordPolicy::default()
-        };
-        assert_eq!(
-            decide(&u, &uri("/default/streams"), &Method::GET, &policy, now()),
-            PolicyDecision::Allow
-        );
-        assert!(matches!(
-            decide(&u, &uri("/default/streams"), &Method::POST, &policy, now()),
-            PolicyDecision::Block { .. }
-        ));
-    }
-
     /// Layered outside the gate, so the gate sees exactly what `auth_middleware` leaves behind.
+    #[cfg(feature = "enterprise")]
     async fn stub_auth(email: &'static str, mut request: Request, next: Next) -> Response {
         request
             .headers_mut()
@@ -651,9 +128,6 @@ mod tests {
     /// nothing about identity, and a 401 here would hide whatever the route itself answers.
     #[tokio::test]
     async fn a_request_carrying_no_authenticated_email_passes_through() {
-        use axum::{Router, body::Body, routing::get};
-        use tower::ServiceExt;
-
         let app = Router::new()
             .route("/default/streams", get(|| async { "ok" }))
             .layer(axum::middleware::from_fn(password_policy_middleware));
@@ -673,11 +147,9 @@ mod tests {
 
     /// Authentication succeeded against an identity the users cache does not hold — a token, or an
     /// enterprise login. There is no local password to have a policy about.
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_user_the_cache_does_not_hold_passes_through() {
-        use axum::{Router, body::Body, routing::get};
-        use tower::ServiceExt;
-
         let app = Router::new()
             .route("/default/streams", get(|| async { "ok" }))
             .layer(axum::middleware::from_fn(password_policy_middleware))
@@ -698,24 +170,45 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
     }
 
-    /// `decide` blocking an expired password is covered above, but not the middleware step that
-    /// reads the live policy and turns that into a response: dropping it would leave the unit
-    /// tests green. This one runs a real request through the layer.
+    /// `decide` blocking an expired password is unit-tested in the enterprise crate, but not the
+    /// step that reads the live policy and turns that into a response: dropping it would leave
+    /// those tests green. This one runs a real request through the layer.
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn an_expired_password_is_refused_through_the_layer() {
-        use axum::{Router, body::Body, routing::get};
-        use common::infra::config::{SYSTEM_SETTINGS, USERS};
+        use chrono::TimeDelta;
+        use common::infra::config::SYSTEM_SETTINGS;
         use config::{
             META_ORG_ID,
-            meta::system_settings::{SystemSetting, keys},
+            meta::{
+                password_policy::PasswordPolicy,
+                system_settings::{SystemSetting, keys},
+                user::UserType,
+            },
         };
-        use tower::ServiceExt;
+        use infra::table::users::UserRecord;
 
         let email = "expired@b.com";
-        let mut user = unflagged(email, 0);
-        // Against the wall clock, not the tests' fixed instant: the middleware reads `Utc::now()`.
-        user.password_updated_at = Some((Utc::now() - TimeDelta::days(91)).timestamp_micros());
-        USERS.insert(email.to_string(), user);
+        USERS.insert(
+            email.to_string(),
+            UserRecord {
+                email: email.to_string(),
+                first_name: "T".to_string(),
+                last_name: "U".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root: false,
+                password_ext: None,
+                user_type: UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                // Against the wall clock: the layer reads `Utc::now()`.
+                password_updated_at: Some((Utc::now() - TimeDelta::days(91)).timestamp_micros()),
+            },
+        );
 
         // Seeding the settings cache keeps the policy read off the database. The key format is
         // db::system_settings::cache_key's; a drift there fails this test rather than silencing it,
@@ -726,7 +219,12 @@ mod tests {
             SystemSetting::new_org(
                 META_ORG_ID,
                 keys::PASSWORD_POLICY,
-                serde_json::to_value(rotating(90, 7)).unwrap(),
+                serde_json::to_value(PasswordPolicy {
+                    rotation_days: 90,
+                    rotation_warning_days: 7,
+                    ..PasswordPolicy::default()
+                })
+                .unwrap(),
             ),
         );
 
@@ -753,15 +251,12 @@ mod tests {
         SYSTEM_SETTINGS.write().await.remove(&policy_key);
     }
 
-    /// The unit tests above feed `decide` a path string directly, so they cannot catch the case
-    /// where the middleware receives a different string than expected. This one routes a real
+    /// The enterprise unit tests feed `decide` a path string directly, so they cannot catch the
+    /// case where the layer receives a different string than expected. This one routes a real
     /// request through `nest("/api", ..)` and asserts on what actually arrives.
     #[tokio::test]
     async fn nesting_strips_the_api_prefix_before_the_middleware_sees_it() {
-        use axum::{
-            Router, body::Body, extract::Request, middleware, response::Response, routing::get,
-        };
-        use tower::ServiceExt;
+        use axum::{extract::Request, middleware, response::Response};
 
         async fn capture(request: Request, next: middleware::Next) -> Response {
             let seen = request.uri().path().to_string();
@@ -792,19 +287,39 @@ mod tests {
         let seen = response.headers()["x-seen-path"].to_str().unwrap();
         assert_eq!(seen, "/default/password_complexity");
 
-        // And the matcher must accept exactly that string.
-        assert!(is_complexity_route(&route_segments(seen)));
-    }
+        // And the real matcher must let exactly that string through, for a user it would otherwise
+        // refuse. Asserting on the string alone is what would let the two drift apart.
+        #[cfg(feature = "enterprise")]
+        {
+            use config::meta::{password_policy::PasswordPolicy, user::UserType};
+            use infra::table::users::UserRecord;
 
-    #[test]
-    fn missing_reason_falls_back_rather_than_leaking_none() {
-        let mut u = user("a@b.com");
-        u.password_reset_reason = None;
-        assert_eq!(
-            decide_hard(&u, "/api/default/streams", Method::GET),
-            PolicyDecision::Block {
-                reason: "policy_tightened".to_string()
-            }
-        );
+            let flagged = UserRecord {
+                email: "a@b.com".to_string(),
+                first_name: "T".to_string(),
+                last_name: "U".to_string(),
+                password: "hash".to_string(),
+                salt: "salt".to_string(),
+                is_root: false,
+                password_ext: None,
+                user_type: UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: true,
+                password_reset_reason: Some("policy_tightened".to_string()),
+                flagged_at: Some(1),
+                password_updated_at: Some(1),
+            };
+            assert_eq!(
+                decide(
+                    &flagged,
+                    &seen.parse().unwrap(),
+                    &Method::GET,
+                    &PasswordPolicy::default(),
+                    Utc::now(),
+                ),
+                PolicyDecision::Allow
+            );
+        }
     }
 }

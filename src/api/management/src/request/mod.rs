@@ -47,6 +47,7 @@ pub mod kv;
 pub mod license;
 pub mod model_pricing;
 pub mod organization;
+#[cfg(feature = "enterprise")]
 pub mod password_policy;
 #[cfg(feature = "enterprise")]
 pub mod playground;
