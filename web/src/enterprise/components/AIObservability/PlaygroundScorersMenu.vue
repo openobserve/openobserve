@@ -66,7 +66,7 @@
         <!-- The reason sits under the row it belongs to, not in a tooltip: it
              is the difference between a verdict and a blank, and it changes as
              soon as an expected output is added. -->
-        <span v-if="entry.note" class="text-text-secondary text-2xs pl-6 italic">
+        <span v-if="entry.note" class="text-text-secondary text-2xs ps-6 italic">
           {{ entry.note }}
         </span>
       </div>

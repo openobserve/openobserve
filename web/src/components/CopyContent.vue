@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <pre
       data-test="rum-content-text"
-      class="m-0 p-3 pr-10 text-sm leading-5 wrap-break-word whitespace-pre-wrap"
+      class="m-0 p-3 pe-10 text-sm leading-5 wrap-break-word whitespace-pre-wrap"
       >{{ computedContent }}</pre>
   </div>
 </template>

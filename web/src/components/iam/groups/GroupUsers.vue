@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="iam-users-selection-filters"
       class="bg-card-glass-bg flex flex-shrink-0 justify-start px-3 py-2"
     >
-      <div data-test="iam-users-selection-show-toggle" class="mr-3">
+      <div data-test="iam-users-selection-show-toggle" class="me-3">
         <div class="flex items-center">
           <span data-test="iam-users-selection-show-text" style="font-size: var(--text-sm)">
             {{ t("iam.groupUsers.show") }}
           </span>
           <OToggleGroup
-            class="ml-1"
+            class="ms-1"
             :model-value="usersDisplay"
             @update:model-value="(v) => updateUserTable(v as string)"
           >
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroup>
         </div>
       </div>
-      <div data-test="iam-users-selection-search-input" class="mr-3">
+      <div data-test="iam-users-selection-search-input" class="me-3">
         <OSearchInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon
                 name="info"
                 size="sm"
-                class="ml-1 cursor-pointer"
+                class="ms-1 cursor-pointer"
                 :data-test="`iam-external-user-warning-icon-${row.email}`"
               />
               <template #content>

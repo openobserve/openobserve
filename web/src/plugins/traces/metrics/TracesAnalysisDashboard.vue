@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-left>
       <OIcon name="timeline" size="md" />
       <!-- Time Range Display: Inline chips -->
-      <div class="ml-2 flex flex-wrap items-center gap-2">
+      <div class="ms-2 flex flex-wrap items-center gap-2">
         <!-- Baseline Chip -->
         <div
           class="time-range-chip baseline-chip rounded-default flex items-center gap-1 px-2 py-1.5 text-sm"
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Additional filter info -->
-        <span v-if="filterMetadata" class="text-3xs ml-1 opacity-60">
+        <span v-if="filterMetadata" class="text-3xs ms-1 opacity-60">
           {{ filterMetadata }}
         </span>
 

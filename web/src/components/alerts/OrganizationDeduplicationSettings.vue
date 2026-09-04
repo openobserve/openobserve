@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="bg-card-glass-bg flex h-full w-full flex-col"
   >
     <!-- Scrollable content area -->
-    <div class="flex-1 overflow-y-auto pt-4 pr-2">
+    <div class="flex-1 overflow-y-auto pe-2 pt-4">
       <div class="mb-4">
         <div class="text-text-heading text-sm leading-tight font-semibold">
           {{ t("alerts.correlation.title") }}
@@ -75,8 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-6" v-if="enabled && alertDedupEnabled">
         <div class="flex items-center pb-2 font-semibold">
           {{ t("alerts.correlation.fingerprintGroups") }}
-          <span class="text-status-error-text ml-1">*</span>
-          <OIcon name="info" size="sm" class="ml-1 cursor-pointer" :class="'text-text-secondary'">
+          <span class="text-status-error-text ms-1">*</span>
+          <OIcon name="info" size="sm" class="ms-1 cursor-pointer" :class="'text-text-secondary'">
             <OTooltip
               side="right"
               align="center"
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-6">
         <div class="flex items-center pb-2 font-semibold">
           {{ t("alerts.correlation.defaultWindow") }}
-          <OIcon name="info" size="sm" class="ml-1 cursor-pointer" :class="'text-text-secondary'" />
+          <OIcon name="info" size="sm" class="ms-1 cursor-pointer" :class="'text-text-secondary'" />
           <OTooltip
             side="right"
             align="center"

@@ -151,8 +151,8 @@ describe("DashboardHeader", () => {
 
       expect(backButton.props("variant")).toBe("outline");
       expect(backButton.props("size")).toBe("icon-xs");
-      // Migration replaced the legacy margin class with mr-2.
-      expect(backButton.classes().some((c) => c.includes("mr-2"))).toBe(true);
+      // Migration replaced the legacy margin class with me-2.
+      expect(backButton.classes().some((c) => c.includes("me-2"))).toBe(true);
     });
 
     it("should emit back event when back button is clicked", async () => {

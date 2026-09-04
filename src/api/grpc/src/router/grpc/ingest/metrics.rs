@@ -34,7 +34,8 @@ impl MetricsService for MetricsServer {
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
         let start = std::time::Instant::now();
         let cfg = config::get_config();
-        let (metadata, extensions, message) = request.into_parts();
+        let (mut metadata, extensions, message) = request.into_parts();
+        super::strip_http_framing_headers(&mut metadata);
 
         // basic validation
         if !metadata.contains_key(&cfg.grpc.org_header_key) {

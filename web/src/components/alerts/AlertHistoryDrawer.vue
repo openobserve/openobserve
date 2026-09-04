@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #cell-timestamp="{ row }">
                     <span
                       class="text-compact whitespace-nowrap tabular-nums"
-                      :class="row._child ? 'pl-5 opacity-70' : ''"
+                      :class="row._child ? 'ps-5 opacity-70' : ''"
                     >
                       {{ formatTimestampFull(row.timestamp) }}
                     </span>

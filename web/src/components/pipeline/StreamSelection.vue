@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             data-test="add-pipeline-stream-type-select"
-            class="alert-stream-type o2-input mr-2 mb-2 pt-0"
+            class="alert-stream-type o2-input me-2 mb-2 pt-0"
           >
             <OFormSelect
               name="stream_type"

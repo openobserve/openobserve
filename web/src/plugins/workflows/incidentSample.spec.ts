@@ -25,6 +25,7 @@ import {
   INCIDENT_EVENT_TYPES,
   INCIDENT_COMMON_KEYS,
   DEFAULT_INCIDENT_EVENT,
+  buildIncidentDisplaySample,
 } from "./incidentSample";
 
 const metaOf = (eventType?: string) =>
@@ -86,5 +87,39 @@ describe("INCIDENT_COMMON_KEYS ↔ common block (drift guard)", () => {
         expect(common.has(k)).toBe(false);
       }
     }
+  });
+});
+
+// F8b(c): incidents pass `&[]` as data (src/core/src/incidents.rs:211), so `data` is
+// ALWAYS empty on the wire. Showing it invites `row.data[0]`, so the DISPLAY payload
+// drops the key. The wire shape (buildIncidentSample) is unchanged.
+describe("buildIncidentDisplaySample — display payload drops the always-empty data[]", () => {
+  it("returns a single event object, not the batch array", () => {
+    const shown = buildIncidentDisplaySample();
+    expect(Array.isArray(shown)).toBe(false);
+    expect(shown).toHaveProperty("meta");
+  });
+
+  it("has no `data` key at all", () => {
+    const shown = buildIncidentDisplaySample() as Record<string, unknown>;
+    expect(shown).not.toHaveProperty("data");
+    expect(Object.keys(shown)).toEqual(["meta"]);
+  });
+
+  it("keeps the full meta block byte-for-byte from the wire sample", () => {
+    const wire = (buildIncidentSample() as [{ meta: Record<string, unknown> }])[0].meta;
+    expect((buildIncidentDisplaySample() as { meta: unknown }).meta).toEqual(wire);
+  });
+
+  it("honours the requested event_type", () => {
+    const shown = buildIncidentDisplaySample("resolved") as { meta: Record<string, unknown> };
+    expect(shown.meta.event_type).toBe("resolved");
+    expect(shown.meta.status).toBe("resolved");
+  });
+
+  it("leaves the wire sample untouched — data[] still present there", () => {
+    const wire = buildIncidentSample() as [{ data: unknown[] }];
+    expect(wire[0]).toHaveProperty("data");
+    expect(wire[0].data).toEqual([]);
   });
 });

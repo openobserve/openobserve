@@ -31,7 +31,7 @@
             data-test="job-form-details-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.detailsSection")
               }}</span>
@@ -68,7 +68,7 @@
             data-test="job-form-target-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.targetSection")
               }}</span>
@@ -109,7 +109,7 @@
             data-test="job-form-filtering-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.filteringSection")
               }}</span>
@@ -130,7 +130,7 @@
             data-test="job-form-sampling-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.stepper.sampling")
               }}</span>
@@ -173,7 +173,7 @@
             data-test="job-form-scorers-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.scorersSection")
               }}</span>
@@ -207,7 +207,7 @@
             data-test="job-form-completion-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.job.completionSection")
               }}</span>

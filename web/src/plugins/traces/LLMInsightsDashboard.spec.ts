@@ -458,16 +458,17 @@ describe("LLMInsightsDashboard — onMounted", () => {
 // ===========================================================================
 
 describe("LLMInsightsDashboard — onUnmounted", () => {
-  // The dashboard exposes cancelAll on the composable and wires it
-  // through onUnmounted so in-flight server queries are cancelled
-  // when the user navigates away. Without this the server keeps
-  // streaming results to a component that's no longer rendered.
+  // The dashboard wires cancellation through onUnmounted so in-flight server
+  // queries are cancelled when the user navigates away. Without this the server
+  // keeps streaming results to a component that's no longer rendered. Unmount
+  // cancels the dashboard's own queries plus the version-compare arms (armA +
+  // armB), which share the mocked stream-query — three cancelAll calls total.
   it("calls cancelAll on unmount", async () => {
     const wrapper = mountDashboard();
     await flushPromises();
     mockCancelAll.mockClear();
     wrapper.unmount();
-    expect(mockCancelAll).toHaveBeenCalledTimes(1);
+    expect(mockCancelAll).toHaveBeenCalledTimes(3);
   });
 });
 

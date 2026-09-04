@@ -25,7 +25,7 @@ use axum::{
 };
 use config::get_config;
 use openobserve_api_common::X_O2_ASSISTANT_SESSION_ID;
-use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
+use openobserve_api_ingest::request::{clusters, logs, metrics, profiles, rum};
 #[cfg(feature = "cloud")]
 use openobserve_api_management::request::cloud;
 #[cfg(feature = "profiling")]
@@ -841,6 +841,12 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/loki/api/v1/push", post(logs::loki::loki_push))
         .route("/{org_id}/v1/logs", post(logs::ingest::otlp_logs_write))
         .route("/{org_id}/v1/metrics", post(metrics::ingest::otlp_metrics_write))
+        .route("/{org_id}/v1/profiles", post(profiles::ingest::otlp_profiles_write))
+        // OTLP Profiles is still development; otlp_http exporter defaults to this path.
+        .route(
+            "/{org_id}/v1development/profiles",
+            post(profiles::ingest::otlp_profiles_write),
+        )
         .route("/{org_id}/v1/traces", post(traces::traces_write))
         .route("/{org_id}/traces", post(traces::traces_write))
         .route("/{org_id}/otel/v1/traces", post(traces::traces_write))

@@ -33,7 +33,7 @@
             data-test="json-preview-field-dropdown-btn"
             size="xs"
             variant="ghost"
-            class="ml-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
+            class="ms-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
             :aria-label="t('common.addIcon')"
           >
             <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
@@ -44,7 +44,7 @@
         </div>
       </ODropdown>
 
-      <span class="pl-2.5" :data-test="`json-preview-key-${key}`">
+      <span class="ps-2.5" :data-test="`json-preview-key-${key}`">
         <span class="log-key">{{ key }}</span
         ><span class="log-separator">: </span
         ><span

@@ -8,8 +8,8 @@ on:
   pull_request:
     branches:
       - "**"
-    # labeled/unlabeled so adding or removing 'e2e' starts or resets CI.
-    types: [opened, reopened, synchronize, labeled, unlabeled]
+    # labeled/unlabeled so adding or removing 'e2e' starts or resets CI; drafts never run paid CI.
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   merge_group:
 
 concurrency:
@@ -34,7 +34,7 @@ env:
 jobs:
   check_changes:
     # Runs only on PRs carrying the 'e2e' label; the merge queue runs unit tests only (see docs/ci).
-    if: ${{ github.event_name != 'merge_group' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e')) }}
+    if: ${{ github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false)) }}
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
@@ -49,27 +49,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      # One shared classification for every suite (see .github/actions/classify-changes); a change to
+      # this workflow file re-tests itself on top of it.
+      - uses: ./.github/actions/classify-changes
+        id: classify
       - id: check
+        env:
+          HAS_CHANGES: ${{ steps.classify.outputs.run_api }}
+          CHANGED_WORKFLOWS: ${{ steps.classify.outputs.changed_workflows }}
         run: |
-          # Skip when a PR touches only docs, images, frontend/UI-test files, or unrelated
-          # workflow files (e.g. a dependabot bump to another workflow) — none affect the API.
-          # Source and this workflow (api-testing.yml) still run the suite.
-          IGNORE_RE='(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          # Files not matching IGNORE_RE. Captured (not `grep -qv`) so the check doesn't depend
-          # on grep -qv exit semantics, which differ across grep builds; the `|| true` keeps
-          # `set -e` from aborting when grep matches nothing (exit 1). The `grep -qE` below is a
-          # loop-safe `if`-condition term (`set -e` doesn't fire there), so it needs no `|| true`.
-          RELEVANT=$(printf '%s' "$CHANGED" | grep -vE "$IGNORE_RE" || true)
-          if [ -z "$CHANGED" ] || [ -n "$RELEVANT" ] || printf '%s' "$CHANGED" | grep -qE '^\.github/workflows/api-testing\.yml$'; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
+          if [ "$HAS_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' api-testing.yml '; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
           fi
-
-  # Build the exact PR/merge-group binary once, then fan it out to every API
-  # test shard. The artifact is scoped to this workflow run and SHA; Rust cache
-  # remains an input to this single build, not a substitute for the binary.
   build_api_binary:
     name: build_api_binary
     needs: [check_changes]
@@ -94,6 +87,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -557,7 +551,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     needs: [check_changes, build_api_binary, api_integration_tests, api_query_agent_tests, api_regression_tests]
-    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e'))
+    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
         run: |
@@ -591,7 +585,7 @@ jobs:
   report_to_openobserve:
     name: Report run metrics to OpenObserve
     needs: [check_changes, api_integration_tests, api_query_agent_tests, api_regression_tests]
-    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e'))
+    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false))
     runs-on: ubuntu-latest
     permissions:
       actions: read

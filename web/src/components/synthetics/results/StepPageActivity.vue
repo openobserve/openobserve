@@ -176,7 +176,7 @@ function reloadPage() {
         variant="ghost"
         size="xs"
         icon-right="arrow-forward"
-        class="ml-auto shrink-0"
+        class="ms-auto shrink-0"
         data-test="synthetics-step-page-activity-view-all-btn"
         @click="emit('view-all', stepId)"
       >
@@ -259,7 +259,7 @@ function reloadPage() {
           class="rounded-default border-status-warning-text/30 border p-2 text-xs"
           data-test="synthetics-step-page-activity-truncated"
         >
-          <OIcon name="warning" size="xs" class="text-status-warning-text mr-1" />
+          <OIcon name="warning" size="xs" class="text-status-warning-text me-1" />
           {{ t("synthetics.evidence.truncated") }}
         </div>
 

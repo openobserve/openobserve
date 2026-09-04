@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Drag handle -->
           <div
-            class="mr-2 flex cursor-move items-center px-1"
+            class="me-2 flex cursor-move items-center px-1"
             data-test="dashboard-column-order-drag-handle"
           >
             <OIcon
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Actions -->
-          <div class="ml-2 flex gap-0.5" data-test="dashboard-column-order-column-actions">
+          <div class="ms-2 flex gap-0.5" data-test="dashboard-column-order-column-actions">
             <OButton
               variant="ghost"
               size="icon"

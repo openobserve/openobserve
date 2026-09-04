@@ -339,7 +339,7 @@
                       />
                       <div
                         v-else
-                        class="bg-surface-base border-border-default flex h-27.75 flex-col items-center justify-center border-r border-b border-l"
+                        class="bg-surface-base border-border-default flex h-27.75 flex-col items-center justify-center border-s border-e border-b"
                       >
                         <div v-if="!testLoading && outputString.length === 0">
                           <OIcon name="lightbulb" size="md" class="text-icon-color" />

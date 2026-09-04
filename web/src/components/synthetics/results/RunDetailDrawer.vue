@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onUnmounted } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -44,6 +44,8 @@ const emit = defineEmits<{ close: [] }>();
 
 const store = useStore();
 const { executeQuery, cancelAll } = useLLMStreamQuery();
+
+onUnmounted(() => cancelAll());
 
 const loading = ref(false);
 const queryError = ref<string | null>(null);
@@ -258,7 +260,7 @@ function toggleSteps(executionId: string) {
               <span class="text-text-heading truncate text-sm font-semibold">{{
                 loc.location || "—"
               }}</span>
-              <div class="ml-auto flex shrink-0 items-center gap-3">
+              <div class="ms-auto flex shrink-0 items-center gap-3">
                 <span class="text-text-muted text-xs">{{
                   [loc.browserEngine, loc.device].filter(Boolean).join(" · ")
                 }}</span>
@@ -298,7 +300,7 @@ function toggleSteps(executionId: string) {
                   {{ t("synthetics.runDetail.stepsCount", { count: loc.steps.length }) }}
                   <span
                     v-if="loc.steps.some((s) => s.status === 'fail')"
-                    class="text-status-error-text ml-1"
+                    class="text-status-error-text ms-1"
                   >
                     ·
                     {{
@@ -325,7 +327,7 @@ function toggleSteps(executionId: string) {
                         <span class="text-text-secondary truncate font-mono">{{
                           step.stepId
                         }}</span>
-                        <span class="text-text-muted ml-auto shrink-0 tabular-nums">{{
+                        <span class="text-text-muted ms-auto shrink-0 tabular-nums">{{
                           fmtDuration(step.durationMs)
                         }}</span>
                       </div>

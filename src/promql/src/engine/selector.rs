@@ -16,23 +16,25 @@
 //! Vector/matrix selector evaluation and data loading. Reads `ctx`,
 //! `label_selector`, and `skip_labels`; writes `result_type`.
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::{NAME_LABEL, value::*};
 use datafusion::error::{DataFusionError, Result};
-use futures::future::try_join_all;
+use futures::future::{pending, try_join_all};
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
 use promql_parser::{
     label::{MatchOp, Matchers},
-    parser::{Offset, VectorSelector},
+    parser::{LabelModifier, MatrixSelector, Offset, VectorSelector},
 };
 use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
 use super::Engine;
 use crate::{
+    functions, fused,
     load_series::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
     micros,
+    promql::rewrite::remove_filter_all,
 };
 
 impl Engine {
@@ -160,13 +162,14 @@ impl Engine {
 
         let mut selector = selector.clone();
         if selector.name.is_none() {
-            let name = selector
-                .matchers
-                .find_matchers(NAME_LABEL)
-                .first()
-                .unwrap()
-                .value
-                .clone();
+            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
+                Some(mat) => mat.value.clone(),
+                None => {
+                    return Err(DataFusionError::Plan(
+                        "MatrixSelector: metric name is required".into(),
+                    ));
+                }
+            };
 
             selector.name = Some(name);
             // see eval_vector_selector: the matcher is consumed by stream selection
@@ -504,6 +507,147 @@ impl Engine {
 
         Ok(metrics)
     }
+
+    /// Attempts the streaming fused path: series arrive whole from
+    /// `(__hash__, _timestamp)` ordered scans and fold straight into the
+    /// aggregation, so the sample matrix is never materialized. `None` means
+    /// the query shape or the storage layout requires the materializing path.
+    pub(super) async fn try_streaming_fused_agg(
+        &mut self,
+        matrix_selector: &MatrixSelector,
+        modifier: &Option<LabelModifier>,
+        func: Arc<dyn functions::RangeFunc>,
+        op: fused::FusedAggOp,
+    ) -> Result<Option<Value>> {
+        let query_ctx = &self.ctx.query_ctx;
+        // need_wal bails early: WAL would split series and double the context-creation cost
+        if !config::get_config()
+            .search
+            .feature_metrics_streaming_agg_enabled
+            || query_ctx.query_exemplars
+            || query_ctx.query_data
+            || query_ctx.is_super_cluster
+            || query_ctx.need_wal
+            || matches!(modifier, Some(LabelModifier::Exclude(_)))
+        {
+            return Ok(None);
+        }
+        let MatrixSelector { vs, range } = matrix_selector;
+        let range = *range;
+        let mut selector = vs.clone();
+        remove_filter_all(&mut selector);
+        if !selector.matchers.or_matchers.is_empty() || selector.at.is_some() {
+            return Ok(None);
+        }
+        if selector.name.is_none() {
+            let names = selector.matchers.find_matchers(NAME_LABEL);
+            let Some(matcher) = names.first() else {
+                return Ok(None);
+            };
+            selector.name = Some(matcher.value.clone());
+            selector
+                .matchers
+                .matchers
+                .retain(|mat| mat.name != NAME_LABEL);
+        }
+        let table_name = selector.name.clone().unwrap();
+
+        let offset = get_offset_modifier(selector.offset.clone());
+        let start = self.ctx.start - micros(range) - offset;
+        let end = self.ctx.end - offset;
+        let mut filters = equal_matcher_filters(&selector.matchers);
+        let mut label_selector = self.label_selector.clone();
+        label_selector.extend(self.ctx.label_selector.iter().cloned());
+
+        let ctxs = self
+            .ctx
+            .table_provider
+            .create_context(
+                &query_ctx.org_id,
+                &table_name,
+                (start, end),
+                selector.matchers.clone(),
+                label_selector,
+                &mut filters,
+            )
+            .await?;
+        // a second context would split series and evaluate rate windows on partial data
+        if ctxs.len() != 1 {
+            return Ok(None);
+        }
+        let (ctx, schema, scan_stats, keep_filters) = ctxs.into_iter().next().unwrap();
+        if !keep_filters {
+            selector.matchers = Matchers::empty();
+        }
+
+        let run = fused::stream::fused_agg(
+            &ctx,
+            &schema,
+            fused::stream::StreamingSelector {
+                table_name: &table_name,
+                matchers: &selector.matchers,
+                offset,
+            },
+            fused::stream::FusedShape { op, func, range },
+            modifier,
+            &self.eval_ctx,
+        );
+        let value = self.run_cancellable(run, query_ctx.timeout).await?;
+        if value.is_some() {
+            let mut ctx_scan_stats = self.ctx.scan_stats.write().await;
+            ctx_scan_stats.add(&scan_stats);
+            if self.result_type.is_none() {
+                self.result_type = Some("matrix".to_string());
+            }
+        }
+        Ok(value)
+    }
+
+    /// Runs the streaming fold under the query timeout and the host's cancel signal; dropping
+    /// the future aborts the shard folds.
+    async fn run_cancellable<T>(
+        &self,
+        run: impl Future<Output = Result<T>>,
+        timeout: u64,
+    ) -> Result<T> {
+        let trace_id = &self.ctx.query_ctx.trace_id;
+        let mut abort_receiver = self
+            .ctx
+            .table_provider
+            .register_cancellation(trace_id)
+            .await?;
+        tokio::pin!(run);
+        // a cancel or an expired budget wins over a fold that happens to be ready
+        tokio::select! {
+            biased;
+            _ = async {
+                match abort_receiver.as_mut() {
+                    Some(receiver) => {
+                        let _ = receiver.await;
+                    }
+                    None => pending::<()>().await,
+                }
+            } => {
+                log::info!("[trace_id {trace_id}] [PromQL] streaming fused agg canceled");
+                Err(DataFusionError::Plan(
+                    Error::ErrorCode(ErrorCodes::SearchCancelQuery(
+                        "[PromQL] streaming fused agg canceled".to_string(),
+                    ))
+                    .to_string(),
+                ))
+            }
+            _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
+                log::error!("[trace_id {trace_id}] [PromQL] streaming fused agg timeout");
+                Err(DataFusionError::Plan(
+                    Error::ErrorCode(ErrorCodes::SearchTimeout(
+                        "[PromQL] streaming fused agg timeout".to_string(),
+                    ))
+                    .to_string(),
+                ))
+            }
+            ret = &mut run => ret,
+        }
+    }
 }
 
 /// Discard the already-partitioned series hashes without rebuilding a global
@@ -832,6 +976,90 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_eval_vector_selector_without_a_metric_name_is_an_error() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
+        let mut engine = Engine::new(
+            trace_id,
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx(trace_id, org_id, 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+
+        // `{env="prod"}` -- no name and no __name__ matcher to fall back on.
+        let selector = VectorSelector {
+            name: None,
+            matchers: Matchers {
+                matchers: vec![promql_parser::label::Matcher {
+                    name: "env".to_string(),
+                    op: MatchOp::Equal,
+                    value: "prod".to_string(),
+                }],
+                or_matchers: vec![],
+            },
+            offset: None,
+            at: None,
+        };
+
+        let result = engine.eval_vector_selector(&selector).await;
+
+        assert!(result.is_err(), "expected an error, not a panic");
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("VectorSelector: metric name is required"),
+            "the error should name the vector selector"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_eval_matrix_selector_without_a_metric_name_is_an_error() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
+        let mut engine = Engine::new(
+            trace_id,
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx(trace_id, org_id, 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+
+        // `{env="prod"}[5m]` -- no name and no __name__ matcher to fall back on.
+        let selector = VectorSelector {
+            name: None,
+            matchers: Matchers {
+                matchers: vec![promql_parser::label::Matcher {
+                    name: "env".to_string(),
+                    op: MatchOp::Equal,
+                    value: "prod".to_string(),
+                }],
+                or_matchers: vec![],
+            },
+            offset: None,
+            at: None,
+        };
+
+        let result = engine
+            .eval_matrix_selector(&selector, Duration::from_secs(300))
+            .await;
+
+        assert!(result.is_err(), "expected an error, not a panic");
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("MatrixSelector: metric name is required"),
+            "the error should name the matrix selector"
+        );
+    }
+
+    #[tokio::test]
     async fn test_eval_matrix_selector_with_offset() {
         let trace_id = "test_trace";
         let org_id = "test_org";
@@ -884,5 +1112,161 @@ mod tests {
     fn test_get_offset_modifier_negative() {
         let result = get_offset_modifier(Some(Offset::Neg(Duration::from_secs(30))));
         assert_eq!(result, -30_000_000); // -30s in micros
+    }
+
+    mod streaming_fused_agg {
+        use config::{
+            TIMESTAMP_COL_NAME,
+            meta::{
+                promql::{HASH_LABEL, STREAMING_AGG_TABLE_SUFFIX, VALUE_LABEL},
+                search::ScanStats,
+            },
+        };
+        use datafusion::{
+            arrow::{
+                array::{Float64Array, Int64Array, RecordBatch, UInt64Array},
+                datatypes::{DataType, Field, Schema},
+            },
+            datasource::MemTable,
+            prelude::{SessionConfig, SessionContext, col},
+        };
+        use hashbrown::HashSet;
+        use tokio::sync::oneshot;
+
+        use super::*;
+
+        const SECOND: i64 = 1_000_000;
+        const BASE: i64 = 1_000 * SECOND;
+
+        /// Serves one hash-sorted context and can hand out an already-fired cancel signal.
+        struct StreamingProvider {
+            ctx: SessionContext,
+            canceled: bool,
+            // a dropped sender reads as a cancel, so a live registration keeps it
+            cancel: std::sync::Mutex<Option<oneshot::Sender<()>>>,
+        }
+
+        #[async_trait::async_trait]
+        impl crate::TableProvider for StreamingProvider {
+            async fn create_context(
+                &self,
+                _org_id: &str,
+                _stream_name: &str,
+                _time_range: (i64, i64),
+                _matchers: Matchers,
+                _label_selector: HashSet<String>,
+                _filters: &mut [(String, Vec<String>)],
+            ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
+                Ok(vec![(
+                    self.ctx.clone(),
+                    metrics_schema(),
+                    ScanStats::default(),
+                    true,
+                )])
+            }
+
+            async fn register_cancellation(
+                &self,
+                _trace_id: &str,
+            ) -> Result<Option<oneshot::Receiver<()>>> {
+                let (sender, receiver) = oneshot::channel();
+                if self.canceled {
+                    let _ = sender.send(());
+                } else {
+                    *self.cancel.lock().unwrap() = Some(sender);
+                }
+                Ok(Some(receiver))
+            }
+        }
+
+        fn metrics_schema() -> Arc<Schema> {
+            Arc::new(Schema::new(vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(HASH_LABEL, DataType::UInt64, false),
+                Field::new(VALUE_LABEL, DataType::Float64, false),
+            ]))
+        }
+
+        /// Two counters sampled every 20 s, registered as the hash-sorted table.
+        fn provider(canceled: bool) -> StreamingProvider {
+            let rows: Vec<(i64, u64, f64)> = [7u64, u64::MAX / 2]
+                .into_iter()
+                .flat_map(|hash| {
+                    (0..10).map(move |step| (BASE + step * 20 * SECOND, hash, (step * 3) as f64))
+                })
+                .collect();
+            let batch = RecordBatch::try_new(
+                metrics_schema(),
+                vec![
+                    Arc::new(Int64Array::from_iter_values(rows.iter().map(|row| row.0))),
+                    Arc::new(UInt64Array::from_iter_values(rows.iter().map(|row| row.1))),
+                    Arc::new(Float64Array::from_iter_values(rows.iter().map(|row| row.2))),
+                ],
+            )
+            .unwrap();
+            let table = MemTable::try_new(metrics_schema(), vec![vec![batch]])
+                .unwrap()
+                .with_sort_order(vec![vec![
+                    col(HASH_LABEL).sort(true, false),
+                    col(TIMESTAMP_COL_NAME).sort(true, false),
+                ]]);
+            let mut config = SessionConfig::new().with_target_partitions(3);
+            config.options_mut().optimizer.prefer_existing_sort = true;
+            let ctx = SessionContext::new_with_config(config);
+            ctx.register_table(format!("m{STREAMING_AGG_TABLE_SUFFIX}"), Arc::new(table))
+                .unwrap();
+            StreamingProvider {
+                ctx,
+                canceled,
+                cancel: Default::default(),
+            }
+        }
+
+        /// The flag defaults to off; flip it once for this process before the engine reads it.
+        fn enable_streaming() {
+            static ENABLE: std::sync::Once = std::sync::Once::new();
+            ENABLE.call_once(|| {
+                unsafe { std::env::set_var("ZO_FEATURE_METRICS_STREAMING_AGG_ENABLED", "true") };
+                config::refresh_config().expect("config refresh");
+            });
+        }
+
+        async fn eval_sum_rate(provider: StreamingProvider, timeout: u64) -> Result<Value> {
+            enable_streaming();
+            let eval_ctx = EvalContext::new(
+                BASE + 60 * SECOND,
+                BASE + 180 * SECOND,
+                60 * SECOND,
+                "test_trace".into(),
+            );
+            let mut ctx = PromqlContext::new(
+                create_test_query_ctx("test_trace", "test_org", timeout),
+                provider,
+                vec![],
+            );
+            ctx.start = eval_ctx.start;
+            ctx.end = eval_ctx.end;
+            let mut engine = Engine::new("test_trace", Arc::new(ctx), eval_ctx);
+            let expr = promql_parser::parser::parse("sum(rate(m[1m]))").unwrap();
+            engine.exec(&expr).await.map(|(value, _)| value)
+        }
+
+        #[tokio::test]
+        async fn test_streaming_run_stops_on_cancel() {
+            let err = eval_sum_rate(provider(true), 30)
+                .await
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("canceled"), "unexpected error: {err}");
+        }
+
+        #[tokio::test]
+        async fn test_streaming_run_stops_on_timeout() {
+            let err = eval_sum_rate(provider(false), 0)
+                .await
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("timeout"), "unexpected error: {err}");
+        }
     }
 }
