@@ -1724,7 +1724,7 @@ async fn page_for_alert_firing(
     // One representative row per group key, the same reduction
     // `dispatch_per_group` performs, so the two halves of a firing
     // cannot disagree about what its groups are.
-    let group_dimensions: Vec<std::collections::HashMap<String, String>> =
+    let mut group_dimensions: Vec<std::collections::HashMap<String, String>> =
         if alert.query_condition.multi_alert_enabled() {
             let group_by = alert
                 .query_condition
@@ -1745,6 +1745,34 @@ async fn page_for_alert_firing(
         } else {
             vec![dimensions.clone()]
         };
+    // I-D3, last resort: what the service registry already knows. A
+    // `SELECT count(*)` whose threshold lives in an inequality names
+    // nothing static, so neither the row nor the conditions can route it
+    // — and correlation can. The incident path has had this, which meant
+    // the same alert routed differently depending on a checkbox about
+    // incidents.
+    //
+    // Costs a lookup only for a firing that would otherwise be
+    // unroutable: anything carrying its own identity never gets here.
+    // Set on every group because every group is the same empty identity,
+    // so they route as one team either way.
+    if group_dimensions.iter().all(|d| d.is_empty())
+        && let Some(service) =
+            crate::alerts::incidents::correlated_service_for_routing(&alert.org_id, first_row).await
+    {
+        for dims in &mut group_dimensions {
+            dims.insert(
+                config::meta::oncall::SERVICE_DIMENSION.to_string(),
+                service.clone(),
+            );
+        }
+        log::debug!(
+            "[SCHEDULER trace_id {trace_id}] {}/{}: no identity fields in the result row; routing \
+             on the correlated service `{service}`",
+            alert.org_id,
+            alert.name,
+        );
+    }
     // Single-sourced with the incident path: the same alert must
     // not page at a different severity depending on whether it
     // creates an incident.

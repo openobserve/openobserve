@@ -36,6 +36,9 @@ struct ServiceDiscoveryResult {
     group_values: HashMap<String, String>,
     key_type: config::meta::alerts::incidents::KeyType,
     service_name: String,
+    /// `service_name` is the name of the stream this service was discovered in,
+    /// not anything about the service. Fine to show; never route on it.
+    service_name_from_stream: bool,
 }
 
 /// Result from filtered semantic extraction using distinguish_by groups
@@ -547,19 +550,7 @@ pub async fn correlate_alert_to_incident(
     // enterprise default.
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
 ) -> Result<Option<IncidentCorrelationOutcome>, anyhow::Error> {
-    // Extract labels from result row as HashMap
-    let mut labels: HashMap<String, String> = result_row
-        .iter()
-        .filter_map(|(k, v)| {
-            let value_str = match v {
-                Value::String(s) => s.clone(),
-                Value::Number(n) => n.to_string(),
-                Value::Bool(b) => b.to_string(),
-                _ => return None,
-            };
-            Some((k.clone(), value_str))
-        })
-        .collect();
+    let mut labels = labels_from_row(result_row);
 
     // Enrich with alert condition dimensions (deterministic baseline)
     // Handles SQL WHERE, GUI conditions, and PromQL label matchers
@@ -701,7 +692,14 @@ pub async fn correlate_alert_to_incident(
         // Additive like those sources. A row that carries its own
         // identity keeps routing on it, so no existing alert changes team —
         // this can only add a route where there was none.
-        if dimensions.is_empty() && !service_name.trim().is_empty() {
+        // ...and only when it names a service. Discovery's last resort is the
+        // stream a record arrived in, so the registry legitimately holds
+        // `node_cpu_seconds`; routing on that is routing on a table name.
+        let names_a_service = parallel_result
+            .service_discovery
+            .as_ref()
+            .is_none_or(|sd| !sd.service_name_from_stream);
+        if dimensions.is_empty() && names_a_service && !service_name.trim().is_empty() {
             dimensions.insert(
                 config::meta::oncall::SERVICE_DIMENSION.to_string(),
                 service_name.clone(),
@@ -1011,6 +1009,41 @@ pub async fn try_auto_resolve_incident_for_external_alert(
     Ok(())
 }
 
+/// The scalar columns of a result row, as the labels correlation matches on.
+fn labels_from_row(row: &Map<String, Value>) -> HashMap<String, String> {
+    row.iter()
+        .filter_map(|(k, v)| {
+            let value_str = match v {
+                Value::String(s) => s.clone(),
+                Value::Number(n) => n.to_string(),
+                Value::Bool(b) => b.to_string(),
+                _ => return None,
+            };
+            Some((k.clone(), value_str))
+        })
+        .collect()
+}
+
+/// The service the registry identifies this row as, when it identifies a real
+/// service.
+///
+/// For the alert path, which has no correlation of its own: an alert routed
+/// differently depending on a checkbox about incidents, because only the
+/// incident path could reach the registry. `None` when the registry has nothing,
+/// or when the name it has is the stream a record arrived in — routing on that
+/// is routing on a table name.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn correlated_service_for_routing(
+    org_id: &str,
+    row: &Map<String, Value>,
+) -> Option<String> {
+    let found = query_service_discovery_key(org_id, &labels_from_row(row)).await?;
+    if found.service_name_from_stream || found.service_name.trim().is_empty() {
+        return None;
+    }
+    Some(found.service_name)
+}
+
 /// Query Service Discovery for group_values using the correlation API
 ///
 /// Uses ServiceStorage::correlate() for proper dimension matching
@@ -1047,6 +1080,7 @@ async fn query_service_discovery_key(
                     group_values: response.matched_dimensions.clone(),
                     key_type: config::meta::alerts::incidents::KeyType::Primary,
                     service_name: response.service_name,
+                    service_name_from_stream: response.service_name_from_stream,
                 })
             }
             Ok(None) => {
@@ -2873,6 +2907,7 @@ mod tests {
             group_values: [("ns".to_string(), "prod".to_string())].into(),
             key_type: KeyType::Primary,
             service_name: "svc-a".to_string(),
+            service_name_from_stream: false,
         };
         let sem = FilteredSemanticResult {
             group_values: [("region".to_string(), "us-east".to_string())].into(),
@@ -2913,6 +2948,7 @@ mod tests {
             group_values: HashMap::new(),
             key_type: KeyType::Primary,
             service_name: "payment-service".to_string(),
+            service_name_from_stream: false,
         };
         let labels = HashMap::new();
         let name = extract_service_name_parallel(&labels, &Some(sd));
