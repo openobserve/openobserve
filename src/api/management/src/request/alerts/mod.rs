@@ -104,6 +104,7 @@ pub mod templates;
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
@@ -1559,7 +1560,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     tag = "Alerts",
     operation_id = "CloneAlert",
     summary = "Clone an alert or anomaly detection config",
-    description = "Creates a copy of an existing alert or anomaly detection config. For anomaly configs, the clone starts untrained with counters reset. Provide an optional name and folder_id in the request body.",
+    description = "Creates a copy of an existing alert or anomaly detection config. For anomaly configs, the clone starts untrained with counters reset. Provide an optional name and folder_id in the request body; a folder_id requires write access to that destination folder.",
     security(
         ("Authorization"= [])
     ),
@@ -1571,6 +1572,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
     request_body(content = inline(CloneAlertRequestBody), description = "Clone options", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
@@ -1711,6 +1713,7 @@ pub async fn clone_alert(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
@@ -3280,6 +3283,7 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) -> 
     request_body(content = inline(MoveAlertsRequestBody), description = "Identifies alerts and the destination folder", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
     ),

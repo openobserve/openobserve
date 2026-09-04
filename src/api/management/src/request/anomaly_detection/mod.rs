@@ -152,6 +152,7 @@ fn resolve_owner(owner: Option<String>, fallback: &str) -> Option<String> {
     responses(
         (status = 201, description = "Created", content_type = "application/json", body = AnomalyConfigResponse),
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
     ),
     request_body(
@@ -208,6 +209,7 @@ pub async fn create_config(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = AnomalyConfigResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),

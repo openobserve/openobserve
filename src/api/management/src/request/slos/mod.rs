@@ -130,6 +130,7 @@ pub async fn get_slo(Path((org_id, slo_id)): Path<(String, String)>) -> Response
     responses(
         (status = 200, description = "Created", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
     ),
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
@@ -197,6 +198,7 @@ pub async fn create_slo(
     responses(
         (status = 200, description = "Updated", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
     ),
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
@@ -291,12 +293,13 @@ pub struct MoveSlosRequestBody {
     tag = "SLOs",
     operation_id = "MoveSlos",
     summary = "Move SLOs between folders",
-    description = "Relocates one or more SLOs into another folder. SLOs share the alert folder namespace, so the destination is an alert folder. A move never changes an SLO's definition and never restarts its measurement.",
+    description = "Relocates one or more SLOs into another folder. SLOs share the alert folder namespace, so the destination is an alert folder. Requires write access to BOTH the folder each SLO is leaving and the destination folder. A move never changes an SLO's definition and never restarts its measurement.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization identifier")),
     request_body(content = inline(MoveSlosRequestBody), description = "The SLOs and the destination folder", content_type = "application/json"),
     responses(
         (status = 200, description = "Moved", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 409, description = "Name already used in the destination", content_type = "application/json", body = MetaHttpResponse),
     ),

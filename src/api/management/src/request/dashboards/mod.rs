@@ -389,6 +389,7 @@ pub async fn delete_dashboard_bulk(
     ),
     responses(
         (status = StatusCode::OK, description = "Dashboard Moved", body = Object),
+        (status = StatusCode::FORBIDDEN, description = "Forbidden", body = ()),
         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
     ),
     extensions(

@@ -669,6 +669,7 @@ pub async fn get_report_v2(Path((org_id, report_id)): Path<(String, String)>) ->
     request_body(content = inline(Report), description = "Report details"),
     responses(
         (status = StatusCode::OK, description = "Updated", body = ()),
+        (status = StatusCode::FORBIDDEN, description = "Forbidden", body = ()),
         (status = StatusCode::NOT_FOUND, description = "Not found", body = ()),
     ),
     extensions(
@@ -907,6 +908,7 @@ pub async fn trigger_report_v2(Path((org_id, report_id)): Path<(String, String)>
     ),
     responses(
         (status = 200, description = "Success", body = Object),
+        (status = 403, description = "Forbidden", body = ()),
         (status = 404, description = "Not found", body = ()),
     ),
     extensions(

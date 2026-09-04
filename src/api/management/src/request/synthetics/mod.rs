@@ -450,6 +450,7 @@ pub async fn get_synthetic(
     request_body(content = config::meta::synthetics::Synthetic, description = "Updated synthetic definition", content_type = "application/json"),
     responses(
         (status = 200, description = "Updated",   content_type = "application/json", body = config::meta::synthetics::Synthetic),
+        (status = 403, description = "Forbidden"),
         (status = 404, description = "Not found"),
         (status = 500, description = "Error",     content_type = "application/json", body = Object),
     ),
@@ -620,6 +621,7 @@ pub async fn delete_synthetics_bulk(
     request_body(content = MoveSyntheticsRequestBody, description = "IDs and destination folder", content_type = "application/json"),
     responses(
         (status = 200, description = "Moved"),
+        (status = 403, description = "Forbidden"),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
 )]
