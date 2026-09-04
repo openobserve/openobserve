@@ -231,6 +231,11 @@ impl Sample {
     pub fn new(timestamp: i64, value: f64) -> Self {
         Self { timestamp, value }
     }
+
+    #[allow(dead_code)]
+    pub fn is_nan(&self) -> bool {
+        self.value.is_nan()
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -415,7 +420,9 @@ impl EvalContext {
         self.start == self.end
     }
 
-    /// Adjacent windows share at most one sample, so a reset pair repeats only when `step < range`.
+    /// More than one evaluation window, overlapping by a positive duration.
+    /// Reset detection compares adjacent sample pairs, and a pair repeats
+    /// across windows only when two windows share at least two samples.
     pub fn windows_overlap(&self, range_micros: i64) -> bool {
         !self.is_instant()
             && self.step > 0
@@ -649,16 +656,33 @@ pub fn extrapolated_rate(
     offset: Duration,
     kind: ExtrapolationKind,
 ) -> Option<f64> {
-    CounterSeries::new(samples, kind).extrapolate_with_offset(
-        0,
-        samples.len(),
-        eval_ts,
-        range,
-        offset,
-    )
+    if samples.len() < 2 {
+        // Not enough samples.
+        return None;
+    }
+
+    let first = &samples[0];
+    let last = &samples.last().unwrap();
+    let mut delta = last.value - first.value;
+
+    if kind.is_counter() {
+        // Handle counter resets.
+        let mut prev_value = first.value;
+        for sample in &samples[1..] {
+            if sample.value < prev_value {
+                delta += prev_value;
+            }
+            prev_value = sample.value;
+        }
+    }
+
+    extrapolate_from_delta(samples, delta, eval_ts, range, offset, kind)
 }
 
-/// One series' reset list, located once so every window only sums its own corrections.
+/// Per-series counter state for reset-corrected extrapolation across sliding
+/// windows: resets are located once, then each window sums only its own
+/// corrections in scan order, so results are bit-identical to
+/// [`extrapolated_rate`].
 pub struct CounterSeries<'a> {
     samples: &'a [Sample],
     // (sample index, value dropped by the reset ending at that index)
@@ -667,8 +691,9 @@ pub struct CounterSeries<'a> {
 }
 
 impl<'a> CounterSeries<'a> {
-    /// The per-series reset list only pays off when windows overlap; `None` keeps the per-window
-    /// scan, which touches only the samples inside the windows.
+    /// Builds the per-series reset state when `kind` is a counter function
+    /// and the one-pass scan can amortize over overlapping windows; `None`
+    /// keeps the caller on the per-window scan.
     pub fn try_new(
         samples: &'a [Sample],
         kind: Option<ExtrapolationKind>,
@@ -681,14 +706,15 @@ impl<'a> CounterSeries<'a> {
             .then(|| Self::new(samples, kind))
     }
 
-    pub fn new(samples: &'a [Sample], kind: ExtrapolationKind) -> Self {
+    /// # Panics
+    ///
+    /// Panics if `kind` is not a counter kind.
+    fn new(samples: &'a [Sample], kind: ExtrapolationKind) -> Self {
+        assert!(kind.is_counter(), "CounterSeries requires a counter kind");
         let mut resets = Vec::new();
-        // only counter kinds correct for resets; a delta keeps the raw difference
-        if kind.is_counter() {
-            for i in 1..samples.len() {
-                if samples[i].value < samples[i - 1].value {
-                    resets.push((i, samples[i - 1].value));
-                }
+        for i in 1..samples.len() {
+            if samples[i].value < samples[i - 1].value {
+                resets.push((i, samples[i - 1].value));
             }
         }
         Self {
@@ -698,24 +724,19 @@ impl<'a> CounterSeries<'a> {
         }
     }
 
-    /// [`extrapolated_rate`] for `samples[start..end]`; `None` below two samples.
+    /// [`extrapolated_rate`] for the window `samples[start..end]`.
+    ///
+    /// Returns `None` for windows with fewer than two samples.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `start..end` is out of bounds or the window is not in range.
     pub fn extrapolate(
         &self,
         start: usize,
         end: usize,
         eval_ts: i64,
         range: Duration,
-    ) -> Option<f64> {
-        self.extrapolate_with_offset(start, end, eval_ts, range, Duration::ZERO)
-    }
-
-    fn extrapolate_with_offset(
-        &self,
-        start: usize,
-        end: usize,
-        eval_ts: i64,
-        range: Duration,
-        offset: Duration,
     ) -> Option<f64> {
         let window = &self.samples[start..end];
         if window.len() < 2 {
@@ -730,7 +751,7 @@ impl<'a> CounterSeries<'a> {
             }
             delta += correction;
         }
-        extrapolate_from_delta(window, delta, eval_ts, range, offset, self.kind)
+        extrapolate_from_delta(window, delta, eval_ts, range, Duration::ZERO, self.kind)
     }
 }
 
@@ -866,6 +887,14 @@ impl Value {
     pub fn get_range_values(self) -> Option<Vec<RangeValue>> {
         match self {
             Value::Matrix(values) => Some(values),
+            _ => None,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn get_vector(&self) -> Option<&Vec<InstantValue>> {
+        match self {
+            Value::Vector(values) => Some(values),
             _ => None,
         }
     }
@@ -1124,12 +1153,12 @@ mod tests {
         let eval_ts = 100 * MICROS;
 
         for kind in [ExtrapolationKind::Rate, ExtrapolationKind::Increase] {
-            let windowed_only =
+            let legacy =
                 extrapolated_rate(&samples[2..6], eval_ts, range, Duration::ZERO, kind).unwrap();
             let counter = CounterSeries::new(&samples, kind);
-            let sliced = counter.extrapolate(2, 6, eval_ts, range).unwrap();
-            assert_eq!(windowed_only.to_bits(), sliced.to_bits());
-            assert!(sliced.is_finite());
+            let windowed = counter.extrapolate(2, 6, eval_ts, range).unwrap();
+            assert_eq!(legacy.to_bits(), windowed.to_bits());
+            assert!(legacy.is_finite());
         }
     }
 
@@ -1137,7 +1166,7 @@ mod tests {
     fn test_counter_series_infinite_reset_outside_window() {
         const MICROS: i64 = 1_000_000;
         // The +Inf -> 2.0 reset sits before the window; a shared prefix would
-        // produce inf - inf = NaN where the window-local sum stays finite.
+        // produce inf - inf = NaN where the legacy scan stays finite.
         let values = [f64::INFINITY, 2.0, 5.0, 9.0];
         let samples = values
             .iter()
@@ -1147,7 +1176,7 @@ mod tests {
         let range = Duration::from_secs(60);
         let eval_ts = 80 * MICROS;
 
-        let windowed_only = extrapolated_rate(
+        let legacy = extrapolated_rate(
             &samples[1..4],
             eval_ts,
             range,
@@ -1156,9 +1185,9 @@ mod tests {
         )
         .unwrap();
         let counter = CounterSeries::new(&samples, ExtrapolationKind::Rate);
-        let sliced = counter.extrapolate(1, 4, eval_ts, range).unwrap();
-        assert!(sliced.is_finite());
-        assert_eq!(windowed_only.to_bits(), sliced.to_bits());
+        let windowed = counter.extrapolate(1, 4, eval_ts, range).unwrap();
+        assert!(legacy.is_finite());
+        assert_eq!(legacy.to_bits(), windowed.to_bits());
     }
 
     #[test]
@@ -1174,6 +1203,12 @@ mod tests {
         assert!(!ctx(0, MINUTE / 4).windows_overlap(5 * MINUTE));
         assert!(!ctx(0, 0).windows_overlap(5 * MINUTE));
         assert!(!ctx(MINUTE, 0).windows_overlap(5 * MINUTE));
+    }
+
+    #[test]
+    #[should_panic(expected = "counter kind")]
+    fn test_counter_series_rejects_non_counter_kind() {
+        CounterSeries::new(&[], ExtrapolationKind::Delta);
     }
 
     #[test]
@@ -1558,10 +1593,12 @@ mod tests {
         let matrix = vec![range_value.clone()];
 
         let value_vector = Value::Vector(vector.clone());
+        assert!(value_vector.get_vector().is_some());
         assert!(value_vector.get_ref_matrix_values().is_none());
 
         let value_matrix = Value::Matrix(matrix.clone());
         assert!(value_matrix.get_ref_matrix_values().is_some());
+        assert!(value_matrix.get_vector().is_none());
 
         let value_string = Value::String("test".to_string());
         assert_eq!(value_string.get_string(), Some("test".to_string()));
@@ -1777,6 +1814,18 @@ mod tests {
     }
 
     #[test]
+    fn test_sample_is_nan() {
+        let normal = Sample::new(1000, 42.0);
+        assert!(!normal.is_nan());
+
+        let nan_sample = Sample::new(1000, f64::NAN);
+        assert!(nan_sample.is_nan());
+
+        let inf_sample = Sample::new(1000, f64::INFINITY);
+        assert!(!inf_sample.is_nan());
+    }
+
+    #[test]
     fn test_range_value_new() {
         let labels: Labels = vec![
             Arc::new(Label::new("__name__", "cpu")),
@@ -1810,6 +1859,19 @@ mod tests {
         assert_eq!(result.unwrap().len(), 1);
 
         assert!(Value::Float(1.0).get_range_values().is_none());
+    }
+
+    #[test]
+    fn test_value_get_vector() {
+        let iv = InstantValue {
+            labels: vec![],
+            sample: Sample::new(1000, 5.0),
+        };
+        let val = Value::Vector(vec![iv]);
+        assert!(val.get_vector().is_some());
+        assert_eq!(val.get_vector().unwrap().len(), 1);
+
+        assert!(Value::Float(1.0).get_vector().is_none());
     }
 
     #[test]
