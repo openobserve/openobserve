@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{io::Error, time::Instant};
 
 use axum::{
     Json, http,
@@ -290,8 +290,17 @@ fn run_js_test(org_id: &str, function: &str, events: Vec<Value>) -> Result<Vec<V
             transformed_events.push(VRLResult::new("", transform));
         }
     } else {
+        // Bound the whole request so a big batch can't tie up a thread for N x the per-eval limit.
+        let deadline = Instant::now() + transform::js::exec_timeout();
         // Normal mode: apply function to each event
         for event in events {
+            if Instant::now() >= deadline {
+                transformed_events.push(VRLResult::new(
+                    "Test aborted: exceeded the execution time limit",
+                    event,
+                ));
+                continue;
+            }
             let (ret_val, err) =
                 transform::js::apply_js_fn(&js_config, event.clone(), org_id, &[String::new()]);
 

@@ -65,6 +65,9 @@ thread_local! {
     });
 }
 
+/// Fallback when the configured limit is 0; every eval stays bounded (no unlimited option).
+const DEFAULT_JS_EXEC_TIMEOUT_SECS: u64 = 5;
+
 /// Compiled JS function configuration
 #[derive(Clone, Debug)]
 pub struct JSRuntimeConfig {
@@ -80,18 +83,18 @@ impl MemorySize for JSRuntimeConfig {
 
 /// Arms the thread-local eval deadline; clears it on drop (including early return/panic).
 struct JsDeadlineGuard {
-    deadline: Option<Instant>,
+    deadline: Instant,
 }
 
 impl JsDeadlineGuard {
-    fn new(timeout: Option<Duration>) -> Self {
-        let deadline = timeout.map(|t| Instant::now() + t);
-        JS_DEADLINE.with(|d| d.set(deadline));
+    fn new(timeout: Duration) -> Self {
+        let deadline = Instant::now() + timeout;
+        JS_DEADLINE.with(|d| d.set(Some(deadline)));
         Self { deadline }
     }
 
     fn expired(&self) -> bool {
-        self.deadline.is_some_and(|d| Instant::now() >= d)
+        Instant::now() >= self.deadline
     }
 }
 
@@ -110,13 +113,13 @@ pub fn init_js_runtime() -> Result<(), String> {
 /// Compile and validate a JS function
 /// Similar to compile_vrl_function but for JavaScript
 pub fn compile_js_function(func: &str, org_id: &str) -> Result<JSRuntimeConfig, std::io::Error> {
-    compile_js_function_inner(func, org_id, js_exec_timeout())
+    compile_js_function_inner(func, org_id, exec_timeout())
 }
 
 fn compile_js_function_inner(
     func: &str,
     _org_id: &str,
-    timeout: Option<Duration>,
+    timeout: Duration,
 ) -> Result<JSRuntimeConfig, std::io::Error> {
     // Basic validation: function must not be empty
     if func.trim().is_empty() {
@@ -249,11 +252,16 @@ fn strip_result_array_marker(func: &str) -> String {
     result
 }
 
-fn js_exec_timeout() -> Option<Duration> {
+/// Per-eval execution budget; a configured `0` falls back to the default rather than disabling it.
+pub fn exec_timeout() -> Duration {
     let secs = config::get_config()
         .limit
         .js_function_max_execution_time_secs;
-    (secs > 0).then(|| Duration::from_secs(secs))
+    Duration::from_secs(if secs == 0 {
+        DEFAULT_JS_EXEC_TIMEOUT_SECS
+    } else {
+        secs
+    })
 }
 
 /// Apply a JS function to transform data
@@ -339,7 +347,7 @@ pub fn apply_js_fn(
             );
 
             // Execute the function
-            let guard = JsDeadlineGuard::new(js_exec_timeout());
+            let guard = JsDeadlineGuard::new(exec_timeout());
             let eval_result = ctx.eval::<String, _>(exec_code);
             if guard.expired() {
                 let msg = "JavaScript function exceeded the execution time limit".to_string();
@@ -466,11 +474,8 @@ mod tests {
     fn test_compile_rejects_infinite_loop() {
         // Executing at compile time rejects an obvious infinite loop before it can be saved.
         let start = Instant::now();
-        let result = compile_js_function_inner(
-            "while (true) {}",
-            "test_org",
-            Some(Duration::from_millis(100)),
-        );
+        let result =
+            compile_js_function_inner("while (true) {}", "test_org", Duration::from_millis(100));
         let err = result.expect_err("infinite loop must be rejected at compile");
         assert!(
             err.to_string().contains("time limit"),
@@ -496,7 +501,7 @@ mod tests {
         ];
         for src in payloads {
             let start = Instant::now();
-            let _guard = JsDeadlineGuard::new(Some(Duration::from_millis(100)));
+            let _guard = JsDeadlineGuard::new(Duration::from_millis(100));
             let result: Result<String, _> = JS_CONTEXT.with(|ctx| ctx.with(|ctx| ctx.eval(src)));
             assert!(result.is_err(), "infinite loop must be interrupted: {src}");
             assert!(

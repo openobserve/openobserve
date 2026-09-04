@@ -2201,7 +2201,8 @@ pub struct Limit {
     pub disk_free: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
-    #[env_config(name = "ZO_JS_FUNCTION_MAX_EXECUTION_TIME_SECS", default = 5)] // 0 = no limit
+    #[env_config(name = "ZO_JS_FUNCTION_MAX_EXECUTION_TIME_SECS", default = 5)]
+    // 0 falls back to default
     pub js_function_max_execution_time_secs: u64,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
