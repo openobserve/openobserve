@@ -21,20 +21,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Two authentication paths:
    • OAuth (default) — the client signs in via the browser (Dex). The snippet is
      just the URL, no header; the server's OAuth discovery drives the login.
-     Enterprise/Cloud only: the discovery endpoints are compiled out of the OSS
-     build (they 404), so the tab is hidden there and token mode is the default.
-   • Access token — Basic auth. Defaults to the user's own credentials
-     ([BASIC_PASSCODE], masked by CopyContent) as a quick start; a one-click
-     "Generate" creates a scoped, read-only service account and injects its
-     show-once token into every snippet. The generate button additionally needs
-     rbac + service accounts (see useMcpCredential), so on OSS the quick-start
-     passcode is the only path — which works, and the snippets are identical.
+     Needs Enterprise/Cloud AND SSO enabled: the discovery endpoints are compiled
+     out of the OSS build and 404 while Dex is off, so the tab is hidden in both
+     cases and token mode is the default.
+   • Access token — Basic auth. Entering this tab mints a scoped, read-only
+     service account and injects its show-once token into every snippet, so the
+     copied config works as-is. Minting needs rbac + service accounts (see
+     useMcpCredential); without them the snippets fall back to the user's own
+     credentials ([BASIC_PASSCODE], masked by CopyContent), which works too.
 
   Each client's config is produced by a single build(endpoint, auth) function so
   the OAuth (auth=null → no header) and token variants can never drift.
 -->
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -46,6 +46,7 @@ import config from "@/aws-exports";
 import { useMcpCredential } from "@/composables/useMcpCredential";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 
@@ -61,13 +62,31 @@ const { generate, generating, error: genError, credential, canGenerate } = useMc
 
 const endpoint = computed(() => `${props.subs.url}/api/${props.subs.org}/mcp`);
 
-// OAuth discovery (/.well-known/…) is compiled out of the OSS build, so the
-// browser sign-in flow can only work on enterprise/cloud. Elsewhere the tab is
-// hidden and token mode is the only — and default — path.
-const oauthAvailable = config.isEnterprise == "true" || config.isCloud == "true";
+// OAuth discovery 404s on OSS builds and whenever SSO (Dex) is off, so it needs both.
+const oauthAvailable = computed(
+  () =>
+    (config.isEnterprise == "true" || config.isCloud == "true") &&
+    !!store.state.zoConfig?.sso_enabled,
+);
 
 // "oauth" (default, recommended where available) | "token".
-const authMode = ref<"oauth" | "token">(oauthAvailable ? "oauth" : "token");
+const selectedAuthMode = ref<"oauth" | "token">("oauth");
+
+// zoConfig arrives asynchronously, so derive the mode rather than latch a stale default.
+const authMode = computed<"oauth" | "token">(() =>
+  oauthAvailable.value ? selectedAuthMode.value : "token",
+);
+
+// A token snippet is only copy-paste-ready once it carries a real token, so mint on arrival.
+watch(
+  authMode,
+  (mode) => {
+    if (mode === "token" && !credential.value && !generating.value && canGenerate()) {
+      generate();
+    }
+  },
+  { immediate: true },
+);
 
 // The Authorization header VALUE injected into token-mode snippets:
 //  • generated credential → real base64(email:token), shown once;
@@ -286,8 +305,6 @@ const openDeepLink = () => {
   }
 };
 
-const onGenerate = () => generate();
-
 const downloadCredential = () => {
   if (!credentialHeader.value) return;
   const blob = new Blob([credentialHeader.value], { type: "text/plain" });
@@ -340,7 +357,7 @@ const openDocs = () => {
     <div class="flex flex-col gap-2">
       <div class="font-semibold">{{ t("ingestion.mcp.authLabel") }}</div>
       <!-- Without OAuth there is only one method, so the picker is just noise. -->
-      <OTabs v-if="oauthAvailable" v-model="authMode" dense>
+      <OTabs v-if="oauthAvailable" v-model="selectedAuthMode" dense>
         <OTab
           name="oauth"
           :label="t('ingestion.mcp.auth.oauth')"
@@ -363,27 +380,23 @@ const openDocs = () => {
       class="rounded-surface border-border-default bg-surface-panel flex flex-col gap-3 border p-3"
       data-test="ai-integrations-mcp-credential"
     >
-      <!-- Before generation: quick-start note + generate button -->
-      <template v-if="!credential">
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex flex-col gap-1">
-            <div class="font-semibold">
-              {{ t("ingestion.mcp.credential.quickStartTitle") }}
-            </div>
-            <p class="text-text-secondary">
-              {{ t("ingestion.mcp.credential.quickStartBody") }}
-            </p>
+      <!-- Minting the read-only credential -->
+      <template v-if="generating">
+        <div class="flex items-center gap-2" data-test="ai-integrations-mcp-credential-creating">
+          <OSpinner size="sm" />
+          <span class="font-semibold">{{ t("ingestion.mcp.credential.creating") }}</span>
+        </div>
+      </template>
+
+      <!-- No dedicated credential: the snippets fall back to the user's own passcode -->
+      <template v-else-if="!credential">
+        <div class="flex flex-col gap-1">
+          <div class="font-semibold">
+            {{ t("ingestion.mcp.credential.quickStartTitle") }}
           </div>
-          <OButton
-            v-if="canGenerate()"
-            variant="primary"
-            size="sm-action"
-            :loading="generating"
-            data-test="ai-integrations-mcp-generate-btn"
-            @click="onGenerate"
-          >
-            {{ t("ingestion.mcp.credential.generate") }}
-          </OButton>
+          <p class="text-text-secondary">
+            {{ t("ingestion.mcp.credential.quickStartBody") }}
+          </p>
         </div>
         <p v-if="genError" class="text-error" data-test="ai-integrations-mcp-credential-error">
           {{ genError }}
@@ -472,7 +485,7 @@ const openDocs = () => {
 
     <!-- Security note (token mode only) -->
     <div
-      v-if="authMode === 'token'"
+      v-if="authMode === 'token' && !credential"
       class="rounded-surface border-border-default bg-surface-panel flex gap-2 border p-3"
       data-test="ai-integrations-mcp-security"
     >

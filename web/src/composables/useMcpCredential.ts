@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// One-click, least-privilege credential for the MCP server: create a service
+// Least-privilege credential for the MCP server, minted on demand: create a service
 // account, attach a freshly-seeded read-only role, and hand back the show-once
 // token. Reuses the same primitives as the IAM service-account flow
 // (service_accounts.create + createRole + seedReadonlyRolePermissions +
@@ -40,22 +40,33 @@ export interface McpCredential {
   readonlyApplied: boolean;
 }
 
+// The token is show-once, so a remount must reuse it rather than mint a second account.
+const sessionCredentials = new Map<string, McpCredential>();
+
 export function useMcpCredential() {
   const store = useStore();
   const { t } = useI18nTyped();
 
+  const currentOrg = (): string => store.state.selectedOrganization?.identifier ?? "";
+
   const generating = ref(false);
   const error = ref("");
-  const credential = ref<McpCredential | null>(null);
+  const credential = ref<McpCredential | null>(sessionCredentials.get(currentOrg()) ?? null);
 
   /** rbac + service accounts must both be enabled for a read-only SA to exist. */
   const canGenerate = () =>
     !!store.state.zoConfig?.rbac_enabled && (store.state.zoConfig?.service_account_enabled ?? true);
 
   const generate = async (): Promise<McpCredential | null> => {
+    const org = currentOrg();
+    const cached = sessionCredentials.get(org);
+    if (cached) {
+      credential.value = cached;
+      return cached;
+    }
+
     generating.value = true;
     error.value = "";
-    const org = store.state.selectedOrganization?.identifier;
     const isMetaOrg = org === store.state.zoConfig?.meta_org;
 
     // Unique, slug-valid base name shared by the account and its role.
@@ -92,6 +103,7 @@ export function useMcpCredential() {
       }
 
       credential.value = { email, token, roleName: name, readonlyApplied };
+      sessionCredentials.set(org, credential.value);
       return credential.value;
     } catch (err: any) {
       error.value =
