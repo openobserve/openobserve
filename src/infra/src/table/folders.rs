@@ -140,11 +140,51 @@ pub async fn put(
         }
     };
 
-    let ksuid = Ksuid::from_base62(&model.id).map_err(|_| FromStrError {
-        value: model.id.clone(),
-        ty: "svix_ksuid::Ksuid".to_owned(),
-    })?;
-    Ok((ksuid, model.into()))
+    Ok((model_ksuid(&model)?, model.into()))
+}
+
+/// Creates the folder if `(org, type, folder_id)` is still free, otherwise returns the folder that
+/// is already there. The bool reports whether this call is the one that inserted it.
+///
+/// Callers that auto-create a folder cannot check-then-insert: concurrent requests to a fresh org
+/// all see no folder and all insert, and every loser hits the unique index. Losing that race is not
+/// an error here, so the insert is attempted first and a failure is only reported when the row is
+/// still absent afterwards.
+pub async fn get_or_create(
+    org_id: &str,
+    folder: Folder,
+    folder_type: FolderType,
+) -> Result<(Ksuid, Folder, bool), errors::Error> {
+    let client = get_orm_client_rw().await;
+    let folder_id = folder.folder_id.clone();
+
+    if let Some(model) = get_model(client, org_id, &folder_id, folder_type).await? {
+        return Ok((model_ksuid(&model)?, model.into(), false));
+    }
+
+    let active = ActiveModel {
+        id: Set(Ksuid::new(None, None).to_string()),
+        org: Set(org_id.to_owned()),
+        folder_id: Set(folder.folder_id),
+        r#type: Set::<i16>(folder_type_into_i16(folder_type)),
+        name: Set(folder.name),
+        description: Set(Some(folder.description).filter(|d| !d.is_empty())),
+        icon: Set(folder.icon.filter(|i| !i.is_empty())),
+    };
+
+    match active.insert(client).await {
+        Ok(model) => {
+            let model: Model = model.try_into_model()?;
+            Ok((model_ksuid(&model)?, model.into(), true))
+        }
+        // A concurrent caller may have inserted the same folder between the read above and this
+        // write. Re-read before deciding: the row being there now means the folder exists, which is
+        // all the caller wanted. Only a still-missing row makes this a real failure.
+        Err(e) => match get_model(client, org_id, &folder_id, folder_type).await? {
+            Some(model) => Ok((model_ksuid(&model)?, model.into(), false)),
+            None => Err(e.into()),
+        },
+    }
 }
 
 /// Deletes a folder with the given `folder_id` surrogate key.
@@ -236,6 +276,16 @@ pub(crate) async fn get_model_by_name<C: ConnectionTrait>(
 }
 
 /// Lists all folder ORM models with the specified type.
+fn model_ksuid(model: &Model) -> Result<Ksuid, errors::Error> {
+    Ksuid::from_base62(&model.id).map_err(|_| {
+        FromStrError {
+            value: model.id.clone(),
+            ty: "svix_ksuid::Ksuid".to_owned(),
+        }
+        .into()
+    })
+}
+
 async fn list_models(
     db: &DatabaseConnection,
     org_id: &str,
