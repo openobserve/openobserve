@@ -147,13 +147,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
 
             <OButton
-              variant="outline"
-              size="xs"
+              variant="ghost"
+              size="icon-sm"
+              icon-left="edit"
               class="shrink-0"
+              :aria-label="t('oncall.edit')"
               :data-test="`oncall-routing-edit-${row.rule.rule_id}`"
               @click="setEditor(row.rule.rule_id)"
             >
-              {{ t("oncall.edit") }}
+              <OTooltip side="bottom" :content="t('oncall.edit')" />
             </OButton>
           </div>
         </div>
@@ -417,6 +419,7 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type {
   DimensionCatalogue,
   DiscoveredService,

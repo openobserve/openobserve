@@ -101,12 +101,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <span class="flex items-center justify-end gap-1">
           <OButton
-            variant="outline"
-            size="xs"
+            variant="ghost"
+            size="icon-sm"
+            icon-left="edit"
+            :aria-label="t('oncall.edit')"
             :data-test="`oncall-ownership-edit-${row.rule_id}`"
             @click.stop="emit('edit', row)"
           >
-            {{ t("oncall.edit") }}
+            <OTooltip side="bottom" :content="t('oncall.edit')" />
           </OButton>
           <OButton
             variant="ghost"
@@ -143,6 +145,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OwnershipRuleHealth, OwnershipRuleStats } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
