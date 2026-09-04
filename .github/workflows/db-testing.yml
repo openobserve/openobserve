@@ -93,12 +93,12 @@ jobs:
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: nightly-2026-05-20
 
       - name: Setup Rust Cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           # This successful main-branch build is the single writer for the
           # canonical dev(debug=0)+mimalloc cache consumed by API and DB PRs.
@@ -156,7 +156,7 @@ jobs:
           fi
 
       - name: Setup rye
-        uses: eifinger/setup-rye@v4
+        uses: eifinger/setup-rye@c694239a43768373e87d0103d7f547027a23f3c8 # v4.2.9
         env:
           # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
           RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
