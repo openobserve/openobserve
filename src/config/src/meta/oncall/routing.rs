@@ -211,7 +211,12 @@ impl DimensionDepth {
     pub fn shipped_default() -> Self {
         const AXES: [&[&str]; 5] = [
             &["k8s-cluster", "k8s-namespace", "k8s-deployment"],
-            &["region", "availability-zone", "aws-ecs-cluster", "aws-ecs-task"],
+            &[
+                "region",
+                "availability-zone",
+                "aws-ecs-cluster",
+                "aws-ecs-task",
+            ],
             &["region", "faas-name"],
             &["region", "azure-resource-group", "azure-cloud-role"],
             &["region", "gcp-cloud-run", "gcp-instance"],

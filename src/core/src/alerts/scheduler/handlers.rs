@@ -605,7 +605,6 @@ pub async fn handle_triggers(
     }
 }
 
-
 /// Run one escalation step for a response record.
 ///
 /// The job is dropped rather than re-armed once the ladder is finished, the
@@ -6026,7 +6025,6 @@ mod tests {
             "the previous firing closed and stayed closed, so this one is a new one"
         );
     }
-
 
     /// The alert path and the incident path have to agree, or ticking
     /// `creates_incident` silently changes how loudly an alert pages.
