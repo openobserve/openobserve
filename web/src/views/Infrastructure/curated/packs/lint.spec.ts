@@ -227,6 +227,42 @@ describe.each(packs)("generic invariants — %s pack", (packId, manifest) => {
     }
   });
 
+  it("every panel CARRIES every scope token its section declares, or declares fleetWide", () => {
+    // The rule the two rules above do not cover: they check the tokens that ARE
+    // written, never the one that is missing. A picker the user can operate must
+    // move every panel beside it — a panel that stays fleet-wide while its
+    // neighbours react reads as a broken page, and shipped exactly that way.
+    for (const section of manifest.sections) {
+      for (const panel of section.panels) {
+        const declared = new Set<string>(panel.fleetWide ?? []);
+        for (const name of section.scopedBy ?? []) {
+          const queries = queriesOf(panel);
+          const carriedBy = queries.filter((q) => q.includes(`\${scope:${name}}`)).length;
+          if (carriedBy === queries.length) {
+            // An opt-out on a panel that scopes anyway is a stale marker.
+            expect(declared.has(name), `${panel.id} marks ${name} fleetWide yet carries it`).toBe(
+              false,
+            );
+            continue;
+          }
+          // Half-scoping is the worse bug: one variant reacts, the other lies.
+          expect(carriedBy, `${panel.id} carries ${name} on only some queries`).toBe(0);
+          expect(
+            declared.has(name),
+            `${panel.id} omits \${scope:${name}} declared by ${section.id}.scopedBy — ` +
+              `add the token, or declare fleetWide: ["${name}"] with a reason`,
+          ).toBe(true);
+        }
+        for (const name of declared) {
+          expect(
+            (section.scopedBy ?? []).includes(name),
+            `${panel.id}.fleetWide names ${name}, which ${section.id} does not declare`,
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
   it("cardinality: every by(...) reaching the output is topk(N ≤ 20) or allowlist-only", () => {
     // Curated pages render on any fleet size — an unbounded per-node fan-out is a
     // page that dies on the org that needs it most.
@@ -404,4 +440,38 @@ describe("registry", () => {
       expect(manifest.defaultRelativePeriod).toBeTruthy();
     }
   });
+});
+
+// A ratio scoped on ONE side is the addendum's "lying gauge": measured live,
+// production CPU used-over-fleet-allocatable reads 3.76% where the truth is
+// 24.15%. The query succeeds and returns exactly one series, so nothing at
+// runtime can catch it — only this rule can.
+describe("lint (h): a division carries its scope token on BOTH sides", () => {
+  for (const [packId, manifest] of Object.entries(curatedPacks)) {
+    it(`${packId}: no query divides a scoped numerator by an unscoped denominator`, () => {
+      for (const section of manifest.sections) {
+        for (const name of section.scopedBy ?? []) {
+          const token = `\${scope:${name}}`;
+          for (const panel of section.panels) {
+            if ((panel.fleetWide ?? []).includes(name)) continue;
+            for (const variant of panel.variants) {
+              for (const { query } of variant.queries) {
+                if (!query.includes("/") || !query.includes(token)) continue;
+                const sides = query.split("/");
+                for (const [index, side] of sides.entries()) {
+                  // A side with no metric selector (a bare literal like `* 100`)
+                  // has nothing to scope, so it is not a violation.
+                  if (!/[a-z_]+\{|[a-z_]{4,}\s*\)/i.test(side)) continue;
+                  expect(
+                    side.includes(token),
+                    `${panel.id} side ${index} of "${query}" lacks ${token}`,
+                  ).toBe(true);
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+  }
 });

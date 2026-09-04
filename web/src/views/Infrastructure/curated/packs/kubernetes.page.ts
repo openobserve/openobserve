@@ -114,6 +114,10 @@ export const kubernetesPage: CuratedPageManifest = {
       id: "overview",
       titleKey: "infra.k8s.section.overview",
       scopedBy: ["cluster"],
+      // Running/Pending/Failed are three of FIVE phases, so the tiles do not sum
+      // to the fleet (dry-run finding 10). Stated once for the trio: inlined per
+      // tile it consumed the bar and truncated the very titles it qualified.
+      noteKey: "infra.k8s.section.overviewNote",
       panels: [
         panel(
           {
@@ -128,13 +132,21 @@ export const kubernetesPage: CuratedPageManifest = {
                 requiresStreams: ["k8s_node_cpu_utilization"],
                 queryType: "promql",
                 queries: [
-                  { query: `count(count by (${NODE}) (k8s_node_cpu_utilization))`, legend: "" },
+                  {
+                    query: `count(count by (${NODE}) (k8s_node_cpu_utilization\${scope:cluster}))`,
+                    legend: "",
+                  },
                 ],
               },
               {
                 requiresStreams: ["k8s_node_cpu_usage"],
                 queryType: "promql",
-                queries: [{ query: `count(count by (${NODE}) (k8s_node_cpu_usage))`, legend: "" }],
+                queries: [
+                  {
+                    query: `count(count by (${NODE}) (k8s_node_cpu_usage\${scope:cluster}))`,
+                    legend: "",
+                  },
+                ],
               },
             ],
           },
@@ -157,7 +169,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queries: [
                   {
                     query:
-                      'count(kube_node_status_condition{condition="Ready",status="true"} == 1)',
+                      'count(kube_node_status_condition{condition="Ready",status="true",${scope:cluster}} == 1)',
                     legend: "",
                   },
                 ],
@@ -171,7 +183,6 @@ export const kubernetesPage: CuratedPageManifest = {
           {
             id: "k8s_ov_pods_running",
             titleKey: "infra.k8s.panel.podsRunning",
-            subtitleKey: "infra.k8s.panel.podsRunningSub",
             type: "metric",
             unit: "numbers",
             groupId: "kube-state",
@@ -180,7 +191,12 @@ export const kubernetesPage: CuratedPageManifest = {
               {
                 requiresStreams: ["kube_pod_status_phase"],
                 queryType: "promql",
-                queries: [{ query: 'sum(kube_pod_status_phase{phase="Running"})', legend: "" }],
+                queries: [
+                  {
+                    query: 'sum(kube_pod_status_phase{phase="Running",${scope:cluster}})',
+                    legend: "",
+                  },
+                ],
               },
             ],
           },
@@ -191,7 +207,6 @@ export const kubernetesPage: CuratedPageManifest = {
           {
             id: "k8s_ov_pods_pending",
             titleKey: "infra.k8s.panel.podsPending",
-            subtitleKey: "infra.k8s.panel.podsPendingSub",
             type: "metric",
             unit: "numbers",
             groupId: "kube-state",
@@ -200,7 +215,12 @@ export const kubernetesPage: CuratedPageManifest = {
               {
                 requiresStreams: ["kube_pod_status_phase"],
                 queryType: "promql",
-                queries: [{ query: 'sum(kube_pod_status_phase{phase="Pending"})', legend: "" }],
+                queries: [
+                  {
+                    query: 'sum(kube_pod_status_phase{phase="Pending",${scope:cluster}})',
+                    legend: "",
+                  },
+                ],
               },
             ],
           },
@@ -211,7 +231,6 @@ export const kubernetesPage: CuratedPageManifest = {
           {
             id: "k8s_ov_pods_failed",
             titleKey: "infra.k8s.panel.podsFailed",
-            subtitleKey: "infra.k8s.panel.podsFailedSub",
             type: "metric",
             unit: "numbers",
             groupId: "kube-state",
@@ -220,40 +239,55 @@ export const kubernetesPage: CuratedPageManifest = {
               {
                 requiresStreams: ["kube_pod_status_phase"],
                 queryType: "promql",
-                queries: [{ query: 'sum(kube_pod_status_phase{phase="Failed"})', legend: "" }],
+                queries: [
+                  {
+                    query: 'sum(kube_pod_status_phase{phase="Failed",${scope:cluster}})',
+                    legend: "",
+                  },
+                ],
               },
             ],
           },
           "kube_pod_status_phase",
         ),
 
+        // Scoping ONE side of the ratio is the addendum's "lying gauge": measured
+        // live, production's used-over-FLEET-allocatable reads 3.76% where the
+        // truth is 24.15%. Both sides carry ${scope:cluster} or neither may.
         panel(
           {
-            id: "k8s_ov_fleet_cpu",
-            titleKey: "infra.k8s.panel.fleetCpu",
+            id: "k8s_ov_cpu_used",
+            titleKey: "infra.k8s.panel.cpuUsed",
             type: "metric",
-            unit: "percent-1",
+            unit: "percent",
             groupId: "kubelet-node",
             layout: { w: 32, h: 6 },
             variants: [
               {
-                requiresStreams: ["k8s_node_cpu_utilization"],
+                requiresStreams: ["k8s_node_cpu_usage", "kube_node_status_allocatable"],
                 queryType: "promql",
-                queries: [{ query: "avg(k8s_node_cpu_utilization${scope:cluster})", legend: "" }],
+                queries: [
+                  {
+                    query:
+                      'sum(k8s_node_cpu_usage${scope:cluster}) / sum(kube_node_status_allocatable{resource="cpu",${scope:cluster}}) * 100',
+                    legend: "",
+                  },
+                ],
               },
               {
+                // No denominator on this org: cores in use, never a percentage
+                // of a capacity we cannot see.
                 requiresStreams: ["k8s_node_cpu_usage"],
                 queryType: "promql",
-                // Cores in use — a ratio is not derivable from usage alone.
                 unit: "numbers",
                 queries: [{ query: "sum(k8s_node_cpu_usage${scope:cluster})", legend: "" }],
               },
             ],
           },
-          "k8s_node_cpu_utilization",
+          "k8s_node_cpu_usage",
         ),
 
-        // Five phases exist on a live org, so this chart is deliberately unfiltered — the superset the three tiles draw from.
+        // Five phases exist on a live org, so this chart carries no PHASE filter — the superset the three tiles draw from.
         panel(
           {
             id: "k8s_ov_pods_by_phase",
@@ -266,7 +300,12 @@ export const kubernetesPage: CuratedPageManifest = {
               {
                 requiresStreams: ["kube_pod_status_phase"],
                 queryType: "promql",
-                queries: [{ query: "sum by (phase)(kube_pod_status_phase)", legend: "{phase}" }],
+                queries: [
+                  {
+                    query: "sum by (phase)(kube_pod_status_phase${scope:cluster})",
+                    legend: "{phase}",
+                  },
+                ],
               },
             ],
           },
@@ -323,7 +362,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryType: "promql",
                 queries: [
                   {
-                    query: `topk(20, last_over_time(sum by (${NS}, ${POD}, phase)(kube_pod_status_phase{phase=~"Pending|Failed|Unknown"} > 0)[5m:]))`,
+                    query: `topk(20, last_over_time(sum by (${NS}, ${POD}, phase)(kube_pod_status_phase{phase=~"Pending|Failed|Unknown",\${scope:cluster}} > 0)[5m:]))`,
                     legend: `{${NS}}/{${POD}} {phase}`,
                   },
                 ],
@@ -423,7 +462,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryType: "promql",
                 queries: [
                   {
-                    query: `topk(20, last_over_time(sum by (${NODE}, condition)(kube_node_status_condition{status="true"} == 1)[5m:]))`,
+                    query: `topk(20, last_over_time(sum by (${NODE}, condition)(kube_node_status_condition{status="true",\${scope:cluster}} == 1)[5m:]))`,
                     legend: `{${NODE}} {condition}`,
                   },
                 ],
@@ -472,7 +511,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryType: "promql",
                 queries: [
                   {
-                    query: `topk(20, last_over_time(sum by (${NODE})(kube_node_status_condition{condition="Ready"} == 0)[5m:]))`,
+                    query: `topk(20, last_over_time(sum by (${NODE})(kube_node_status_condition{condition="Ready",\${scope:cluster}} == 0)[5m:]))`,
                     legend: `{${NODE}}`,
                   },
                 ],
@@ -551,6 +590,8 @@ export const kubernetesPage: CuratedPageManifest = {
         panel(
           {
             id: "k8s_wl_nonrunning_by_ns",
+            // Scoped by namespace only — a per-namespace rollup: a pod filter would shrink the namespace total the title promises.
+            fleetWide: ["pod"],
             titleKey: "infra.k8s.panel.nonRunningByNs",
             type: "line",
             unit: "numbers",
@@ -575,6 +616,8 @@ export const kubernetesPage: CuratedPageManifest = {
         panel(
           {
             id: "k8s_wl_cpu_requests",
+            // Scoped by namespace only — a per-namespace rollup: requests are a namespace-level budget, not a per-pod reading.
+            fleetWide: ["pod"],
             titleKey: "infra.k8s.panel.cpuRequestsByNs",
             type: "line",
             unit: "numbers",
@@ -599,6 +642,8 @@ export const kubernetesPage: CuratedPageManifest = {
         panel(
           {
             id: "k8s_wl_pod_network",
+            // Scoped by namespace only — a per-namespace rollup: a pod filter would shrink the namespace total the title promises.
+            fleetWide: ["pod"],
             titleKey: "infra.k8s.panel.podNetwork",
             type: "line",
             unit: "bps",
@@ -634,7 +679,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryType: "promql",
                 queries: [
                   {
-                    query: `topk(10, 100 * sum by (${NS}, ${POD}) (k8s_pod_filesystem_usage{\${scope:namespace}}) / sum by (${NS}, ${POD}) (k8s_pod_filesystem_capacity{\${scope:namespace}}))`,
+                    query: `topk(10, 100 * sum by (${NS}, ${POD}) (k8s_pod_filesystem_usage{\${scope:namespace},\${scope:pod}}) / sum by (${NS}, ${POD}) (k8s_pod_filesystem_capacity{\${scope:namespace},\${scope:pod}}))`,
                     legend: `{${NS}}/{${POD}}`,
                   },
                 ],
@@ -682,7 +727,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryType: "promql",
                 queries: [
                   {
-                    query: `topk(20, last_over_time(sum by (${NS}, ${POD}) (increase(kube_pod_container_status_restarts_total{\${scope:namespace}}[1h]))[5m:]))`,
+                    query: `topk(20, last_over_time(sum by (${NS}, ${POD}) (increase(kube_pod_container_status_restarts_total{\${scope:namespace},\${scope:pod}}[1h]))[5m:]))`,
                     legend: `{${NS}}/{${POD}}`,
                   },
                 ],
