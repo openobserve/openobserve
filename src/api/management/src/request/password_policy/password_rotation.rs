@@ -22,7 +22,7 @@
 
 use chrono::{DateTime, Utc};
 use common::infra::config::USERS;
-use config::meta::password_policy::RotationStatus;
+use o2_enterprise::enterprise::password_policy::meta::RotationStatus;
 
 /// Days left before `user_email`'s password expires, or `None` when there is nothing to say.
 ///
@@ -55,12 +55,12 @@ mod tests {
     use config::{
         META_ORG_ID,
         meta::{
-            password_policy::PasswordPolicy,
             system_settings::{SystemSetting, keys},
             user::UserType,
         },
     };
     use infra::table::users::UserRecord;
+    use o2_enterprise::enterprise::password_policy::meta::PasswordPolicy;
 
     use super::*;
 

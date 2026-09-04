@@ -17,23 +17,66 @@
 //!
 //! The policy is a single `system_settings` row under `_meta`, written only by the admin API. There
 //! is no environment-variable path and nothing runs at startup: an instance with no row enforces
-//! [`PasswordPolicy::default`], which is a permanent valid state rather than a bootstrap phase.
+//! `PasswordPolicy::default`, which is a permanent valid state rather than a bootstrap phase.
+//!
+//! The reads here are the caching layer over `system_settings`, which is why they stayed on this
+//! side: `o2_enterprise` cannot depend on this crate. [`validate_password`] and
+//! [`cookie_max_age_secs`] exist in an OSS build too, answering from the static rule and from
+//! `ZO_COOKIE_MAX_AGE`, so their callers need no feature gate of their own.
 
+#[cfg(feature = "enterprise")]
 use config::{
     META_ORG_ID,
-    meta::{
-        password_policy::{PasswordPolicy, PasswordResetReason},
-        system_settings::{SettingCategory, SettingScope, SystemSetting, keys},
-    },
+    meta::system_settings::{SettingCategory, SettingScope, SystemSetting, keys},
 };
+#[cfg(feature = "enterprise")]
 use infra::table::users;
+#[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::password_policy::{
+    meta::{PasswordPolicy, PasswordResetReason},
+    validate::validate_password_strength_with_policy,
+};
 
+#[cfg(feature = "enterprise")]
 const POLICY_LOCK_KEY: &str = "/password_policy/write";
+
+/// Reject a password the instance would not accept, naming what it fails.
+///
+/// The single funnel for every human-set password. Without the enterprise feature there is no
+/// configurable policy, so this is the static rule that has always applied.
+pub async fn validate_password(password: &str) -> Result<(), String> {
+    #[cfg(feature = "enterprise")]
+    {
+        validate_password_strength_with_policy(password, &get_effective_policy().await)
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        config::utils::password::validate_password_strength(password).map_err(str::to_string)
+    }
+}
+
+/// How long a sign-in cookie should live, in seconds.
+///
+/// The policy wins when an administrator has set it; otherwise `ZO_COOKIE_MAX_AGE` stands, so an
+/// instance nobody has configured keeps the lifetime its deployment chose. Every place that issues
+/// the auth cookie reads this rather than the config value directly.
+pub async fn cookie_max_age_secs() -> i64 {
+    let fallback = config::get_config().auth.cookie_max_age;
+    #[cfg(feature = "enterprise")]
+    {
+        get_effective_policy().await.cookie_max_age_secs(fallback)
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        fallback
+    }
+}
 
 /// The policy every enforcement point should read, served from the system-settings cache.
 ///
 /// The rotation check consults it on every authenticated request, so the read has to stay off the
 /// database — see [`read_stored_policy`] for how an instance with no row does that.
+#[cfg(feature = "enterprise")]
 pub async fn get_effective_policy() -> PasswordPolicy {
     match read_stored_policy().await {
         Ok(Some(policy)) => policy,
@@ -45,21 +88,11 @@ pub async fn get_effective_policy() -> PasswordPolicy {
     }
 }
 
-/// How long a sign-in cookie should live, in seconds.
-///
-/// The policy wins when an administrator has set it; otherwise `ZO_COOKIE_MAX_AGE` stands, so an
-/// instance nobody has configured keeps the lifetime its deployment chose. Every place that issues
-/// the auth cookie reads this rather than the config value directly.
-pub async fn cookie_max_age_secs() -> i64 {
-    get_effective_policy()
-        .await
-        .cookie_max_age_secs(config::get_config().auth.cookie_max_age)
-}
-
 /// Persist `policy`, flagging every eligible user for a forced password reset if the complexity
 /// requirements grew. Returns the number of users flagged, which is 0 when nothing tightened.
 ///
 /// The only writer. Callers must validate the policy first.
+#[cfg(feature = "enterprise")]
 pub async fn set_policy(policy: &PasswordPolicy) -> Result<u64, anyhow::Error> {
     // Two admins submitting at once would otherwise both read the pre-change policy, and the second
     // write could land a tightening whose sweep never ran.
@@ -69,6 +102,7 @@ pub async fn set_policy(policy: &PasswordPolicy) -> Result<u64, anyhow::Error> {
     result
 }
 
+#[cfg(feature = "enterprise")]
 async fn set_locked(policy: &PasswordPolicy) -> Result<u64, anyhow::Error> {
     // The *effective* policy, not the stored row: an instance with no row is genuinely enforcing
     // the default, so a first write that raises the bar above it is a real tightening. Diffing
@@ -106,6 +140,7 @@ async fn set_locked(policy: &PasswordPolicy) -> Result<u64, anyhow::Error> {
 /// request, forever, since no row is a permanent valid state. The cached default says exactly what
 /// an absent row means, so callers need not tell the two apart, and a real row written on any node
 /// replaces it through `set` or the settings watcher.
+#[cfg(feature = "enterprise")]
 async fn read_stored_policy() -> Result<Option<PasswordPolicy>, anyhow::Error> {
     let Some(setting) = crate::system_settings::get(
         &SettingScope::Org,
@@ -122,11 +157,13 @@ async fn read_stored_policy() -> Result<Option<PasswordPolicy>, anyhow::Error> {
     Ok(Some(serde_json::from_value(setting.setting_value)?))
 }
 
+#[cfg(feature = "enterprise")]
 async fn write_policy(policy: &PasswordPolicy) -> Result<(), anyhow::Error> {
     crate::system_settings::set(&policy_setting(policy)?).await?;
     Ok(())
 }
 
+#[cfg(feature = "enterprise")]
 fn policy_setting(policy: &PasswordPolicy) -> Result<SystemSetting, anyhow::Error> {
     Ok(SystemSetting::new_org(
         META_ORG_ID,

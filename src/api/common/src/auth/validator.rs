@@ -1437,13 +1437,13 @@ fn _extract_full_url(req: &Request) -> String {
 #[cfg(test)]
 mod tests {
     use chrono::Utc;
-    #[cfg(feature = "enterprise")]
-    use config::meta::password_policy::{LockoutPolicy, PasswordPolicy};
     use infra::{
         db as infra_db,
         db::{get_orm_client_ro, get_orm_client_rw},
         table as infra_table,
     };
+    #[cfg(feature = "enterprise")]
+    use o2_enterprise::enterprise::password_policy::meta::{LockoutPolicy, PasswordPolicy};
     use openobserve_core::{organization, users};
 
     use super::*;

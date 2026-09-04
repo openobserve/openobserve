@@ -27,7 +27,7 @@ use common::meta::user::UserList;
 use config::{
     Config, get_config,
     meta::user::UserRole,
-    utils::{base64, json, password::validate_password_strength_with_policy},
+    utils::{base64, json},
 };
 use openobserve_api_common::{auth::validator::AuthError, extractors::Headers};
 use openobserve_core::{
@@ -277,10 +277,9 @@ pub async fn save(
     let mut user = UserRequest::from(&user);
     user.email = user.email.trim().to_lowercase();
 
-    let policy = db::password_policy::get_effective_policy().await;
     let bad_req_msg = if let Some(msg) = validate_org_id(&org_id) {
         Some(msg.to_string())
-    } else if let Err(msg) = validate_password_strength_with_policy(&user.password, &policy) {
+    } else if let Err(msg) = db::password_policy::validate_password(&user.password).await {
         Some(msg)
     } else if user.role.base_role == UserRole::Root {
         Some("Not allowed".to_string())
@@ -369,10 +368,7 @@ pub async fn update(
     }
     if user.change_password
         && let Some(new_pw) = user.new_password.as_deref()
-        && let Err(msg) = validate_password_strength_with_policy(
-            new_pw,
-            &db::password_policy::get_effective_policy().await,
-        )
+        && let Err(msg) = db::password_policy::validate_password(new_pw).await
     {
         return Response::builder()
             .status(StatusCode::BAD_REQUEST)

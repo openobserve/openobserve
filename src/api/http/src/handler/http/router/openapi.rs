@@ -59,9 +59,6 @@ use crate::{
         openobserve_api_management::request::organization::system_settings::set_user_setting,
         openobserve_api_management::request::organization::system_settings::delete_org_setting,
         openobserve_api_management::request::organization::system_settings::delete_user_setting,
-        openobserve_api_management::request::organization::password_policy::get_policy,
-        openobserve_api_management::request::organization::password_policy::set_policy,
-        openobserve_api_management::request::organization::password_policy::get_password_complexity,
         openobserve_api_management::request::announcements::get_announcements,
         openobserve_api_management::request::announcements::get_announcements_config,
         openobserve_api_management::request::announcements::set_announcements_config,
@@ -574,6 +571,9 @@ pub struct ApiDoc;
     openobserve_api_management::request::remote_tasks::end_remote_task_signing_grace,
     openobserve_api_management::request::remote_tasks::revoke_remote_task_signing_secret,
     openobserve_api_management::request::users::get,
+    openobserve_api_management::request::organization::password_policy::get_policy,
+    openobserve_api_management::request::organization::password_policy::set_policy,
+    openobserve_api_management::request::organization::password_policy::get_password_complexity,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,

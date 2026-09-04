@@ -28,13 +28,8 @@
 //! belong to `_meta` able to read the lockout thresholds or rewrite the policy for everyone.
 
 use axum::{Json, extract::Path, response::Response};
-use config::{
-    META_ORG_ID,
-    meta::{
-        password_policy::{PasswordComplexity, PasswordPolicy},
-        user::UserRole,
-    },
-};
+use config::{META_ORG_ID, meta::user::UserRole};
+use o2_enterprise::enterprise::password_policy::meta::{PasswordComplexity, PasswordPolicy};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 

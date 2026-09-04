@@ -813,12 +813,6 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/settings/v2/user/{user_id}", post(organization::system_settings::set_user_setting))
         .route("/{org_id}/settings/v2/user/{user_id}/{key}", delete(organization::system_settings::delete_user_setting))
 
-        // Instance-wide native-user auth policy: authored on the meta org, enforced everywhere
-        .route("/{org_id}/settings/password_policy", get(organization::password_policy::get_policy).put(organization::password_policy::set_policy))
-        // Complexity requirements only: readable by any authenticated user, including one the
-        // policy middleware has blocked, who needs to know what password will satisfy it
-        .route("/{org_id}/password_complexity", get(organization::password_policy::get_password_complexity))
-
         // Announcement banners: read by every org, authored on the meta org
         .route("/{org_id}/announcements", get(announcements::get_announcements))
         .route("/{org_id}/announcements/config", get(announcements::get_announcements_config).put(announcements::set_announcements_config))
@@ -1083,6 +1077,12 @@ pub fn service_routes() -> Router {
     #[cfg(feature = "enterprise")]
     {
         router = router
+            // Instance-wide native-user auth policy: authored on the meta org, enforced everywhere
+            .route("/{org_id}/settings/password_policy", get(organization::password_policy::get_policy).put(organization::password_policy::set_policy))
+            // Complexity requirements only: readable by any authenticated user, including one the
+            // policy middleware has blocked, who needs to know what password will satisfy it
+            .route("/{org_id}/password_complexity", get(organization::password_policy::get_password_complexity))
+
             // Anomaly Detection
             .route("/{org_id}/anomaly_detection", get(anomaly_detection::list_configs).post(anomaly_detection::create_config))
             .route("/{org_id}/anomaly_detection/{config_id}", get(anomaly_detection::get_config).put(anomaly_detection::update_config).delete(anomaly_detection::delete_config))
@@ -2048,6 +2048,7 @@ mod tests {
     // appears in the OpenAPI surface, and a minimal router carrying only this
     // route dispatches GET to the handler and rejects other methods.
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn password_policy_read_is_refused_outside_the_meta_org() {
         // The full policy carries lockout thresholds and history depth. Gating only the write
@@ -2075,6 +2076,7 @@ mod tests {
         assert_eq!(refused.status(), StatusCode::FORBIDDEN);
     }
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn password_policy_read_is_refused_for_a_non_admin_on_the_meta_org() {
         // Belonging to _meta is not enough. With OpenFGA off — or in an OSS build, where
@@ -2195,6 +2197,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn password_complexity_route_is_readable_by_any_org() {
         // The counterpart to the test above: the projection is deliberately not org-gated, since

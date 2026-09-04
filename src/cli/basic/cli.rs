@@ -228,10 +228,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             match component.as_str() {
                 "root" => {
                     if let Err(msg) =
-                        config::utils::password::validate_password_strength_with_policy(
-                            &cfg.auth.root_user_password,
-                            &db::password_policy::get_effective_policy().await,
-                        )
+                        db::password_policy::validate_password(&cfg.auth.root_user_password).await
                     {
                         return Err(anyhow::anyhow!(
                             "ZO_ROOT_USER_PASSWORD does not meet policy: {msg}"

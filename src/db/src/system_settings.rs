@@ -171,6 +171,7 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting> {
 /// For a setting whose absence has a defined meaning: caching that meaning stops every subsequent
 /// [`get`] falling through to a database read that can only return nothing. A real row, written
 /// here or on any other node, replaces it through [`set`] or [`watch`].
+#[cfg(feature = "enterprise")]
 pub(crate) async fn set_only_cached(setting: &SystemSetting) {
     let cache_k = cache_key(
         &setting.scope,

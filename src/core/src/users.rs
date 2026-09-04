@@ -30,7 +30,7 @@ use config::meta::ratelimit::CachedUserRoles;
 use config::{
     DEFAULT_ORG, META_ORG_ID, get_config, ider,
     meta::user::{DBUser, User, UserOrg, UserRole},
-    utils::{password::validate_password_strength_with_policy, rand::generate_random_string},
+    utils::rand::generate_random_string,
 };
 use db::{self, user::is_root_user};
 use hashbrown::HashMap;
@@ -395,8 +395,7 @@ pub async fn update_user(
             // Validated here, not only at the HTTP layer: this is the single funnel
             // every password change passes through, and clearing the reset flag below
             // must never happen for a password the current policy would reject.
-            let policy = db::password_policy::get_effective_policy().await;
-            if let Err(msg) = validate_password_strength_with_policy(new_pass, &policy) {
+            if let Err(msg) = db::password_policy::validate_password(new_pass).await {
                 return Ok(MetaHttpResponse::bad_request(msg));
             }
             let new_hash = get_hash(new_pass, &local_user.salt);
@@ -405,7 +404,7 @@ pub async fn update_user(
                 email,
                 &new_hash,
                 &local_user.password,
-                &policy,
+                &db::password_policy::get_effective_policy().await,
             )
             .await
             {
@@ -430,8 +429,7 @@ pub async fn update_user(
         && !local_user.is_external
         && let Some(new_pass) = user.new_password
     {
-        let policy = db::password_policy::get_effective_policy().await;
-        if let Err(msg) = validate_password_strength_with_policy(&new_pass, &policy) {
+        if let Err(msg) = db::password_policy::validate_password(&new_pass).await {
             return Ok(MetaHttpResponse::bad_request(msg));
         }
         let new_hash = get_hash(&new_pass, &local_user.salt);
@@ -440,7 +438,7 @@ pub async fn update_user(
             email,
             &new_hash,
             &local_user.password,
-            &policy,
+            &db::password_policy::get_effective_policy().await,
         )
         .await
         {
@@ -1437,13 +1435,13 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
 #[cfg(test)]
 mod tests {
     use common::{infra::config::USERS, meta::user::get_default_user_role};
-    #[cfg(feature = "enterprise")]
-    use config::meta::password_policy::PasswordPolicy;
     use config::meta::user::{UserRole, UserType};
     use infra::{
         db::{self as infra_db, get_orm_client_rw},
         table as infra_table,
     };
+    #[cfg(feature = "enterprise")]
+    use o2_enterprise::enterprise::password_policy::meta::PasswordPolicy;
     use tokio::sync::Mutex;
 
     use super::*;

@@ -181,12 +181,12 @@ mod tests {
         use config::{
             META_ORG_ID,
             meta::{
-                password_policy::PasswordPolicy,
                 system_settings::{SystemSetting, keys},
                 user::UserType,
             },
         };
         use infra::table::users::UserRecord;
+        use o2_enterprise::enterprise::password_policy::meta::PasswordPolicy;
 
         let email = "expired@b.com";
         USERS.insert(
@@ -291,8 +291,9 @@ mod tests {
         // refuse. Asserting on the string alone is what would let the two drift apart.
         #[cfg(feature = "enterprise")]
         {
-            use config::meta::{password_policy::PasswordPolicy, user::UserType};
+            use config::meta::user::UserType;
             use infra::table::users::UserRecord;
+            use o2_enterprise::enterprise::password_policy::meta::PasswordPolicy;
 
             let flagged = UserRecord {
                 email: "a@b.com".to_string(),

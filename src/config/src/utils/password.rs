@@ -20,8 +20,6 @@
 //  on entropy from generate_random_string().
 // =============================================================================
 
-use crate::meta::password_policy::PasswordPolicy;
-
 /// Minimum length for a user-set password.
 pub const MIN_PASSWORD_LEN: usize = 8;
 
@@ -63,75 +61,6 @@ pub fn validate_password_strength(password: &str) -> Result<(), &'static str> {
         Ok(())
     } else {
         Err(PASSWORD_POLICY_HINT)
-    }
-}
-
-/// Validate a password against a configured policy, naming every requirement it fails.
-///
-/// The static [`validate_password_strength`] above stays for bootstrap paths that run before the
-/// settings cache exists; everything with a live policy in hand should call this instead.
-pub fn validate_password_strength_with_policy(
-    password: &str,
-    policy: &PasswordPolicy,
-) -> Result<(), String> {
-    let len = password.chars().count() as u32;
-    let mut failures: Vec<String> = Vec::new();
-
-    if len < policy.min_length {
-        failures.push(format!("be at least {} characters", policy.min_length));
-    }
-    // 0 means unbounded, so the upper bound is only checked when one is configured.
-    if policy.max_length != 0 && len > policy.max_length {
-        failures.push(format!("be at most {} characters", policy.max_length));
-    }
-
-    let mut has_lower = false;
-    let mut has_upper = false;
-    let mut has_digit = false;
-    let mut has_special = false;
-
-    for c in password.chars() {
-        if c.is_ascii_lowercase() {
-            has_lower = true;
-        } else if c.is_ascii_uppercase() {
-            has_upper = true;
-        } else if c.is_ascii_digit() {
-            has_digit = true;
-        } else if policy.special_char_set.is_empty() {
-            // Empty set keeps the historical rule: anything that is not an ASCII letter or digit
-            // counts, including non-ASCII characters.
-            has_special = true;
-        }
-
-        if !policy.special_char_set.is_empty() && policy.special_char_set.contains(c) {
-            has_special = true;
-        }
-    }
-
-    if policy.require_lowercase && !has_lower {
-        failures.push("contain a lowercase letter".to_string());
-    }
-    if policy.require_uppercase && !has_upper {
-        failures.push("contain an uppercase letter".to_string());
-    }
-    if policy.require_digit && !has_digit {
-        failures.push("contain a digit".to_string());
-    }
-    if policy.require_special && !has_special {
-        failures.push(if policy.special_char_set.is_empty() {
-            "contain a special character".to_string()
-        } else {
-            format!(
-                "contain one of these special characters: {}",
-                policy.special_char_set
-            )
-        });
-    }
-
-    if failures.is_empty() {
-        Ok(())
-    } else {
-        Err(format!("Password must {}.", failures.join(", ")))
     }
 }
 
@@ -188,69 +117,6 @@ mod tests {
     fn accepts_unicode_as_special() {
         // Non-ASCII characters satisfy the special-character requirement.
         assert!(validate_password_strength("Abcdef1π").is_ok());
-    }
-
-    fn policy() -> PasswordPolicy {
-        PasswordPolicy::default()
-    }
-
-    #[test]
-    fn policy_default_accepts_any_eight_chars() {
-        // The default policy is the pre-feature rule: length only, no character classes. A
-        // password the static validator rejects must still pass here, or upgrading would lock
-        // existing users out of changing their own password.
-        assert!(validate_password_strength("password").is_err());
-        assert!(validate_password_strength_with_policy("password", &policy()).is_ok());
-    }
-
-    #[test]
-    fn policy_reports_every_failed_requirement_at_once() {
-        let mut p = policy();
-        p.min_length = 12;
-        p.require_uppercase = true;
-        p.require_digit = true;
-
-        let err = validate_password_strength_with_policy("short", &p).unwrap_err();
-        assert!(err.contains("at least 12"));
-        assert!(err.contains("uppercase"));
-        assert!(err.contains("digit"));
-        // Not required, so never mentioned.
-        assert!(!err.contains("special"));
-    }
-
-    #[test]
-    fn policy_max_length_zero_is_unbounded() {
-        let mut p = policy();
-        p.max_length = 0;
-        let long = "a".repeat(5_000);
-        assert!(validate_password_strength_with_policy(&long, &p).is_ok());
-
-        p.max_length = 16;
-        assert!(validate_password_strength_with_policy(&long, &p).is_err());
-    }
-
-    #[test]
-    fn policy_special_char_set_restricts_what_counts() {
-        let mut p = policy();
-        p.require_special = true;
-        p.special_char_set = "!@#".to_string();
-
-        assert!(validate_password_strength_with_policy("passwor$", &p).is_err());
-        assert!(validate_password_strength_with_policy("passwor!", &p).is_ok());
-        // The error names the acceptable set rather than leaving the user guessing.
-        let err = validate_password_strength_with_policy("passwor$", &p).unwrap_err();
-        assert!(err.contains("!@#"));
-    }
-
-    #[test]
-    fn policy_empty_special_char_set_accepts_any_non_alnum() {
-        let mut p = policy();
-        p.require_special = true;
-        assert!(p.special_char_set.is_empty());
-
-        assert!(validate_password_strength_with_policy("passwor$", &p).is_ok());
-        assert!(validate_password_strength_with_policy("passwordπ", &p).is_ok());
-        assert!(validate_password_strength_with_policy("password", &p).is_err());
     }
 
     #[test]

@@ -414,6 +414,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // watch org users
     tokio::task::spawn(db::user::watch());
+    // Only the policy-tightening sweep publishes to this key, so without the feature the watcher
+    // would hold a coordinator watch open forever for an event that cannot happen.
+    #[cfg(feature = "enterprise")]
     tokio::task::spawn(db::user::watch_bulk_refresh());
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::org_ingestion_tokens::watch());
