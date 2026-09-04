@@ -445,7 +445,8 @@
       "traceDetails.spec.js",
       "traceAdvancedFiltering.spec.js",
       "tracesAnalyzeDimensions.spec.js",
-      "traces-autocomplete-suggestions.spec.js"
+      "traces-autocomplete-suggestions.spec.js",
+      "traceGenAiParts.spec.js"
     ],
     "disabled": []
   },
