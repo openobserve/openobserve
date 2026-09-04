@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Enable/Pause toggle with per-row spinner -->
         <div
           v-if="props.toggleLoadingMap[(row as any).id]"
-          class="flex h-8 w-7 items-center justify-center"
+          class="flex h-8 w-7 items-center justify-center max-md:hidden"
           :data-test="`${dataTest}-toggle-spinner`"
         >
           <OSpinner size="xs" />
@@ -250,6 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variant="(row as any).enabled ? 'ghost-destructive' : 'ghost'"
           size="icon-sm"
           :icon-left="(row as any).enabled ? 'pause' : 'play-arrow'"
+          class="max-md:hidden"
           :data-test="`${dataTest}-${(row as any).enabled ? 'pause' : 'enable'}-btn`"
           @click.stop="emit('toggle-enabled', row)"
         >
@@ -266,6 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-sm"
           icon-left="edit"
+          class="max-md:hidden"
           :data-test="`${dataTest}-edit-btn`"
           @click.stop="emit('edit', row)"
         >
@@ -277,6 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon-sm"
           icon-left="content-copy"
+          class="max-md:hidden"
           :data-test="`${dataTest}-duplicate-btn`"
           @click.stop="emit('duplicate', row)"
         >
@@ -306,6 +309,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip side="bottom" :content="t('synthetics.table.more')" />
             </OButton>
           </template>
+
+          <ODropdownItem
+            class="md:hidden"
+            :disabled="!!props.toggleLoadingMap[(row as any).id]"
+            :data-test="`${dataTest}-${(row as any).enabled ? 'pause' : 'enable'}-btn-menu`"
+            @select="emit('toggle-enabled', row)"
+          >
+            <template #icon-left>
+              <OIcon :name="(row as any).enabled ? 'pause' : 'play-arrow'" size="sm" />
+            </template>
+            {{ (row as any).enabled ? t("synthetics.table.pause") : t("synthetics.table.enable") }}
+          </ODropdownItem>
+
+          <ODropdownItem
+            class="md:hidden"
+            :data-test="`${dataTest}-edit-btn-menu`"
+            @select="emit('edit', row)"
+          >
+            <template #icon-left>
+              <OIcon name="edit" size="sm" />
+            </template>
+            {{ t("synthetics.table.edit") }}
+          </ODropdownItem>
+
+          <ODropdownItem
+            class="md:hidden"
+            :data-test="`${dataTest}-duplicate-btn-menu`"
+            @select="emit('duplicate', row)"
+          >
+            <template #icon-left>
+              <OIcon name="content-copy" size="sm" />
+            </template>
+            {{ t("synthetics.table.duplicate") }}
+          </ODropdownItem>
+
+          <ODropdownSeparator class="md:hidden" />
 
           <ODropdownItem :data-test="`${dataTest}-move-item`" @select="emit('move', row)">
             <template #icon-left>
@@ -372,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               total: data.length,
             })
           }}</template>
-          <template v-else>{{ data.length }} {{ resolvedFooterTitle }}</template>
+          <span v-else class="max-md:hidden">{{ data.length }} {{ resolvedFooterTitle }}</span>
         </span>
         <template v-if="localSelectedIds.length > 0">
           <OButton

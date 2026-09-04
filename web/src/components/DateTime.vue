@@ -35,13 +35,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="{
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
-            'min-w-71.5': !disableRelative && selectedType === 'absolute',
+            // md+ only: on phones the full-range min-width would overflow the toolbar.
+            'md:min-w-71.5': !disableRelative && selectedType === 'absolute',
             'w-fit': disableRelative,
           }"
+          class="max-w-full min-w-0"
           :disabled="disable"
           icon-left="schedule"
         >
-          <span class="date-time-label flex-1 text-left font-semibold">{{ triggerLabel }}</span>
+          <span class="date-time-label min-w-0 flex-1 truncate text-left font-semibold">{{
+            triggerLabel
+          }}</span>
           <template #icon-right
             ><OIcon
               name="arrow-drop-down"
@@ -316,6 +320,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
 interface ConsumableDateTime {
@@ -976,11 +981,41 @@ export default defineComponent({
      * back to what's actually applied; see `appliedDisplayValue`.
      * The `||` fallback covers the first paint, before the mount-time apply.
      */
-    const triggerLabel = computed(() =>
-      props.autoApply || menuOpen.value
-        ? getDisplayValue.value
-        : appliedDisplayValue.value || getDisplayValue.value,
-    );
+    const { isMobile } = useBreakpoint();
+
+    // < md: shorten an absolute-range label so it fits the toolbar. Years and
+    // seconds are dropped, and a same-day range keeps one date:
+    // "2026/08/11 11:43:57 - 2026/08/11 11:58:57" → "08/11 11:43 - 11:58".
+    // The full-precision range stays visible inside the picker. Applied at
+    // render (not in getDisplayValue) so already-applied labels compact too
+    // when the viewport shrinks.
+    const compactRangeLabel = (label: string) => {
+      // Relative ranges use the standard shorthand: "Past 15 Minutes" → "Past 15m".
+      const REL_UNIT: Record<string, string> = {
+        second: "s",
+        minute: "m",
+        hour: "h",
+        day: "d",
+        week: "w",
+        month: "M",
+      };
+      const rel = label.match(/^Past (\d+) ([A-Za-z]+?)s?$/);
+      if (rel) return `Past ${rel[1]}${REL_UNIT[rel[2].toLowerCase()] ?? ` ${rel[2]}`}`;
+      let out = label
+        .replace(/\b\d{4}\/(\d{2}\/\d{2})\b/g, "$1")
+        .replace(/\b(\d{2}:\d{2}):\d{2}\b/g, "$1");
+      const m = out.match(/^(\d{2}\/\d{2}) (\S+) - (\d{2}\/\d{2}) (\S+)$/);
+      if (m && m[1] === m[3]) out = `${m[1]} ${m[2]} - ${m[4]}`;
+      return out;
+    };
+
+    const triggerLabel = computed(() => {
+      const label =
+        props.autoApply || menuOpen.value
+          ? getDisplayValue.value
+          : appliedDisplayValue.value || getDisplayValue.value;
+      return isMobile.value ? compactRangeLabel(label) : label;
+    });
 
     const getDisplayValue = computed(() => {
       if (!props.disableRelative && selectedType.value === "relative") {

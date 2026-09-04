@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :footer-title="t('synthetics.tokens.title')"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('synthetics.tokens.searchPlaceholder')"
@@ -381,6 +381,7 @@ export default defineComponent({
       },
       {
         id: "status",
+        hideBelowMd: true,
         header: t("synthetics.table.status"),
         accessorKey: "enabled",
         sortable: true,
@@ -390,6 +391,7 @@ export default defineComponent({
       },
       {
         id: "agents",
+        hideBelowMd: true,
         header: t("synthetics.tokens.agentsColumn"),
         accessorKey: "agents",
         sortable: true,
@@ -399,6 +401,7 @@ export default defineComponent({
       },
       {
         id: "created_by",
+        hideBelowMd: true,
         header: t("synthetics.tokens.createdBy"),
         accessorKey: "created_by",
         sortable: true,

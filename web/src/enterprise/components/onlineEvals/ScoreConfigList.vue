@@ -119,7 +119,7 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="text-xs font-normal">
+          <span class="text-xs font-normal max-md:hidden">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scoreConfig.listTitle") }}
           </span>
           <OButton
@@ -144,6 +144,7 @@
               size="icon-sm"
               :title="t('onlineEvals.actions.edit')"
               icon-left="edit"
+              class="max-md:hidden"
               @click.stop="$emit('edit', row)"
             />
             <OButton
@@ -152,6 +153,7 @@
               size="icon-sm"
               :title="t('onlineEvals.actions.export')"
               icon-left="download"
+              class="max-md:hidden"
               @click.stop="$emit('export', row)"
             />
             <OButton
@@ -161,8 +163,46 @@
               size="icon-sm"
               :title="t('onlineEvals.actions.delete')"
               icon-left="delete"
+              class="max-md:hidden"
               @click.stop="$emit('delete', row)"
             />
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="score-config-list-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`score-config-list-${row.name}-edit-btn-menu`"
+                @select="$emit('edit', row)"
+              >
+                <span>{{ t("onlineEvals.actions.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="download"
+                class="md:hidden"
+                :data-test="`score-config-list-${row.name}-export-btn-menu`"
+                @select="$emit('export', row)"
+              >
+                <span>{{ t("onlineEvals.actions.export") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`score-config-list-${row.name}-delete-btn-menu`"
+                @select="$emit('delete', row)"
+              >
+                <span>{{ t("onlineEvals.actions.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
       </OTable>
@@ -175,6 +215,8 @@ import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTag from "@/lib/core/Badge/OTag.vue";

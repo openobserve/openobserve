@@ -31,7 +31,7 @@
         <OTooltip :content="t('search.messageWrapContent')" />
       </OButton>
       <div
-        class="text-status-warning-text border-status-warning-text rounded-default flex h-9 items-center border px-2"
+        class="text-status-warning-text border-status-warning-text rounded-default flex h-9 items-center border px-2 max-md:hidden"
       >
         <OIcon name="info" class="mr-1" size="sm" />
         <div>
@@ -67,6 +67,16 @@
         </OButton>
       </div>
     </template>
+    <!-- < md the delay notice leaves the header (it is wider than the viewport
+         allows there) and shows as a strip above the table instead. -->
+    <div
+      class="text-status-warning-text border-border-default flex shrink-0 items-center border-b px-3 py-1.5 text-xs md:hidden"
+    >
+      <OIcon name="info" class="mr-1 shrink-0" size="sm" />
+      <div>
+        {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
+      </div>
+    </div>
     <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
       <OTable
         :frame="false"
@@ -253,7 +263,7 @@
 
         <template #bottom>
           <div class="flex h-12 w-full items-center justify-between">
-            <div class="mr-md flex w-25 items-center text-xs font-normal">
+            <div class="mr-md flex w-25 items-center text-xs font-normal max-md:hidden">
               {{ resultTotal }} {{ t("search_history.results") }}
             </div>
             <div class="mr-2 ml-auto">{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></div>

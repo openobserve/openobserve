@@ -55,6 +55,7 @@ import config from "@/aws-exports";
 import { GATE_PREDICATES } from "./navGroups";
 import type { SubnavChild, NavGateContext } from "./ONavbar.types";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const props = defineProps<{
   groupKey: string;
@@ -70,6 +71,9 @@ const router: any = useRouter();
 const { t } = useI18nTyped();
 
 const isLinkMode = computed(() => !!props.parentItem);
+
+// Touch has no hover: < md the submenu is an inline accordion (see template).
+const { isMobile } = useBreakpoint();
 
 // Submenu text is pure black in light mode (the dropdown-item-text token is
 // grey-900, which reads as "not quite black"); dark mode keeps the token so the
@@ -325,12 +329,15 @@ function close() {
 }
 
 function scheduleOpen() {
+  // < md the accordion is tap-driven; some touch browsers still emit a synthetic
+  // mouseenter, which would open a group the user only scrolled past.
+  if (isMobile.value) return;
   clearTimers();
   openTimer = setTimeout(() => open(), OPEN_DELAY);
 }
 
 function scheduleClose() {
-  if (isPinned.value) return;
+  if (isPinned.value || isMobile.value) return;
   clearTimers();
   closeTimer = setTimeout(() => close(), CLOSE_DELAY);
 }
@@ -449,8 +456,12 @@ function onChildMouseenter(event: MouseEvent) {
     <!-- Link mode: a navigating MenuLink that also reveals sub-pages on hover.
          `active` is driven by "is any child active" so a group tile (e.g. Data,
          whose children span several path roots) highlights on all its pages. -->
+    <!-- Touch has no hover, so < md the tile only toggles the (inline) submenu
+         instead of navigating — otherwise it would route away and close the nav
+         drawer before its sub-pages could be tapped. Nothing is lost: every
+         group lists its own parent page as the first child (navGroups.ts). -->
     <MenuLink
-      v-if="isLinkMode && parentItem"
+      v-if="isLinkMode && parentItem && !isMobile"
       submenu
       :title="title"
       :icon="icon"
@@ -473,11 +484,77 @@ function onChildMouseenter(event: MouseEvent) {
       @keydown="onTileKeydown"
     />
 
+    <!-- < md: the same rows rendered INLINE under the tile (an accordion). A
+         teleported flyout anchored to the rail is unreachable on a phone. -->
+    <div
+      v-if="isMobile && isOpen"
+      :data-test="`nav-group-inline-${groupKey}`"
+      role="menu"
+      :aria-label="title"
+      class="border-border-default mt-0.5 mb-1 ml-3 flex flex-col gap-0.5 border-l pl-2"
+    >
+      <template v-for="block in flyoutBlocks" :key="`inline-${block.key}`">
+        <div
+          v-if="block.kind === 'group'"
+          role="group"
+          :aria-labelledby="`inline-${block.labelId}`"
+          :data-test="`nav-group-inline-section-${block.key}`"
+        >
+          <div
+            :id="`inline-${block.labelId}`"
+            role="presentation"
+            class="text-2xs text-tabs-inactive-text px-2 pt-2 pb-0.5 font-medium"
+          >
+            {{ t(block.labelKey) }}
+          </div>
+          <router-link
+            v-for="child in block.children"
+            :key="childKey(child)"
+            :data-test="childDataTest(child)"
+            role="menuitem"
+            :to="childTo(child)"
+            class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
+            :class="[
+              flyoutTextClass,
+              isChildActive(child) ? 'bg-select-item-selected-bg font-medium' : '',
+            ]"
+            :aria-current="isChildActive(child) ? 'page' : undefined"
+            @click="onChildClick"
+          >
+            <OIcon :name="child.icon" size="sm" class="shrink-0" :class="flyoutIconClass" />
+            <span class="leading-tight">{{
+              child.title ? raw(child.title) : t(child.titleKey)
+            }}</span>
+          </router-link>
+        </div>
+
+        <router-link
+          v-else
+          :data-test="childDataTest(block.child)"
+          role="menuitem"
+          :to="childTo(block.child)"
+          class="nav-group-item rounded-default flex cursor-pointer items-center gap-2 px-2 py-1.5 text-xs transition-colors duration-150 outline-none select-none [text-decoration:none]!"
+          :class="[
+            flyoutTextClass,
+            block.spaced ? 'mt-2' : '',
+            isChildActive(block.child) ? 'bg-select-item-selected-bg font-medium' : '',
+          ]"
+          :aria-current="isChildActive(block.child) ? 'page' : undefined"
+          @click="onChildClick"
+        >
+          <OIcon :name="block.child.icon" size="sm" class="shrink-0" :class="flyoutIconClass" />
+          <span class="leading-tight">{{
+            block.child.title ? raw(block.child.title) : t(block.child.titleKey)
+          }}</span>
+        </router-link>
+      </template>
+    </div>
+
     <!-- Flyout submenu — teleported to escape the rail's overflow clip; styled
-         exactly like O2's native dropdown for consistency. -->
+         exactly like O2's native dropdown for consistency. Desktop only. -->
     <Teleport to="body">
       <div
-        v-if="isOpen"
+        v-if="isOpen && !isMobile"
         ref="flyoutRef"
         :data-test="`nav-group-flyout-${groupKey}`"
         role="menu"

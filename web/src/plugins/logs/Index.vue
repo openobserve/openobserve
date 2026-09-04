@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <OSplitter
               v-model="searchObj.config.splitterModel"
-              :limits="searchObj.config.splitterLimit"
+              :limits="isMobile ? [0, 0] : searchObj.config.splitterLimit"
               class="logs-splitter-smooth h-full max-h-full w-full overflow-hidden"
               separatorClass="field-list-separator"
               :separatorStyle="{
@@ -94,8 +94,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="relative-position border-border-default bg-surface-panel h-full border-r pt-2.5"
                 >
+                  <!-- < md the field list moves into a drawer (see below), so the
+                       in-splitter copy is desktop/tablet only. -->
                   <IndexList
-                    v-if="searchObj.meta.showFields"
+                    v-if="searchObj.meta.showFields && !isMobile"
                     data-test="logs-search-index-list"
                     @setInterestingFieldInSQLQuery="setInterestingFieldInSQLQuery"
                   />
@@ -246,6 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @send-to-ai-chat="sendToAiChat"
                         @run-query="searchData"
                         @jump-to-stream-data="onJumpToStreamData"
+                        @open-mobile-fields="mobileFieldsOpen = true"
                       />
                     </div>
                   </div>
@@ -291,6 +294,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </div>
+
+    <!-- < md: the field list, hosted in a left drawer instead of a side pane. -->
+    <ODrawer
+      v-if="isMobile"
+      v-model:open="mobileFieldsOpen"
+      side="left"
+      size="sm"
+      bleed
+      seamless
+      data-test="logs-mobile-fields-drawer"
+    >
+      <div class="flex h-full flex-col overflow-hidden pt-2.5">
+        <IndexList
+          data-test="logs-search-index-list-mobile"
+          @setInterestingFieldInSQLQuery="setInterestingFieldInSQLQuery"
+        />
+      </div>
+    </ODrawer>
   </div>
 </template>
 
@@ -355,6 +376,8 @@ import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
 import IndexList from "@/plugins/logs/IndexList.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
@@ -378,6 +401,7 @@ export default defineComponent({
     VisualizeLogsQuery: defineAsyncComponent(() => import("@/plugins/logs/VisualizeLogsQuery.vue")),
     BuildQueryPage: defineAsyncComponent(() => import("@/plugins/logs/BuildQueryPage.vue")),
     OSplitter,
+    ODrawer,
     OEmptyState,
     LogsNoEventsState,
     LogsNoDataState,
@@ -564,6 +588,27 @@ export default defineComponent({
 
     const expandedLogs = ref([]);
     const splitterModel = ref(90);
+
+    // ── Mobile (< md) field-list handling ──────────────────────────────────
+    // On a phone the field list can't be a side-by-side splitter pane — it
+    // would crush the results. Below md we collapse the inner splitter to 0 and
+    // surface the same IndexList inside a left drawer, toggled by a button.
+    const { isMobile } = useBreakpoint();
+    const mobileFieldsOpen = ref(false);
+    // Lock the inner field-list splitter shut on mobile (results take 100%);
+    // restore the default width when returning to a larger viewport.
+    watch(
+      isMobile,
+      (mobile) => {
+        if (mobile) {
+          searchObj.config.splitterModel = 0;
+        } else if (searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
+          searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
+        }
+      },
+      { immediate: true },
+    );
+
     const chartRedrawTimeout = ref(null);
     const updateColumnsTimeout = ref(null);
 
@@ -1327,6 +1372,17 @@ export default defineComponent({
     };
 
     const onSelectStream = () => {
+      // < md the stream selector lives inside the fields drawer — open it first,
+      // then focus the trigger once the drawer content has mounted.
+      if (isMobile.value) {
+        mobileFieldsOpen.value = true;
+        setTimeout(() => {
+          document
+            .querySelector<HTMLElement>('[data-test="log-search-index-list-select-stream"] button')
+            ?.click();
+        }, 300);
+        return;
+      }
       // Focus the stream selector trigger so the user can immediately pick a stream.
       const trigger = document.querySelector<HTMLElement>(
         '[data-test="log-search-index-list-select-stream"] button',
@@ -2232,19 +2288,23 @@ export default defineComponent({
       },
     );
 
-    // Auto-expand splitter to 165px when either editor has >2 lines; collapse to 130px otherwise.
-    // Never overrides a user-set value above 165px.
+    // Auto-expand splitter to 130px when either editor has >2 lines; collapse to
+    // the base height otherwise. Never overrides a user-set value above 130px.
+    // < md the toolbar wraps to a second row, so the base height is taller.
     watch(
-      [() => searchObj.data.editorValue, () => searchObj.data.tempFunctionContent],
-      ([queryValue, fnValue]) => {
+      [() => searchObj.data.editorValue, () => searchObj.data.tempFunctionContent, isMobile],
+      ([queryValue, fnValue, mobile]) => {
         const queryLines = (queryValue || "").split("\n").length;
         const fnLines = (fnValue || "").split("\n").length;
         const hasMoreThanTwoLines = queryLines > 2 || fnLines > 2;
+        // Base (≤2 lines): 125px on mobile to clear the wrapped toolbar, else 83px.
+        const baseHeight = mobile ? 125 : 83;
+        const expandedHeight = mobile ? 165 : 130;
 
-        if (hasMoreThanTwoLines && splitterModel.value < 130) {
-          splitterModel.value = 130;
-        } else if (!hasMoreThanTwoLines && splitterModel.value <= 130) {
-          splitterModel.value = 83;
+        if (hasMoreThanTwoLines && splitterModel.value < expandedHeight) {
+          splitterModel.value = expandedHeight;
+        } else if (!hasMoreThanTwoLines && splitterModel.value <= expandedHeight) {
+          splitterModel.value = baseHeight;
         }
       },
       { immediate: true },
@@ -3068,6 +3128,8 @@ export default defineComponent({
       searchObj,
       searchBarRef,
       splitterModel,
+      isMobile,
+      mobileFieldsOpen,
       // loadPageData,
       getQueryData,
       getJobData,

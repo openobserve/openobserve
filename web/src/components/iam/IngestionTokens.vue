@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :footer-title="t('iam.ingestionTokens')"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('ingestion.searchToken')"
@@ -322,6 +322,7 @@ export default defineComponent({
       },
       {
         id: "status",
+        hideBelowMd: true,
         header: t("ingestion.tokenStatus"),
         accessorKey: "enabled",
         sortable: true,
@@ -331,6 +332,7 @@ export default defineComponent({
       },
       {
         id: "created_by",
+        hideBelowMd: true,
         header: t("ingestion.createdBy"),
         accessorKey: "created_by",
         sortable: true,

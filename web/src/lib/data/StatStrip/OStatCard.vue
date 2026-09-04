@@ -138,16 +138,19 @@ const trendClass = computed(() =>
 </script>
 
 <template>
+  <!-- < md the tile compacts to icon + value (label moves to the title
+       tooltip) so a five-tile strip fits one row without scrolling. -->
   <component
     :is="clickable ? 'button' : 'div'"
     :type="clickable ? 'button' : undefined"
     :aria-pressed="clickable ? String(selected) : undefined"
-    class="rounded-default bg-surface-base flex min-w-0 flex-col justify-center gap-1 overflow-hidden border px-2.5 py-1 text-left transition-colors"
+    class="rounded-default bg-surface-base flex min-w-0 flex-col justify-center gap-1 overflow-hidden border px-2.5 py-1 text-left transition-colors max-md:px-1.5"
     :class="[
       selected ? 'border-accent' : 'border-border-default',
       clickable ? 'cursor-pointer' : '',
       clickable && !selected ? 'hover:border-accent' : '',
     ]"
+    :title="label ? String(label) : undefined"
     :data-test="dataTest"
   >
     <div class="flex min-w-0 items-center justify-between gap-2">
@@ -157,26 +160,28 @@ const trendClass = computed(() =>
              the squeeze is absorbed by the label below, which stays readable
              truncated because the tone icon already identifies the metric. -->
         <span
-          class="shrink-0 text-2xl leading-none font-semibold whitespace-nowrap"
+          class="shrink-0 text-2xl leading-none font-semibold whitespace-nowrap max-md:text-lg"
           :class="isMuted ? 'text-text-muted' : tc.value"
         >
           <slot name="value">{{ displayValue }}</slot>
         </span>
-        <span v-if="label" class="text-text-secondary truncate text-xs font-medium">{{
+        <span v-if="label" class="text-text-secondary truncate text-xs font-medium max-md:hidden">{{
           label
         }}</span>
-        <span v-if="trend" class="text-2xs shrink-0 font-semibold" :class="trendClass"
+        <span v-if="trend" class="text-2xs shrink-0 font-semibold max-md:hidden" :class="trendClass"
           >{{ trendArrow }} {{ trend.label }}</span
         >
         <!-- A QUALIFIER on the value, not a second metric: it says what the
              number IS (which measurement, whose count), so a tile under a
              generic heading cannot be read as the wrong quantity. Truncates
              before the value does — the value never shrinks. -->
-        <span v-if="sub" class="text-text-label text-2xs min-w-0 truncate">{{ sub }}</span>
+        <span v-if="sub" class="text-text-label text-2xs min-w-0 truncate max-md:hidden">{{
+          sub
+        }}</span>
       </div>
       <span
         v-if="icon || slots.icon"
-        class="rounded-default grid h-7 w-7 shrink-0 place-items-center"
+        class="rounded-default grid h-7 w-7 shrink-0 place-items-center max-md:h-6 max-md:w-6"
         :class="tc.chip"
       >
         <slot name="icon">

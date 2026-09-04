@@ -35,18 +35,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="ghost"
       size="icon-xs-sq"
       :icon-left="action.icon"
+      class="max-md:hidden"
       :data-test="`${dataTest}-${action.id}`"
       @click.stop="emit('action', action.id)"
     >
       <!-- Icon-only actions carry no label, so the tooltip names them; `left` opens it into the row, not over the row above. -->
       <OTooltip side="left" :content="action.label" />
     </OButton>
+    <ODropdown side="bottom" align="end">
+      <template #trigger>
+        <OButton
+          icon-left="more-vert"
+          variant="ghost"
+          size="icon-xs-sq"
+          class="md:hidden"
+          :data-test="moreTest"
+          @click.stop
+        />
+      </template>
+      <ODropdownItem
+        v-for="action in actions"
+        :key="action.id"
+        :icon-left="action.icon"
+        class="md:hidden"
+        :data-test="`${dataTest}-${action.id}-menu`"
+        @select="emit('action', action.id)"
+      >
+        <span>{{ action.label }}</span>
+      </ODropdownItem>
+    </ODropdown>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
+
 import OButton from "@/lib/core/Button/OButton.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { I18nText } from "@/types/i18n";
 
@@ -57,13 +84,15 @@ export interface DbmRowAction {
   label: I18nText;
 }
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     actions?: DbmRowAction[];
     dataTest?: string;
   }>(),
   { actions: () => [], dataTest: "dbm-row-actions" },
 );
+
+const moreTest = computed(() => `${props.dataTest.replace(/-row-actions$/, "")}-row-more-actions`);
 
 const emit = defineEmits<{ (e: "action", id: string): void }>();
 </script>

@@ -223,12 +223,14 @@ onBeforeUnmount(() => {
         :align="align"
         :side-offset="sideOffset"
         :hide-when-detached="hideWhenDetached"
+        :collision-padding="8"
         :aria-label="ariaLabel"
         :style="{ zIndex }"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         :class="[
-          'outline-none',
+          // max-w keeps wide popovers on-screen on small viewports.
+          'max-w-[calc(100vw-1rem)] outline-none',
           // Surface
           'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
           // Open/close reveal animation (matches ODropdown)

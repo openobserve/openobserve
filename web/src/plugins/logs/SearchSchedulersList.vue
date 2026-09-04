@@ -72,6 +72,7 @@
               variant="ghost"
               size="icon-sm"
               icon-left="cancel"
+              class="max-md:hidden"
               :title="t('search_scheduler_job.cancel')"
               :disabled="row.status_code !== 0 && row.status_code !== 1"
               @click="confirmCancelJob(row)"
@@ -83,6 +84,7 @@
               variant="ghost-destructive"
               size="icon-sm"
               icon-left="delete"
+              class="max-md:hidden"
               :title="t('search_scheduler_job.delete')"
               @click="confirmDeleteJob(row)"
             />
@@ -92,6 +94,7 @@
               variant="ghost"
               size="icon-sm"
               icon-left="refresh"
+              class="max-md:hidden"
               :title="t('search_scheduler_job.restart')"
               :disabled="row.status_code !== 2 && row.status_code !== 3"
               @click="retrySearchJob(row)"
@@ -102,10 +105,59 @@
               variant="ghost"
               size="icon-sm"
               icon-left="search"
+              class="max-md:hidden"
               :title="t('search_scheduler_job.explore')"
               :disabled="row.status_code == 0 || row.status_code == 3"
               @click="fetchSearchResults(row)"
             />
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="search-scheduler-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="cancel"
+                class="md:hidden"
+                :disabled="row.status_code !== 0 && row.status_code !== 1"
+                data-test="search-scheduler-cancel-btn-menu"
+                @select="confirmCancelJob(row)"
+              >
+                <span>{{ t("search_scheduler_job.cancel") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                data-test="search-scheduler-delete-btn-menu"
+                @select="confirmDeleteJob(row)"
+              >
+                <span>{{ t("search_scheduler_job.delete") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="refresh"
+                class="md:hidden"
+                :disabled="row.status_code !== 2 && row.status_code !== 3"
+                data-test="search-scheduler-restart-btn-menu"
+                @select="retrySearchJob(row)"
+              >
+                <span>{{ t("search_scheduler_job.restart") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="search"
+                class="md:hidden"
+                :disabled="row.status_code == 0 || row.status_code == 3"
+                data-test="search-scheduler-explore-btn-menu"
+                @select="fetchSearchResults(row)"
+              >
+                <span>{{ t("search_scheduler_job.explore") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
           <template #expansion="{ row }">
             <div class="app-tabs-schedule-list h-fit w-fit px-4 py-2">
@@ -229,7 +281,7 @@
           </template>
           <template #bottom>
             <div class="flex h-12 w-full items-center justify-between">
-              <div class="mr-md flex w-25 items-center text-xs font-normal">
+              <div class="mr-md flex w-25 items-center text-xs font-normal max-md:hidden">
                 {{ resultTotal }} {{ t("search_scheduler_job.results") }}
               </div>
               <div class="mr-2 ml-auto">
@@ -292,6 +344,8 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -312,6 +366,8 @@ export default defineComponent({
     AppTabs,
     OButton,
     OTooltip,
+    ODropdown,
+    ODropdownItem,
     QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     OIcon,
     OPageLayout,

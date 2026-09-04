@@ -159,7 +159,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div class="flex min-h-0 flex-1">
+      <!-- < md the form and Preview/Summary panes stack: side by side each gets
+           ~180px and every control clips. -->
+      <div class="flex min-h-0 flex-1 max-md:flex-col">
         <!-- LEFT column wrapper (flex: 6.5) -->
         <div
           :class="[
@@ -198,7 +200,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroupItem>
               </OToggleGroup>
             </div>
-            <div v-if="!isCompositeMode" class="flex items-center gap-4 px-3 py-2">
+            <div
+              v-if="!isCompositeMode"
+              class="flex items-center gap-4 px-3 py-2 max-md:flex-wrap max-md:gap-2"
+            >
               <!-- Stream Type -->
               <div v-if="!isCompositeMode" class="flex items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
@@ -219,7 +224,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Stream Name -->
-              <div v-if="!isCompositeMode" class="flex min-w-0 flex-1 items-center gap-1.5">
+              <div
+                v-if="!isCompositeMode"
+                class="flex min-w-0 flex-1 items-center gap-1.5 max-md:basis-full"
+              >
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
                 </div>
@@ -456,7 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- border-l: full-height vertical divider flush against the Preview/Summary pane -->
         <div
           v-if="!isCompositeMode"
-          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-l pt-2 pb-2"
+          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-l pt-2 pb-2 max-md:border-t max-md:border-l-0"
         >
           <!-- Preview Card -->
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">

@@ -38,23 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- The provider behind the Terraform export tab, which is otherwise
              only discoverable once the export dialog is already open. -->
         <IacRegistryLinks data-test="alert-list-iac-registries" />
-        <!-- Import button -->
-        <OButton
-          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
-          variant="outline"
-          size="sm"
-          @click="importAlert"
-          data-test="alert-import"
-          icon-left="upload-file"
-        >
-          <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
-          <OTooltip
-            v-if="isCompactToolbar"
-            :content="t('dashboard.import')"
-            side="bottom"
-            shortcut-id="alertsImport"
-          />
-        </OButton>
         <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
         <OButton
           data-test="alert-list-add-alert-btn"
@@ -79,9 +62,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
 
-      <div data-test="alert-list-splitter" class="flex min-h-0 flex-1">
-        <!-- Left: FolderList -->
-        <div class="w-rail h-full shrink-0">
+      <!-- Secondary: inline on desktop, behind "More" < md. -->
+      <template #actions-overflow>
+        <!-- Import button -->
+        <OButton
+          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
+          variant="outline"
+          size="sm"
+          @click="importAlert"
+          data-test="alert-import"
+          icon-left="upload-file"
+        >
+          <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
+          <OTooltip
+            v-if="isCompactToolbar"
+            :content="t('dashboard.import')"
+            side="bottom"
+            shortcut-id="alertsImport"
+          />
+        </OButton>
+      </template>
+
+      <div data-test="alert-list-splitter" class="flex min-h-0 flex-1 max-md:flex-col">
+        <!-- Left: FolderList (< md: stacks above the table, bounded height) -->
+        <div
+          class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:w-full max-md:border-b"
+        >
           <div class="h-full">
             <FolderList type="alerts" @update:activeFolderId="updateActiveFolderId" />
           </div>
@@ -134,9 +140,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
 
-              <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
+              <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh.
+                   < md it wraps: type filter row, then the search row. -->
               <template #toolbar>
-                <div class="flex w-full items-center gap-2">
+                <!-- max-md:contents flattens this wrapper so the tabs, the search
+                     and OTable's own controls share one wrapping toolbar: tabs
+                     row, then search + columns + refresh on a single row. -->
+                <!-- ≥ md it is a named container: the folder rail can squeeze this
+                     toolbar at any viewport width, so the tab labels key off the
+                     container's own width, not a viewport breakpoint. -->
+                <div
+                  class="@container/alert-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
+                >
                   <OToggleGroup
                     :model-value="activeTab"
                     data-test="alert-list-tabs"
@@ -148,12 +163,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="tab.value"
                       size="sm"
                       :icon-left="tab.icon"
+                      :title="tab.label"
                       :data-test="`alert-list-tab-${tab.value}`"
                     >
-                      {{ tab.label }}
+                      <span class="max-md:hidden @max-[34rem]/alert-toolbar:hidden">{{
+                        tab.label
+                      }}</span>
                     </OToggleGroupItem>
                   </OToggleGroup>
-                  <div class="min-w-0 flex-1">
+                  <!-- < md search takes its own full row below the icon controls
+                       instead of being crushed between them. -->
+                  <!-- md:min-w-80: flex-1 is basis-0, so without a floor the input
+                       shrinks and its embedded folder-scope chips spill out of the
+                       box; the floor makes it wrap to its own row instead. -->
+                  <div class="min-w-0 flex-1 max-md:order-last max-md:basis-full md:min-w-80">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -180,7 +203,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="folder-outline"
                             data-test="alert-list-search-scope-current"
                             :title="t('alerts.searchThisFolderTooltip')"
-                            >{{ t("alerts.searchThisFolder") }}</OToggleGroupItem
+                            ><span class="max-md:hidden">{{
+                              t("alerts.searchThisFolder")
+                            }}</span></OToggleGroupItem
                           >
                           <OToggleGroupItem
                             value="all"
@@ -188,7 +213,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="search"
                             data-test="alert-list-search-across-folders-toggle"
                             :title="t('alerts.searchAllFoldersTooltip')"
-                            >{{ t("alerts.searchAllFolders") }}</OToggleGroupItem
+                            ><span class="max-md:hidden">{{
+                              t("alerts.searchAllFolders")
+                            }}</span></OToggleGroupItem
                           >
                         </OToggleGroup>
                       </template>
@@ -473,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="alert-list-loading-alert"
                     v-if="alertStateLoadingMap[row.uuid]"
                     style="display: inline-block; width: 2.07125rem; height: auto"
-                    class="ml-1 flex items-center justify-center"
+                    class="ml-1 flex items-center justify-center max-md:hidden"
                     :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
                   >
                     <OSpinner size="xs" />
@@ -482,7 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else
                     :data-row-action="row.enabled ? 'pause' : 'resume'"
                     :data-test="`alert-list-${row.name}-pause-start-alert`"
-                    class="ml-1"
+                    class="ml-1 max-md:hidden"
                     :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                     size="icon-sm"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -500,6 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     icon-left="edit"
+                    class="max-md:hidden"
                     @click.stop="editAlert(row)"
                   >
                     <OTooltip
@@ -513,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        button receives no pointer events, so a tooltip anchored
                        to it would never open — leaving a greyed-out control
                        with no way to find out why. -->
-                  <span class="inline-flex">
+                  <span class="inline-flex max-md:hidden">
                     <OTooltip
                       v-if="isSloRow(row)"
                       side="bottom"
@@ -566,6 +594,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`alert-list-${row.name}-more-options`"
                       />
                     </template>
+                    <ODropdownItem
+                      class="md:hidden"
+                      :disabled="!!alertStateLoadingMap[row.uuid]"
+                      :data-test="`alert-list-${row.name}-pause-start-alert-menu`"
+                      @select="toggleAlertState(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon :name="row.enabled ? 'pause' : 'play-arrow'" size="sm" />
+                      </template>
+                      {{ row.enabled ? t("alerts.pause") : t("alerts.start") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      class="md:hidden"
+                      :data-test="`alert-list-${row.name}-update-alert-menu`"
+                      @select="editAlert(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="edit" size="sm" />
+                      </template>
+                      {{ t("alerts.edit") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      class="md:hidden"
+                      :disabled="isSloRow(row)"
+                      :data-test="`alert-list-${row.name}-clone-alert-menu`"
+                      @select="duplicateAlert(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="content-copy" size="sm" />
+                      </template>
+                      {{ t("alerts.clone") }}
+                    </ODropdownItem>
+                    <ODropdownSeparator class="md:hidden" />
                     <ODropdownItem
                       :data-test="`alert-list-${row.name}-move-alert`"
                       @select="moveAlertToAnotherFolder(row)"
@@ -673,7 +734,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >{{ selectedAlerts.length }} {{ t("alerts.conditionOf") }} {{ resultTotal }}
                       {{ t("alerts.selectedLabel") }}</template
                     >
-                    <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
+                    <span v-else class="max-md:hidden"
+                      >{{ resultTotal }} {{ t("alerts.header") }}</span
+                    >
                   </div>
 
                   <OButton
@@ -1457,6 +1520,7 @@ export default defineComponent({
         // model trained?). Backed by the alert_states rollup row.
         {
           id: "last_outcome",
+          hideBelowMd: true,
           accessorKey: "last_outcome",
           header: t("alerts.lastOutcome"),
           cell: " ",
@@ -1472,6 +1536,7 @@ export default defineComponent({
         // normal is perfectly ordinary.
         {
           id: "priority",
+          hideBelowMd: true,
           accessorKey: "priority",
           header: t("alerts.priority"),
           cell: " ",
@@ -1487,6 +1552,7 @@ export default defineComponent({
         // exactness, so a single sort order would misrepresent it.
         {
           id: "groups",
+          hideBelowMd: true,
           accessorKey: "groups_observed",
           header: t("alerts.groups.tab"),
           cell: " ",
@@ -1500,6 +1566,7 @@ export default defineComponent({
         // no meaningful order and sorting by it would imply one.
         {
           id: "tags",
+          hideBelowMd: true,
           accessorKey: "tags",
           header: t("alerts.tags"),
           cell: " ",
@@ -1511,6 +1578,7 @@ export default defineComponent({
         },
         {
           id: "owner",
+          hideBelowMd: true,
           accessorKey: "owner",
           header: t("alerts.owner"),
           cell: " ",
@@ -1538,6 +1606,7 @@ export default defineComponent({
           : []),
         {
           id: "last_triggered_at",
+          hideBelowMd: true,
           accessorKey: "last_triggered_at",
           header: t("alerts.lastTriggered"),
           cell: " ",
@@ -1549,6 +1618,7 @@ export default defineComponent({
         },
         {
           id: "last_satisfied_at",
+          hideBelowMd: true,
           accessorKey: "last_satisfied_at",
           header: t("alerts.lastSatisfied"),
           cell: " ",
@@ -1563,6 +1633,7 @@ export default defineComponent({
           ? [
               {
                 id: "status",
+                hideBelowMd: true,
                 accessorKey: "status",
                 header: t("alerts.status"),
                 cell: " ",

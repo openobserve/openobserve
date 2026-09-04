@@ -16,10 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="logs-search-bar-component" id="searchBarComponent">
+    <!-- < md: the toolbar wraps (overflow-visible) so the date picker + Run
+         controls drop to their own line instead of being clipped. -->
     <div
-      class="solid border-b-card-glass-border m-0! flex w-full items-center! overflow-hidden border-b p-1.5!"
+      class="solid border-b-card-glass-border m-0! flex w-full items-center! overflow-hidden border-b p-1.5! max-md:flex-wrap max-md:gap-y-1 max-md:overflow-visible"
     >
-      <div ref="toolbarLeftRef" class="flex min-w-0 flex-1 flex-nowrap items-center gap-1">
+      <div
+        ref="toolbarLeftRef"
+        class="flex min-w-0 flex-1 flex-nowrap items-center gap-1 max-md:w-full max-md:flex-none"
+      >
         <!-- Collapsible region — clips its overflow so the More button (a
              shrink-0 sibling below) always stays visible. Pinned items hide via
              the pinBudget computation before they would clip. `flex-initial`
@@ -309,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
-              class="rounded-default hover:bg-button-outline-hover-bg element-box-shadow ml-1 min-h-[1.875rem]! p-1! text-xs font-medium [border:0.0625rem_solid_var(--color-button-outline-border)]! [transition:all_0.2s_ease]"
+              class="rounded-default hover:bg-button-outline-hover-bg element-box-shadow ml-1 min-h-[1.875rem]! p-1! text-xs font-medium [border:0.0625rem_solid_var(--color-button-outline-border)]! [transition:all_0.2s_ease] max-md:ml-auto"
               icon-left="more-horiz"
               variant="outline"
               size="xs"
@@ -567,7 +572,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdown>
       </div>
 
-      <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center gap-1">
+      <div
+        ref="toolbarRightRef"
+        class="flex flex-shrink-0 items-center gap-1 max-md:w-full max-md:justify-end"
+      >
         <template v-if="searchObj.meta.showTransformEditor && !shouldMoveShareToMenu">
           <FunctionSelector
             :function-options="functionOptions"
@@ -642,7 +650,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :aria-disabled="isDownloadDisabled || undefined"
               @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
               @mouseleave="showDownloadSubmenu = false"
-              class="hover:bg-interactive-hover-bg search-download-item relative flex cursor-pointer items-center gap-2 px-3 py-1.5 [line-height:1.2] text-[var(--text-sm)] select-none before:absolute before:top-0 before:right-full before:h-full before:w-2.5 before:content-['']"
+              @click.stop="
+                isMobile && !isDownloadDisabled && (showDownloadSubmenu = !showDownloadSubmenu)
+              "
+              class="hover:bg-interactive-hover-bg search-download-item relative flex cursor-pointer items-center gap-2 px-3 py-1.5 [line-height:1.2] text-[var(--text-sm)] select-none before:absolute before:top-0 before:right-full before:h-full before:w-2.5 before:content-[''] max-md:flex-wrap"
               :class="{
                 'text-text-muted cursor-not-allowed! hover:bg-transparent!': isDownloadDisabled,
               }"
@@ -657,7 +668,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu bg-dropdown-bg rounded-default shadow-hover-shadow absolute top-0 right-full z-9999 mr-1 min-w-40 px-0 py-1 shadow-lg [border:0.063rem_solid_var(--color-card-glass-border)]"
+                class="search-download-submenu bg-dropdown-bg rounded-default shadow-hover-shadow absolute top-0 right-full z-9999 mr-1 min-w-40 px-0 py-1 shadow-lg [border:0.063rem_solid_var(--color-card-glass-border)] max-md:static max-md:mt-1 max-md:mr-0 max-md:w-full max-md:min-w-0 max-md:basis-full max-md:shadow-none"
                 data-test="search-download-submenu"
               >
                 <button
@@ -849,7 +860,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
-        <div class="order-1 mr-1">
+        <div class="order-1 mr-1 max-md:mr-auto">
           <DateTime
             ref="dateTimeRef"
             auto-apply
@@ -1778,7 +1789,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.edit')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover max-md:hidden"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-update-${row.view_id}-saved-view-btn`"
@@ -1788,7 +1799,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.delete')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover max-md:hidden"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-delete-${row.view_id}-saved-view-btn`"
@@ -1796,6 +1807,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OIcon name="delete" size="xs" />
                     </OButton>
+                    <ODropdown side="bottom" align="end">
+                      <template #trigger>
+                        <OButton
+                          icon-left="more-vert"
+                          variant="ghost"
+                          size="icon-xs-sq"
+                          class="md:hidden"
+                          data-test="logs-search-bar-saved-view-row-more-actions"
+                          @click.stop
+                        />
+                      </template>
+                      <ODropdownItem
+                        icon-left="edit"
+                        class="md:hidden"
+                        :data-test="`logs-search-bar-update-${row.view_id}-saved-view-btn-menu`"
+                        @select="handleUpdateSavedView(row)"
+                      >
+                        <span>{{ t("common.edit") }}</span>
+                      </ODropdownItem>
+                      <ODropdownItem
+                        icon-left="delete"
+                        variant="destructive"
+                        class="md:hidden"
+                        :data-test="`logs-search-bar-delete-${row.view_id}-saved-view-btn-menu`"
+                        @select="handleDeleteSavedView(row)"
+                      >
+                        <span>{{ t("common.delete") }}</span>
+                      </ODropdownItem>
+                    </ODropdown>
                   </div>
                 </template>
                 <template #empty>
@@ -1852,7 +1892,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.edit')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover max-md:hidden"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-update-${row.view_id}-favorite-saved-view-btn`"
@@ -1862,7 +1902,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                     <OButton
                       :title="t('common.delete')"
-                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover"
+                      class="hover:text-text-body! hover:bg-interactive-hover-bg! action-btn-hover max-md:hidden"
                       variant="ghost-neutral"
                       size="icon-sm"
                       :data-test="`logs-search-bar-delete-${row.view_id}-favorite-saved-view-btn`"
@@ -1870,6 +1910,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OIcon name="delete" size="xs" />
                     </OButton>
+                    <ODropdown side="bottom" align="end">
+                      <template #trigger>
+                        <OButton
+                          icon-left="more-vert"
+                          variant="ghost"
+                          size="icon-xs-sq"
+                          class="md:hidden"
+                          data-test="logs-search-bar-favorite-saved-view-row-more-actions"
+                          @click.stop
+                        />
+                      </template>
+                      <ODropdownItem
+                        icon-left="edit"
+                        class="md:hidden"
+                        :data-test="`logs-search-bar-update-${row.view_id}-favorite-saved-view-btn-menu`"
+                        @select="handleUpdateSavedView(row)"
+                      >
+                        <span>{{ t("common.edit") }}</span>
+                      </ODropdownItem>
+                      <ODropdownItem
+                        icon-left="delete"
+                        variant="destructive"
+                        class="md:hidden"
+                        :data-test="`logs-search-bar-delete-${row.view_id}-favorite-saved-view-btn-menu`"
+                        @select="handleDeleteSavedView(row)"
+                      >
+                        <span>{{ t("common.delete") }}</span>
+                      </ODropdownItem>
+                    </ODropdown>
                   </div>
                 </template>
               </OTable>
@@ -1900,6 +1969,7 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
+import useBreakpoint from "@/composables/useBreakpoint";
 import DateTime from "@/components/DateTime.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -4315,7 +4385,9 @@ export default defineComponent({
     const downloadCustomFileType = ref("csv");
     // Hover-triggered submenu state for "Download results → CSV/JSON" in the more-options dropdown.
     // Resets automatically when the parent ODropdown closes (via @update:open handler).
+    // Touch has no hover, so < md a tap toggles it instead (inline, not flyout).
     const showDownloadSubmenu = ref(false);
+    const { isMobile } = useBreakpoint();
     const isDownloadDisabled = computed(
       () =>
         !searchObj.data.stream.selectedStream?.length || !searchObj.data.queryResults?.hits?.length,
@@ -4965,6 +5037,7 @@ export default defineComponent({
       confirmDialogVisible,
       confirmCallback,
       showDownloadSubmenu,
+      isMobile,
       isDownloadDisabled,
       refreshTimes: searchObj.config.refreshTimes,
       refreshTimeChange,
@@ -5386,6 +5459,13 @@ export default defineComponent({
 
 .saved-view-table :deep(tr:hover .action-btn-hover) {
   opacity: 1;
+}
+
+/* Touch has no row hover — keep the row actions visible. */
+@media (max-width: 47.99rem) {
+  .saved-view-table :deep(.action-btn-hover) {
+    opacity: 1;
+  }
 }
 
 /* Remove outer box border so both panels blend into the dialog background

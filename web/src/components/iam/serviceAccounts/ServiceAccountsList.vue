@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('serviceAccounts.search')"
@@ -174,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 icon-left="refresh"
+                class="max-md:hidden"
                 @click="confirmRefreshAction(row)"
               />
               <OButton
@@ -183,6 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 icon-left="edit"
+                class="max-md:hidden"
                 @click="addRoutePush(row)"
               />
               <OButton
@@ -192,13 +194,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 icon-left="delete"
+                class="max-md:hidden"
                 @click="confirmDeleteAction(row)"
               />
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    :title="t('dashboard.moreActions')"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="service-accounts-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="refresh"
+                  class="md:hidden"
+                  data-test="service-accounts-refresh-menu"
+                  @select="confirmRefreshAction(row)"
+                >
+                  <span>{{ t("serviceAccounts.rotate") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  data-test="service-accounts-edit-menu"
+                  @select="addRoutePush(row)"
+                >
+                  <span>{{ t("serviceAccounts.update") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="service-accounts-delete-menu"
+                  @select="confirmDeleteAction(row)"
+                >
+                  <span>{{ t("serviceAccounts.deleteServiceAccount") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </template>
           </template>
 
           <template #bottom>
-            <span class="text-xs font-normal"
+            <span class="text-xs font-normal max-md:hidden"
               >{{ serviceAccountsState.service_accounts_users.length }}
               {{ t("serviceAccounts.header") }}</span
             >
@@ -440,6 +481,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -488,6 +531,8 @@ export default defineComponent({
     AddServiceAccount,
     ConfirmDialog,
     OButton,
+    ODropdown,
+    ODropdownItem,
     ODialog,
     OIcon,
     OPageLayout,
@@ -688,6 +733,7 @@ export default defineComponent({
       },
       {
         id: "first_name",
+        hideBelowMd: true,
         header: t("user.description"),
         accessorKey: "first_name",
         sortable: true,
@@ -699,6 +745,7 @@ export default defineComponent({
       },
       {
         id: "token",
+        hideBelowMd: true,
         header: t("serviceAccounts.list.col.token"),
         accessorKey: "token",
         sortable: false,
@@ -709,6 +756,7 @@ export default defineComponent({
       },
       {
         id: "created_at",
+        hideBelowMd: true,
         header: t("serviceAccounts.list.col.created"),
         accessorKey: "created_at",
         sortable: true,

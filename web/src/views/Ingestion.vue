@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template #actions>
-      <div class="w-50 flex-none">
+      <div class="w-50 flex-none max-md:w-auto max-md:min-w-36 max-md:flex-1">
         <OSearchInput
           v-model="globalSearchQuery"
           :placeholder="t('common.search')"
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="tokenOptions"
         label-key="label"
         value-key="value"
-        class="max-w-xs"
+        class="max-w-xs max-md:order-last max-md:max-w-full max-md:min-w-0! max-md:basis-full"
         style="min-width: 13.75rem"
         @update:model-value="onTokenSelected"
       />

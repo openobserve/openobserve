@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="flex items-end gap-3">
-          <div class="claim-parser-select col-auto min-w-100">
+          <div class="claim-parser-select col-auto min-w-100 max-md:w-full max-md:min-w-0">
             <OSelect
               v-model="claimParserFunction"
               :options="functionOptions"
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-slot="{ isSubmitting }"
           class="flex items-start gap-x-2"
         >
-          <div class="w-[18.75rem] shrink-0">
+          <div class="w-[18.75rem] shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1">
             <OFormInput
               data-test="domain-management-new-domain-input"
               name="newDomain"

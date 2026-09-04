@@ -80,10 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Search stretches so the queue filter and the column toggle OTable
              injects after this slot both sit at the right edge. -->
         <template #toolbar>
-          <div class="flex w-full items-center gap-2">
+          <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
             <OSearchInput
               v-model="search"
-              class="min-w-0 flex-1"
+              class="min-w-0 flex-1 max-md:min-w-40"
               :placeholder="t('aiObservability.discovery.searchPlaceholder')"
               data-test="ai-discovery-search-input"
               clearable
@@ -218,9 +218,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   })
                 }}
               </template>
-              <template v-else>
+              <span v-else class="max-md:hidden">
                 {{ t("aiObservability.discovery.footerTitle", { scope: scopeNoun }) }}
-              </template>
+              </span>
             </span>
             <AddToQueueMenu
               v-if="selectedIds.length"

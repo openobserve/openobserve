@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OToggleGroup
                 :model-value="activeTab"
                 @update:model-value="
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("pipeline_list.tab_realtime") }}
                 </OToggleGroupItem>
               </OToggleGroup>
-              <div class="min-w-0 flex-1">
+              <div class="min-w-0 flex-1 max-md:min-w-40">
                 <OInput
                   data-test="pipeline-list-search-input"
                   v-model="filterQuery"
@@ -162,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                 size="icon-sm"
                 :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                class="max-md:hidden"
                 @click.stop="togglePipeline(row)"
               >
                 <OTooltip
@@ -170,11 +171,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :shortcut-id="row.enabled ? 'pipelinesRowPause' : undefined"
                 />
               </OButton>
+              <!-- Hover-only preview with no click action, so it has no menu counterpart below md. -->
               <OButton
                 :data-test="`pipeline-list-${row.name}-view-pipeline`"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('pipeline.view')"
+                class="max-md:hidden"
                 icon-left="visibility"
               >
                 <OTooltip max-width="none" side="left">
@@ -186,6 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click.stop="editPipeline(row)"
                 icon-left="edit"
               >
@@ -223,6 +227,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="more-vert"
                   />
                 </template>
+                <ODropdownItem
+                  :data-test="`pipeline-list-${row.name}-pause-start-action-menu`"
+                  class="md:hidden"
+                  @select="togglePipeline(row)"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" :name="row.enabled ? 'pause' : 'play-arrow'" />
+                  </template>
+                  {{ row.enabled ? t("alerts.pause") : t("alerts.start") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  :data-test="`pipeline-list-${row.name}-update-pipeline-menu`"
+                  class="md:hidden"
+                  @select="editPipeline(row)"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" name="edit" />
+                  </template>
+                  {{ t("alerts.edit") }}
+                </ODropdownItem>
+                <ODropdownSeparator class="md:hidden" />
                 <ODropdownItem
                   :data-test="`pipeline-list-${row.name}-export-action`"
                   shortcut-id="pipelinesRowExport"
@@ -316,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom="bottomProps">
             <div class="flex w-full items-center justify-between py-1">
-              <div class="mr-4 flex items-center text-xs font-normal">
+              <div class="mr-4 flex items-center text-xs font-normal max-md:hidden">
                 {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
               </div>
               <div v-if="selectedPipelineIds.length > 0" class="flex items-center gap-2">
@@ -809,6 +834,7 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const stateColumn = {
     id: "state",
+    hideBelowMd: true,
     header: t("pipeline_list.state"),
     // Sorts by the state word so errored / paused / active group together.
     accessorFn: (row: any) => pipelineState(row),
@@ -821,6 +847,7 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const streamNameColumn = {
     id: "stream_name",
+    hideBelowMd: true,
     header: t("alerts.stream_name"),
     accessorKey: "stream_name",
     sortable: true,
@@ -831,6 +858,7 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const streamTypeColumn = {
     id: "stream_type",
+    hideBelowMd: true,
     header: t("alerts.streamType"),
     accessorKey: "stream_type",
     sortable: true,
@@ -841,6 +869,7 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const frequencyColumn = {
     id: "frequency",
+    hideBelowMd: true,
     header: t("pipeline_list.frequency"),
     accessorKey: "frequency",
     sortable: true,
@@ -851,6 +880,7 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const periodColumn = {
     id: "period",
+    hideBelowMd: true,
     header: t("pipeline_list.period"),
     accessorKey: "period",
     sortable: true,
@@ -861,6 +891,7 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const cronColumn = {
     id: "cron",
+    hideBelowMd: true,
     header: t("pipeline_list.cron"),
     accessorKey: "cron",
     sortable: false,
@@ -871,6 +902,7 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const typeColumn = {
     id: "type",
+    hideBelowMd: true,
     header: t("pipeline_list.type"),
     accessorKey: "type",
     sortable: true,
@@ -881,6 +913,7 @@ const getColumnsForActiveTab = (tab: any) => {
   };
   const scheduledStreamTypeColumn = {
     id: "stream_type",
+    hideBelowMd: true,
     header: t("pipeline_list.stream_type"),
     accessorKey: "stream_type",
     sortable: true,

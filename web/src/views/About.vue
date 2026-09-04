@@ -34,8 +34,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("about.logoMsg") }}
             </OText>
 
-            <!-- One-line meta bar -->
-            <div class="mt-5 inline-flex flex-wrap items-center gap-2">
+            <!-- One-line meta bar (< md: long chips clip inside the viewport) -->
+            <div
+              class="mt-5 inline-flex flex-wrap items-center gap-2 max-md:max-w-full max-md:[&>span]:max-w-full max-md:[&>span]:overflow-hidden"
+            >
               <!-- version -->
               <span
                 class="rounded-default text-status-positive border-status-positive/28 bg-card-glass-tint-positive inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm font-semibold whitespace-nowrap"
@@ -52,13 +54,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <!-- commit -->
               <span
-                class="text-text-body rounded-default border-info/28 bg-card-glass-tint-info-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm whitespace-nowrap"
+                class="text-text-body rounded-default border-info/28 bg-card-glass-tint-info-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm whitespace-nowrap max-md:min-w-0"
               >
                 <OIcon name="code" size="sm" class="text-info shrink-0" />
                 <span class="text-info text-xs font-semibold tracking-wide uppercase">{{
                   t("about.commit_lbl")
                 }}</span>
-                <OText variant="mono">{{ store.state.zoConfig.commit_hash }}</OText>
+                <OText variant="mono" class="max-md:max-w-28 max-md:truncate">{{
+                  store.state.zoConfig.commit_hash
+                }}</OText>
                 <button
                   @click="copyToClipboard(store.state.zoConfig.commit_hash)"
                   class="rounded-default text-text-muted hover:text-info inline-flex cursor-pointer items-center justify-center border-none bg-transparent p-0.5 transition-colors duration-150"
@@ -98,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</OText>
             </div>
             <div class="text-text-secondary text-sm">{{ t("about.os_libraries_msg") }}</div>
-            <div class="grid grid-cols-4 gap-2.5">
+            <div class="grid grid-cols-4 gap-2.5 max-md:grid-cols-1">
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/Cargo.toml"
                 target="_blank"
@@ -296,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OBanner>
           </div>
 
-          <div v-else class="grid grid-cols-2 gap-4">
+          <div v-else class="grid grid-cols-2 gap-4 max-md:grid-cols-1">
             <!-- License details table -->
             <div class="border-card-glass-border rounded-default overflow-hidden border">
               <table class="w-full border-collapse">

@@ -1,8 +1,11 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="bg-surface-panel border-border-default flex h-full w-full flex-col border-r">
-    <div class="px-page-edge my-3 flex shrink-0 items-center justify-between">
+  <div
+    class="bg-surface-panel flex h-full w-full flex-col"
+    :class="frameless ? '' : 'border-border-default border-r'"
+  >
+    <div v-if="!frameless" class="px-page-edge my-3 flex shrink-0 items-center justify-between">
       <span class="text-base font-bold">{{ t("panel.fields") }}</span>
       <OButton
         variant="outline"
@@ -421,6 +424,8 @@ import type { FieldItem } from "@/lib/lists/FieldList/OFieldList.types";
 const props = defineProps<{
   editMode?: boolean;
   hideAllFieldsSelection?: boolean;
+  /** Drop the pane's own title row + border when a host (drawer) provides them. */
+  frameless?: boolean;
 }>();
 
 const dashboardPanelDataPageKey: string = inject("dashboardPanelDataPageKey", "dashboard");

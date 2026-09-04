@@ -75,9 +75,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :get-row-style="streamRowStyle"
           class="h-full w-full"
         >
-          <!-- Toolbar inside the table frame: stream-type filter + search. -->
+          <!-- Toolbar inside the table frame: stream-type filter + search.
+               < md the search wraps to its own full-width row. -->
           <template #toolbar>
-            <div class="flex w-full items-center justify-between gap-2">
+            <!-- max-md:contents flattens this wrapper so the tabs, the search and
+                 OTable's own controls share one wrapping toolbar. -->
+            <div class="flex w-full items-center justify-between gap-2 max-md:contents">
               <OToggleGroup
                 :model-value="streamActiveTab"
                 @update:model-value="(v) => filterLogStreamByTab(v as string)"
@@ -106,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 data-test="streams-search-stream-input"
                 v-model="filterQuery"
-                class="no-border o2-search-input w-64"
+                class="no-border o2-search-input w-64 max-md:w-auto max-md:min-w-40 max-md:flex-1"
                 :placeholder="t('logStream.search')"
                 :debounce="300"
               />
@@ -177,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="exploreStream({ row })"
               />
               <OButton
@@ -186,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="listSchema({ row })"
               />
               <OButton
@@ -195,8 +200,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="confirmDeleteAction({ row })"
               />
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="log-stream-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="search"
+                  class="md:hidden"
+                  data-test="log-stream-explore-btn-menu"
+                  @select="exploreStream({ row })"
+                >
+                  <span>{{ t("logStream.explore") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="description"
+                  class="md:hidden"
+                  data-test="log-stream-schema-btn-menu"
+                  @select="listSchema({ row })"
+                >
+                  <span>{{ t("logStream.schemaHeader") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="log-stream-delete-btn-menu"
+                  @select="confirmDeleteAction({ row })"
+                >
+                  <span>{{ t("logStream.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
           <template #empty>
@@ -285,7 +328,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #bottom="scope">
             <div class="flex w-full items-center justify-between py-2">
               <div class="flex w-full items-center text-xs font-normal">
-                {{ t("logStream.streamsUnit", { count: scope.totalRows }) }}
+                <span class="max-md:hidden">
+                  {{ t("logStream.streamsUnit", { count: scope.totalRows }) }}
+                </span>
                 <OButton
                   v-if="selectedIds.length > 0"
                   icon-left="delete"
@@ -402,6 +447,8 @@ import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -422,6 +469,8 @@ export default defineComponent({
     OButton,
     OTooltip,
     ODialog,
+    ODropdown,
+    ODropdownItem,
     OIcon,
     OToggleGroup,
     OToggleGroupItem,
@@ -509,6 +558,7 @@ export default defineComponent({
       },
       {
         id: "doc_time_max",
+        hideBelowMd: true,
         accessorKey: "doc_time_max",
         header: t("logStream.lastIngested"),
         // NOT sortable: this table is `sorting="server"`, and the streams endpoint's
@@ -528,6 +578,7 @@ export default defineComponent({
       },
       {
         id: "doc_num",
+        hideBelowMd: true,
         accessorFn: (row: any) => formatCount(row.doc_num),
         header: t("logStream.docNum"),
         sortable: true,
@@ -538,6 +589,7 @@ export default defineComponent({
       },
       {
         id: "storage_size",
+        hideBelowMd: true,
         accessorFn: (row: any) => formatBytes(row.storage_size),
         header: t("logStream.storageSize"),
         sortable: true,
@@ -548,6 +600,7 @@ export default defineComponent({
       },
       {
         id: "compressed_size",
+        hideBelowMd: true,
         accessorFn: (row: any) => formatBytes(row.compressed_size),
         header: t("logStream.compressedSize"),
         sortable: true,
@@ -562,6 +615,7 @@ export default defineComponent({
       },
       {
         id: "compression",
+        hideBelowMd: true,
         accessorFn: (row: any) => compressionRatio(row.storage_size, row.compressed_size),
         header: t("logStream.compression"),
         // NOT sortable — same reason as doc_time_max: the endpoint has no
@@ -576,6 +630,7 @@ export default defineComponent({
       },
       {
         id: "index_size",
+        hideBelowMd: true,
         accessorFn: (row: any) => formatBytes(row.index_size),
         header: t("logStream.indexSize"),
         sortable: true,

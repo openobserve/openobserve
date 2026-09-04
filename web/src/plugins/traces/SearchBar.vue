@@ -16,10 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component flex h-full flex-col pb-px" id="searchBarComponent">
-    <div class="border-border-default m-0! flex w-full items-center justify-between border-b p-1.5">
+    <!-- < md the toolbar wraps so the mode toggle and the run/date controls each
+         get a full row instead of the right group squeezing the left to nothing. -->
+    <div
+      class="border-border-default m-0! flex w-full flex-wrap items-center justify-between gap-y-1 border-b p-1.5"
+    >
       <div
         ref="toolbarLeftRef"
-        class="flex min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden"
+        class="flex min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden max-md:w-full max-md:flex-none max-md:flex-wrap max-md:gap-y-1 max-md:overflow-visible"
       >
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
@@ -109,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="xs"
               icon-left="more-horiz"
+              class="max-md:ml-auto"
             >
               {{ t("search.menuMore") }}
             </OButton>
@@ -122,13 +127,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdown>
       </div>
       <!-- Right toolbar — persistent wrapper so toolbarRightRef is always observable -->
-      <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center">
+      <div
+        ref="toolbarRightRef"
+        class="flex flex-shrink-0 items-center max-md:w-full max-md:justify-end"
+      >
         <div
           v-if="
             searchObj.meta.searchMode !== 'service-graph' &&
             searchObj.meta.searchMode !== 'services-catalog'
           "
-          class="flex items-center gap-1.5"
+          class="flex items-center gap-1.5 max-md:w-full"
         >
           <DateTime
             ref="dateTimeRef"
@@ -143,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-date-time-dropdown"
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
-            class="h-8"
+            class="h-8 max-md:mr-auto"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />
@@ -247,9 +255,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
-        <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ml-auto">
-          <div class="flex items-center gap-2">
+        <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout.
+             < md the tab labels drop to icons and the select narrows so the
+             whole cluster fits one row. -->
+        <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ml-auto max-md:ml-0">
+          <div class="flex items-center gap-2 max-md:w-full max-md:justify-end max-md:gap-1.5">
             <DateTime
               ref="dateTimeRef"
               auto-apply
@@ -281,18 +291,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left>
                   <OIcon name="git-branch" size="sm" />
                 </template>
-                {{ t("traces.treeView") }}
+                <span class="max-md:hidden">{{ t("traces.treeView") }}</span>
               </OToggleGroupItem>
               <OToggleGroupItem data-test="service-graph-graph-view-btn" value="graph" size="sm">
                 <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
-                {{ t("traces.graphView") }}
+                <span class="max-md:hidden">{{ t("traces.graphView") }}</span>
               </OToggleGroupItem>
             </OToggleGroup>
             <OSelect
               v-model="searchObj.meta.serviceGraphLayoutType"
               :options="serviceGraphLayoutOptions"
               :searchable="false"
-              class="h-8! min-h-8! w-[7.5rem]"
+              class="h-8! min-h-8! w-[7.5rem] max-md:w-24!"
               :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
               @update:model-value="onServiceGraphLayoutChange"
             />

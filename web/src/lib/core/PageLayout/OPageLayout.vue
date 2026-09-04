@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Header — from props (the normal case):
     :title :subtitle :icon :back :titleDataTest
     #actions      — right-aligned header actions (O2 buttons)
+    #actions-overflow — secondary actions; inline on desktop, behind "More" < md
     #header-tabs  — inline module tabs in the header row (Level-2 nav)
     #title        — custom title node (when a string title isn't enough)
     #header       — ESCAPE HATCH: a fully custom header the props can't express.
@@ -77,6 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           /></template>
           <template v-if="!!slots.subtitle" #subtitle><slot name="subtitle" /></template>
           <template v-if="!!slots.actions" #actions><slot name="actions" /></template>
+          <template v-if="!!slots['actions-overflow']" #actions-overflow
+            ><slot name="actions-overflow"
+          /></template>
           <template v-if="!!slots['header-tabs']" #tabs><slot name="header-tabs" /></template>
         </OPageHeader>
       </slot>
@@ -87,9 +91,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <slot name="subnav" />
     </div>
 
+    <!-- ── Body (mobile): sidebar collapses into an off-canvas drawer ── -->
+    <template v-if="!!slots.sidebar && isMobile">
+      <div class="border-border-default px-page-edge flex shrink-0 items-center border-b py-1">
+        <OButton
+          variant="ghost"
+          size="sm"
+          data-test="o-page-layout-mobile-sidebar-btn"
+          @click="mobileSidebarOpen = true"
+        >
+          <template #icon-left><OIcon name="menu" size="sm" /></template>
+          {{ t("common.sidePanel") }}
+        </OButton>
+      </div>
+      <OContent
+        :bleed="bleed"
+        :y="padY"
+        class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden"
+      >
+        <slot />
+      </OContent>
+      <ODrawer
+        v-model:open="mobileSidebarOpen"
+        side="left"
+        size="sm"
+        bleed
+        seamless
+        data-test="o-page-layout-mobile-sidebar-drawer"
+      >
+        <div class="flex h-full flex-col overflow-hidden">
+          <slot name="sidebar" />
+        </div>
+      </ODrawer>
+    </template>
+
     <!-- ── Body: resizable sidebar + main (OSplitter) ───────────── -->
     <OSplitter
-      v-if="!!slots.sidebar && resizable"
+      v-else-if="!!slots.sidebar && resizable"
       v-model="internalWidth"
       unit="px"
       :limits="splitterLimits"
@@ -151,12 +189,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import type { I18nText } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { ref, computed, watch, useSlots } from "vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
@@ -218,6 +260,11 @@ const emit = defineEmits<{
 }>();
 
 const slots = useSlots();
+const { t } = useI18nTyped();
+
+// < md the rail has no room beside the content — it moves into a drawer.
+const { isMobile } = useBreakpoint();
+const mobileSidebarOpen = ref(false);
 
 const hasHeader = computed(
   () =>

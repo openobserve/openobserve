@@ -21,9 +21,10 @@
           class="mx-1.25 my-0.5 flex flex-wrap items-center gap-2"
         >
           <!-- Legend -->
+          <!-- < md the legend field takes its own full row; the input flexes. -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="ml-2.5 flex flex-row items-center gap-2"
+            class="ml-2.5 flex flex-row items-center gap-2 max-md:ml-0 max-md:w-full"
           >
             <span
               data-test="promql-builder-options-field-label"
@@ -32,7 +33,7 @@
             >
             <div
               data-test="promql-builder-options-field-input-wrapper"
-              class="relative inline-block"
+              class="relative inline-block max-md:min-w-0 max-md:flex-1"
             >
               <OCombobox
                 v-model="
@@ -44,6 +45,7 @@
                 search-regex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
                 data-test="dashboard-promql-builder-legend"
                 :value-replace-fn="selectPromQlNameOption"
+                class="max-md:w-full!"
                 style="width: 16.25rem"
               />
               <OIcon
@@ -68,7 +70,7 @@
           <!-- Step Value -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="ml-2.5 flex flex-row items-center gap-2"
+            class="ml-2.5 flex flex-row items-center gap-2 max-md:ml-0"
           >
             <span
               data-test="promql-builder-options-field-label"
@@ -111,7 +113,7 @@
           <!-- Query Type Select (Range/Instant) -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="ml-2.5 flex flex-row items-center gap-2"
+            class="ml-2.5 flex flex-row items-center gap-2 max-md:ml-0"
           >
             <span
               data-test="promql-builder-options-field-label"

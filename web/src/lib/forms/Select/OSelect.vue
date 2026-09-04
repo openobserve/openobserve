@@ -1821,9 +1821,10 @@ const fieldWidthClass = computed(() => {
           position="popper"
           :side-offset="4"
           :hide-when-detached="true"
+          :collision-padding="8"
           :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
           :class="[
-            'z-10001 min-w-(--reka-select-trigger-width)',
+            'z-10001 max-w-[calc(100vw-1rem)] min-w-(--reka-select-trigger-width)',
             'overflow-hidden',
             'rounded-default border shadow-md',
             'bg-select-content-bg border-select-content-border',

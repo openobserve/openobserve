@@ -31,13 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #actions>
         <OButton
-          variant="outline"
-          size="sm"
-          @click="importDestination"
-          data-test="destination-import"
-          >{{ t(`dashboard.import`) }}</OButton
-        >
-        <OButton
           data-test="alert-destination-list-add-alert-btn"
           variant="primary"
           size="sm"
@@ -47,6 +40,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_destinations.add`) }}</OButton
         >
       </template>
+      <!-- Secondary: inline on desktop, behind "More" < md. -->
+      <template #actions-overflow>
+        <OButton
+          variant="outline"
+          size="sm"
+          @click="importDestination"
+          data-test="destination-import"
+          >{{ t(`dashboard.import`) }}</OButton
+        >
+      </template>
+
       <div class="bg-card-glass-bg min-h-0 flex-1">
         <OTable
           data-test="alert-destinations-list-table"
@@ -70,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OToggleGroup
                 :model-value="activeTab"
                 @update:model-value="
@@ -96,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 v-model="filterQuery"
                 data-test="destination-list-search-input"
-                class="flex-1"
+                class="min-w-0 flex-1 max-md:min-w-40"
                 :placeholder="t('alert_destinations.search')"
               />
             </div>
@@ -119,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom="{ totalRows }">
-            <span class="text-xs font-normal">
+            <span class="text-xs font-normal max-md:hidden">
               {{ totalRows.toLocaleString() }} {{ t("alert_destinations.header") }}
             </span>
             <OButton
@@ -219,6 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="export"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('alert_destinations.exportDestination')"
                 @click.stop="exportDestination(row)"
               >
@@ -229,6 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('alert_destinations.edit')"
                 @click="editDestination(row)"
               >
@@ -239,12 +245,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('alert_destinations.delete')"
                 :loading="deletingDestinations.has(row.name)"
                 @click="conformDeleteDestination(row)"
               >
                 <OIcon name="delete" size="sm" />
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="alert-destination-list-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="download"
+                  class="md:hidden"
+                  data-test="destination-export-menu"
+                  @select="exportDestination(row)"
+                >
+                  <span>{{ t("alert_destinations.exportDestination") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  :data-test="`alert-destination-list-${row.name}-update-destination-menu`"
+                  @select="editDestination(row)"
+                >
+                  <span>{{ t("alert_destinations.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  :data-test="`alert-destination-list-${row.name}-delete-destination-menu`"
+                  @select="conformDeleteDestination(row)"
+                >
+                  <span>{{ t("alert_destinations.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
 
@@ -320,6 +364,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -347,6 +393,8 @@ export default defineComponent({
     ImportDestination,
     OButton,
     OTooltip,
+    ODropdown,
+    ODropdownItem,
     OSearchInput,
     OTag,
     OTable,
@@ -385,6 +433,7 @@ export default defineComponent({
       },
       {
         id: "type",
+        hideBelowMd: true,
         header: t("common.type"),
         accessorKey: "type",
         sortable: true,
@@ -395,6 +444,7 @@ export default defineComponent({
       },
       {
         id: "url",
+        hideBelowMd: true,
         header: t("alert_destinations.urlOrRecipients"),
         accessorFn: destinationUrl,
         resizable: true,
@@ -404,6 +454,7 @@ export default defineComponent({
       },
       {
         id: "template",
+        hideBelowMd: true,
         header: t("alert_destinations.template"),
         accessorKey: "template",
         sortable: true,
@@ -414,6 +465,7 @@ export default defineComponent({
       },
       {
         id: "method",
+        hideBelowMd: true,
         header: t("alert_destinations.method"),
         accessorFn: destinationMethod,
         sortable: true,
@@ -424,6 +476,7 @@ export default defineComponent({
       },
       {
         id: "used_by",
+        hideBelowMd: true,
         header: t("alert_dependencies.usedByColumn"),
         cell: " ",
         sortable: false,

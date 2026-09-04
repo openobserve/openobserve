@@ -17,109 +17,145 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="bg-surface-panel border-border-default flex h-full flex-col border-r pb-1">
-    <div class="folder-header bg-transparent">
-      <div
-        class="text-text-heading pl-page-edge flex items-center justify-between gap-2 py-1.5 pr-1.5 text-sm font-semibold"
+  <div
+    class="bg-surface-panel flex flex-col"
+    :class="mobileRail ? '' : 'border-border-default h-full border-r pb-1'"
+  >
+    <!-- < md the rail moves into a left drawer: a folder panel stacked above
+         the list it filters pushed the list itself off a phone screen. This
+         trigger row names the active folder so the scope stays visible. -->
+    <div v-if="mobileRail" class="flex items-center justify-between gap-1 py-1 pr-1.5 pl-1.5">
+      <OButton
+        variant="ghost"
+        size="sm"
+        data-test="folder-list-mobile-toggle"
+        @click="mobileDrawerOpen = true"
       >
-        {{ t("dashboard.folders") }}
-        <div>
-          <OButton
-            variant="ghost"
-            size="icon"
-            @click.stop="addFolder"
-            data-test="dashboard-new-folder-btn"
-            :title="t('common.addFolder')"
-          >
-            <OIcon name="add" size="sm" />
-          </OButton>
-        </div>
-      </div>
-      <!-- Search Input -->
-      <div class="px-1.5 pb-1.5">
-        <OSearchInput
-          v-model="searchQuery"
-          data-test="folder-search"
-          :placeholder="t('dashboard.searchFolder')"
-          clearable
-          class="w-full"
-        />
-      </div>
+        <template #icon-left><OIcon name="folder-outline" size="sm" /></template>
+        <span class="max-w-52 truncate">{{ activeFolderName || t("dashboard.folders") }}</span>
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon"
+        @click="addFolder"
+        data-test="dashboard-new-folder-btn"
+        :title="t('common.addFolder')"
+      >
+        <OIcon name="add" size="sm" />
+      </OButton>
     </div>
-    <div class="folders-tabs flex-1 overflow-y-auto px-1.5">
-      <OTabs
-        orientation="vertical"
-        dense
-        v-model="activeFolderId"
-        data-test="dashboards-folder-tabs"
-      >
-        <OTab
-          v-for="tab in filteredTabs"
-          :key="tab.folderId"
-          :name="tab.folderId"
-          class="test-class min-h-6"
-          :data-test="`dashboard-folder-tab-${tab.folderId}`"
-          @click="onTabClick(tab.folderId)"
-        >
+    <component
+      :is="mobileRail ? 'ODrawer' : 'div'"
+      v-bind="railWrapperProps"
+      :class="mobileRail ? undefined : 'contents'"
+    >
+      <div class="flex min-h-0 flex-col" :class="mobileRail ? 'h-full' : 'flex-1'">
+        <div class="folder-header bg-transparent">
           <div
-            class="folder-item group/row flex min-h-6 w-full flex-nowrap items-center gap-1.5"
-            :data-test="`dashboard-folder-tab-name-${tab.name}`"
+            v-if="!mobileRail"
+            class="text-text-heading pl-page-edge flex items-center justify-between gap-2 py-1.5 pr-1.5 text-sm font-semibold"
           >
-            <!-- Fixed-width icon slot. Always rendered, so every folder name
-                 starts on the same x-position whether or not it has an icon. -->
-            <FolderIcon
-              :token="iconFor(tab)"
-              :favorite="tab.folderId === FAVORITES_FOLDER_ID"
-              :data-test="`dashboard-folder-icon-${tab.name}`"
-            />
-            <span
-              class="folder-name min-w-0 flex-1 truncate text-left"
-              :title="tab.name"
-              :data-test="`dashboard-folder-name-${tab.name}`"
-              >{{ tab.name }}</span
+            <span class="truncate">{{ t("dashboard.folders") }}</span>
+            <OButton
+              variant="ghost"
+              size="icon"
+              @click="addFolder"
+              data-test="dashboard-new-folder-btn"
+              :title="t('common.addFolder')"
             >
-            <!-- Kept in flow rather than overlaid: an overlay needs a backdrop
+              <OIcon name="add" size="sm" />
+            </OButton>
+          </div>
+          <!-- Search Input -->
+          <div class="px-1.5 pb-1.5" :class="mobileRail ? 'pt-1' : ''">
+            <OSearchInput
+              v-model="searchQuery"
+              data-test="folder-search"
+              :placeholder="t('dashboard.searchFolder')"
+              clearable
+              class="w-full"
+            />
+          </div>
+        </div>
+        <div class="folders-tabs flex-1 overflow-y-auto px-1.5">
+          <OTabs
+            orientation="vertical"
+            dense
+            v-model="activeFolderId"
+            data-test="dashboards-folder-tabs"
+          >
+            <OTab
+              v-for="tab in filteredTabs"
+              :key="tab.folderId"
+              :name="tab.folderId"
+              class="test-class min-h-6"
+              :data-test="`dashboard-folder-tab-${tab.folderId}`"
+              @click="onTabClick(tab.folderId)"
+            >
+              <div
+                class="folder-item group/row flex min-h-6 w-full flex-nowrap items-center gap-1.5"
+                :data-test="`dashboard-folder-tab-name-${tab.name}`"
+              >
+                <!-- Fixed-width icon slot. Always rendered, so every folder name
+                 starts on the same x-position whether or not it has an icon. -->
+                <FolderIcon
+                  :token="iconFor(tab)"
+                  :favorite="tab.folderId === FAVORITES_FOLDER_ID"
+                  :data-test="`dashboard-folder-icon-${tab.name}`"
+                />
+                <span
+                  class="folder-name min-w-0 flex-1 truncate text-left"
+                  :title="tab.name"
+                  :data-test="`dashboard-folder-name-${tab.name}`"
+                  >{{ tab.name }}</span
+                >
+                <!-- Kept in flow rather than overlaid: an overlay needs a backdrop
                  matching the row, and OTab only paints a hover background on
                  INACTIVE tabs, so it would read wrong on the open folder. -->
-            <div
-              v-if="tab.folderId.toLowerCase() != 'default' && tab.folderId !== FAVORITES_FOLDER_ID"
-              class="hidden shrink-0 items-center group-hover/row:flex has-[[data-state=open]]:flex"
-            >
-              <ODropdown side="bottom" align="start">
-                <template #trigger>
-                  <OButton
-                    size="icon"
-                    variant="ghost"
-                    icon-left="more-vert"
-                    class="h-5 w-5"
-                    data-test="dashboard-more-icon"
-                  />
-                </template>
-                <ODropdownItem
-                  data-test="dashboard-edit-folder-icon"
-                  @select="editFolder(tab.folderId)"
+                <div
+                  v-if="
+                    tab.folderId.toLowerCase() != 'default' && tab.folderId !== FAVORITES_FOLDER_ID
+                  "
+                  class="hidden shrink-0 items-center group-hover/row:flex has-[[data-state=open]]:flex max-md:flex"
+                  @click.stop
                 >
-                  <template #icon-left>
-                    <OIcon name="edit" size="xs" />
-                  </template>
-                  {{ t("common.edit") }}
-                </ODropdownItem>
-                <ODropdownItem
-                  variant="destructive"
-                  data-test="dashboard-delete-folder-icon"
-                  @select="showDeleteFolderDialogFn(tab.folderId)"
-                >
-                  <template #icon-left>
-                    <OIcon name="delete" size="xs" />
-                  </template>
-                  {{ t("common.delete") }}
-                </ODropdownItem>
-              </ODropdown>
-            </div>
-          </div>
-        </OTab>
-      </OTabs>
-    </div>
+                  <ODropdown side="bottom" align="start">
+                    <template #trigger>
+                      <OButton
+                        size="icon"
+                        variant="ghost"
+                        icon-left="more-vert"
+                        class="h-5 w-5"
+                        data-test="dashboard-more-icon"
+                      />
+                    </template>
+                    <ODropdownItem
+                      data-test="dashboard-edit-folder-icon"
+                      @select="editFolder(tab.folderId)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="edit" size="xs" />
+                      </template>
+                      {{ t("common.edit") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      variant="destructive"
+                      data-test="dashboard-delete-folder-icon"
+                      @select="showDeleteFolderDialogFn(tab.folderId)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="delete" size="xs" />
+                      </template>
+                      {{ t("common.delete") }}
+                    </ODropdownItem>
+                  </ODropdown>
+                </div>
+              </div>
+            </OTab>
+          </OTabs>
+        </div>
+      </div>
+    </component>
   </div>
   <AddFolder
     v-model:open="showAddFolderDialog"
@@ -143,10 +179,12 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 // @ts-nocheck
 import { computed, defineComponent, onMounted, ref, watch } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useStore } from "vuex";
 import { useI18nTyped, raw } from "@/types/i18n";
 
@@ -172,6 +210,7 @@ export default defineComponent({
     OTab,
     OButton,
     OSearchInput,
+    ODrawer,
     ODropdown,
     ODropdownItem,
   },
@@ -186,6 +225,12 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // Off when the rail already lives inside another drawer (OPageLayout
+    // #sidebar) — nesting a drawer trigger inside a drawer double-wraps it.
+    drawerOnMobile: {
+      type: Boolean,
+      default: true,
+    },
   },
   emits: ["update:folders", "update:activeFolderId"],
   setup(props, { emit }) {
@@ -193,6 +238,25 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const { showPositiveNotification, showErrorNotification } = useNotifications();
     const activeFolderId = ref("");
+    // < md the rail collapses to one row (see template).
+    const { isMobile } = useBreakpoint();
+    const mobileDrawerOpen = ref(false);
+    const mobileRail = computed(() => isMobile.value && props.drawerOnMobile);
+    const railWrapperProps = computed(() =>
+      mobileRail.value
+        ? {
+            open: mobileDrawerOpen.value,
+            side: "left",
+            size: "sm",
+            bleed: true,
+            title: t("dashboard.folders"),
+            "onUpdate:open": (v: boolean) => (mobileDrawerOpen.value = v),
+          }
+        : {},
+    );
+    const activeFolderName = computed(
+      () => filteredTabs.value.find((f: any) => f.folderId === activeFolderId.value)?.name ?? "",
+    );
     const showAddFolderDialog = ref(false);
     const isFolderEditMode = ref(false);
     const selectedFolderToEdit = ref(null);
@@ -295,6 +359,7 @@ export default defineComponent({
       if (folderId === activeFolderId.value) {
         emit("update:activeFolderId", folderId);
       }
+      mobileDrawerOpen.value = false;
     };
 
     const filteredTabs = computed(() => {
@@ -313,6 +378,11 @@ export default defineComponent({
     });
 
     return {
+      isMobile,
+      mobileDrawerOpen,
+      mobileRail,
+      railWrapperProps,
+      activeFolderName,
       t,
       activeFolderId,
       showAddFolderDialog,

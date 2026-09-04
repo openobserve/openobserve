@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="px-page-edge flex items-center gap-3 py-2"
+    class="px-page-edge flex items-center gap-3 py-2 max-md:flex-wrap"
     :class="{ 'border-border-default border-b': bordered }"
   >
     <OToggleGroup

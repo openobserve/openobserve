@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OTabs
     :model-value="activeSectionKey"
     align="left"
+    collapse-labels
     data-test="alert-section-tabs"
     @change="navigateToSection"
   >
@@ -35,11 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="section in sections"
       :key="section.key"
       :name="section.key"
+      :icon="section.icon"
+      :label="section.label"
       :data-test="`alert-section-tab-${section.key}`"
-    >
-      <OIcon :name="section.icon" size="sm" class="shrink-0" />
-      <span>{{ section.label }}</span>
-    </OTab>
+    />
   </OTabs>
 </template>
 
@@ -48,7 +48,6 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";

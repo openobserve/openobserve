@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Toolbar: status toggle (All / Active / Resolved) + search — same
              shape as the Alerts page tabs. -->
         <template #toolbar>
-          <div class="flex w-full items-center gap-2">
+          <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
             <OToggleGroup
               :model-value="statusFilter"
               @update:model-value="(v) => filterByStatus(v as string)"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
             <OSearchInput
               v-model="searchQuery"
-              class="min-w-0 flex-1"
+              class="min-w-0 flex-1 max-md:min-w-40"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
               clearable
@@ -193,6 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.status === 'open'"
               variant="ghost-warning"
               size="icon-sm"
+              class="max-md:hidden"
               @click.stop="acknowledgeIncident(row)"
               data-test="incident-ack-btn"
               ><OIcon name="visibility" size="sm" /><OTooltip
@@ -202,6 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.status !== 'resolved'"
               variant="ghost-primary"
               size="icon-sm"
+              class="max-md:hidden"
               @click.stop="resolveIncident(row)"
               data-test="incident-resolve-btn"
               ><OIcon name="task-alt" size="sm" /><OTooltip
@@ -211,11 +213,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.status === 'resolved'"
               variant="ghost-warning"
               size="icon-sm"
+              class="max-md:hidden"
               @click.stop="reopenIncident(row)"
               data-test="incident-reopen-btn"
               ><OIcon name="restart-alt" size="sm" /><OTooltip
                 :content="t('alerts.incidents.reopen')"
             /></OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :title="t('dashboard.moreActions')"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="incident-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                v-if="row.status === 'open'"
+                icon-left="visibility"
+                class="md:hidden"
+                data-test="incident-ack-btn-menu"
+                @select="acknowledgeIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.acknowledge") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.status !== 'resolved'"
+                icon-left="task-alt"
+                class="md:hidden"
+                data-test="incident-resolve-btn-menu"
+                @select="resolveIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.resolve") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.status === 'resolved'"
+                icon-left="restart-alt"
+                class="md:hidden"
+                data-test="incident-reopen-btn-menu"
+                @select="reopenIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.reopen") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
 
@@ -235,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Bottom -->
         <template #bottom>
           <div class="flex h-12 w-full items-center justify-between">
-            <div class="mr-md flex w-25 items-center text-xs font-normal">
+            <div class="mr-md flex w-25 items-center text-xs font-normal max-md:hidden">
               {{ visibleIncidents.length }}
               {{
                 visibleIncidents.length === 1
@@ -273,6 +316,8 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -293,6 +338,8 @@ export default defineComponent({
     OStatStrip,
     OToggleGroup,
     OToggleGroupItem,
+    ODropdown,
+    ODropdownItem,
   },
   setup() {
     const { t } = useI18nTyped();
@@ -346,6 +393,7 @@ export default defineComponent({
       },
       {
         id: "status",
+        hideBelowMd: true,
         header: t("alerts.incidents.status"),
         accessorKey: "status",
         resizable: true,
@@ -355,6 +403,7 @@ export default defineComponent({
       },
       {
         id: "dimensions",
+        hideBelowMd: true,
         header: t("alerts.incidents.stableDimensions"),
         accessorKey: "group_values",
         resizable: true,
@@ -364,6 +413,7 @@ export default defineComponent({
       },
       {
         id: "alert_count",
+        hideBelowMd: true,
         header: t("alerts.incidents.alertCount"),
         accessorKey: "alert_count",
         resizable: true,
@@ -373,6 +423,7 @@ export default defineComponent({
       },
       {
         id: "last_alert_at",
+        hideBelowMd: true,
         header: t("alerts.incidents.lastAlertAt"),
         accessorKey: "last_alert_at",
         sortable: true,

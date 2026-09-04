@@ -117,6 +117,7 @@
                 data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('onlineEvals.actions.edit')"
                 icon-left="edit"
                 @click.stop="openEdit(row)"
@@ -126,10 +127,40 @@
                 data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('onlineEvals.actions.delete')"
                 icon-left="delete"
                 @click.stop="confirmDelete(row)"
               />
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="llm-providers-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  :data-test="`llm-providers-${row.name}-edit-btn-menu`"
+                  @select="openEdit(row)"
+                >
+                  <span>{{ t("onlineEvals.actions.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  :data-test="`llm-providers-${row.name}-delete-btn-menu`"
+                  @select="confirmDelete(row)"
+                >
+                  <span>{{ t("onlineEvals.actions.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
         </OTable>
@@ -152,6 +183,8 @@ import { useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";

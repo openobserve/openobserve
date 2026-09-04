@@ -220,7 +220,12 @@ const heightClasses = computed<string>(() => {
             >{{ icon }}</span
           >
         </slot>
-        <span v-if="label" class="o-tab__label truncate">{{ label }}</span>
+        <span
+          v-if="label"
+          class="o-tab__label truncate"
+          :class="context?.collapseLabels && !isActive ? 'max-md:hidden' : ''"
+          >{{ label }}</span
+        >
       </template>
       <slot v-else />
     </TabsTrigger>

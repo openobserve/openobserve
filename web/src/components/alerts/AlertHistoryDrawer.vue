@@ -240,7 +240,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <template #bottom>
                     <div class="flex h-12 w-full items-center">
-                      <div class="flex w-55 items-center text-xs font-normal">
+                      <!-- < md the pager's "Showing x-y of z" already carries the count. -->
+                      <div class="flex w-55 items-center text-xs font-normal max-md:hidden">
                         {{ resultTotal }} {{ t("alerts.alertDetails.results") }}
                       </div>
                     </div>

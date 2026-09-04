@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #toolbar>
             <OSearchInput
               v-model="filterQuery"
-              class="no-border o2-search-input w-64"
+              class="no-border o2-search-input w-64 max-md:w-full"
               :placeholder="t('aiToolset.search')"
             />
           </template>
@@ -95,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="edit"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :title="t('common.edit')"
               @click="editToolset(row)"
               icon-left="edit"
@@ -104,10 +105,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="delete"
               variant="ghost-destructive"
               size="icon-sm"
+              class="max-md:hidden"
               :title="t('common.delete')"
               @click="confirmDeleteToolset(row)"
               icon-left="delete"
             />
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="ai-toolsets-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`ai-toolset-${row.name}-edit-menu`"
+                @select="editToolset(row)"
+              >
+                <span>{{ t("common.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`ai-toolset-${row.name}-delete-menu`"
+                @select="confirmDeleteToolset(row)"
+              >
+                <span>{{ t("common.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
         </OTable>
       </div>
@@ -135,6 +166,8 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -157,6 +190,8 @@ export default defineComponent({
     ConfirmDialog,
     AddAiToolset,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OTag,
     OSearchInput,

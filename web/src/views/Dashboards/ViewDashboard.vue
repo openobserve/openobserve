@@ -87,21 +87,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="selectedDate"
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
-            class="dashboard-icons h-7.5 [transition:all_0.2s_ease]"
+            class="dashboard-icons h-7.5 [transition:all_0.2s_ease] max-md:[&_.date-time-label]:hidden"
             size="sm"
             v-model="selectedDate"
             :initialTimezone="initialTimezone"
             :disable="arePanelsLoading"
             @hide="setTimeForVariables"
             data-test="dashboard-global-date-time-picker"
-          />
-          <AutoRefreshInterval
-            v-model="refreshInterval"
-            trigger
-            :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
-            @trigger="refreshData"
-            class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
-            size="sm"
           />
           <OButton
             v-if="config.isEnterprise == 'true' && arePanelsLoading"
@@ -134,7 +126,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               shortcut-id="dashboardRefresh"
             />
           </OButton>
+        </template>
 
+        <!-- Secondary toolbar actions: inline on desktop, behind "More" < md. -->
+        <template #actions-overflow>
+          <AutoRefreshInterval
+            v-model="refreshInterval"
+            trigger
+            :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+            @trigger="refreshData"
+            class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
+            size="sm"
+          />
           <ExportDashboard
             v-if="!isFullscreen"
             v-show="store.state.printMode !== true"
@@ -1607,9 +1610,7 @@ export default defineComponent({
     };
 
     const onFullscreenChange = () => {
-      if (!document.fullscreenElement) {
-        isFullscreen.value = false;
-      }
+      isFullscreen.value = !!document.fullscreenElement;
     };
 
     const openScheduledReports = () => {

@@ -292,11 +292,14 @@ onBeforeUnmount(() => {
         :align="align"
         :side-offset="sideOffset"
         :hide-when-detached="true"
+        :collision-padding="8"
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         :style="{ zIndex: contentZIndex }"
         :class="[
-          'min-w-40 p-1',
+          // Layout — max-w keeps wide menus on-screen on small viewports.
+          // Stacking is the inline z-index above, not a class.
+          'max-w-[calc(100vw-1rem)] min-w-40 p-1',
           // Surface
           'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
           // Typography

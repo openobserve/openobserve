@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Toolbar: Built-in/Custom tabs + search -->
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <div class="app-tabs-container h-9">
                 <AppTabs
                   class="tabs-selection-container"
@@ -327,6 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="
                     row.enabled ? t('modelPricing.actionDisable') : t('modelPricing.actionEnable')
                   "
@@ -338,6 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('modelPricing.actionEdit')"
                   @click.stop="openEditor(row)"
                   data-test="model-pricing-edit-btn"
@@ -347,6 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost-destructive"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('modelPricing.actionDelete')"
                   @click.stop="confirmDelete(row)"
                   data-test="model-pricing-delete-btn"
@@ -356,12 +359,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('modelPricing.actionDuplicate')"
                   @click.stop="duplicateModel(row)"
                   data-test="model-pricing-duplicate-btn"
                   data-row-action="duplicate"
                   icon-left="content-copy"
                 />
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="model-pricing-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    :variant="row.enabled ? 'destructive' : 'default'"
+                    class="md:hidden"
+                    data-test="model-pricing-toggle-btn-menu"
+                    @select="toggleEnabled(row, !row.enabled)"
+                  >
+                    <span>{{
+                      row.enabled ? t("modelPricing.actionDisable") : t("modelPricing.actionEnable")
+                    }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    data-test="model-pricing-edit-btn-menu"
+                    @select="openEditor(row)"
+                  >
+                    <span>{{ t("modelPricing.actionEdit") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    data-test="model-pricing-delete-btn-menu"
+                    @select="confirmDelete(row)"
+                  >
+                    <span>{{ t("modelPricing.actionDelete") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="content-copy"
+                    class="md:hidden"
+                    data-test="model-pricing-duplicate-btn-menu"
+                    @select="duplicateModel(row)"
+                  >
+                    <span>{{ t("modelPricing.actionDuplicate") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </template>
               <template v-else>
                 <OButton
@@ -389,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom>
             <div class="flex h-12 w-full items-center gap-x-2">
-              <div class="flex w-25 items-center text-xs font-normal">
+              <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
                 {{ t("modelPricing.modelsCount", { count: resultTotal }) }}
               </div>
               <OButton
@@ -588,6 +640,8 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import TestModelMatchDialog from "@/components/settings/TestModelMatchDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -694,6 +748,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "match_pattern",
+    hideBelowMd: true,
     header: t("modelPricing.colMatchPattern"),
     accessorKey: "match_pattern",
     resizable: true,
@@ -703,6 +758,7 @@ const columns: OTableColumnDef[] = [
   },
   {
     id: "pricing",
+    hideBelowMd: true,
     header: t("modelPricing.colPricing"),
     accessorKey: "pricing",
     resizable: true,

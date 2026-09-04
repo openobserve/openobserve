@@ -79,10 +79,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTab>
       </OTabs>
     </template>
-    <!-- CONTENT AREA: sidebar + main -->
-    <div class="flex flex-1 overflow-hidden">
+    <!-- CONTENT AREA: sidebar + main (< md: sidebar stacks above main) -->
+    <div class="flex flex-1 overflow-hidden max-md:flex-col">
       <!-- LEFT SIDEBAR: folder navigation (locations are org-level, no folders) -->
-      <div v-if="activeSection === 'checks'" class="w-rail shrink-0 overflow-y-auto">
+      <div
+        v-if="activeSection === 'checks'"
+        class="w-rail max-md:border-border-default shrink-0 overflow-y-auto max-md:h-auto max-md:w-full max-md:border-b"
+      >
         <FolderList
           type="synthetics"
           data-test="synthetic-monitoring-folder-list"
@@ -160,7 +163,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Toolbar content rendered inside OTable's toolbar bar -->
           <template #toolbar>
-            <div class="flex min-w-0 flex-1 items-center gap-2">
+            <!-- ≥ md it is a named container: the folder rail can squeeze this
+                 toolbar at any viewport width, so the tab labels key off the
+                 container's own width, not a viewport breakpoint. -->
+            <div
+              class="@container/synthetics-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
+            >
               <!-- Type tabs -->
               <OToggleGroup :model-value="activeTab" @update:model-value="onTabChange">
                 <OToggleGroupItem
@@ -169,13 +177,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :value="tab.key"
                   size="sm"
                   :icon-left="tab.icon"
+                  :title="tab.label"
                 >
-                  {{ tab.label }}
+                  <span class="max-md:hidden @max-[38rem]/synthetics-toolbar:hidden">{{
+                    tab.label
+                  }}</span>
                 </OToggleGroupItem>
               </OToggleGroup>
 
               <!-- Search -->
-              <div class="min-w-0 flex-1">
+              <!-- < md search takes its own full row below the icon controls. -->
+              <!-- md:min-w-60: flex-1 is basis-0, so without a floor the input
+                   shrinks to nothing instead of wrapping to its own row. -->
+              <div class="min-w-0 flex-1 max-md:order-last max-md:basis-full md:min-w-60">
                 <OInput
                   v-model="search"
                   :placeholder="
@@ -202,16 +216,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="xs"
                         icon-left="folder-outline"
                         data-test="synthetic-monitoring-search-this-folder-btn"
+                        :title="t('synthetics.search.thisFolder')"
                       >
-                        {{ t("synthetics.search.thisFolder") }}
+                        <span class="max-md:hidden">{{ t("synthetics.search.thisFolder") }}</span>
                       </OToggleGroupItem>
                       <OToggleGroupItem
                         value="all"
                         size="xs"
                         icon-left="search"
                         data-test="synthetic-monitoring-search-all-folders-btn"
+                        :title="t('synthetics.search.allFolders')"
                       >
-                        {{ t("synthetics.search.allFolders") }}
+                        <span class="max-md:hidden">{{ t("synthetics.search.allFolders") }}</span>
                       </OToggleGroupItem>
                     </OToggleGroup>
                   </template>

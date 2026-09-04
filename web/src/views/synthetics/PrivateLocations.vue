@@ -137,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost"
             size="icon-sm"
             icon-left="content-copy"
+            class="max-md:hidden"
             :title="t('synthetics.privateLocations.copySetupCmd')"
             :data-test="`synthetics-private-locations-copy-btn-${(row as any).id}`"
             @click="emit('copy-setup', row as any)"
@@ -145,6 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="ghost-destructive"
             size="icon-sm"
             icon-left="delete"
+            class="max-md:hidden"
             :disabled="checksUsing(row) > 0"
             :title="
               checksUsing(row) > 0
@@ -156,6 +158,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`synthetics-private-locations-delete-btn-${(row as any).id}`"
             @click="emit('delete', row as any)"
           />
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                icon-left="more-vert"
+                variant="ghost"
+                size="icon-xs-sq"
+                class="md:hidden"
+                data-test="synthetics-private-locations-row-more-actions"
+                @click.stop
+              />
+            </template>
+            <ODropdownItem
+              icon-left="content-copy"
+              class="md:hidden"
+              :data-test="`synthetics-private-locations-copy-btn-${(row as any).id}-menu`"
+              @select="emit('copy-setup', row as any)"
+            >
+              <span>{{ t("synthetics.privateLocations.copySetupCmd") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="delete"
+              variant="destructive"
+              class="md:hidden"
+              :disabled="checksUsing(row) > 0"
+              :data-test="`synthetics-private-locations-delete-btn-${(row as any).id}-menu`"
+              @select="emit('delete', row as any)"
+            >
+              <span>{{
+                checksUsing(row) > 0
+                  ? t("synthetics.privateLocations.deleteBlocked", {
+                      count: checksUsing(row),
+                    })
+                  : t("synthetics.table.delete")
+              }}</span>
+            </ODropdownItem>
+          </ODropdown>
         </div>
       </template>
 
@@ -186,6 +224,8 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { SyntheticLocation } from "@/types/synthetics";
 import { formatTimeAgoUs } from "@/utils/synthetics/format";

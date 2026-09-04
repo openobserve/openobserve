@@ -27,6 +27,7 @@ import {
 } from "./OTable.types";
 
 import { useTableCore } from "./composables/useTableCore";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useTablePagination } from "./composables/useTablePagination";
 import { useTableSorting } from "./composables/useTableSorting";
 import { useTableSelection } from "./composables/useTableSelection";
@@ -92,6 +93,12 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
 
 const emit = defineEmits<OTableEmits<TData>>();
 const slots = defineSlots<OTableSlots<TData>>();
+
+// < md every table behaves as horizontalScroll: columns keep their natural
+// width and the extra ones are reached by scrolling WITHIN the table, instead
+// of being crushed until only the name column survives.
+const { isMobile: isMobileViewport } = useBreakpoint();
+const horizontalScrollOn = computed(() => !!props.horizontalScroll || isMobileViewport.value);
 
 // A row only gets the pointer cursor when it's actually interactive — i.e. the
 // parent listens for @row-click / @row-dblclick, or row-click toggles expansion.
@@ -808,7 +815,7 @@ provide("o2TableBoundedFill", hasBoundedFill);
 // is still absorbing the leftover the table fits, so a stray 1-2px scrollbar
 // from rounding must stay hidden.
 const allowHorizontalScroll = computed(() => {
-  if (props.horizontalScroll) return true;
+  if (horizontalScrollOn.value) return true;
   if (!hasFillColumn.value) return true;
   if (useComputedWidth.value) {
     if (containerWidth.value <= 0) return false;
@@ -994,6 +1001,14 @@ const computedTableWidth = computed<string | undefined>(() => {
   return `${Math.max(containerWidth.value || 0, realSum())}px`;
 });
 
+// < md a fill-layout table refuses to crush its columns below their defined
+// sizes: their sum becomes the table's floor and the container scrolls.
+const mobileMinTableWidth = computed<string | undefined>(() => {
+  if (!isMobileViewport.value || props.horizontalScroll || props.defaultColumns) return undefined;
+  const sum = table.getVisibleLeafColumns().reduce((a, c) => a + c.getSize(), 0);
+  return sum > 0 ? `${sum}px` : undefined;
+});
+
 // Virtual measureElement callback — wraps the virtualizer's measure.
 // Re-measuring is only needed when row heights actually VARY (expanded rows or
 // wrapped text). For fixed-height rows the virtualizer's size estimate is exact,
@@ -1131,27 +1146,31 @@ defineExpose({
       <div
         v-if="slots.toolbar || slots['toolbar-trailing']"
         :class="[
-          'px-page-edge flex items-center gap-2 py-2',
+          'px-page-edge flex items-center gap-2 py-2 max-md:flex-wrap max-md:gap-y-1.5',
           props.toolbarBordered ? 'border-table-row-divider border-b' : '',
         ]"
         data-test="o2-table-toolbar"
       >
         <slot name="toolbar" />
-        <OTableColumnToggle
-          v-if="
-            props.persistColumns &&
-            props.tableId &&
-            props.columns.some((c) => c.hideable && !c.isAction)
-          "
-          :columns="props.columns"
-          :column-visibility="internalColumnVisibility"
-          :has-resized-columns="props.enableColumnResize && hasResizedColumns"
-          class="shrink-0"
-          data-test="o2-table-column-toggle"
-          @update:column-visibility="handleColumnVisibilityChange"
-          @reset:column-sizes="handleResetColumnSizes"
-        />
-        <slot name="toolbar-trailing" />
+        <!-- Grouped so that when the mobile toolbar wraps, the controls land
+             right-aligned on their row instead of ragged bottom-left. -->
+        <div class="flex shrink-0 items-center gap-2 max-md:ml-auto">
+          <OTableColumnToggle
+            v-if="
+              props.persistColumns &&
+              props.tableId &&
+              props.columns.some((c) => c.hideable && !c.isAction)
+            "
+            :columns="props.columns"
+            :column-visibility="internalColumnVisibility"
+            :has-resized-columns="props.enableColumnResize && hasResizedColumns"
+            class="shrink-0"
+            data-test="o2-table-column-toggle"
+            @update:column-visibility="handleColumnVisibilityChange"
+            @reset:column-sizes="handleResetColumnSizes"
+          />
+          <slot name="toolbar-trailing" />
+        </div>
       </div>
       <!-- ── Sub-header slot: custom full-width content between the toolbar and
          the table body (e.g. a summary-stat strip). ── -->
@@ -1276,6 +1295,7 @@ defineExpose({
             ...measuredColumnSizeVars,
             ...dynamicSizeVars,
             ...(computedTableWidth ? { width: computedTableWidth } : {}),
+            ...(mobileMinTableWidth ? { minWidth: mobileMinTableWidth } : {}),
             '--table-row-height':
               props.rowHeight != null
                 ? `${props.rowHeight}px`

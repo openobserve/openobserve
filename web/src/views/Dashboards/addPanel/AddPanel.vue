@@ -51,37 +51,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #actions>
-            <OButton
-              variant="outline"
-              size="sm"
-              @click="showTutorial"
-              data-test="dashboard-panel-tutorial-btn"
-              >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
-            >
-            <OButton
-              v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
-              variant="outline"
-              size="icon-sm"
-              @click="showViewPanel = true"
-              data-test="dashboard-panel-data-view-query-inspector-btn"
-              icon-left="info-outline"
-            >
-              <OTooltip
-                side="left"
-                align="center"
-                :content="t('dashboard.addPanel.queryInspector')"
-                shortcut-id="panelEditorQueryInspector"
-              />
-            </OButton>
+            <!-- < md Tutorial / Inspector / Discard move behind More (below)
+                 so the primary run controls keep a single row. -->
+            <template v-if="!isMobile">
+              <OButton
+                variant="outline"
+                size="sm"
+                @click="showTutorial"
+                data-test="dashboard-panel-tutorial-btn"
+                >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
+              >
+              <OButton
+                v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+                variant="outline"
+                size="icon-sm"
+                @click="showViewPanel = true"
+                data-test="dashboard-panel-data-view-query-inspector-btn"
+                icon-left="info-outline"
+              >
+                <OTooltip
+                  side="left"
+                  align="center"
+                  :content="t('dashboard.addPanel.queryInspector')"
+                  shortcut-id="panelEditorQueryInspector"
+                />
+              </OButton>
+            </template>
             <DateTimePickerDashboard
               v-if="selectedDate"
               v-model="selectedDate"
               ref="dateTimePickerRef"
               :disable="disable"
+              class="max-md:[&_.date-time-label]:hidden"
               @hide="setTimeForVariables"
               data-test="dashboard-global-date-time-picker"
             />
             <OButton
+              v-if="!isMobile"
               variant="outline-destructive"
               size="sm-action"
               @click="goBackToDashboardList"
@@ -138,6 +144,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdownItem>
                 </ODropdown>
               </OButtonGroup>
+            </template>
+          </template>
+          <template #actions-overflow>
+            <template v-if="isMobile">
+              <OButton
+                variant="outline"
+                size="sm"
+                @click="showTutorial"
+                data-test="dashboard-panel-tutorial-btn"
+                >{{ t("dashboard.addPanel.dashboardTutorial") }}</OButton
+              >
+              <OButton
+                v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+                variant="outline"
+                size="sm"
+                icon-left="info-outline"
+                @click="showViewPanel = true"
+                data-test="dashboard-panel-data-view-query-inspector-btn"
+                >{{ t("dashboard.addPanel.queryInspector") }}</OButton
+              >
+              <OButton
+                variant="outline-destructive"
+                size="sm"
+                @click="goBackToDashboardList"
+                data-test="dashboard-panel-discard"
+                >{{ t("panel.discard") }}</OButton
+              >
             </template>
           </template>
         </OPageHeader>
@@ -217,6 +250,7 @@ import AddSettingVariable from "../../../components/dashboards/settings/AddSetti
 import { debounce, isEqual } from "lodash-es";
 import { provide, inject } from "vue";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
+import useBreakpoint from "@/composables/useBreakpoint";
 import useNotifications from "@/composables/useNotifications";
 import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
@@ -282,6 +316,7 @@ export default defineComponent({
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
@@ -1721,6 +1756,7 @@ export default defineComponent({
 
     return {
       t,
+      isMobile,
       updateDateTime,
       goBack,
       savePanelChangesToDashboard,

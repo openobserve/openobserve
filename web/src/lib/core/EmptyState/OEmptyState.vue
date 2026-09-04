@@ -49,7 +49,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="dotGridStyle"
     />
 
-    <div :class="['relative flex flex-col items-center text-center', sizeClass.stack]">
+    <!-- w-full/max-w-full: without it the stack sizes to its widest child (the
+         no-wrap action-card row) and overflows the viewport on phones. -->
+    <div
+      :class="[
+        'relative flex w-full max-w-full flex-col items-center text-center',
+        sizeClass.stack,
+      ]"
+    >
       <!-- illustration (hero/block) — preset/illustration prop or slot -->
       <div v-if="hasIllustration" class="shrink-0">
         <slot name="illustration">
@@ -95,7 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="[
           props.columns
             ? 'flex flex-wrap justify-center'
-            : 'flex flex-nowrap items-stretch justify-center',
+            : // < md the single-row card strip wraps instead of overflowing.
+              'flex items-stretch justify-center max-md:flex-wrap md:flex-nowrap',
           sizeClass.actions,
         ]"
       >

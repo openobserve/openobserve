@@ -83,10 +83,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- O2 AI Assistant tab -->
         <div
           v-if="activeHomeTab === 'ai'"
-          class="home-ai-panel flex min-h-0 flex-1 flex-row overflow-hidden"
+          class="home-ai-panel flex min-h-0 flex-1 flex-row overflow-hidden max-md:flex-col"
         >
-          <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
+          <!-- < md the chat-history rail moves into a drawer so the chat gets
+               the full width. -->
+          <HomeChatHistory class="max-md:hidden" @load-chat="onLoadChat" @new-chat="onNewChat" />
+          <!-- In-flow toggle bar (not a floating overlay — it would sit over the
+               message list once the chat scrolls). -->
+          <div v-if="isMobile" class="flex shrink-0 items-center pb-1">
+            <OButton
+              variant="outline"
+              size="sm"
+              data-test="home-mobile-chats-toggle"
+              @click="mobileChatsOpen = true"
+            >
+              <template #icon-left><OIcon name="menu" size="sm" /></template>
+              {{ t("chatHistory.title") }}
+            </OButton>
+          </div>
           <O2AIChat ref="homeChat" :is-open="true" :header-height="0" :centered-start="true" />
+          <ODrawer
+            v-if="isMobile"
+            v-model:open="mobileChatsOpen"
+            side="left"
+            size="sm"
+            bleed
+            seamless
+            data-test="home-mobile-chats-drawer"
+          >
+            <HomeChatHistory
+              class="w-full!"
+              @load-chat="
+                (chat) => {
+                  onLoadChat(chat);
+                  mobileChatsOpen = false;
+                }
+              "
+              @new-chat="
+                () => {
+                  onNewChat();
+                  mobileChatsOpen = false;
+                }
+              "
+            />
+          </ODrawer>
         </div>
 
         <!-- Overview tab (no inner card-container — the outer section panel
@@ -128,6 +168,10 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -311,10 +355,16 @@ export default defineComponent({
     onMounted(() => window.addEventListener("o2:home-switch-tab", onSwitchTab));
     onUnmounted(() => window.removeEventListener("o2:home-switch-tab", onSwitchTab));
 
+    // < md: the chat-history rail lives in a drawer (see template).
+    const { isMobile } = useBreakpoint();
+    const mobileChatsOpen = ref(false);
+
     return {
       t,
       store,
       config,
+      isMobile,
+      mobileChatsOpen,
       activeHomeTab,
       tabOrder,
       onTabReorder,
@@ -337,6 +387,9 @@ export default defineComponent({
     OTab,
     OTooltip,
     OPageLayout,
+    OButton,
+    OIcon,
+    ODrawer,
     PinnedDashboardTab,
   },
 });

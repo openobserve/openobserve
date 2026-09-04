@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <div
         v-if="indexData.name"
-        class="rounded-default bg-surface-panel border-border-default flex items-center gap-1.5 border px-2 py-1"
+        class="rounded-default bg-surface-panel border-border-default flex items-center gap-1.5 border px-2 py-1 max-md:hidden"
       >
         <img
           :src="getTimelineIcon"
@@ -70,7 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             style="height: calc(100vh - 3.75rem)"
           >
             <!-- this the grid section the tiles section -->
-            <div class="stats-grid mb-2 grid grid-cols-4 gap-2">
+            <!-- < md: 2×2 so the values don't clip out of the tiles. -->
+            <div class="stats-grid mb-2 grid grid-cols-4 gap-2 max-md:grid-cols-2">
               <!-- Docs Count Tile -->
               <div
                 v-if="store.state.zoConfig.show_stream_stats_doc_num"
@@ -170,7 +171,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default bg-surface-base border-border-default flex h-full min-h-0 w-full flex-col overflow-hidden border p-2"
               >
                 <div>
-                  <div class="flex justify-start">
+                  <!-- min-w-0/max-w-full let OTabs' own arrow-scroller engage in
+                       the narrow mobile drawer instead of clipping silently. -->
+                  <div class="flex max-w-full min-w-0 justify-start">
                     <OTabs v-model="activeMainTab" dense>
                       <!-- Schema Settings Tab with conditional class -->
                       <OTab
@@ -224,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div v-if="indexData.defaultFts" class="mt-3 font-normal">
                         <label
-                          class="bg-banner-warning-bg rounded-default border-banner-warning-border text-banner-warning-text border px-4 py-1 font-semibold"
+                          class="bg-banner-warning-bg rounded-default border-banner-warning-border text-banner-warning-text inline-block max-w-full border px-4 py-1 font-semibold"
                         >
                           {{ t("logStream.mapping") }}
                           {{ t("logStream.defaultFtsKeysUsed") }}</label
@@ -338,10 +341,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- OTable fills the remaining height inside the schemaSettings flex column -->
                     <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
+                      <!-- < md: content-sized columns + x-scroll, or the elastic
+                           name column collapses to 0 beside the fixed columns. -->
                       <OTable
                         data-test="schema-log-stream-field-mapping-table"
                         :data="filteredSchemaData"
                         :columns="columns"
+                        horizontal-scroll
                         row-key="name"
                         selection="multiple"
                         :selected-ids="selectedSchemaIds"
@@ -601,6 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="schema-log-stream-field-mapping-table"
                           :data="redBtnRows"
                           :columns="redBtnColumns"
+                          horizontal-scroll
                           row-key="index"
                           selection="multiple"
                           v-model:selected-ids="selectedDateIds"
@@ -646,8 +653,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="bg-card-glass-solid sticky bottom-0 z-1 mt-auto w-full flex-shrink-0 px-2 py-1"
                 >
-                  <div v-if="indexData.schema.length > 0" class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
+                  <div
+                    v-if="indexData.schema.length > 0"
+                    class="flex items-center justify-between max-md:flex-wrap max-md:gap-y-1"
+                  >
+                    <div class="flex items-center gap-2 max-md:flex-wrap">
                       <span v-if="activeMainTab == 'schemaSettings'" class="px-2 py-2"
                         ><strong> {{ selectedFields.length }}</strong>
                         {{ t("logStream.fieldsSelected") }}</span

@@ -42,7 +42,7 @@
     data-test="alerts-alertgroupstable-table"
   >
     <template #toolbar>
-      <div class="flex w-full items-center gap-2">
+      <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
         <OSearchInput
           v-model="search"
           class="flex-1"

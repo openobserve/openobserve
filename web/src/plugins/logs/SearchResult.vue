@@ -20,30 +20,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex h-full max-h-full flex-col overflow-hidden">
     <div class="flex h-full max-h-full w-full flex-col overflow-hidden" ref="searchListContainer">
       <!-- Section header: static at top -->
+      <!-- < md the header wraps into tidy rows instead of truncating the
+           count chip against the pager. -->
       <div
-        class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b"
+        class="border-card-glass-border bg-card-glass-bg flex h-auto min-h-9 shrink-0 flex-wrap items-center gap-y-1 border-b py-0.5"
       >
-        <!-- Field panel toggle — same style as add-panel config sidebar -->
+        <!-- Field panel toggle — same style as add-panel config sidebar.
+             < md the field list is a drawer, so this button opens it instead
+             of collapsing an (absent) side pane. -->
         <OButton
           variant="outline"
           size="icon-xs-sq"
           class="ml-1.5 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
-          @click="toggleFieldList"
+          @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
         >
           <OIcon
             :name="
-              searchObj.meta.showFields
-                ? 'keyboard-double-arrow-left'
-                : 'keyboard-double-arrow-right'
+              isMobile
+                ? 'menu'
+                : searchObj.meta.showFields
+                  ? 'keyboard-double-arrow-left'
+                  : 'keyboard-double-arrow-right'
             "
             size="sm"
           />
           <OTooltip
             :content="
-              searchObj.meta.showFields
-                ? t('logs.searchResult.collapseFields')
-                : t('logs.searchResult.openFields')
+              isMobile
+                ? t('search.showFields')
+                : searchObj.meta.showFields
+                  ? t('logs.searchResult.collapseFields')
+                  : t('logs.searchResult.openFields')
             "
             side="bottom"
             shortcut-id="logsToggleSidebar"
@@ -60,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 pl-2 text-left"
+          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 pl-2 text-left max-md:min-w-32"
           data-test="logs-search-result-title"
           :data-search-state="
             searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'
@@ -73,13 +81,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="logsResultChip" value="neutral" data-test="logs-result-records-chip">{{
                 recordsChips.records
               }}</OTag>
-              <OTag type="logsResultChip" value="info" data-test="logs-result-time-chip">{{
-                recordsChips.time
-              }}</OTag>
+              <!-- max-md:hidden: the fixed-height toolbar fits one chip beside
+                   the pager — extra chips wrapped onto the histogram beneath. -->
+              <OTag
+                type="logsResultChip"
+                value="info"
+                class="max-md:hidden"
+                data-test="logs-result-time-chip"
+                >{{ recordsChips.time }}</OTag
+              >
               <OTag
                 v-if="recordsChips.scan"
                 type="logsResultChip"
                 value="warn"
+                class="max-md:hidden"
                 data-test="logs-result-scan-chip"
                 >{{ recordsChips.scan }}</OTag
               >
@@ -99,7 +114,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="logsResultChip" value="neutral" data-test="logs-result-patterns-chip"
                 >{{ patternChips.patterns }} {{ t("logs.searchResult.patterns") }}</OTag
               >
-              <OTag type="logsResultChip" value="info" data-test="logs-result-pattern-time-chip"
+              <OTag
+                type="logsResultChip"
+                value="info"
+                class="max-md:hidden"
+                data-test="logs-result-pattern-time-chip"
                 >{{ patternChips.time }} {{ t("logs.searchResult.msUnit") }}</OTag
               >
             </template>
@@ -121,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="flex flex-none items-center justify-end gap-1 pr-2">
+        <div class="flex flex-none items-center justify-end gap-1 pr-2 max-md:ml-auto">
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
@@ -862,6 +881,7 @@ import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   buildPatternVolumeContext,
   fetchWindowTotal,
@@ -919,6 +939,7 @@ export default defineComponent({
     "sendToAiChat",
     "run-query",
     "jump-to-stream-data",
+    "open-mobile-fields",
   ],
   props: {
     expandedLogs: {
@@ -1126,6 +1147,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
+    const { isMobile } = useBreakpoint();
     const searchListContainer = ref<HTMLElement | null>(null);
 
     // Responsive: observe the outer container (reacts to splitter + window resize)
@@ -1175,7 +1197,8 @@ export default defineComponent({
       if (!parts) return null;
 
       return {
-        records: t("search.recordsChip", {
+        // < md the long form collides with the pager cluster beside it.
+        records: t(isMobile.value ? "search.recordsChipShort" : "search.recordsChip", {
           start: parts.start,
           end: parts.end,
           total: parts.total,
@@ -2343,6 +2366,7 @@ export default defineComponent({
     return {
       raw,
       isDark,
+      isMobile,
       t,
       store,
       config,

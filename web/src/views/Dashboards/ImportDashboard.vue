@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="outline"
         size="sm-action"
+        class="max-md:hidden"
         @click="goToCommunityDashboards"
         data-test="dashboard-panel-tutorial-btn"
         >{{ t("dashboard.communityDashboard") }}</OButton
@@ -48,11 +49,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div class="flex min-h-0 w-full flex-1">
       <div class="flex min-h-0 w-full min-w-0">
-        <OSplitter v-model="splitterModel" class="h-full min-h-0 w-full min-w-0">
+        <!-- < md the form/preview panes stack: side by side leaves the upload pane
+             ~224px and clips its controls. -->
+        <OSplitter
+          v-model="splitterModel"
+          :horizontal="isMobile"
+          class="h-full min-h-0 w-full min-w-0"
+        >
           <template #before>
             <OForm id="import-dashboard-form" :form="form" class="flex h-full min-h-0 flex-col">
               <div class="flex h-full min-h-0 w-full flex-col">
-                <div class="bg-card-glass-bg px-page-edge mb-1 shrink-0 py-2.5">
+                <div
+                  class="bg-card-glass-bg px-page-edge mb-1 flex shrink-0 items-center justify-between gap-2 py-2.5 max-md:flex-wrap"
+                >
                   <div class="app-tabs-container h-9 w-fit">
                     <AppTabs
                       data-test="dashboard-import-type-tabs"
@@ -62,14 +71,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @update:active-tab="updateActiveTab"
                     />
                   </div>
+                  <!-- < md this secondary action leaves the header so Cancel +
+                       Import keep the title row to one line. -->
+                  <OButton
+                    variant="outline"
+                    size="sm-action"
+                    class="md:hidden"
+                    @click="goToCommunityDashboards"
+                    data-test="dashboard-panel-tutorial-btn-mobile"
+                    >{{ t("dashboard.communityDashboard") }}</OButton
+                  >
                 </div>
                 <div
                   v-if="activeTab == 'import_json_url'"
                   class="editor-container-url bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
                 >
                   <div class="mx-2 mt-1 mb-1 flex min-h-0 flex-1 flex-col">
-                    <div class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2">
-                      <div data-test="dashboard-import-url-input" class="w-[69%]">
+                    <div
+                      class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2 max-md:flex-wrap"
+                    >
+                      <div data-test="dashboard-import-url-input" class="w-[69%] max-md:w-full">
                         <OFormInput
                           data-test="dashboard-import-url-control"
                           name="url"
@@ -80,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <div
                         data-test="dashboard-folder-dropdown"
-                        class="import-folder-dropdown-container w-[calc(30%)]"
+                        class="import-folder-dropdown-container w-[calc(30%)] max-md:w-full"
                       >
                         <SelectFolderDropdown
                           @folder-selected="selectedFolder = $event"
@@ -104,8 +125,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="dashboard-import-json-container bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
                 >
                   <div class="mx-2 mt-1 mb-1 flex min-h-0 flex-1 flex-col">
-                    <div class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2">
-                      <div data-test="dashboard-import-file-input" class="w-[69%]">
+                    <div
+                      class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2 max-md:flex-wrap"
+                    >
+                      <div data-test="dashboard-import-file-input" class="w-[69%] max-md:w-full">
                         <OFormFile
                           data-test="dashboard-import-file-control"
                           name="jsonFiles"
@@ -117,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :disabled="!!isLoading"
                         />
                       </div>
-                      <div class="import-folder-dropdown-container w-[calc(30%)]">
+                      <div class="import-folder-dropdown-container w-[calc(30%)] max-md:w-full">
                         <SelectFolderDropdown
                           @folder-selected="selectedFolder = $event"
                           :activeFolderId="selectedFolder.value"
@@ -272,6 +295,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeImportDashboardSchema, importDashboardDefaults } from "./ImportDashboard.schema";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 export default defineComponent({
@@ -310,7 +334,19 @@ export default defineComponent({
     const activeTab = ref("import_json_file");
 
     const dashboardErrorsToDisplay = ref([]);
+    const { isMobile } = useBreakpoint();
     const splitterModel = ref(60);
+
+    // < md the error pane earns its half of the screen only once it has
+    // something to show — empty, it buried the form's own controls.
+    watch(
+      [isMobile, () => dashboardErrorsToDisplay.value.length],
+      ([mobile, errCount]) => {
+        if (mobile) splitterModel.value = errCount > 0 ? 55 : 100;
+        else if (splitterModel.value === 100) splitterModel.value = 60;
+      },
+      { immediate: true },
+    );
 
     // holds the value of the loading for any of the import type
     const isLoading = ref(false);
@@ -844,6 +880,7 @@ export default defineComponent({
       activeTab,
       dashboardErrorsToDisplay,
       splitterModel,
+      isMobile,
       updateActiveTab,
       queryEditorPlaceholderFlag,
       importDashboard,

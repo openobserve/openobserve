@@ -62,7 +62,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex min-h-0 w-full flex-1 flex-col overflow-hidden pt-2.5">
       <!-- Summary Stats Card -->
       <div v-if="!loading" class="mx-2.5 mb-2.5 shrink-0">
-        <div class="grid gap-3" style="grid-template-columns: 1fr 1fr 1fr 1.6fr 0.9fr">
+        <!-- < md the five stat tiles stack (the fixed 5-column template overflows). -->
+        <div
+          class="grid gap-3 max-md:grid-cols-1! md:[grid-template-columns:1fr_1fr_1fr_1.6fr_0.9fr]"
+        >
           <!-- Results Returned -->
           <div class="stat-tile">
             <div

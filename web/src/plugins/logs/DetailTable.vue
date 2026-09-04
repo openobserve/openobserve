@@ -408,8 +408,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="tab === 'json' || tab === 'table'"
       class="px-page-edge bg-dialog-bg sticky bottom-0 z-10 py-4"
     >
-      <div class="flex flex-nowrap items-center justify-between">
-        <div class="w-1/12">
+      <!-- < md: Previous/Next keep the first row, the search-around cluster
+           wraps to its own full-width row (nowrap overlapped all three). -->
+      <div class="flex flex-nowrap items-center justify-between max-md:flex-wrap max-md:gap-2">
+        <div class="w-1/12 max-md:w-auto">
           <OButton
             data-test="log-detail-previous-detail-btn"
             variant="outline"
@@ -427,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.stream.selectedStream.length <= 1 &&
             hasAggregationQuery == false
           "
-          class="flex items-center gap-2"
+          class="flex items-center gap-2 max-md:order-last max-md:basis-full max-md:justify-center"
         >
           <label class="font-bold whitespace-nowrap">{{ t("common.noOfRecords") }}</label>
           <OSelect

@@ -70,8 +70,11 @@ const pageSizeSelectOptions = computed(() => {
          The footer-title typography lives on this wrapper so BOTH the default
          row count and any custom #bottom (actions) slot content inherit it —
          font-size / weight / line-height are inherited properties. -->
+    <!-- < md the plain count is hidden: "Showing x - y of z" already carries
+         it, and the footer must stay ONE row. Bulk actions still show. -->
     <div
       class="flex items-center gap-2 text-xs font-normal"
+      :class="slots.actions ? '' : 'max-md:hidden'"
       data-test="o2-table-pagination-actions"
     >
       <!-- Loading: always skeleton, regardless of slot/count -->
@@ -87,8 +90,8 @@ const pageSizeSelectOptions = computed(() => {
       </span>
     </div>
 
-    <!-- Right: controls -->
-    <div class="flex items-center gap-3">
+    <!-- Right: controls. < md this cluster IS the footer row. -->
+    <div class="flex items-center gap-3 max-md:flex-1 max-md:justify-between max-md:gap-2">
       <span
         v-if="loading"
         class="o2-pag-skel rounded-default inline-block h-3 w-36 [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] [background-size:200%_100%] [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)]"
@@ -103,9 +106,12 @@ const pageSizeSelectOptions = computed(() => {
         {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }}
         {{ totalCount.toLocaleString() }}{{ totalCountExact ? "" : "+" }}
       </span>
-      <div class="bg-border-default h-4 w-px shrink-0" v-if="pageSizeOptions.length > 0" />
+      <div
+        class="bg-border-default h-4 w-px shrink-0 max-md:hidden"
+        v-if="pageSizeOptions.length > 0"
+      />
       <div v-if="pageSizeOptions.length > 0" class="text-primary flex items-center gap-1.5 text-xs">
-        <span class="whitespace-nowrap">{{ t("search.recordsPerPage") }}</span>
+        <span class="whitespace-nowrap max-md:hidden">{{ t("search.recordsPerPage") }}</span>
         <OSelect
           v-model="pageSizeModel"
           :options="pageSizeSelectOptions"

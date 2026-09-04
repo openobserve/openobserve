@@ -40,6 +40,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="truncate">{{ homeDashboard.label }}</span>
       </OButton>
       <OTooltip v-if="homeDashboard" side="bottom" :content="t('dashboard.openHomeDashboard')" />
+      <!-- new dashboard button -->
+      <OButton
+        variant="primary"
+        size="sm"
+        icon-left="add"
+        data-test="dashboard-new"
+        @click="addDashboard"
+      >
+        {{ t(`dashboard.add`) }}
+      </OButton>
+    </template>
+
+    <!-- Secondary: inline on desktop, behind "More" < md. -->
+    <template #actions-overflow>
       <!-- import dashboard button with dropdown -->
       <ODropdown side="bottom" align="end">
         <template #trigger>
@@ -94,22 +108,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </ODropdownItem>
       </ODropdown>
-      <!-- new dashboard button -->
-      <OButton
-        variant="primary"
-        size="sm"
-        icon-left="add"
-        data-test="dashboard-new"
-        @click="addDashboard"
-      >
-        {{ t(`dashboard.add`) }}
-      </OButton>
     </template>
 
     <!-- Folder rail + table — matches the Alerts/Reports layout. -->
-    <div class="flex min-h-0 flex-1">
+    <!-- < md: rail stacks above the table as a bounded, scrollable panel. -->
+    <div class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Left: shared folder list (same component as Alerts/Reports) -->
-      <div class="w-rail h-full shrink-0">
+      <div
+        class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:w-full max-md:border-b"
+      >
         <div class="h-full">
           <FolderList
             type="dashboards"
@@ -146,8 +153,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Toolbar inside the table frame: scoped search (fills the bar) + refresh -->
             <template #toolbar>
-              <div class="flex w-full items-center gap-2">
-                <div class="min-w-0 flex-1">
+              <!-- max-md:contents flattens this wrapper so the search and
+                   OTable's own controls share one row on mobile. -->
+              <!-- min-w-0: without it the wrapper cannot shrink below the search
+                   box's min-content width, so a rail-narrowed toolbar pushes the
+                   trailing controls off the right edge instead of squeezing. -->
+              <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+                <div class="min-w-0 flex-1 max-md:min-w-40">
                   <OInput
                     v-model="dynamicQueryModel"
                     :placeholder="
@@ -174,7 +186,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-left="folder-outline"
                           data-test="dashboard-search-scope-current"
                           :title="t('dashboard.searchThisFolderTitle')"
-                          >{{ t("dashboard.searchThisFolder") }}</OToggleGroupItem
+                          ><span class="max-md:hidden">{{
+                            t("dashboard.searchThisFolder")
+                          }}</span></OToggleGroupItem
                         >
                         <OToggleGroupItem
                           value="all"
@@ -182,7 +196,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-left="search"
                           data-test="dashboard-search-across-folders-toggle"
                           :title="t('dashboard.searchAllFoldersTitle')"
-                          >{{ t("dashboard.searchAllFolders") }}</OToggleGroupItem
+                          ><span class="max-md:hidden">{{
+                            t("dashboard.searchAllFolders")
+                          }}</span></OToggleGroupItem
                         >
                       </OToggleGroup>
                     </template>
@@ -273,12 +289,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-actions="{ row }">
               <span class="row-actions flex items-center justify-end gap-0.5">
+                <!-- < md the inline icons fold into the overflow menu so the
+                     actions column stops eating half the table's width. -->
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="drive-file-move"
                   :title="t('dashboard.move_to_another_folder')"
                   variant="ghost"
                   size="icon-xs-sq"
+                  class="max-md:hidden"
                   data-test="dashboard-move-to-another-folder"
                   @click.stop="showMoveDashboardPanel(row)"
                 />
@@ -288,6 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.duplicate')"
                   variant="ghost"
                   size="icon-xs-sq"
+                  class="max-md:hidden"
                   data-test="dashboard-duplicate"
                   data-row-action="duplicate"
                   @click.stop="duplicateDashboard(row.id, row.folder_id)"
@@ -298,6 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.delete')"
                   variant="ghost-destructive"
                   size="icon-xs-sq"
+                  class="max-md:hidden"
                   data-test="dashboard-delete"
                   data-row-action="delete"
                   @click.stop="showDeleteDialogFn({ row })"
@@ -316,6 +337,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop
                     />
                   </template>
+                  <ODropdownItem
+                    icon-left="drive-file-move"
+                    class="md:hidden"
+                    data-test="dashboard-move-to-another-folder-menu"
+                    @select="showMoveDashboardPanel(row)"
+                  >
+                    <span>{{ t("dashboard.move_to_another_folder") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="content-copy"
+                    class="md:hidden"
+                    data-test="dashboard-duplicate-menu"
+                    @select="duplicateDashboard(row.id, row.folder_id)"
+                  >
+                    <span>{{ t("dashboard.duplicate") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    data-test="dashboard-delete-menu"
+                    @select="showDeleteDialogFn({ row })"
+                  >
+                    <span>{{ t("dashboard.delete") }}</span>
+                  </ODropdownItem>
                   <ODropdownItem
                     :icon-left="isHome(row.id) ? 'keep' : 'keep-outline'"
                     data-test="dashboard-list-set-home-btn"
@@ -354,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #bottom>
               <div class="flex w-full items-center justify-between gap-4 py-1">
-                <div class="flex shrink-0 items-center text-xs font-normal">
+                <div class="flex shrink-0 items-center text-xs font-normal max-md:hidden">
                   {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
                 <div v-if="selectedIds.length > 0" class="bulk-action-bar flex items-center gap-2">
@@ -800,6 +846,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
+          hideBelowMd: true,
           size: COL.description,
           meta: { align: "left" },
         },
@@ -810,6 +857,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
+          hideBelowMd: true,
           size: COL.owner,
           meta: { align: "left" },
         },
@@ -820,6 +868,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
+          hideBelowMd: true,
           size: COL.date,
           meta: { align: "left" },
         },
@@ -841,6 +890,7 @@ export default defineComponent({
           sortable: true,
           resizable: true,
           hideable: true,
+          hideBelowMd: true,
           size: COL.folder,
           meta: { align: "left" },
         });

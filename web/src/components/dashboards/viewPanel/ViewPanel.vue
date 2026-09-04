@@ -16,13 +16,23 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div class="flex h-full flex-col overflow-hidden" data-test="view-panel-screen">
-    <div class="flex items-center justify-between p-3">
-      <div class="mr-3 flex min-w-0 items-center text-xl tracking-[0.005em]">
-        <span class="truncate" data-test="dashboard-viewpanel-title">
+    <div class="flex items-center justify-between p-3 max-md:flex-wrap max-md:gap-y-2">
+      <!-- max-md:basis-full: the controls alone fill a phone row, so the title
+           takes its own row rather than truncating to a couple of characters. -->
+      <div
+        class="mr-3 flex min-w-0 flex-1 items-center text-xl tracking-[0.005em] max-md:mr-0 max-md:basis-full"
+      >
+        <!-- truncate, not wrap: a long panel name would otherwise grow the header
+             to two lines and leave the controls floating beside a ragged block. -->
+        <span
+          class="truncate"
+          :title="dashboardPanelData.data.title"
+          data-test="dashboard-viewpanel-title"
+        >
           {{ dashboardPanelData.data.title }}
         </span>
       </div>
-      <div class="flex shrink-0 items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2 max-md:ml-auto">
         <!-- histogram interval for sql queries -->
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"

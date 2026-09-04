@@ -1816,6 +1816,40 @@ export default defineComponent({
   cursor: move;
 }
 
+/* < md: stack every panel full-width, one below the other, at a fixed viewable
+   height — presentation only. GridStack's engine still holds the 192-column
+   desktop layout (its own oneColumnMode is kept OFF because the `change`
+   handler persists positions; a CSS-only stack can never write a mangled
+   layout back). Section headers keep their natural short height. */
+@media (max-width: 47.99rem) {
+  .displayDiv :deep(.grid-stack) {
+    height: auto !important;
+  }
+  .displayDiv :deep(.grid-stack > .grid-stack-item) {
+    position: relative !important;
+    inset: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: 20rem !important;
+    min-height: 20rem !important;
+    margin-bottom: 0.5rem;
+  }
+  /* Single-value tiles don't earn a chart's height. */
+  .displayDiv :deep(.grid-stack > .grid-stack-item:has([data-panel-type="metric"])),
+  .displayDiv :deep(.grid-stack > .grid-stack-item:has([data-panel-type="gauge"])) {
+    height: 10rem !important;
+    min-height: 10rem !important;
+  }
+  .displayDiv :deep(.grid-stack > .grid-stack-item.panel-section-header) {
+    height: 2.5rem !important;
+    min-height: 2.5rem !important;
+  }
+  .displayDiv :deep(.grid-stack > .grid-stack-item > .ui-resizable-handle) {
+    display: none !important;
+  }
+}
+
 .displayDiv :deep(.grid-stack .grid-stack-item.ui-draggable-dragging) {
   opacity: 0.8;
   z-index: 1000;

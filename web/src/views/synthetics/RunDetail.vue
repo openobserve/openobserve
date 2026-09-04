@@ -371,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     />
                                   </OButton>
                                   <div
-                                    class="rounded-default bg-surface-base/80 pointer-events-none absolute top-2 right-2 flex h-7 w-7 items-center justify-center opacity-0 transition-opacity group-hover:opacity-100"
+                                    class="rounded-default bg-surface-base/80 pointer-events-none absolute top-2 right-2 flex h-7 w-7 items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
                                     aria-hidden="true"
                                   >
                                     <OIcon name="fullscreen" size="sm" class="text-text-body" />

@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onAlertSelected"
         :placeholder="t('alerts.searcHistory')"
         data-test="alert-history-search-select"
-        class="o2-search-input min-w-62.5"
+        class="o2-search-input min-w-62.5 max-md:hidden"
         clearable
         @clear="clearSearch"
       >
@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         icon-left="search"
         size="icon-sm"
+        class="max-md:hidden"
         @click="manualSearch"
         data-test="alert-history-manual-search-btn"
         :disabled="loading"
@@ -77,6 +78,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('common.refresh')" />
       </OButton>
     </template>
+    <!-- < md the alert filter leaves the header (its 250px select forces a
+         wrap there) and gets its own full-width row above the table. -->
+    <div
+      class="border-border-default flex shrink-0 items-center gap-1 border-b px-3 py-1.5 md:hidden"
+    >
+      <OSelect
+        v-model="selectedAlert"
+        :options="filteredAlertOptions"
+        labelKey="label"
+        valueKey="value"
+        @update:model-value="onAlertSelected"
+        :placeholder="t('alerts.searcHistory')"
+        data-test="alert-history-search-select-mobile"
+        class="o2-search-input min-w-0 flex-1"
+        clearable
+        @clear="clearSearch"
+      >
+        <template #icon-left>
+          <OIcon class="o2-search-input-icon" name="search" size="sm" />
+        </template>
+        <template #empty>
+          <div class="text-muted-foreground px-3 py-2">
+            {{ t("alerts.noAlertsFound") }}
+          </div>
+        </template>
+      </OSelect>
+      <OButton
+        variant="ghost"
+        icon-left="search"
+        size="icon-sm"
+        @click="manualSearch"
+        data-test="alert-history-manual-search-btn-mobile"
+        :disabled="loading"
+      >
+        <OTooltip :content="t('common.search')" />
+      </OButton>
+    </div>
     <div class="min-h-0 flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
@@ -238,6 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               icon-left="visibility"
+              class="max-md:hidden"
               @click="showDetailsDialog(row)"
               data-test="alert-history-view-details"
             >
@@ -249,6 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-destructive"
               size="icon-sm"
               icon-left="error"
+              class="max-md:hidden"
               @click.stop="showErrorDialog(row)"
             >
               <OTooltip
@@ -257,6 +297,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="alert-history-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="visibility"
+                class="md:hidden"
+                data-test="alert-history-view-details-menu"
+                @select="showDetailsDialog(row)"
+              >
+                <span>{{ t("alerts.viewDetails") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.error"
+                icon-left="error"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`pipeline-list-${row.name}-error-indicator-menu`"
+                @select="showErrorDialog(row)"
+              >
+                <span>{{
+                  t("common.lastErrorAt", { time: new Date(row.timestamp / 1000).toLocaleString() })
+                }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
         </OTable>
       </div>
@@ -486,6 +558,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { COL } from "@/lib/core/Table/OTable.types";

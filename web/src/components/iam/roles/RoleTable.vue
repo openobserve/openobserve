@@ -8,6 +8,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
@@ -110,7 +112,7 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
     @update:global-filter="emit('update:globalFilter', $event)"
   >
     <template #toolbar>
-      <div class="flex w-full items-center gap-2">
+      <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
         <OSearchInput
           :model-value="globalFilter"
           :placeholder="t('iam.searchRole')"
@@ -141,6 +143,7 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
           data-row-action="edit"
           variant="ghost"
           size="icon-sm"
+          class="max-md:hidden"
           :title="t('common.edit')"
           @click="emit('edit', row)"
         >
@@ -151,11 +154,41 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
           data-row-action="delete"
           variant="ghost"
           size="icon-sm"
+          class="max-md:hidden"
           :title="t('common.delete')"
           @click="emit('delete', row)"
         >
           <OIcon name="delete" size="sm" />
         </OButton>
+        <ODropdown side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              icon-left="more-vert"
+              variant="ghost"
+              size="icon-xs-sq"
+              class="md:hidden"
+              data-test="iam-roles-row-more-actions"
+              @click.stop
+            />
+          </template>
+          <ODropdownItem
+            icon-left="edit"
+            class="md:hidden"
+            :data-test="`iam-roles-edit-${row.role_name}-role-icon-menu`"
+            @select="emit('edit', row)"
+          >
+            <span>{{ t("common.edit") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="delete"
+            variant="destructive"
+            class="md:hidden"
+            :data-test="`iam-roles-delete-${row.role_name}-role-icon-menu`"
+            @select="emit('delete', row)"
+          >
+            <span>{{ t("common.delete") }}</span>
+          </ODropdownItem>
+        </ODropdown>
       </div>
     </template>
 
@@ -169,7 +202,7 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
     </template>
 
     <template #bottom>
-      <span class="text-xs font-normal">{{ data.length }} {{ t("iam.roles") }}</span>
+      <span class="text-xs font-normal max-md:hidden">{{ data.length }} {{ t("iam.roles") }}</span>
       <OButton
         v-if="(selectedIds?.length ?? 0) > 0"
         data-test="iam-roles-bulk-delete-btn"

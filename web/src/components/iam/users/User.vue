@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('user.search')"
@@ -166,6 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('user.delete')"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :data-test="`delete-basic-user-${row.email}`"
               data-row-action="delete"
               @click="confirmDeleteAction(row)"
@@ -177,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('user.revoke_invite')"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :data-test="`revoke-invite-${row.email}`"
               data-row-action="delete"
               @click="confirmRevokeAction(row)"
@@ -188,15 +190,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('user.update')"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :data-test="`edit-basic-user-${row.email}`"
               data-row-action="edit"
               @click="addRoutePush(row)"
             >
               <OIcon name="edit" size="sm" />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="user-list-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                v-if="row.enableDelete && row.status != 'pending'"
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`delete-basic-user-${row.email}-menu`"
+                @select="confirmDeleteAction(row)"
+              >
+                <span>{{ t("user.delete") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.status == 'pending' && row.token"
+                icon-left="cancel"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`revoke-invite-${row.email}-menu`"
+                @select="confirmRevokeAction(row)"
+              >
+                <span>{{ t("user.revoke_invite") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.enableEdit && row.status != 'pending'"
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`edit-basic-user-${row.email}-menu`"
+                @select="addRoutePush(row)"
+              >
+                <span>{{ t("user.update") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
           <template #bottom>
-            <span class="text-xs font-normal"
+            <span class="text-xs font-normal max-md:hidden"
               >{{ rows.length }}
               {{
                 isEnterpriseOrCloud
@@ -282,6 +326,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -324,6 +370,8 @@ export default defineComponent({
     AddUser,
     MemberInvitation,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OTag,
     OStatStrip,
@@ -430,6 +478,7 @@ export default defineComponent({
         },
         {
           id: "first_name",
+          hideBelowMd: true,
           header: t("user.firstName"),
           accessorKey: "first_name",
           sortable: true,
@@ -440,6 +489,7 @@ export default defineComponent({
         },
         {
           id: "last_name",
+          hideBelowMd: true,
           header: t("user.lastName"),
           accessorKey: "last_name",
           sortable: true,
@@ -454,6 +504,7 @@ export default defineComponent({
       if (isEnterpriseOrCloud) {
         cols.push({
           id: "auth",
+          hideBelowMd: true,
           header: t("user.authType"),
           accessorKey: "auth_type",
           sortable: true,
@@ -467,6 +518,7 @@ export default defineComponent({
       // Roles column — array of role chips in enterprise/cloud, single role string otherwise
       cols.push({
         id: isEnterpriseOrCloud ? "roles" : "role",
+        hideBelowMd: true,
         header: isEnterpriseOrCloud ? t("user.roles") : t("user.role"),
         accessorKey: isEnterpriseOrCloud ? "roles" : "role",
         sortable: true,

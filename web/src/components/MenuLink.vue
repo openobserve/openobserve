@@ -19,7 +19,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        and submenu-group triggers (<button>, used by ONavGroup) all share the
        exact same tile markup and styling — a group tile is literally a MenuLink. -->
   <component :is="rootComponent" v-bind="rootProps" :class="rootClass" @click="onRootClick">
-    <div class="nav-menu-item-avatar flex w-full flex-col items-center gap-0.5">
+    <!-- < md the tile is a full-width drawer row, so icon and label sit side by
+         side and left-aligned rather than stacked in an icon rail. -->
+    <div
+      class="nav-menu-item-avatar flex w-full flex-col items-center gap-0.5 max-md:flex-row max-md:items-center max-md:gap-3 max-md:px-1"
+    >
       <div
         class="icon-wrapper rounded-default relative inline-flex items-center justify-center p-0.5 transition-colors duration-250"
         :class="isActive ? activeIconClass : 'text-tabs-inactive-text group-hover:text-accent'"
@@ -37,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-[0.01em] break-normal wrap-normal [hyphens:none] transition-colors duration-250"
+        class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-[0.01em] break-normal wrap-normal [hyphens:none] transition-colors duration-250 max-md:text-left max-md:text-sm"
         :class="
           isActive
             ? activeLabelClass
@@ -51,17 +55,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Submenu affordance: hidden at rest so a group/link-with-subnav tile is
          indistinguishable from a plain tile (consistency). It fades in only on
          hover, or stays lit while the flyout is open / the section is active. -->
+    <!-- < md it centres on the row and rotates to point down when open, so it
+         reads as the accordion affordance it is there (not a flyout hint). -->
     <span
       v-if="asTrigger || submenu"
-      class="absolute top-3 right-1 transition-opacity duration-150"
-      :class="
+      class="absolute top-3 right-1 transition-opacity duration-150 max-md:top-1/2 max-md:right-3 max-md:-translate-y-1/2 max-md:opacity-100"
+      :class="[
         isActive || expanded
           ? 'text-accent opacity-100'
-          : 'text-tabs-inactive-text opacity-70 group-hover:opacity-100'
-      "
+          : 'text-tabs-inactive-text opacity-70 group-hover:opacity-100',
+        expanded ? 'max-md:rotate-90' : '',
+      ]"
       aria-hidden="true"
     >
-      <OIcon name="chevron-right" size="xs" />
+      <OIcon name="chevron-right" size="xs" class="max-md:size-4.5!" />
     </span>
   </component>
 </template>
@@ -267,6 +274,9 @@ export default defineComponent({
     const rootClass = computed(() => [
       "nav-menu-item",
       "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-surface transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1",
+      // Drawer rows are tap targets, so they clear the 44px minimum instead of
+      // keeping the rail's compact 34px height.
+      "max-md:flex max-md:min-h-11 max-md:items-center max-md:px-2 max-md:py-2",
       // Sit above the rail's sliding pill so icon/label stay readable.
       slideActive.value ? "z-10" : "",
       isActive.value

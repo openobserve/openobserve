@@ -89,10 +89,10 @@ function handleClick(e: MouseEvent) {
     <span :class="['size-2 shrink-0 rounded-full transition-colors duration-700', dotColor]">
       <OTooltip :content="dotTitle" />
     </span>
-    <!-- relative timestamp -->
+    <!-- relative timestamp; < md the dot + tooltip carry the same info -->
     <span
       v-if="lastRunAt"
-      class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none"
+      class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none max-md:hidden"
     >
       {{ relativeTime || t("refreshButton.justNow") }}
       <OTooltip :content="exactTime" />
