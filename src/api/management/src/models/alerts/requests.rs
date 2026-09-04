@@ -346,6 +346,8 @@ pub struct UpdateAnomalyAlertFields {
     pub percentile: Option<f64>,
     pub alert_enabled: Option<bool>,
     pub enabled: Option<bool>,
+    /// Moves the config to this folder. Naming a folder you cannot write to
+    /// returns 403; omit it to leave the config where it is.
     pub folder_id: Option<String>,
     pub owner: Option<String>,
 }

@@ -293,7 +293,7 @@ pub struct MoveSlosRequestBody {
     tag = "SLOs",
     operation_id = "MoveSlos",
     summary = "Move SLOs between folders",
-    description = "Relocates one or more SLOs into another folder. SLOs share the alert folder namespace, so the destination is an alert folder. Requires write access to BOTH the folder each SLO is leaving and the destination folder. A move never changes an SLO's definition and never restarts its measurement.",
+    description = "Relocates one or more SLOs into another folder. SLOs share the alert folder namespace, so the destination is an alert folder. Requires write access to each SLO being moved, and to the destination folder. A move never changes an SLO's definition and never restarts its measurement.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization identifier")),
     request_body(content = inline(MoveSlosRequestBody), description = "The SLOs and the destination folder", content_type = "application/json"),

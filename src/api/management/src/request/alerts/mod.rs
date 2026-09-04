@@ -98,7 +98,7 @@ pub mod templates;
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("folder" = Option<String>, Query, description = "Folder ID for the alert. The default folder is used when absent."),
+        ("folder" = Option<String>, Query, description = "Folder ID for the alert. Authoritative: it overrides any folder_id in the body. The default folder is used when absent."),
       ),
     request_body(content = inline(CreateAlertRequestBody), description = "Alert data", content_type = "application/json"),
     responses(

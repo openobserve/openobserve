@@ -728,6 +728,8 @@ mod tests {
 
     // Handlers that gained a folder-destination authorization check must
     // advertise the 403 it returns, or clients cannot distinguish it from a bug.
+    // The /{org}/anomaly_detection pair is annotated but enterprise-gated, so it
+    // is absent from this ApiDoc and cannot be asserted from an OSS build.
     #[test]
     fn folder_scoped_writes_document_forbidden() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
@@ -745,6 +747,8 @@ mod tests {
             ("/api/v2/{org_id}/synthetics/move", "patch"),
             ("/api/v2/{org_id}/reports/{report_id}", "put"),
             ("/api/v2/{org_id}/reports/move", "patch"),
+            ("/api/{org_id}/folders/dashboards/{dashboard_id}", "put"),
+            ("/api/{org_id}/dashboards/move", "patch"),
         ];
 
         let mut missing = Vec::new();
