@@ -20,6 +20,7 @@
 import { describe, it, expect } from "vitest";
 import { kubernetesPage } from "./kubernetes.page";
 import { GROUP, STALENESS_24H_US } from "../types";
+import enLocale from "@/locales/languages/en-US.json";
 
 const allPanels = () => kubernetesPage.sections.flatMap((section: any) => section.panels);
 
@@ -79,11 +80,15 @@ describe("kube-state fieldOverrides — keyed by the REAL group ids", () => {
       [GROUP.namespace]: "namespace",
       [GROUP.pod]: "pod",
       [GROUP.node]: "node",
+      // The inventory tables name their cluster, so the token must resolve here
+      // too — without the override an empty dictionary hides those panels.
+      [GROUP.cluster]: "k8s_cluster",
     });
     expect(Object.keys(group("kube-state").fieldOverrides)).toEqual([
       "k8s-namespace",
       "k8s-pod-name",
       "k8s-node-name",
+      "k8s-cluster",
     ]);
   });
 
@@ -130,7 +135,11 @@ describe("DRY-RUN finding 2 — a `status` label is not a value test", () => {
     // returned 20 healthy nodes valued 0. Asserted negatively so a well-meaning
     // edit cannot restore it.
     expect(query).not.toContain('condition!="Ready"');
-    expect(query).not.toMatch(/status="true"(?![^}]*==)/);
+    // Measured live: without status="true" the `== 0` matched 214 false/unknown
+    // rows — 0 BECAUSE they are false — while zero nodes were actually not ready.
+    expect(query).toContain('status="true"');
+    // A status selector still has to carry a value test somewhere in the query.
+    expect(query).toMatch(/(==|>|<|>=|<=)\s*-?\d/);
   });
 
   it("k8s_nd_conditions and k8s_ov_nodes_ready both carry a `== 1` value test", () => {
@@ -150,11 +159,15 @@ describe("DRY-RUN finding 7 — topk bounds rows only on an instant vector", () 
 
   it("every table panel is instant-vector shaped so topk(20) is a real row cap", () => {
     // Measured: a RANGE topk(20) returned 450 series behind a title promising 20.
+    // The window is now pinned by running the panel at a single instant; the old
+    // `[5m:]` spelling did cap the rows but 500s the panel when nothing matches.
     for (const id of TABLES) {
       expect(panel(id).type, id).toBe("table");
-      for (const query of queriesOf(id)) {
-        expect(query, id).toContain("topk(20,");
-        expect(query, id).toMatch(/last_over_time\(.*\[\d+[smh]:\]\)/s);
+      for (const variant of panel(id).variants) {
+        expect(variant.queryMode, id).toBe("instant");
+        for (const { query } of variant.queries) {
+          expect(query, id).toContain("topk(20,");
+        }
       }
     }
   });
@@ -346,5 +359,98 @@ describe("panel titles carry an N only where the query can honour it", () => {
       if (!hasTopk) continue;
       expect(p.titleKey, p.id).not.toMatch(/top\d/i);
     }
+  });
+});
+
+// Item 1-4: the trust defects an on-call SRE hit at 3am — tiles and tables that
+// disagreed, a 500 on healthy clusters, ready nodes listed as not-ready, and
+// rows no one could attribute to a cluster. Verified live against introspect.
+describe("inventory tables read the same instant as the tiles above them", () => {
+  const TABLES = [
+    "k8s_ov_unhealthy_pods",
+    "k8s_nd_conditions",
+    "k8s_nd_not_ready",
+    "k8s_wl_pod_restarts",
+  ];
+
+  it.each(TABLES)("%s runs as an instant query", (id) => {
+    for (const variant of panel(id).variants) {
+      expect(variant.queryMode, `${id} must pin its window to one instant`).toBe("instant");
+    }
+  });
+
+  // Measured: wrapping an expression that matches ZERO series in `[5m:]` makes the
+  // engine mis-type the empty result as scalar and 500 the panel — reproduced on
+  // production and ap1cloud, clean without the subquery.
+  it.each(TABLES)("%s carries no [Ns:] subquery", (id) => {
+    for (const query of queriesOf(id)) {
+      expect(query, `${id} still wraps a subquery`).not.toMatch(/\[\d+[smh]:\]/);
+    }
+  });
+
+  // Measured on the live fleet: the tile read 4 pending while the 3h range table
+  // listed 399 rows, 395 of whose series had stopped reporting hours earlier.
+  it("the unhealthy-pods table and the phase tiles select the same phases", () => {
+    const [table] = queriesOf("k8s_ov_unhealthy_pods");
+    expect(table).toContain('phase=~"Pending|Failed|Unknown"');
+    expect(table).toContain("> 0");
+  });
+});
+
+describe("node condition panels test the ACTIVE condition row", () => {
+  // kube_node_status_condition emits a row per condition/status pair. Measured:
+  // {condition="Ready"} == 0 matched 214 rows — the false and unknown rows, which
+  // are 0 BECAUSE they are false — while zero nodes were actually not ready.
+  it("nodes-not-ready pins status=true so it cannot match the false/unknown rows", () => {
+    for (const query of queriesOf("k8s_nd_not_ready")) {
+      expect(query).toMatch(/condition="Ready"/);
+      expect(query, "must pin status=true or it lists healthy nodes").toMatch(/status="true"/);
+    }
+  });
+});
+
+describe("multi-cluster inventory tables name their cluster", () => {
+  // With every cluster selected, a row grouped only by (namespace, pod) is
+  // unattributable — the reader cannot tell WHICH cluster the sick pod is in.
+  it.each(["k8s_ov_unhealthy_pods", "k8s_nd_conditions", "k8s_nd_not_ready"])(
+    "%s groups by the cluster field",
+    (id) => {
+      for (const query of queriesOf(id)) {
+        const by = query.match(/by\s*\(([^)]*)\)/);
+        expect(by, `${id} has no by(...) clause`).toBeTruthy();
+        expect(by![1], `${id} drops the cluster label`).toContain("${f:k8s-cluster}");
+      }
+    },
+  );
+
+  it.each(["k8s_ov_unhealthy_pods", "k8s_nd_conditions", "k8s_nd_not_ready"])(
+    "%s names the cluster in its legend",
+    (id) => {
+      for (const variant of panel(id).variants) {
+        for (const query of variant.queries) {
+          expect(query.legend, `${id} legend omits the cluster`).toContain("${f:k8s-cluster}");
+        }
+      }
+    },
+  );
+});
+
+// A number with no stated window is a number the reader has to guess at. The
+// tiles already said "(now)"; the tables that must agree with them say it too.
+describe("every instant panel states its window in the title", () => {
+  it.each(["k8s_ov_unhealthy_pods", "k8s_nd_not_ready", "k8s_nd_conditions"])(
+    "%s title discloses that it reads the current instant",
+    (id) => {
+      let node: any = enLocale;
+      for (const segment of panel(id).titleKey.split(".")) node = node?.[segment];
+      expect(typeof node, `${panel(id).titleKey} resolves to no copy`).toBe("string");
+      expect(String(node).toLowerCase(), panel(id).titleKey).toContain("(now)");
+    },
+  );
+
+  it("the overview note tells the reader the tiles and the table share one instant", () => {
+    let node: any = enLocale;
+    for (const segment of kubernetesPage.sections[0].noteKey!.split(".")) node = node?.[segment];
+    expect(String(node).toLowerCase()).toContain("now");
   });
 });

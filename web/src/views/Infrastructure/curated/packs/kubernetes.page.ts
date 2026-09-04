@@ -18,6 +18,7 @@
 import { GROUP, STALENESS_24H_US, type CuratedPageManifest, type CuratedPanelDef } from "../types";
 import { explorerDrilldown } from "./drilldown";
 
+const CLUSTER = "${f:k8s-cluster}";
 const NODE = "${f:k8s-node-name}";
 const NS = "${f:k8s-namespace}";
 const POD = "${f:k8s-pod-name}";
@@ -78,6 +79,7 @@ export const kubernetesPage: CuratedPageManifest = {
         [GROUP.namespace]: "namespace",
         [GROUP.pod]: "pod",
         [GROUP.node]: "node",
+        [GROUP.cluster]: "k8s_cluster",
       },
     },
   ],
@@ -347,7 +349,8 @@ export const kubernetesPage: CuratedPageManifest = {
           "k8s_node_cpu_utilization",
         ),
 
-        // The inventory the tiles above imply, instant-vector shaped so the outer topk(20) really returns twenty rows.
+        // The inventory the tiles above imply, and it must agree with them: run at
+        // the same instant, or a 3h range lists every pod that was ever unhealthy.
         panel(
           {
             id: "k8s_ov_unhealthy_pods",
@@ -360,10 +363,11 @@ export const kubernetesPage: CuratedPageManifest = {
               {
                 requiresStreams: ["kube_pod_status_phase"],
                 queryType: "promql",
+                queryMode: "instant",
                 queries: [
                   {
-                    query: `topk(20, last_over_time(sum by (${NS}, ${POD}, phase)(kube_pod_status_phase{phase=~"Pending|Failed|Unknown",\${scope:cluster}} > 0)[5m:]))`,
-                    legend: `{${NS}}/{${POD}} {phase}`,
+                    query: `topk(20, sum by (${CLUSTER}, ${NS}, ${POD}, phase)(kube_pod_status_phase{phase=~"Pending|Failed|Unknown",\${scope:cluster}} > 0))`,
+                    legend: `{${CLUSTER}} {${NS}}/{${POD}} {phase}`,
                   },
                 ],
               },
@@ -460,10 +464,11 @@ export const kubernetesPage: CuratedPageManifest = {
               {
                 requiresStreams: ["kube_node_status_condition"],
                 queryType: "promql",
+                queryMode: "instant",
                 queries: [
                   {
-                    query: `topk(20, last_over_time(sum by (${NODE}, condition)(kube_node_status_condition{status="true",\${scope:cluster}} == 1)[5m:]))`,
-                    legend: `{${NODE}} {condition}`,
+                    query: `topk(20, sum by (${CLUSTER}, ${NODE}, condition)(kube_node_status_condition{status="true",\${scope:cluster}} == 1))`,
+                    legend: `{${CLUSTER}} {${NODE}} {condition}`,
                   },
                 ],
               },
@@ -496,7 +501,8 @@ export const kubernetesPage: CuratedPageManifest = {
           "k8s_node_network_io",
         ),
 
-        // `condition!="Ready"` selected 13 unrelated conditions; `{condition="Ready"} == 0` stays correct when Ready="unknown".
+        // The metric emits a row per condition/status pair, so without status="true"
+        // the `== 0` matches the false and unknown rows — 0 BECAUSE they are false.
         panel(
           {
             id: "k8s_nd_not_ready",
@@ -509,10 +515,11 @@ export const kubernetesPage: CuratedPageManifest = {
               {
                 requiresStreams: ["kube_node_status_condition"],
                 queryType: "promql",
+                queryMode: "instant",
                 queries: [
                   {
-                    query: `topk(20, last_over_time(sum by (${NODE})(kube_node_status_condition{condition="Ready",\${scope:cluster}} == 0)[5m:]))`,
-                    legend: `{${NODE}}`,
+                    query: `topk(20, sum by (${CLUSTER}, ${NODE})(kube_node_status_condition{condition="Ready",status="true",\${scope:cluster}} == 0))`,
+                    legend: `{${CLUSTER}} {${NODE}}`,
                   },
                 ],
               },
@@ -725,9 +732,10 @@ export const kubernetesPage: CuratedPageManifest = {
               {
                 requiresStreams: ["kube_pod_container_status_restarts_total"],
                 queryType: "promql",
+                queryMode: "instant",
                 queries: [
                   {
-                    query: `topk(20, last_over_time(sum by (${NS}, ${POD}) (increase(kube_pod_container_status_restarts_total{\${scope:namespace},\${scope:pod}}[1h]))[5m:]))`,
+                    query: `topk(20, sum by (${NS}, ${POD}) (increase(kube_pod_container_status_restarts_total{\${scope:namespace},\${scope:pod}}[1h])))`,
                     legend: `{${NS}}/{${POD}}`,
                   },
                 ],

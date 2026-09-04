@@ -354,9 +354,23 @@ describe.each(packs)("generic invariants — %s pack", (packId, manifest) => {
         for (const segment of panel.titleKey.split(".")) node = node?.[segment];
         expect(typeof node, `${panel.id}: ${panel.titleKey} resolves to no copy`).toBe("string");
         expect(String(node), panel.titleKey).toContain(topk[1]);
-        // …and the query must actually honour it. A range topk is a per-step
-        // selector: measured, topk(20) over 3h returned 450 rows.
-        expect(query, panel.id).toMatch(/last_over_time\(.*\[\d+[smh]:\]\)/s);
+      }
+    }
+  });
+
+  // A range topk is a per-step selector: measured, topk(20) over 3h returned 450
+  // rows, one per series seen ANYWHERE in the window, which is what made the
+  // table contradict the instant tiles above it. The window is pinned by running
+  // the panel as an instant query, never by a `[Ns:]` subquery — that spelling
+  // mis-types an EMPTY result as scalar and 500s the panel on a healthy cluster.
+  it("(a2) every topk table is an INSTANT query and carries no subquery", () => {
+    for (const panel of panels.filter((p) => p.type === "table")) {
+      for (const variant of panel.variants) {
+        for (const { query } of variant.queries) {
+          if (!/topk\(\d+,/.test(query)) continue;
+          expect(query, `${panel.id} must not use a [Ns:] subquery`).not.toMatch(/\[\d+[smh]:\]/);
+          expect(variant.queryMode, `${panel.id} must declare queryMode "instant"`).toBe("instant");
+        }
       }
     }
   });
