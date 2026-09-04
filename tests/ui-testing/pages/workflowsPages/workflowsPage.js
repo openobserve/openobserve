@@ -124,6 +124,7 @@ class WorkflowsPage {
     this.nodeTestPassedFor = (t) =>
       `[data-test="workflow-node-${t}-test-ok"], [data-test="workflow-node-${t}-test-rehearsal"]`;
     this.nodeTestErrorFor = (t) => `[data-test="workflow-node-${t}-test-error"]`;
+    this.nodeTestRehearsalFor = (t) => `[data-test="workflow-node-${t}-test-rehearsal"]`;
     this.listRowPrefixFor = (n) => `[data-test^="workflow-list-${n}-"]`;
     this.listRowActionFor = (n, a) => `[data-test="workflow-list-${n}-${a}"]`;
     // NDV output pane — on a successful destination send this holds the sink's
@@ -134,6 +135,7 @@ class WorkflowsPage {
     this.testDrawer = '[data-test="workflow-test-drawer"]';
     this.testDrawerPrimary = '[data-test="workflow-test-drawer"] [data-test="o-drawer-primary-btn"]';
     this.testSuppressSwitch = '[data-test="workflow-test-suppress-destinations-btn"]';
+    this.testDispatchWarning = '[data-test="workflow-test-dispatch-warning"]';
     // Workflow function code editor (QuickJS/JavaScript), shared with the Functions page.
     this.functionEditor = '[data-test="logs-vrl-function-editor"]';
     // Warning toast — how a blocked Publish reports itself, since it never reaches the network.
@@ -531,22 +533,76 @@ class WorkflowsPage {
   }
 
   /**
+   * Open the Test drawer from the editor. Extracted from testRunFromEditor so a test can
+   * inspect the drawer's default state (suppress switch, warning banner) before running.
+   */
+  async openTestDrawer() {
+    await this.page.locator(this.testBtn).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.testDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /**
    * Open the Test drawer from the editor and run the saved graph against the (pre-filled) sample
    * payload. Per-node results paint as ✓/✗ badges on the canvas nodes afterwards.
    */
   async testRunFromEditor({ liveSend = false } = {}) {
-    await this.page.locator(this.testBtn).click({ timeout: DRAWER_TIMEOUT_MS });
-    await this.page.locator(this.testDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await this.openTestDrawer();
     if (liveSend) {
       // Destination sends are suppressed by default; send-error tests need the real dispatch.
-      const sw = this.page.locator(this.testSuppressSwitch);
-      if ((await sw.getAttribute('aria-checked')) === 'true') {
-        await sw.click({ timeout: DRAWER_TIMEOUT_MS });
-      }
+      // Route through disableSuppression() so the toggle landing is GUARDED (a silent
+      // no-op flip would otherwise run a suppressed rehearsal and green a delivery test).
+      await this.disableSuppression();
     }
     // The Test panel is still a real ODrawer (WorkflowTestDialog.vue) — only the NODE
     // config panel became an ODialog. Its buttons stay `o-drawer-*`.
     await this.page.locator(this.testDrawerPrimary).click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** Assert the suppress-destinations switch state. The OSwitch exposes it via `aria-checked`
+   *  on the clickable `-btn` element (the `-destinations` wrapper is non-interactive). */
+  async expectSuppressChecked(checked) {
+    await expect(this.page.locator(this.testSuppressSwitch))
+      .toHaveAttribute('aria-checked', checked ? 'true' : 'false', { timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** Turn destination suppression OFF (enable real dispatch) and guard the toggle landed. */
+  async disableSuppression() {
+    const sw = this.page.locator(this.testSuppressSwitch);
+    if ((await sw.getAttribute('aria-checked')) === 'true') {
+      await sw.click({ timeout: DRAWER_TIMEOUT_MS });
+    }
+    await expect(sw).toHaveAttribute('aria-checked', 'false', { timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** The live-dispatch warning OBanner is present and names the destination it will fire. */
+  async expectDispatchWarningVisible(destName) {
+    const banner = this.page.locator(this.testDispatchWarning);
+    await expect(banner).toBeVisible({ timeout: DRAWER_TIMEOUT_MS });
+    await expect(banner).toContainText(destName, { timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** The live-dispatch warning OBanner is NOT rendered (suppression is still ON). */
+  async expectDispatchWarningAbsent() {
+    await expect(this.page.locator(this.testDispatchWarning)).toHaveCount(0);
+  }
+
+  /** Assert a node passed with the REHEARSAL flask (published workflow), never the green ✓. */
+  async expectNodeTestRehearsal(nodeType, timeout = 60000) {
+    await expect(this.page.locator(this.nodeTestRehearsalFor(nodeType)))
+      .toBeVisible({ timeout });
+    await expect(this.page.locator(this.nodeTestOkFor(nodeType))).toHaveCount(0);
+  }
+
+  /**
+   * The destination node's output for a SUPPRESSED run — the `{"suppressed": true, ...}`
+   * preview, not a delivery receipt. Same two-parse shape as destinationIngestReceipt():
+   * the node output is an array of JSON strings (one per send).
+   */
+  async destinationSuppressionPreview() {
+    const raw = await this.nodeTestOutputText('destination');
+    const outer = JSON.parse(raw);
+    const first = Array.isArray(outer) ? outer[0] : outer;
+    return typeof first === 'string' ? JSON.parse(first) : first;
   }
 
   /** Assert a node painted an error badge after a test run (node_type e.g. 'destination','function').
