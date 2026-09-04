@@ -348,6 +348,13 @@ pub struct TriggerData {
     /// fetch hit its cap, §7.5) — history renders "≥ N". Absent = exact.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value_is_lower_bound: Option<bool>,
+    /// Which failure produced this row. The three synthetics failure paths share
+    /// one stream and one `status`, so only this separates them for an alert rule.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_source: Option<String>,
+    /// The venue the failed slot was scheduled for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
 }
 
 impl Default for TriggerData {
@@ -385,6 +392,8 @@ impl Default for TriggerData {
             level: None,
             group_label: None,
             value_is_lower_bound: None,
+            error_source: None,
+            location: None,
         }
     }
 }
@@ -433,6 +442,8 @@ impl TriggerData {
             level: Some(0),
             group_label: Some(String::new()),
             value_is_lower_bound: Some(false),
+            error_source: Some(String::new()),
+            location: Some(String::new()),
         }
     }
 
@@ -1756,6 +1767,8 @@ mod tests {
             level: None,
             group_label: None,
             value_is_lower_bound: None,
+            error_source: None,
+            location: None,
         };
 
         let json = serde_json::to_string(&trigger_data).unwrap();
@@ -2679,6 +2692,48 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .expect("one unknown row must not abort the cycle for every other org");
         assert_eq!(collected.len(), 4);
+    }
+
+    /// Every `TriggerData` writer shares one inferred schema, so an unset field must stay ABSENT.
+    #[test]
+    fn trigger_data_error_source_and_location_round_trip_and_omit_when_none() {
+        let bare = TriggerData::default();
+        assert_eq!(bare.error_source, None);
+        assert_eq!(bare.location, None);
+
+        let json = serde_json::to_value(&bare).expect("TriggerData must serialize");
+        assert!(json.get("error_source").is_none());
+        assert!(json.get("location").is_none());
+
+        let tagged = TriggerData {
+            error_source: Some("quota".to_string()),
+            location: Some("aws-us-east-1".to_string()),
+            ..TriggerData::default()
+        };
+        let json = serde_json::to_value(&tagged).expect("TriggerData must serialize");
+        assert_eq!(json["error_source"], "quota");
+        assert_eq!(json["location"], "aws-us-east-1");
+
+        let back: TriggerData =
+            serde_json::from_value(json).expect("a tagged row must read back unchanged");
+        assert_eq!(back, tagged);
+
+        let untagged: TriggerData = serde_json::from_value(
+            serde_json::to_value(&bare).expect("TriggerData must serialize"),
+        )
+        .expect("a row written before these fields existed must still deserialize");
+        assert_eq!(untagged.error_source, None);
+        assert_eq!(untagged.location, None);
+
+        let names = TriggerData::get_field_names();
+        for field in ["error_source", "location"] {
+            assert!(
+                names.contains(&field.to_string()),
+                "`skip_serializing_if` keeps `{field}` out of the reflection sample unless \
+                 `init_for_reflection` sets it, and a `triggers` schema without the column is a \
+                 column the quota alert rule can never fire on"
+            );
+        }
     }
 }
 

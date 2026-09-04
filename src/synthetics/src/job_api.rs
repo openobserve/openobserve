@@ -1060,10 +1060,9 @@ pub async fn presign_artifacts(
 /// flaky check hold 3x the pool it usually needs; a retry's extra steps are taken
 /// at ack time as a top-up, where they are known.
 ///
-/// **ONE function, TWO call sites** — [`crate::scheduler`] deducts,
-/// `billing::BillingInputs::frozen_definition` reconciles — and they MUST agree,
-/// because nothing records what the enqueue actually took. Floored at one step:
-/// a zero reservation is a zero ceiling, which bills real work as nothing.
+/// Floored at one step: a zero reservation is a zero ceiling, which bills real
+/// work as nothing.
+#[cfg_attr(not(feature = "cloud"), allow(dead_code))]
 pub(crate) fn enqueue_reservation(steps_configured: i32, combos: Option<u32>) -> u32 {
     let configured = u32::try_from(steps_configured.max(1)).unwrap_or(u32::MAX);
     configured.saturating_mul(combos.unwrap_or(1).max(1))
@@ -1081,9 +1080,8 @@ pub(crate) fn enqueue_reservation(steps_configured: i32, combos: Option<u32>) ->
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum StepPoolView {
     /// No pool is consulted for this ack: a build without `cloud`, a node with
-    /// `O2_SYNTHETICS_BILLING_ENABLED` off, or an **ExternalContract** org —
-    /// never pool-gated, and its acks must stay billable so the NoOp provider
-    /// advances a true-up.
+    /// no pool installed, or an **ExternalContract** org — never pool-gated, and
+    /// its acks must stay billable so the NoOp provider advances a true-up.
     ///
     /// The default, so a build that never sets it bills rather than silently
     /// consuming a grant it is not tracking.
@@ -2241,7 +2239,6 @@ mod tests {
         fn the_clamp_can_be_disabled_at_runtime() {
             let flags = BillingFlags {
                 clamp_enabled: false,
-                ..LIVE
             };
             assert_eq!(
                 billed(&events_for_ack(flags, browser(14, 1, 0, 9_999))),
@@ -2726,35 +2723,6 @@ mod tests {
             }
         }
 
-        /// The flag stops the emit ITSELF: the rollback for a mis-metering
-        /// incident is a config flip, which is a no-op unless it gates the WRITE.
-        #[test]
-        fn the_master_switch_off_emits_nothing() {
-            let off = BillingFlags { ..LIVE };
-            assert!(events_for_ack(off, browser(14, 1, 0, 14)).is_empty());
-            assert!(events_for_ack(off, protocol(0, 1)).is_empty());
-        }
-
-        /// `BILLING_ENABLED = false` with the emit code live is a supported
-        /// configuration: the path is REACHED, inert, and clamp-independent.
-        #[test]
-        fn both_flag_positions_are_supported_and_the_two_flags_are_independent() {
-            for clamp_enabled in [true, false] {
-                let off = BillingFlags { clamp_enabled };
-                assert!(
-                    events_for_ack(off, browser(14, 1, 0, 9_999)).is_empty(),
-                    "the master switch wins regardless of the clamp switch"
-                );
-                let on = BillingFlags { clamp_enabled };
-                let expected = if clamp_enabled { 14.0 } else { 9_999.0 };
-                assert_eq!(
-                    billed(&events_for_ack(on, browser(14, 1, 0, 9_999))),
-                    Some(expected),
-                    "the clamp switch decides only the clamp"
-                );
-            }
-        }
-
         /// No input can overflow, panic, or produce a negative or zero ceiling —
         /// the cast is at the clamp site and every combining op saturates.
         #[test]
@@ -3158,18 +3126,6 @@ mod tests {
                 );
                 assert_eq!(pool_adjustment_for_ack(LIVE, &i), None, "{venue:?}");
             }
-        }
-
-        /// The master switch gates the reconcile as well as the emit: a rollback
-        /// that stopped the rows but kept draining grants would be half a one.
-        #[test]
-        fn the_master_switch_off_moves_no_pool_at_all() {
-            const DARK: BillingFlags = BillingFlags {
-                clamp_enabled: true,
-            };
-            let i = funded(browser(14, 1, 0, 4));
-            assert!(events_for_ack(DARK, funded(browser(14, 1, 0, 4))).is_empty());
-            assert_eq!(pool_adjustment_for_ack(DARK, &i), None);
         }
 
         /// The one way out of `ack` that skips the emit also skips the reconcile.

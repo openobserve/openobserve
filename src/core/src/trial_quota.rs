@@ -59,6 +59,7 @@ use config::{
     },
     utils::json,
 };
+use openobserve_synthetics::pool::StepRemaining;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use utoipa::ToSchema;
@@ -133,6 +134,13 @@ pub enum TrialQuotaPool {
 }
 
 impl TrialQuotaPool {
+    /// Every variant. A new pool missing here is invisible to every scan built on it.
+    pub const ALL_POOLS: &'static [TrialQuotaPool] = &[
+        TrialQuotaPool::AiCredits,
+        TrialQuotaPool::SyntheticsBrowserSteps,
+        TrialQuotaPool::SyntheticsProtocolSteps,
+    ];
+
     /// Stable identifier used in the [`scope`] key and on the HA wire.
     pub fn key(&self) -> &'static str {
         match self {
@@ -158,13 +166,20 @@ impl TrialQuotaPool {
     /// Which pool a `trial_quota_usage.feature` value belongs to. `None` for a
     /// key a NEWER node wrote: guessing would spend one grant on another's usage.
     pub fn from_key_of_feature(feature: &str) -> Option<Self> {
-        [
-            TrialQuotaPool::AiCredits,
-            TrialQuotaPool::SyntheticsBrowserSteps,
-            TrialQuotaPool::SyntheticsProtocolSteps,
-        ]
-        .into_iter()
-        .find(|pool| pool.feature_keys().contains(&feature))
+        Self::ALL_POOLS
+            .iter()
+            .copied()
+            .find(|pool| pool.feature_keys().contains(&feature))
+    }
+
+    /// Exhaustive on purpose: a new variant must be classified before it compiles.
+    pub fn is_synthetics(self) -> bool {
+        match self {
+            TrialQuotaPool::AiCredits => false,
+            TrialQuotaPool::SyntheticsBrowserSteps | TrialQuotaPool::SyntheticsProtocolSteps => {
+                true
+            }
+        }
     }
 
     /// Every `trial_quota_usage.feature` value that spends from this pool; each
@@ -1027,37 +1042,6 @@ pub fn synthetics_steps_remaining(org_id: &str, is_browser: bool) -> u64 {
     get_remaining_for_pool(org_id, synthetics_pool(is_browser))
 }
 
-/// Reserve `steps` from the org's synthetics grant — all or nothing. `false`
-/// means the grant cannot cover this run (§7.1 gate 3).
-pub fn synthetics_steps_try_deduct(org_id: &str, is_browser: bool, steps: u64) -> bool {
-    try_deduct_units(org_id, synthetics_feature(is_browser), steps).is_ok()
-}
-
-/// Give `steps` back — the enqueue never happened (E10/E11, T29).
-pub fn synthetics_steps_refund(org_id: &str, is_browser: bool, steps: u64) {
-    refund_units(org_id, synthetics_feature(is_browser), steps);
-}
-
-/// Give back the reservation of a job that will NEVER ack — SPEC §6.3, E10.
-///
-/// Keyed, because the reaper scan can be re-entered. The direction is fixed at
-/// [`PoolAdjustment::Refund`] HERE rather than at each wiring site — inverting
-/// it turns a refund into a second charge against a grant the org can never get
-/// back. `false` means the key was already used.
-pub fn synthetics_steps_dead_letter_refund(
-    org_id: &str,
-    is_browser: bool,
-    steps: u64,
-    idempotency_key: &str,
-) -> bool {
-    apply_pool_adjustment(
-        org_id,
-        synthetics_feature(is_browser),
-        PoolAdjustment::Refund(steps),
-        idempotency_key,
-    )
-}
-
 /// Apply one idempotent ack-side reconcile — SPEC §6.3.
 pub fn synthetics_steps_adjust(
     org_id: &str,
@@ -1426,6 +1410,88 @@ pub async fn init_from_db() {
     }
 }
 
+/// Every `trial_quota_usage.feature` value that spends from a synthetics pool.
+///
+/// Composed from the pools' own `feature_keys`, never hand-written: it has to
+/// carry the pre-split `synthetics_steps`, or an org whose protocol usage
+/// predates the split reads `used = 0` and is handed the grant a second time.
+pub fn all_synthetics_features() -> Vec<&'static str> {
+    TrialQuotaPool::ALL_POOLS
+        .iter()
+        .filter(|pool| pool.is_synthetics())
+        .flat_map(|pool| pool.feature_keys().iter().copied())
+        .collect()
+}
+
+/// Steps left in each requested org's synthetics grants — SPEC §6.6, ONE read.
+///
+/// An org missing from the answer is UNGATED at the scheduler, so a failed read
+/// returns nothing at all rather than a map of zeroes.
+pub async fn synthetics_remaining_for_orgs(org_ids: Vec<String>) -> HashMap<String, StepRemaining> {
+    let conn = infra::db::get_orm_client_ro().await;
+    let rows = match infra::table::trial_quota_usage::get_for_orgs(
+        conn,
+        &org_ids,
+        &all_synthetics_features(),
+    )
+    .await
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            log::error!("[TRIAL_QUOTA] synthetics counter read failed: {e}");
+            return HashMap::new();
+        }
+    };
+    fold_synthetics_remaining(&org_ids, &rows)
+}
+
+/// EVERY requested org gets an entry, even with no rows: that is what separates
+/// "has not used it yet" from "absent, so ungated".
+pub(crate) fn fold_synthetics_remaining(
+    org_ids: &[String],
+    rows: &[infra::table::entity::trial_quota_usage::Model],
+) -> HashMap<String, StepRemaining> {
+    let mut used: HashMap<(&str, TrialQuotaPool), u64> = HashMap::new();
+    let mut limits: HashMap<(&str, TrialQuotaPool), u64> = HashMap::new();
+    for row in rows {
+        let Some(pool) = TrialQuotaPool::from_key_of_feature(&row.feature) else {
+            continue;
+        };
+        let entry = used.entry((row.org_id.as_str(), pool)).or_default();
+        *entry = entry.saturating_add(u64::try_from(row.usage_count).unwrap_or(0));
+        if let Some(limit) = row.usage_limit.and_then(|l| u64::try_from(l).ok()) {
+            limits
+                .entry((row.org_id.as_str(), pool))
+                .and_modify(|current| *current = (*current).max(limit))
+                .or_insert(limit);
+        }
+    }
+
+    org_ids
+        .iter()
+        .map(|org_id| {
+            // `force_deduct_units` lets usage pass the limit, so a plain subtraction is a panic.
+            let left = |pool| {
+                // The row's override beats `ORG_LIMITS`, which is empty until the first refresh.
+                limits
+                    .get(&(org_id.as_str(), pool))
+                    .copied()
+                    .unwrap_or_else(|| get_pool_limit(org_id, pool))
+                    .saturating_sub(used.get(&(org_id.as_str(), pool)).copied().unwrap_or(0))
+            };
+            (
+                org_id.clone(),
+                StepRemaining {
+                    browser: left(TrialQuotaPool::SyntheticsBrowserSteps),
+                    protocol: left(TrialQuotaPool::SyntheticsProtocolSteps),
+                    // No status pool exists yet, so it has nothing left in it.
+                    status: 0,
+                },
+            )
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1441,6 +1507,15 @@ mod tests {
         org_id
     }
 
+    /// Position of a pool in `ALL_POOLS`, exhaustive so a new variant must claim an index here.
+    fn ordinal(pool: TrialQuotaPool) -> usize {
+        match pool {
+            TrialQuotaPool::AiCredits => 0,
+            TrialQuotaPool::SyntheticsBrowserSteps => 1,
+            TrialQuotaPool::SyntheticsProtocolSteps => 2,
+        }
+    }
+
     const STEPS: TrialQuotaFeature = TrialQuotaFeature::SyntheticsBrowserSteps;
 
     /// `TrialQuotaFeature::pool` and `TrialQuotaPool::feature_keys` MUST agree,
@@ -1452,6 +1527,7 @@ mod tests {
             TrialQuotaFeature::NewIncident,
             TrialQuotaFeature::IncidentReAnalysis,
             TrialQuotaFeature::SyntheticsBrowserSteps,
+            TrialQuotaFeature::SyntheticsProtocolSteps,
         ] {
             let pool = feature.pool();
             assert!(
@@ -1465,19 +1541,6 @@ mod tests {
                 "{feature} must resolve back to its own pool from the DB key",
             );
         }
-    }
-
-    #[test]
-    fn pool_keys_round_trip_and_unknown_keys_are_rejected() {
-        for pool in [
-            TrialQuotaPool::AiCredits,
-            TrialQuotaPool::SyntheticsBrowserSteps,
-        ] {
-            assert_eq!(TrialQuotaPool::from_key(pool.key()), Some(pool));
-        }
-        assert_eq!(TrialQuotaPool::from_key("ingest"), None);
-        // A key a NEWER node writes must not be folded into a pool this build has.
-        assert_eq!(TrialQuotaPool::from_key_of_feature("future_feature"), None);
     }
 
     #[test]
@@ -1620,56 +1683,6 @@ mod tests {
         );
     }
 
-    /// **E10** — the reaper's refund gives steps BACK, and gives them back once.
-    /// The direction is the one thing no compiler can check: inverting it
-    /// charges the grant a second time instead of crediting it.
-    #[test]
-    fn e10_a_dead_letter_refund_credits_the_grant_and_is_idempotent() {
-        let org_id = steps_org("e10-reaper", 1_000);
-        assert!(try_deduct_units(&org_id, STEPS, 28).is_ok());
-        assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            28
-        );
-
-        // Distinct per test: the ledger is process-global.
-        let key = "chk_1\u{1f}aws-us-east-1\u{1f}1787665631000000\u{1f}job-reaper";
-        assert!(synthetics_steps_dead_letter_refund(&org_id, true, 28, key));
-        assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            0,
-            "a refund must give the reservation BACK — a top-up here would charge the org twice \
-             for a run that never happened",
-        );
-
-        assert!(!synthetics_steps_dead_letter_refund(&org_id, true, 28, key));
-        assert!(!synthetics_steps_dead_letter_refund(&org_id, true, 28, key));
-        assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            0
-        );
-    }
-
-    /// The reaper and the ack share ONE ledger and ONE key shape, so a job that
-    /// reached both paths moves the grant once — only while both build the SAME
-    /// key.
-    #[test]
-    fn a_reaper_refund_and_an_ack_reconcile_under_one_key_apply_once() {
-        let org_id = steps_org("e10-onekey", 1_000);
-        assert!(try_deduct_units(&org_id, STEPS, 28).is_ok());
-
-        let key = "chk_1\u{1f}aws-us-east-1\u{1f}1787665631000000\u{1f}job-onekey";
-        assert!(synthetics_steps_dead_letter_refund(&org_id, true, 28, key));
-        assert!(
-            !synthetics_steps_adjust(&org_id, true, PoolAdjustment::Refund(28), key),
-            "the ack-side reconcile must find the reaper's key already applied",
-        );
-        assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            0
-        );
-    }
-
     /// T27 — a key that swallowed everything would pass the first half and
     /// silently stop billing, so a DIFFERENT run's adjustment must still apply.
     #[test]
@@ -1738,34 +1751,33 @@ mod tests {
             0
         );
 
-        assert!(!synthetics_steps_try_deduct(&org_id, true, 1));
         let err = try_deduct_units(&org_id, STEPS, 1).unwrap_err();
         assert_eq!(err.usage_count, 26);
         assert_eq!(err.usage_limit, 20);
     }
 
+    /// All or nothing: a partial deduct would start a run the grant cannot pay for.
     #[test]
-    fn an_enqueue_deduct_that_does_not_fit_takes_nothing() {
+    fn a_deduct_that_does_not_fit_takes_nothing() {
         let org_id = steps_org("partial", 10);
-        assert!(!synthetics_steps_try_deduct(&org_id, true, 14));
+        assert!(try_deduct_units(&org_id, STEPS, 14).is_err());
         assert_eq!(
             get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0
         );
-        assert!(synthetics_steps_try_deduct(&org_id, true, 10));
+        assert!(try_deduct_units(&org_id, STEPS, 10).is_ok());
         assert_eq!(
             get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0
         );
     }
 
-    /// E10/E11, T29 — saturating rather than wrapping: a refund larger than the
-    /// recorded usage must read as zero used, not as 18 quintillion.
+    /// Saturating, not wrapping: an over-large refund must read as zero used, not 18 quintillion.
     #[test]
     fn a_refund_larger_than_the_usage_saturates_at_zero() {
         let org_id = steps_org("saturate", 1_000);
-        assert!(synthetics_steps_try_deduct(&org_id, true, 14));
-        synthetics_steps_refund(&org_id, true, 999_999);
+        assert!(try_deduct_units(&org_id, STEPS, 14).is_ok());
+        refund_units(&org_id, STEPS, 999_999);
         assert_eq!(
             get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0
@@ -1781,11 +1793,11 @@ mod tests {
     #[test]
     fn t32_raising_the_limit_reopens_an_exhausted_org_without_a_restart() {
         let org_id = steps_org("t32", 10);
-        assert!(synthetics_steps_try_deduct(&org_id, true, 10));
-        assert!(!synthetics_steps_try_deduct(&org_id, true, 1));
+        assert!(try_deduct_units(&org_id, STEPS, 10).is_ok());
+        assert!(try_deduct_units(&org_id, STEPS, 1).is_err());
 
         set_cached_limit(&org_id, TrialQuotaPool::SyntheticsBrowserSteps, 50);
-        assert!(synthetics_steps_try_deduct(&org_id, true, 1));
+        assert!(try_deduct_units(&org_id, STEPS, 1).is_ok());
         assert_eq!(
             get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             39
@@ -1795,8 +1807,8 @@ mod tests {
     #[test]
     fn t32_the_ha_queue_carries_the_new_limit_to_every_other_node() {
         let org_id = steps_org("t32-ha", 10);
-        assert!(synthetics_steps_try_deduct(&org_id, true, 10));
-        assert!(!synthetics_steps_try_deduct(&org_id, true, 1));
+        assert!(try_deduct_units(&org_id, STEPS, 10).is_ok());
+        assert!(try_deduct_units(&org_id, STEPS, 1).is_err());
 
         apply_ha_msg(&TrialQuotaHaMsg {
             org_id: org_id.clone(),
@@ -1812,7 +1824,7 @@ mod tests {
             get_limit_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             50
         );
-        assert!(synthetics_steps_try_deduct(&org_id, true, 1));
+        assert!(try_deduct_units(&org_id, STEPS, 1).is_ok());
         assert_eq!(
             get_limit_for_pool(&org_id, TrialQuotaPool::AiCredits),
             TrialQuotaPool::AiCredits.default_limit(),
@@ -1826,7 +1838,7 @@ mod tests {
     #[test]
     fn t33_a_month_boundary_leaves_the_one_time_pool_unchanged() {
         let org_id = steps_org("t33", 100);
-        assert!(synthetics_steps_try_deduct(&org_id, true, 60));
+        assert!(try_deduct_units(&org_id, STEPS, 60).is_ok());
         let before = get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps);
 
         // None of these reads takes a timestamp, so none of them can reset.
@@ -1843,8 +1855,8 @@ mod tests {
             100
         );
         // A grant that reset would let 60 more through on top of 60.
-        assert!(!synthetics_steps_try_deduct(&org_id, true, 41));
-        assert!(synthetics_steps_try_deduct(&org_id, true, 40));
+        assert!(try_deduct_units(&org_id, STEPS, 41).is_err());
+        assert!(try_deduct_units(&org_id, STEPS, 40).is_ok());
         assert_eq!(
             get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0
@@ -1871,6 +1883,29 @@ mod tests {
             assert!(
                 !source.contains(&banned),
                 "SPEC §6.1: the pool is a one-time grant — `{banned}` would make it periodic",
+            );
+        }
+    }
+
+    /// These are `pub`, so a leftover entry point raises no dead-code warning.
+    #[test]
+    fn no_synthetics_reservation_entry_point_survives() {
+        // CODE only: a comment naming what it forbids would satisfy the guard itself.
+        let source: String = include_str!("trial_quota.rs")
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        // Assembled at runtime so the guard cannot match its own text.
+        let banned = [
+            ["synthetics_steps", "_try", "_deduct"].concat(),
+            ["synthetics_steps", "_ref", "und"].concat(),
+            ["synthetics_steps", "_dead_letter", "_ref", "und"].concat(),
+        ];
+        for banned in banned {
+            assert!(
+                !source.contains(&banned),
+                "`{banned}` takes from a ONE-TIME grant the gate no longer gives back",
             );
         }
     }
@@ -2126,6 +2161,177 @@ mod tests {
             limits.get(&scope("acme", TrialQuotaPool::SyntheticsBrowserSteps)),
             None,
             "the step grant keeps its deployment default",
+        );
+    }
+
+    /// A pool missing from `ALL_POOLS` is unreachable from `from_key_of_feature`, so its rows
+    /// are never read and every org reads `used = 0` for it forever.
+    #[test]
+    fn all_pools_lists_every_variant_exactly_once() {
+        let listed = TrialQuotaPool::ALL_POOLS.len();
+        let mut seen = vec![None; listed];
+        for pool in TrialQuotaPool::ALL_POOLS {
+            let at = ordinal(*pool);
+            assert!(
+                seen[at].is_none(),
+                "{} shares index {at} with {:?} — ALL_POOLS lists a pool twice",
+                pool.key(),
+                seen[at],
+            );
+            seen[at] = Some(*pool);
+        }
+        assert!(
+            seen.iter().all(Option::is_some),
+            "the {listed} pools in ALL_POOLS do not cover the indices 0..{listed}",
+        );
+
+        // `ordinal` is exhaustive, so its arm count IS the number of variants.
+        let src = include_str!("trial_quota.rs");
+        let at = src
+            .find("fn ordinal(")
+            .expect("the ordinal helper must be in this file");
+        let end = at
+            + src[at..]
+                .find("\n    }")
+                .expect("the helper must close at module level");
+        assert_eq!(
+            src[at..end].matches("TrialQuotaPool::").count(),
+            listed,
+            "a pool has an ordinal but no ALL_POOLS entry, so every scan built on ALL_POOLS \
+             skips it silently",
+        );
+    }
+
+    /// A pool absent from `ALL_POOLS` or unresolvable by its own key is invisible to every scan.
+    #[test]
+    fn every_pool_round_trips_and_unknown_keys_are_rejected() {
+        for pool in TrialQuotaPool::ALL_POOLS {
+            assert_eq!(
+                TrialQuotaPool::from_key(pool.key()),
+                Some(*pool),
+                "{} must resolve back to its own variant",
+                pool.key(),
+            );
+            assert_eq!(
+                pool.is_synthetics(),
+                pool.key().starts_with("synthetics"),
+                "{} is classified against its own key, so a new pool cannot slip through \
+                 unclassified and read as 0 usage forever",
+                pool.key(),
+            );
+        }
+        assert_eq!(TrialQuotaPool::from_key("ingest"), None);
+        // A key a NEWER node writes must not be folded into a pool this build has.
+        assert_eq!(TrialQuotaPool::from_key_of_feature("future_feature"), None);
+    }
+
+    /// Omit the pre-split key and every org whose protocol usage predates the split is re-granted.
+    #[test]
+    fn all_synthetics_features_includes_the_pre_split_key() {
+        let mut features = all_synthetics_features();
+        let mut expected: Vec<&str> = TrialQuotaPool::SyntheticsBrowserSteps
+            .feature_keys()
+            .iter()
+            .chain(TrialQuotaPool::SyntheticsProtocolSteps.feature_keys())
+            .copied()
+            .collect();
+        features.sort_unstable();
+        expected.sort_unstable();
+        assert_eq!(
+            features, expected,
+            "the read's IN filter must be composed from the pools' own feature_keys, so a key \
+             added to a pool cannot be forgotten here",
+        );
+        assert!(
+            features.contains(&"synthetics_steps"),
+            "without the pre-split key an org whose protocol usage predates the split reads \
+             used = 0 and is handed the whole grant a second time",
+        );
+    }
+
+    /// Absent from the map means UNGATED at the gate, so "has not used it yet" must not land there.
+    #[test]
+    fn fold_synthetics_remaining_gives_every_requested_org_an_entry() {
+        let org_id = steps_org("fold-empty", 700);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 900);
+
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &[]);
+        let r = remaining
+            .get(&org_id)
+            .expect("an org with no rows has not used the feature — it is not absent");
+        assert_eq!(r.browser, 700);
+        assert_eq!(r.protocol, 900);
+        assert_eq!(r.status, 0, "the status pool arrives with Phase 2");
+    }
+
+    /// E14's force-deduct lets `usage_count` pass `usage_limit`, so the subtraction must saturate.
+    #[test]
+    fn fold_synthetics_remaining_saturates_when_used_exceeds_the_limit() {
+        let org_id = steps_org("fold-saturate", 10);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 10);
+        let rows = vec![
+            db_row(&org_id, "synthetics_browser_steps", 4_000),
+            db_row(&org_id, "synthetics_protocol_steps", 11),
+        ];
+
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows);
+        let r = remaining.get(&org_id).expect("the org was requested");
+        assert_eq!(
+            r.browser, 0,
+            "a wrapping subtraction hands an over-spent org 18 quintillion free steps",
+        );
+        assert_eq!(r.protocol, 0);
+    }
+
+    /// Both protocol feature keys spend one grant, and a browser row spends neither of them.
+    #[test]
+    fn fold_synthetics_remaining_sums_a_pools_feature_rows() {
+        let org_id = steps_org("fold-sum", 500);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 1_000);
+        let rows = vec![
+            db_row(&org_id, "synthetics_steps", 300),
+            db_row(&org_id, "synthetics_protocol_steps", 200),
+            db_row(&org_id, "synthetics_browser_steps", 100),
+        ];
+
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows);
+        let r = remaining.get(&org_id).expect("the org was requested");
+        assert_eq!(
+            r.protocol, 500,
+            "both protocol feature keys draw down one grant, or the split hands out two",
+        );
+        assert_eq!(
+            r.browser, 400,
+            "a browser row must not spend the protocol grant"
+        );
+    }
+
+    /// `ORG_LIMITS` is empty for ~10s after a restart, so the row's own override is the truth.
+    #[test]
+    fn fold_synthetics_remaining_prefers_the_rows_own_limit() {
+        let org_id = steps_org("fold-override", 100);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 100);
+        let mut browser = db_row(&org_id, "synthetics_browser_steps", 50);
+        browser.usage_limit = Some(5_000);
+        // The protocol pool's two feature rows, with the raise recorded on only one of them.
+        let mut protocol = db_row(&org_id, "synthetics_protocol_steps", 50);
+        protocol.usage_limit = Some(9_000);
+        let mut pre_split = db_row(&org_id, "synthetics_steps", 0);
+        pre_split.usage_limit = Some(5_000);
+
+        let remaining = fold_synthetics_remaining(
+            std::slice::from_ref(&org_id),
+            &[browser, protocol, pre_split],
+        );
+        let r = remaining.get(&org_id).expect("the org was requested");
+        assert_eq!(
+            r.browser, 4_950,
+            "a just-raised limit must not be judged against a stale process-global cache",
+        );
+        assert_eq!(
+            r.protocol, 8_950,
+            "the read has no ORDER BY, so a last-row-wins limit hands the gate whichever of a \
+             pool's rows arrived last while the org API reports the larger",
         );
     }
 

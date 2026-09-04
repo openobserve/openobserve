@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    ColumnTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
     sea_query::{Expr, Func, OnConflict},
 };
 
@@ -281,4 +281,112 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), sea_orm::DbErr> {
         .exec(db)
         .await?;
     Ok(())
+}
+
+/// One batched read of several orgs' counters, for the features of one pool set.
+///
+/// Both filters early-return on an empty slice: `is_in(&[])` is not a reliable
+/// "match nothing" here, and degrading to an unfiltered read would hand the
+/// caller the whole table.
+pub async fn get_for_orgs<C: ConnectionTrait>(
+    conn: &C,
+    org_ids: &[String],
+    features: &[&str],
+) -> Result<Vec<trial_quota_usage::Model>, sea_orm::DbErr> {
+    if org_ids.is_empty() || features.is_empty() {
+        return Ok(Vec::new());
+    }
+    trial_quota_usage::Entity::find()
+        .filter(trial_quota_usage::Column::OrgId.is_in(org_ids.iter().map(String::as_str)))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
+        .all(conn)
+        .await
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{
+        ActiveModelTrait, ActiveValue, ConnectOptions, ConnectionTrait, Database,
+        DatabaseConnection, Schema,
+    };
+
+    use super::*;
+
+    const AI: &str = "ai_chat";
+    const BROWSER: &str = "synthetics_browser_steps";
+    const PROTOCOL: &str = "synthetics_protocol_steps";
+    const SYNTHETICS: &[&str] = &[BROWSER, PROTOCOL];
+
+    /// One connection, not a pool: two connections to `sqlite::memory:` are two databases.
+    async fn db() -> DatabaseConnection {
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(&schema.create_table_from_entity(trial_quota_usage::Entity)))
+            .await
+            .unwrap();
+        db
+    }
+
+    async fn seed(db: &DatabaseConnection, org_id: &str, feature: &str, usage_count: i64) {
+        trial_quota_usage::ActiveModel {
+            org_id: ActiveValue::Set(org_id.to_string()),
+            feature: ActiveValue::Set(feature.to_string()),
+            usage_count: ActiveValue::Set(usage_count),
+            usage_limit: ActiveValue::Set(None),
+            updated_at: ActiveValue::Set(0),
+            notified_checkpoint: ActiveValue::Set(0),
+        }
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
+    fn pairs(rows: &[trial_quota_usage::Model]) -> Vec<(String, String, i64)> {
+        let mut out: Vec<(String, String, i64)> = rows
+            .iter()
+            .map(|r| (r.org_id.clone(), r.feature.clone(), r.usage_count))
+            .collect();
+        out.sort();
+        out
+    }
+
+    /// A leaked org or a leaked feature is a grant spent against the wrong pool.
+    #[tokio::test]
+    async fn get_for_orgs_returns_only_requested_orgs_and_features() {
+        let db = db().await;
+        seed(&db, "acme", BROWSER, 100).await;
+        seed(&db, "acme", PROTOCOL, 200).await;
+        seed(&db, "acme", AI, 5).await;
+        seed(&db, "beta", BROWSER, 7).await;
+        seed(&db, "gamma", BROWSER, 9).await;
+
+        let orgs = vec!["acme".to_string(), "beta".to_string()];
+        let rows = get_for_orgs(&db, &orgs, SYNTHETICS).await.unwrap();
+        assert_eq!(
+            pairs(&rows),
+            vec![
+                ("acme".to_string(), BROWSER.to_string(), 100),
+                ("acme".to_string(), PROTOCOL.to_string(), 200),
+                ("beta".to_string(), BROWSER.to_string(), 7),
+            ],
+            "an unrequested org or an AI-credit row must never reach the synthetics gate",
+        );
+
+        let rows = get_for_orgs(&db, &orgs, &[BROWSER]).await.unwrap();
+        assert_eq!(
+            pairs(&rows),
+            vec![
+                ("acme".to_string(), BROWSER.to_string(), 100),
+                ("beta".to_string(), BROWSER.to_string(), 7),
+            ],
+        );
+
+        assert!(
+            get_for_orgs(&db, &[], SYNTHETICS).await.unwrap().is_empty(),
+            "a tick that claimed nothing must not read the whole table",
+        );
+    }
 }

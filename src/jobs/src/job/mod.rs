@@ -320,10 +320,9 @@ pub async fn get_nats_lock(key: String) -> Result<String, anyhow::Error> {
 #[cfg(feature = "cloud")]
 fn synthetics_step_pool() -> Option<openobserve_synthetics::pool::StepPoolHooks> {
     Some(openobserve_synthetics::pool::StepPoolHooks {
-        try_deduct: openobserve_core::trial_quota::synthetics_steps_try_deduct,
-        refund: openobserve_core::trial_quota::synthetics_steps_refund,
-        remaining: openobserve_core::trial_quota::synthetics_steps_remaining,
-        dead_letter_refund: openobserve_core::trial_quota::synthetics_steps_dead_letter_refund,
+        remaining_for_orgs: |org_ids| {
+            Box::pin(openobserve_core::trial_quota::synthetics_remaining_for_orgs(org_ids))
+        },
     })
 }
 
@@ -1372,6 +1371,25 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
+    /// Byte range of the brace-balanced block opened at or after `at`.
+    fn block_from(src: &str, at: usize) -> (usize, usize) {
+        let open = at + src[at..].find('{').expect("a block must follow the anchor");
+        let mut depth = 0usize;
+        for (i, c) in src[open..].char_indices() {
+            match c {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return (open, open + i);
+                    }
+                }
+                _ => {}
+            }
+        }
+        panic!("the anchored block is not brace-balanced");
+    }
+
     /// **SPEC §6, item 2.3.** Losing the pool argument is silent: `init` still
     /// starts every worker, every check still runs, and the pool is simply never
     /// consulted — an unmetered, ungated fleet with no error anywhere (§11 F6).
@@ -1387,16 +1405,33 @@ mod tests {
             1,
             "`init` must be handed the pool; passing `None` unconditionally is an unmetered fleet"
         );
-        for hook in [
-            "synthetics_steps_try_deduct",
-            "synthetics_steps_refund",
-            "synthetics_steps_remaining",
-            "synthetics_steps_dead_letter_refund",
+        let hook = "synthetics_remaining_for_orgs";
+        assert_eq!(
+            source.matches(&["trial_quota::", hook].concat()).count(),
+            1,
+            "the `cloud` build must wire {hook} into the scheduler's pool hooks"
+        );
+
+        let literal = ["StepPoolHooks", " {"].concat();
+        let at = source
+            .find(&literal)
+            .expect("the `cloud` build must still construct the hooks");
+        let (open, end) = block_from(source, at);
+        let hooks = &source[open..end];
+        assert!(
+            hooks.contains(&["remaining_for_orgs", ":"].concat()),
+            "the batch read is the only hook left, so losing it is the ungated fleet of §11 F6"
+        );
+        for gone in [
+            ["try", "_deduct"].concat(),
+            ["dead_letter", "_ref", "und"].concat(),
+            ["ref", "und", ":"].concat(),
+            ["remaining", ":"].concat(),
         ] {
-            assert_eq!(
-                source.matches(&["trial_quota::", hook].concat()).count(),
-                1,
-                "the `cloud` build must wire {hook} into the scheduler\'s pool hooks"
+            assert!(
+                !hooks.contains(&gone),
+                "`{gone}` still wired here keeps the reservation model alive on a grant nothing \
+                 gives back any more"
             );
         }
     }

@@ -665,6 +665,8 @@ mod tests {
             level: None,
             group_label: None,
             value_is_lower_bound: None,
+            error_source: None,
+            location: None,
         }
     }
 
