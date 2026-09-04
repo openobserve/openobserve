@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <VariablesValueSelector
         v-if="globalVariables.length > 0 || dashboardData?.variables?.showDynamicFilters"
         :scope="'global'"
+        :tabId="selectedTabId"
         :variablesConfig="{ list: globalVariables }"
         :variablesManager="variablesManager"
         :selectedTimeDate="currentTimeObj['__global']"
@@ -516,17 +517,14 @@ export default defineComponent({
     provide("variablesManager", variablesManager);
 
     // Computed properties for filtered variables by scope
-    // `curatedTabs` narrows a GLOBAL variable to the tabs that declare it —
-    // curated pages need per-tab picker applicability but cannot use tab scope,
-    // because setTabVisibility skips all-sentinel variables and they would never
-    // fetch their options. Stored dashboards never carry the key, so they keep
-    // showing every global variable on every tab.
+    // Per-tab narrowing of a global variable (`curatedTabs`) is applied by
+    // VariablesValueSelector at RENDER time, not here: this list also decides
+    // whether the selector mounts at all, and a variable that is merely off-tab
+    // must still load, because panels on the tabs that do use it read its value.
     const globalVariables = computed(() => {
       return (
         props.dashboardData?.variables?.list?.filter(
-          (v: any) =>
-            (!v.scope || v.scope === "global") &&
-            (!v.curatedTabs || v.curatedTabs.includes(selectedTabId.value)),
+          (v: any) => !v.scope || v.scope === "global",
         ) || []
       );
     });
