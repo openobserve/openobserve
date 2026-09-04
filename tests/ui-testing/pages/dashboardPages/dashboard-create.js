@@ -281,6 +281,12 @@ export default class DashboardCreate {
       createRequest = await requestPromise;
       if (createRequest) {
         createResponse = await responsePromise;
+        // Fresh-org concurrent creates race server-side default-folder creation → the loser 500s on a unique-constraint; the folder now exists so a re-submit lands. Retry transient 5xx while attempts remain (nothing was created, so no duplicate); a persistent error still throws below.
+        if (createResponse && createResponse.status() >= 500 && attempt < submitAttempts) {
+          const stillOpen = await this.submitBtn.isVisible().catch(() => false);
+          if (!stillOpen) await this.openCreateDashboardDialog();
+          continue;
+        }
         break;
       }
 

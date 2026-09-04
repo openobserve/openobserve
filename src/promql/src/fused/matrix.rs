@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::{
     NAME_LABEL,
     value::{EvalContext, Value},
 };
 use datafusion::error::{DataFusionError, Result};
+use infra::errors::{Error, ErrorCodes};
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
@@ -89,7 +90,17 @@ pub(crate) async fn fused_agg(
         .into_iter()
         .map(|source| std::future::ready(Ok(source)))
         .collect();
-    let (value, _) = fold_sources(sources, params, timeout).await?;
+    let (value, _) =
+        tokio::time::timeout(Duration::from_secs(timeout), fold_sources(sources, params))
+            .await
+            .map_err(|_| {
+                DataFusionError::Plan(
+                    Error::ErrorCode(ErrorCodes::SearchTimeout(
+                        "[PromQL] fused agg timeout".to_string(),
+                    ))
+                    .to_string(),
+                )
+            })??;
 
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) completed in {:?}, folded {input_series} series into {} series",

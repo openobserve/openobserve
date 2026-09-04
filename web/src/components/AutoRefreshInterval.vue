@@ -172,6 +172,7 @@ import {
   onActivated,
   onDeactivated,
   onMounted,
+  onUnmounted,
   type PropType,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -360,6 +361,10 @@ export default defineComponent({
     });
 
     onDeactivated(() => {
+      clearInterval(intervalInstance);
+    });
+
+    onUnmounted(() => {
       clearInterval(intervalInstance);
     });
 
