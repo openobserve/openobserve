@@ -32,7 +32,7 @@ use hashbrown::HashMap;
 use infra::errors::ErrorCodes;
 use promql_parser::{
     label::{MatchOp, Matchers},
-    parser::{LabelModifier, MatrixSelector, Offset, VectorSelector},
+    parser::{LabelModifier, Offset, VectorSelector},
 };
 use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
@@ -483,7 +483,8 @@ impl Engine {
     /// same contexts; `None` only when the query shape rules the streaming path out up front.
     pub(super) async fn try_streaming_fused_agg(
         &mut self,
-        matrix_selector: &MatrixSelector,
+        vs: &VectorSelector,
+        range: Duration,
         modifier: &Option<LabelModifier>,
         func: Arc<dyn functions::RangeFunc>,
         op: fused::FusedAggOp,
@@ -501,8 +502,6 @@ impl Engine {
         {
             return Ok(None);
         }
-        let MatrixSelector { vs, range } = matrix_selector;
-        let range = *range;
         let selector = named_selector(plain_selector(vs, "MatrixSelector")?, "MatrixSelector")?;
         let table_name = selector.name.clone().unwrap();
         let timeout = query_ctx.timeout;
@@ -1244,7 +1243,7 @@ mod tests {
             });
         }
 
-        async fn eval_sum_rate(provider: StreamingProvider, timeout: u64) -> Result<Value> {
+        fn engine(provider: StreamingProvider, timeout: u64) -> Engine {
             enable_streaming();
             let eval_ctx = EvalContext::new(
                 BASE + 60 * SECOND,
@@ -1259,9 +1258,83 @@ mod tests {
             );
             ctx.start = eval_ctx.start;
             ctx.end = eval_ctx.end;
-            let mut engine = Engine::new("test_trace", Arc::new(ctx), eval_ctx);
-            let expr = promql_parser::parser::parse("sum(rate(m[1m]))").unwrap();
+            Engine::new("test_trace", Arc::new(ctx), eval_ctx)
+        }
+
+        async fn eval_query(
+            provider: StreamingProvider,
+            timeout: u64,
+            query: &str,
+        ) -> Result<Value> {
+            let mut engine = engine(provider, timeout);
+            let expr = promql_parser::parser::parse(query).unwrap();
             engine.exec(&expr).await.map(|(value, _)| value)
+        }
+
+        async fn eval_sum_rate(provider: StreamingProvider, timeout: u64) -> Result<Value> {
+            eval_query(provider, timeout, "sum(rate(m[1m]))").await
+        }
+
+        /// The generic instant path: `eval_vector_selector` then the plain aggregation.
+        async fn generic_instant_agg(
+            provider: StreamingProvider,
+            selector: &str,
+            modifier: &Option<LabelModifier>,
+            agg: fn(&Option<LabelModifier>, Value, &EvalContext) -> Result<Value>,
+        ) -> Value {
+            let mut engine = engine(provider, 30);
+            let promql_parser::parser::Expr::VectorSelector(vs) =
+                promql_parser::parser::parse(selector).unwrap()
+            else {
+                panic!("{selector} is not a vector selector");
+            };
+            let data = engine.eval_vector_selector(&vs).await.unwrap();
+            let eval_ctx = engine.eval_ctx.clone();
+            agg(modifier, Value::Matrix(data), &eval_ctx).unwrap()
+        }
+
+        /// (sorted labels, (timestamp, value)) per series, sorted by labels.
+        type CanonicalSeries = (Vec<(String, String)>, Vec<(i64, f64)>);
+
+        fn canonical(value: Value) -> Vec<CanonicalSeries> {
+            let Value::Matrix(matrix) = value else {
+                panic!("expected a matrix, got {}", value.get_type());
+            };
+            let mut series: Vec<_> = matrix
+                .into_iter()
+                .map(|series| {
+                    let mut labels: Vec<_> = series
+                        .labels
+                        .iter()
+                        .map(|label| (label.name.clone(), label.value.clone()))
+                        .collect();
+                    labels.sort();
+                    let samples = series
+                        .samples
+                        .iter()
+                        .map(|sample| (sample.timestamp, sample.value))
+                        .collect();
+                    (labels, samples)
+                })
+                .collect();
+            series.sort_by(|a, b| a.0.cmp(&b.0));
+            series
+        }
+
+        fn assert_same_matrix(expected: Value, actual: Value, context: &str) {
+            let (expected, actual) = (canonical(expected), canonical(actual));
+            assert_eq!(expected.len(), actual.len(), "{context}: series count");
+            for (expected, actual) in expected.iter().zip(&actual) {
+                assert_eq!(expected.0, actual.0, "{context}: labels");
+                assert_eq!(expected.1.len(), actual.1.len(), "{context}: sample count");
+                for ((ts_e, v_e), (ts_a, v_a)) in expected.1.iter().zip(&actual.1) {
+                    assert_eq!(ts_e, ts_a, "{context}: timestamp");
+                    assert!(
+                        (v_e - v_a).abs() <= 1e-9,
+                        "{context}: {v_e} vs {v_a} at {ts_e}"
+                    );
+                }
+            }
         }
 
         #[tokio::test]
@@ -1279,6 +1352,46 @@ mod tests {
             assert!(matches!(
                 infra::errors::Error::from(err),
                 infra::errors::Error::ErrorCode(ErrorCodes::SearchTimeout(_))
+            ));
+        }
+
+        /// `agg(m)` streams as `agg(last_over_time(m[lookback]))` and must match the generic
+        /// instant path, both when it streams and when it materializes on the same context.
+        #[tokio::test]
+        async fn test_instant_agg_matches_generic_streaming_and_materialized() {
+            type Agg = fn(&Option<LabelModifier>, Value, &EvalContext) -> Result<Value>;
+            let cases: [(&str, &str, Agg); 4] = [
+                ("sum(m)", "m", crate::aggregations::sum),
+                ("count(m)", "m", crate::aggregations::count),
+                (
+                    "avg(m offset 30s)",
+                    "m offset 30s",
+                    crate::aggregations::avg,
+                ),
+                (
+                    "max(m offset 30s)",
+                    "m offset 30s",
+                    crate::aggregations::max,
+                ),
+            ];
+            for (query, selector, agg) in cases {
+                let expected =
+                    generic_instant_agg(provider(false, false), selector, &None, agg).await;
+                let streamed = eval_query(provider(true, false), 30, query).await.unwrap();
+                assert_same_matrix(expected.clone(), streamed, &format!("streamed {query}"));
+                let materialized = eval_query(provider(false, false), 30, query).await.unwrap();
+                assert_same_matrix(expected, materialized, &format!("materialized {query}"));
+            }
+        }
+
+        #[tokio::test]
+        async fn test_instant_agg_takes_the_streaming_path() {
+            let err = eval_query(provider(true, true), 30, "sum(m)")
+                .await
+                .unwrap_err();
+            assert!(matches!(
+                infra::errors::Error::from(err),
+                infra::errors::Error::ErrorCode(ErrorCodes::SearchCancelQuery(_))
             ));
         }
 
