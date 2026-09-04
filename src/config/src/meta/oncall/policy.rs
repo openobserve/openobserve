@@ -194,6 +194,59 @@ pub fn team_channel<'a>(team: Option<&'a [String]>, policy: &'a [String]) -> &'a
     }
 }
 
+// ── Fanning one firing out to several teams (07 I-D2) ────────────────────────
+
+/// How many teams one firing may wake before it is treated as a grouping
+/// mistake rather than as that many outages.
+///
+/// A `GROUP BY` that suddenly spans fifteen teams is somebody's alert
+/// definition, not fifteen outages, and paging all fifteen is the fastest way
+/// to teach a whole org to ignore the pager. Five is above any real multi-team
+/// failure anybody has described and well below "everyone".
+pub const MAX_FANOUT_TEAMS: usize = 5;
+
+/// How many of a team's other groups the timeline names before it stops
+/// counting. A `GROUP BY` has no bound, and a timeline entry does.
+const NAMED_GROUPS: usize = 5;
+
+/// The line one team's record carries when the firing woke more than one team.
+///
+/// A responder has to be able to tell "my team's own page" from "part of
+/// something wider" without opening three screens, and their own other groups
+/// are the difference between "payments is down" and "payments and search are
+/// down and I am only being told about one of them".
+pub fn fanout_note(mine: &str, also_mine: &[String], other_teams: usize) -> String {
+    let mut note = format!("paged for {mine}");
+    if !also_mine.is_empty() {
+        let named = also_mine
+            .iter()
+            .take(NAMED_GROUPS)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ");
+        note.push_str(&format!(", and {named}"));
+        if also_mine.len() > NAMED_GROUPS {
+            note.push_str(&format!(" and {} more", also_mine.len() - NAMED_GROUPS));
+        }
+        note.push_str(" — all owned by this team, so this is one page");
+    }
+    if other_teams > 0 {
+        note.push_str(&format!(
+            "; {other_teams} other team(s) were paged for the same firing"
+        ));
+    }
+    note
+}
+
+/// The line the one record carries when a firing spanned more teams than
+/// [`MAX_FANOUT_TEAMS`].
+pub fn fanout_capped_note(teams: usize) -> String {
+    format!(
+        "this firing spans {teams} teams, which is a grouping mistake rather than {teams} \
+         outages; one page was sent instead of {teams}, and the alert's grouping needs a look"
+    )
+}
+
 // ── The liaison seat (D-21) ──────────────────────────────────────────────────
 
 /// How many rungs an **impacted** team's record climbs.
@@ -1630,6 +1683,53 @@ mod tests {
     #[test]
     fn test_a_rung_with_no_channels_plans_nothing() {
         assert!(channel_plan(&[]).is_empty());
+    }
+
+    // ── Fanning one firing out to several teams (07 I-D2) ───────────────────
+
+    /// A responder has to be able to tell their team's own page from part of
+    /// something wider, and to know that their team's other broken groups are
+    /// on this record rather than on one nobody opened.
+    #[test]
+    fn test_the_fanout_note_says_whose_page_this_is_and_how_wide_it_is() {
+        let alone = fanout_note("k8s-namespace=payments", &[], 0);
+        assert_eq!(alone, "paged for k8s-namespace=payments");
+
+        let wider = fanout_note("k8s-namespace=payments", &[], 2);
+        assert!(wider.contains("2 other team(s)"));
+
+        let mine = fanout_note(
+            "k8s-namespace=payments",
+            &["k8s-namespace=billing".to_string()],
+            1,
+        );
+        assert!(mine.contains("k8s-namespace=billing"));
+        assert!(mine.contains("one page"), "{mine}");
+        assert!(mine.contains("1 other team(s)"));
+    }
+
+    /// A `GROUP BY` has no bound and a timeline entry does, so a team owning
+    /// fifty broken groups gets a line somebody can read rather than fifty
+    /// paths.
+    #[test]
+    fn test_the_fanout_note_stops_counting_groups() {
+        let many: Vec<String> = (0..50).map(|i| format!("k8s-namespace=ns{i}")).collect();
+        let note = fanout_note("k8s-namespace=payments", &many, 0);
+        assert!(note.contains("and 45 more"), "{note}");
+        assert!(note.contains("k8s-namespace=ns4"));
+        assert!(!note.contains("k8s-namespace=ns6"), "{note}");
+    }
+
+    /// Fifteen teams is somebody's alert definition, not fifteen outages. The
+    /// note has to say that, because the fix is to the grouping and nobody will
+    /// find it from a page that simply arrived.
+    #[test]
+    fn test_the_capped_note_blames_the_grouping_not_the_estate() {
+        let note = fanout_capped_note(15);
+        assert!(note.contains("15 teams"));
+        assert!(note.contains("grouping"));
+        // A cap outside this range is either useless or is itself the noise.
+        const { assert!(MAX_FANOUT_TEAMS > 1 && MAX_FANOUT_TEAMS < 10) };
     }
 
     // ── Where the team's channel lives (Change 1) ───────────────────────────

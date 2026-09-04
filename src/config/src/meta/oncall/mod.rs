@@ -46,9 +46,9 @@ pub use contact::{Contact, ContactError, normalize_phone};
 pub use policy::{
     AfterRung, BREAKER_OPEN_MICROS, BREAKER_WINDOW_MICROS, Channel, ChannelBreaker,
     DEFAULT_PAGING_PRIORITY, EscalationPolicy, FALLBACK_ORDER, LadderAction, LadderStep,
-    MAX_SEND_ATTEMPTS, MAX_TRANSPORT_ATTEMPTS, MAX_TRANSPORT_BACKOFF_MICROS, PolicyError,
-    PriorityRung, RungOutcome, TRANSPORT_BACKOFF_MICROS, after_rung, fallback_chain, plan,
-    retry_delay_micros,
+    MAX_FANOUT_TEAMS, MAX_SEND_ATTEMPTS, MAX_TRANSPORT_ATTEMPTS, MAX_TRANSPORT_BACKOFF_MICROS,
+    PolicyError, PriorityRung, RungOutcome, TRANSPORT_BACKOFF_MICROS, after_rung, fallback_chain,
+    fanout_capped_note, fanout_note, plan, retry_delay_micros,
 };
 pub use preset::{
     CATCH_ALL_PRIORITY, DEFAULT_HANDOVER_MICROS, Group, MAX_FOLLOW_THE_SUN_GROUPS,
