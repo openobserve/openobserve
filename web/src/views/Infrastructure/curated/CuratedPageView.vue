@@ -20,6 +20,7 @@ import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
+import type { I18nKey } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
@@ -225,6 +226,11 @@ const onStripSetup = (group: HiddenGroupInfo["group"] | StaleGroupInfo["group"])
   }
   expandedSetupSlug.value = expandedSetupSlug.value === group.setup.slug ? null : group.setup.slug;
 };
+
+/** A caveat about the active section's panels as a SET (§6.3) — never per tile. */
+const sectionNoteKey = computed(
+  () => (dashboard.value as any)?.curatedSectionNoteKey as I18nKey | undefined,
+);
 
 // ── Stale banner + positive freshness ───────────────────────────────────────
 
@@ -714,6 +720,12 @@ watch(
                 >
               </div>
             </OCollapsible>
+
+            <!-- Last in the region, so it sits directly above the grid it
+                 qualifies rather than being pushed off by banners. -->
+            <OText v-if="sectionNoteKey" variant="meta" data-test="curated-section-note">{{
+              t(sectionNoteKey)
+            }}</OText>
           </div>
         </template>
       </RenderDashboardCharts>

@@ -1906,9 +1906,11 @@ describe("PanelContainer", () => {
       expect(emptyResult.options.series.length).toBe(populated.options.series.length);
     });
 
-    it("renders curated_subtitle_key beside the title, and nothing when it is absent", () => {
-      // Three phase tiles that visibly fail to sum to the fleet read as a page bug
-      // unless the tiles say they are three of five phases.
+    // The inline subtitle was withdrawn: sharing the one-line PanelBar with the
+    // title, it consumed the width and truncated the titles it qualified
+    // ("Pods ru…", "Pods pe…", "Pods f…" — user-reported). The disclosure now
+    // lives once per section; the bar carries the title alone.
+    it("never renders a subtitle in the title bar, even when a key is stamped", () => {
       wrapper = createWrapper({
         data: {
           ...mockPanelData,
@@ -1916,13 +1918,30 @@ describe("PanelContainer", () => {
         },
         viewOnly: true,
       });
-      const subtitle = wrapper.find('[data-test="dashboard-panel-curated-subtitle"]');
-      expect(subtitle.exists()).toBe(true);
-      expect(subtitle.text()).toContain("Three of five phases");
-      wrapper.unmount();
-
-      wrapper = createWrapper({ data: mockPanelData, viewOnly: true });
       expect(wrapper.find('[data-test="dashboard-panel-curated-subtitle"]').exists()).toBe(false);
+    });
+
+    it("gives the title the full bar — nothing between it and the flex spacer", () => {
+      // The truncation was structural, not cosmetic: a sibling in the same
+      // one-line flex row takes width the title then has to ellipsise into.
+      // Pinned on the DOM shape so a future inline sibling reintroduces it red.
+      wrapper = createWrapper({
+        data: {
+          ...mockPanelData,
+          title: "Pods running",
+          config: { curated_subtitle_key: "infra.k8s.panel.podsFailedSub" },
+        },
+        viewOnly: true,
+      });
+      const bar = wrapper.find('[data-test="dashboard-panel-bar"]');
+      const header = bar.find('[data-test="dashboard-panel-header"]');
+      expect(header.exists()).toBe(true);
+      // The title element must not be forced to shrink by a sibling before the
+      // spacer: its immediate next sibling IS the spacer.
+      const children = Array.from(bar.element.children);
+      const headerIndex = children.indexOf(header.element);
+      const next = children[headerIndex + 1] as HTMLElement;
+      expect(next?.className).toContain("flex-1");
     });
   });
 });

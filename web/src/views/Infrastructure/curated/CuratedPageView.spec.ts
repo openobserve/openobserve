@@ -891,9 +891,35 @@ describe("CuratedPageView", () => {
       );
     });
 
-    // The "— no data" tile state and the phase-tile subtitle both render ON the
-    // tile (§6.3), so they are pinned in PanelContainer.spec.ts against the real
-    // series-data-update seam rather than a page-level footnote list.
+    // The "— no data" tile state renders ON the tile (§6.3), so it is pinned in
+    // PanelContainer.spec.ts against the real series-data-update seam rather
+    // than a page-level footnote list. The phase disclosure is NOT a tile
+    // concern — it is a fact about the trio, so it is a section-level line.
+
+    it("renders the active section's note in the banner region, above the panels", async () => {
+      wrapper = await mountView(
+        {},
+        {
+          dashboard: ref({
+            ...dashboardFixture(),
+            curatedSectionNoteKey: "infra.k8s.section.overviewNote",
+          }),
+        },
+      );
+      const note = wrapper.find('[data-test="curated-section-note"]');
+      expect(note.exists()).toBe(true);
+      expect(note.text()).toContain("Succeeded");
+      // In the slot, so it scrolls WITH the tiles it qualifies — a note the user
+      // has to scroll away from the tiles to find is not a disclosure.
+      expect(wrapper.find(".render-stub").find('[data-test="curated-section-note"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("renders NO note for a section that declares none", async () => {
+      wrapper = await mountView();
+      expect(wrapper.find('[data-test="curated-section-note"]').exists()).toBe(false);
+    });
 
     it("the positive freshness line renders on a healthy page and is ABSENT when anything is stale", async () => {
       wrapper = await mountView();

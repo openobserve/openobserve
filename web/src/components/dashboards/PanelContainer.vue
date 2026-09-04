@@ -54,13 +54,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ props.data.title }}
         </div>
-        <span
-          v-if="curatedSubtitle"
-          class="text-text-muted truncate text-xs"
-          data-test="dashboard-panel-curated-subtitle"
-        >
-          {{ t(curatedSubtitle) }}
-        </span>
         <OTag
           v-if="curatedBadge"
           variant="amber-soft"
@@ -575,10 +568,6 @@ export default defineComponent({
         : "";
       return { duration, date: badge.date };
     });
-    const curatedSubtitle = computed(
-      () => props.data?.config?.curated_subtitle_key as string | undefined,
-    );
-
     // need PanleSchemaRendererRef for table download as a csv
     const PanleSchemaRendererRef: any = ref(null);
 
@@ -1054,7 +1043,6 @@ export default defineComponent({
       props,
       curatedBadge,
       curatedBadgeParams,
-      curatedSubtitle,
       curatedNoData,
       onCuratedSeriesData,
       alertDisabledReason,
