@@ -326,6 +326,7 @@ export type ExperimentComparisonAssignment =
 export type ExperimentComparisonScoreDataType = "numeric" | "categorical" | "boolean";
 
 export interface ExperimentComparisonDimension {
+  id: string;
   name: string;
   kind: "score" | "cost" | "latency";
   /** Score value type; null for the cost and latency dimensions. */
@@ -338,8 +339,10 @@ export interface ExperimentComparisonDimension {
   delta: number | null;
   /** Change in the better direction; positive always means improved. */
   orientedDelta: number | null;
-  /** Whether the dimension declares a comparison policy and can vote. */
+  /** Whether the dimension is selected and can vote on the outcome. */
   gating: boolean;
+  /** Whether the dimension has a comparison policy and can be selected. */
+  canAffectOutcome: boolean;
   /** Whether orientedDelta is a fraction of the configured range, not raw units. */
   normalized: boolean;
   baselineSampleCount: number;
@@ -375,6 +378,7 @@ export interface ExperimentComparison {
   candidateId: string;
   datasetId: string;
   threshold: number;
+  outcomeDimensions: string[];
   assignmentRule: string;
   counts: {
     baselineRows: number;
@@ -739,6 +743,7 @@ function normalizeComparisonDimension(input: any): ExperimentComparisonDimension
     null,
   );
   return {
+    id: String(input?.id ?? ""),
     name: String(input?.name ?? ""),
     kind: input?.kind,
     dataType: value(input, "dataType", "data_type", null),
@@ -750,6 +755,7 @@ function normalizeComparisonDimension(input: any): ExperimentComparisonDimension
     delta: value(input, "delta", "delta", null),
     orientedDelta: value(input, "orientedDelta", "oriented_delta", null),
     gating: Boolean(value(input, "gating", "gating", false)),
+    canAffectOutcome: Boolean(value(input, "canAffectOutcome", "can_affect_outcome", input?.gating ?? false)),
     normalized: Boolean(value(input, "normalized", "normalized", false)),
     baselineSampleCount: Number(value(input, "baselineSampleCount", "baseline_sample_count", 0)),
     candidateSampleCount: Number(value(input, "candidateSampleCount", "candidate_sample_count", 0)),
@@ -769,6 +775,7 @@ export function normalizeExperimentComparison(input: any): ExperimentComparison 
     candidateId: value(input, "candidateId", "candidate_id", ""),
     datasetId: value(input, "datasetId", "dataset_id", ""),
     threshold: Number(input?.threshold ?? 0),
+    outcomeDimensions: value(input, "outcomeDimensions", "outcome_dimensions", []),
     assignmentRule: value(input, "assignmentRule", "assignment_rule", ""),
     counts: {
       baselineRows: Number(value(counts, "baselineRows", "baseline_rows", 0)),
@@ -869,9 +876,15 @@ const llmExperimentsService = {
     // a client-side default silently overrides it (a 0 here makes every
     // movement a regression).
     threshold?: number,
+    outcomeDimensions?: string[],
   ): Promise<ExperimentComparison> {
     const response = await http().get(`${base(orgId)}/compare`, {
-      params: { baselineId, candidateId, ...(threshold === undefined ? {} : { threshold }) },
+      params: {
+        baselineId,
+        candidateId,
+        ...(outcomeDimensions === undefined ? {} : { outcomeDimensions: outcomeDimensions.join(",") }),
+        ...(threshold === undefined ? {} : { threshold }),
+      },
     });
     return normalizeExperimentComparison(response.data);
   },
