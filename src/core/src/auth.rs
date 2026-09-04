@@ -692,6 +692,8 @@ pub async fn check_permissions(
     true
 }
 
+// OSS has no folder boundary to cross, so this allows where the `check_permissions`
+// stub above denies: there is no folder ACL to consult, not a failed lookup.
 #[cfg(not(feature = "enterprise"))]
 pub async fn check_folder_write_permissions(
     _org_id: &str,
@@ -704,6 +706,9 @@ pub async fn check_folder_write_permissions(
 
 /// A source-folder check proves the caller may take the object out, never that
 /// they may put it into a destination folder they cannot otherwise reach.
+///
+/// Accepts POST or PUT: creating an object in a folder is authorized as POST on
+/// the folder, so a move or clone into it must not demand a stricter grant.
 #[cfg(feature = "enterprise")]
 pub async fn check_folder_write_permissions(
     org_id: &str,
@@ -711,18 +716,24 @@ pub async fn check_folder_write_permissions(
     folder_type: &str,
     folder_id: &str,
 ) -> bool {
-    check_permissions(
-        folder_id,
-        org_id,
-        user_id,
-        folder_type,
-        "PUT",
-        None,
-        false,
-        false,
-        true,
-    )
-    .await
+    for method in ["POST", "PUT"] {
+        if check_permissions(
+            folder_id,
+            org_id,
+            user_id,
+            folder_type,
+            method,
+            None,
+            false,
+            false,
+            true,
+        )
+        .await
+        {
+            return true;
+        }
+    }
+    false
 }
 
 #[cfg(feature = "enterprise")]

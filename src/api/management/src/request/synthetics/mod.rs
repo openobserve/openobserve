@@ -477,19 +477,26 @@ pub async fn update_synthetic(
         return MetaHttpResponse::forbidden("Forbidden");
     }
 
-    // An update carrying a folder_id is also a move, and the check above only covers the `?folder=`
-    // gate folder.
+    // An update that changes folder_id is also a move, so the destination needs
+    // its own check — the gate above only covers `?folder=`. Compared against the
+    // stored folder because a plain edit round-trips the current one unchanged.
     #[cfg(feature = "enterprise")]
-    if !body.folder_id.is_empty()
-        && !check_folder_write_permissions(
-            &org_id,
-            &user_email.user_id,
-            "synthetic_folder",
-            &body.folder_id,
-        )
-        .await
-    {
-        return MetaHttpResponse::forbidden("Forbidden");
+    if !body.folder_id.is_empty() {
+        let current = openobserve_synthetics::service::folder_of(&org_id, &id)
+            .await
+            .ok()
+            .flatten();
+        if current.as_deref() != Some(body.folder_id.as_str())
+            && !check_folder_write_permissions(
+                &org_id,
+                &user_email.user_id,
+                "synthetic_folder",
+                &body.folder_id,
+            )
+            .await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
     }
 
     match openobserve_synthetics::service::update_synthetic(&org_id, &id, body).await {
