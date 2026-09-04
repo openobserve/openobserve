@@ -38,6 +38,7 @@ import {
   type CuratedWarning,
   type HiddenGroupInfo,
   type PartialGroupInfo,
+  type PickerOption,
   type ProbeVerdict,
   type StaleGroupInfo,
   type StreamListEntry,
@@ -71,6 +72,8 @@ export interface UseCuratedPageResult {
   refresh: (args: { orgId: string; start: number; end: number; force?: boolean }) => Promise<void>;
   /** Re-emits the dashboard from the last resolution (tab switch) — no network. */
   rebuild: () => void;
+  /** Remember a picker's fetched values so the next rebuild re-emits them. */
+  rememberPickerOptions: (variables: unknown) => void;
 }
 
 export function useCuratedPage(
@@ -86,6 +89,10 @@ export function useCuratedPage(
 ): UseCuratedPageResult {
   const store = useStore();
   const { getStreams, getStream } = useStreams(gt);
+
+  // A rebuild re-initializes the variables manager, which never re-fetches an
+  // all-sentinel picker — so the options loaded so far have to ride the rebuild.
+  const pickerOptions: Record<string, PickerOption[]> = {};
 
   // Read per refresh, never snapshotted: the drawer is reused across ?host= switches and lastSeenUs lands after mount.
   const readPins = (): CuratedPagePins => toValue(opts?.pins) ?? {};
@@ -507,6 +514,17 @@ export function useCuratedPage(
     if (lastResolution) applyResolution(lastResolution);
   };
 
+  /** RenderDashboardCharts emits { isVariablesLoading, values } — see its getMergedVariablesForPanel. */
+  const rememberPickerOptions = (variables: unknown) => {
+    const values = (variables as { values?: unknown })?.values;
+    if (!Array.isArray(values)) return;
+    for (const variable of values as { name?: string; options?: PickerOption[] }[]) {
+      if (!variable?.name || !Array.isArray(variable.options)) continue;
+      if (variable.options.length === 0) continue;
+      pickerOptions[variable.name] = variable.options;
+    }
+  };
+
   const applyResolution = (resolution: CuratedResolution) => {
     lastResolution = resolution;
     hiddenGroups.value = resolution.hiddenGroups;
@@ -530,6 +548,7 @@ export function useCuratedPage(
         nowUs: Date.now() * 1000,
         activeSectionId,
         drilldownRange: readDrilldownRange(),
+        pickerOptions,
       });
       // buildDashboard emits KEYS, so titles are resolved here — outside the pure layer, once per build.
       dashboard.value = translateTitles(built, manifest);
@@ -650,6 +669,7 @@ export function useCuratedPage(
     presentGroupIds,
     refresh,
     rebuild,
+    rememberPickerOptions,
   };
 }
 
