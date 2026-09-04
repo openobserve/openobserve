@@ -42,6 +42,7 @@ export const localeFileMap: Record<string, string> = {
   ru: "ru-RU",
   pl: "pl-PL",
   vi: "vi-VN",
+  id: "id-ID",
 };
 
 export const getLocale = () => {
