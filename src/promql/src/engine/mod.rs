@@ -210,7 +210,7 @@ impl Engine {
             }
             PromExpr::MatrixSelector(MatrixSelector { vs, range }) => {
                 let vs = selector::plain_selector(vs, "MatrixSelector")?;
-                let data = self.eval_matrix_selector(&vs, *range).await?;
+                let data = self.eval_matrix_selector(&vs, *range, None).await?;
                 if data.is_empty() {
                     Value::None
                 } else {
