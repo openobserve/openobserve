@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="variablesData.values?.length > 0" class="mt-1 flex flex-wrap gap-y-1">
     <div
       v-for="(item, index) in variablesData.values"
+      v-show="!isVariableOffTab(item)"
       :key="item.name + index"
       :data-test="`dashboard-variable-${item.name}-container`"
     >
@@ -934,7 +935,14 @@ export default defineComponent({
         // we MUST clear oldVariablesData immediately, otherwise the old value will be
         // restored when API response arrives
         // HOWEVER: If variable has custom/all default, set it to that value instead
+        // A variable the manager has just scheduled to load is NOT a reset to be
+        // undone: restoring its all-default here also cleared isVariableLoadingPending
+        // and marked it loaded, cancelling that load, so a chained child never
+        // queried and its picker stayed empty forever.
+        const managerScheduledLoad = v.isVariableLoadingPending === true || v.isLoading === true;
+
         const managerHasResetValue =
+          !managerScheduledLoad &&
           (currentValue === null || (Array.isArray(currentValue) && currentValue.length === 0)) &&
           oldValue !== undefined &&
           oldValue !== null &&
@@ -2340,11 +2348,21 @@ export default defineComponent({
         item.options.length === 0,
       );
 
+    // `curatedTabs` narrows a GLOBAL variable to the tabs that declare it, so an
+    // inapplicable picker is not rendered rather than shown disabled. It gates
+    // RENDERING only: the variable stays in variablesData.values so it still
+    // loads and still feeds panel queries on the tabs that do use it.
+    const isVariableOffTab = (item: any) =>
+      Boolean(
+        Array.isArray(item?.curatedTabs) && props.tabId && !item.curatedTabs.includes(props.tabId),
+      );
+
     return {
       t,
       props,
       isVariableCapped,
       isVariableOmitted,
+      isVariableOffTab,
       variablesData,
       changeInitialVariableValues,
       onVariablesValueUpdated,
