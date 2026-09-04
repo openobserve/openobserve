@@ -9,7 +9,7 @@
 -->
 <template>
   <aside
-    class="border-border-default min-w-0 flex-[3.5] overflow-auto border-l p-3 max-[68.75rem]:border-t max-[68.75rem]:border-l-0"
+    class="border-border-default min-w-0 flex-[3.5] overflow-auto border-s p-3 max-[68.75rem]:border-s-0 max-[68.75rem]:border-t"
     data-test="ai-experiment-form-rail"
   >
     <section

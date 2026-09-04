@@ -11,7 +11,7 @@
     <div v-if="backgroundType === 'single'">
       <div
         data-test="dashboard-config-color-input-wrapper"
-        class="relative mt-9 ml-1.25 inline-flex h-6.25 w-6.25 items-center overflow-hidden rounded-full"
+        class="relative ms-1.25 mt-9 inline-flex h-6.25 w-6.25 items-center overflow-hidden rounded-full"
       >
         <input
           data-test="dashboard-config-color-input"

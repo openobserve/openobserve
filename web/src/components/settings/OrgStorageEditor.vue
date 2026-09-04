@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="step1-cancel-btn"
                 variant="outline"
-                class="o2-secondary-button mr-2 h-9"
+                class="o2-secondary-button me-2 h-9"
                 :class="isDark ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                 @click="emit('cancel')"
               >
@@ -331,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="!isEditMode"
                 data-test="step2-back-btn"
                 variant="outline"
-                class="o2-secondary-button mr-2 h-9"
+                class="o2-secondary-button me-2 h-9"
                 :class="isDark ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
                 @click="prevStep"
               >
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="storage-settings-submit-btn"
                 variant="primary"
-                class="no-border o2-primary-button ml-2 h-9"
+                class="no-border o2-primary-button ms-2 h-9"
                 :class="isDark ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
                 type="submit"
               >

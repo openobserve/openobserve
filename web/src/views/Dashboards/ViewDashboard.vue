@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="t('panel.add')" shortcut-id="dashboardAddPanel" />
           </OButton>
           <!-- <DateTimePicker 
-            class="ml-2"
+            class="ms-2"
             ref="refDateTime"
             v-model="selectedDate"
             /> -->

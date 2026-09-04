@@ -86,7 +86,7 @@
               icon-right="expand-more"
             >
               <span class="text-text-secondary font-bold">{{ totalEntities }}</span>
-              <span class="text-text-body ml-1">{{ t("traces.serviceGraph.entities") }}</span>
+              <span class="text-text-body ms-1">{{ t("traces.serviceGraph.entities") }}</span>
             </OButton>
           </template>
           <div class="min-w-48" data-test="service-graph-entity-distribution">
@@ -125,7 +125,7 @@
                    dropdown below. -->
               <span
                 v-if="activeFilterCount > 0"
-                class="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-white"
+                class="ms-1.5 inline-block h-1.5 w-1.5 rounded-full bg-white"
                 data-test="service-graph-active-filter-indicator"
               />
               <OTooltip

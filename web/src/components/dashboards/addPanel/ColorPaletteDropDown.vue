@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- color picker for fixed and shades typed color mode -->
       <div
         v-if="['fixed', 'shades'].includes(dashboardPanelData.data.config.color.mode)"
-        class="relative mt-7.5 ml-1.5 inline-flex flex-shrink-0 items-center"
+        class="relative ms-1.5 mt-7.5 inline-flex flex-shrink-0 items-center"
         data-test="dashboard-color-palette-color-input-wrapper"
       >
         <button

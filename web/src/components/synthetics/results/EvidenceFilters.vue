@@ -109,13 +109,13 @@ const stepFilter = computed({
       v-model="firstPartyOnly"
       size="sm"
       :label="t('synthetics.evidence.firstPartyOnly')"
-      class="ml-2"
+      class="ms-2"
       data-test="synthetics-evidence-first-party"
     />
     <OButton
       variant="outline"
       size="icon-chip"
-      class="ml-auto"
+      class="ms-auto"
       :active="wrap"
       data-test="synthetics-evidence-wrap-btn"
       @click="wrap = !wrap"

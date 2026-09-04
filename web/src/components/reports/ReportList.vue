@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OToggleGroup
                           :model-value="searchAcrossFolders ? 'all' : 'this'"
                           type="single"
-                          class="mr-1 self-center"
+                          class="me-1 self-center"
                           @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                         >
                           <OToggleGroupItem
@@ -165,9 +165,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="row.dashboards?.[0]?.report_type === 'png'"
                   type="reportTag"
                   value="png"
-                  class="ml-1"
+                  class="ms-1"
                 />
-                <OTag v-if="row.imagePreview" type="reportTag" value="preview" class="ml-1" />
+                <OTag v-if="row.imagePreview" type="reportTag" value="preview" class="ms-1" />
               </template>
 
               <!-- Owner column -->

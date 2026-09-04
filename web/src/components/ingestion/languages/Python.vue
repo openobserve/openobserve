@@ -34,7 +34,7 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
     <CopyContent :content="raw(content)" />
     <div>
       <div class="font-medium">{{ t("ingestion.checkFurtherDocumentationAt") }}</div>
-      <ol class="mt-1 list-decimal pl-5">
+      <ol class="mt-1 list-decimal ps-5">
         <li class="py-0.5">
           <a
             :href="docURL"

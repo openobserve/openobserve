@@ -476,7 +476,7 @@ const { t } = useI18nTyped();
       </div>
 
       <!-- Marker labels on right -->
-      <div v-if="markerLabels?.length" class="relative h-full w-6 shrink-0 pl-1" aria-hidden="true">
+      <div v-if="markerLabels?.length" class="relative h-full w-6 shrink-0 ps-1" aria-hidden="true">
         <span
           v-for="ml in markerLabels"
           :key="ml.value"

@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-accounts-system-badge"
                 type="serviceAccountKind"
                 value="system"
-                class="ml-2"
+                class="ms-2"
               />
             </template>
             <template v-else-if="isSyntheticSA(row.email)">
@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-accounts-list-token-download-btn"
               variant="outline"
               size="icon-md"
-              class="ml-2"
+              class="ms-2"
               :title="t('serviceAccounts.downloadToken')"
               @click.stop="downloadTokenAsFile(serviceToken)"
             >

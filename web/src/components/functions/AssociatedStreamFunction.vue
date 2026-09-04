@@ -45,12 +45,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="text-sm font-[600]" data-test="log-stream-title-text">
             {{ t("logStream.header") }}
           </div>
-          <div class="ml-auto" data-test="stream-association-search-input">
+          <div class="ms-auto" data-test="stream-association-search-input">
             <OSearchInput v-model="filterQuery" class="mb-1" :placeholder="t('logStream.search')" />
           </div>
           <OButton
             data-test="log-stream-refresh-stats-btn"
-            class="mb-1 ml-3"
+            class="ms-3 mb-1"
             variant="outline"
             size="sm-action"
             @click="getLogStream"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #expansion>
-        <div v-show="loadingFunctions" class="py-1 pl-3" style="height: 3.75rem">
+        <div v-show="loadingFunctions" class="py-1 ps-3" style="height: 3.75rem">
           <OInnerLoading
             :showing="loadingFunctions"
             :label="t('logStream.fetchingFunctions')"
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="stream-association-associate-function-btn"
                   variant="outline"
                   size="sm-action"
-                  class="mb-1 ml-3"
+                  class="ms-3 mb-1"
                   @click="addFunctionInProgress = true"
                 >
                   {{ t("logStream.associateFunction") }}
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="!row._isAddRow"
                 data-test="stream-association-delete-function-btn"
                 :title="t('function.deleteAssociatedFunction')"
-                class="ml-1"
+                class="ms-1"
                 variant="ghost-destructive"
                 size="icon-sm"
                 icon-left="delete"

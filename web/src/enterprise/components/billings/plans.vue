@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("billing.billingGroup.viewOrgGroup") }}
         <template #icon-right>
-          <OIcon name="arrow-forward" size="sm" class="ml-1" />
+          <OIcon name="arrow-forward" size="sm" class="ms-1" />
         </template>
       </OButton>
     </div>
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.selectedOrganization.hasOwnProperty('note') &&
           store.state.selectedOrganization.note
         "
-        class="text-status-error-text flex items-center justify-start gap-2 pb-4 pl-6 text-xl font-semibold"
+        class="text-status-error-text flex items-center justify-start gap-2 ps-6 pb-4 text-xl font-semibold"
       >
         <OIcon name="warning" size="sm" class="pt-2" />
         >{{ store.state.selectedOrganization.note }}

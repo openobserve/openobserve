@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OTooltip>
               </OIcon>
-              <span class="ml-1 text-xs">×{{ row.group_size || 1 }}</span>
+              <span class="ms-1 text-xs">×{{ row.group_size || 1 }}</span>
             </div>
             <div v-else class="text-status-positive flex items-center justify-center">
               <OIcon name="check-circle" size="md">
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OTooltip>
               </OIcon>
-              <span v-if="row.dedup_count && row.dedup_count > 1" class="ml-1 text-xs">
+              <span v-if="row.dedup_count && row.dedup_count > 1" class="ms-1 text-xs">
                 ×{{ row.dedup_count }}
               </span>
             </div>
@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-sm">
                 <OIcon
                   :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
-                  class="mr-1"
+                  class="me-1"
                   size="xs"
                 />
                 {{ selectedRow.is_realtime ? t("common.realTime") : t("alerts.scheduled") }}
@@ -329,8 +329,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("alerts.insights.filters.silenced") }}
               </div>
               <div class="text-sm">
-                <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="mr-1" />
-                <OIcon v-else name="volume-up" size="xs" class="mr-1" />
+                <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="me-1" />
+                <OIcon v-else name="volume-up" size="xs" class="me-1" />
                 {{ selectedRow.is_silenced ? t("common.yes") : t("common.no") }}
               </div>
             </div>
@@ -382,7 +382,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSeparator class="my-2" />
           <div class="px-0 py-1">
             <div class="text-text-secondary mb-1 text-xs">
-              <OIcon name="error" size="xs" class="mr-1" />
+              <OIcon name="error" size="xs" class="me-1" />
               {{ t("alerts.errorDetails") }}
             </div>
             <div
@@ -407,7 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSeparator class="my-2" />
           <div class="px-0 py-1">
             <div class="text-text-secondary mb-1 text-xs">
-              <OIcon name="check-circle" size="xs" class="mr-1" />
+              <OIcon name="check-circle" size="xs" class="me-1" />
               {{ t("alerts.response") }}
             </div>
             <div
@@ -442,9 +442,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="error" size="sm" class="text-status-error-text" />
       </template>
       <template #header-right>
-        <div class="text-compact ml-9 flex items-center text-xs opacity-70">
-          <span class="mr-1">{{ t("alerts.lastError") }}</span>
-          <OIcon name="schedule" size="xs" class="mr-1" />
+        <div class="text-compact ms-9 flex items-center text-xs opacity-70">
+          <span class="me-1">{{ t("alerts.lastError") }}</span>
+          <OIcon name="schedule" size="xs" class="me-1" />
           {{
             errorMessage.last_error_timestamp &&
             new Date(errorMessage.last_error_timestamp / 1000).toLocaleString()

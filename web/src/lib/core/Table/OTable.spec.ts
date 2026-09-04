@@ -1134,10 +1134,10 @@ describe("OTable", () => {
       it("centres the arrow and clips it to the half outside the bar", async () => {
         const bar = await hoverCell(300, 324, 40, 400);
         expect(bar.style.left).toBe("400px");
-        // `left` is the arrow's centre (`-ml-1`); unclipped, the rotated square's
+        // `left` is the arrow's centre (`-ms-1`); unclipped, the rotated square's
         // upper half notches any filled control in the bar (the AI chip).
         expect(arrowOf(bar).style.left).toBe("60px");
-        expect(arrowOf(bar).className).toContain("-ml-1");
+        expect(arrowOf(bar).className).toContain("-ms-1");
         expect(arrowOf(bar).className).toContain("[clip-path:polygon(0_100%");
       });
     });

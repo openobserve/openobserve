@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OSplitter v-model="splitterWidthModel" unit="px" :horizontal="false" class="h-full">
     <template #before>
       <div class="h-full w-full">
-        <div class="bg-surface-panel border-border-default h-full border-r">
+        <div class="bg-surface-panel border-border-default h-full border-e">
           <div
             :class="['h-full overflow-hidden', { 'pt-1.5': !searchable }]"
             :data-test="panelDataTest || undefined"

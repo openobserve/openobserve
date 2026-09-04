@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OFieldRow
     v-if="(field.ftsKey && !showFtsFieldValues) || !field.isSchemaField || !field.showValues"
     :data-test="`logs-field-list-item-${field.name}`"
-    class="pl-6"
+    class="ps-6"
     :highlight="isFieldSelected && field.name !== timestampColumn"
   >
     <OFieldLabel :field="field" :show-type-icon="false" />
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showQuickMode && field.name !== timestampColumn"
       :name="field.isInterestingField ? 'info-filled' : 'info-outline'"
       variant="ghost-neutral"
-      class="mr-1 gap-0!"
+      class="me-1 gap-0!"
       size="icon"
       :title="
         field.isInterestingField

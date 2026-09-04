@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon-chip"
-              class="ml-0.5"
+              class="ms-0.5"
               :data-test="`service-graph-filter-chip-remove-${chip.key}`"
               @click="removeLocalRangeFilter(chip.key)"
             >
