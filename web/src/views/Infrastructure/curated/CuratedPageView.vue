@@ -32,6 +32,7 @@ import DateTime from "@/components/DateTime.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
+import { getConsumableRelativeTime } from "@/utils/date";
 import type { WorkloadId } from "@/composables/useWorkloadDetection";
 import { curatedPacks } from "./packs";
 import { useCuratedPage } from "./useCuratedPage";
@@ -68,7 +69,19 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "")
 const timezone = computed(() => store.state.timezone ?? "UTC");
 
 const DEFAULT_WINDOW_US = 3 * 60 * 60 * 1_000_000;
-const range = ref({ from: Date.now() * 1000 - DEFAULT_WINDOW_US, to: Date.now() * 1000 });
+
+/** The SELECTION, not its bounds: a relative window means "as of now", so it is materialized per refresh. */
+type CuratedWindow =
+  | { kind: "relative"; period: string; widthUs: number }
+  | { kind: "absolute"; from: number; to: number };
+
+const selectedWindow = ref<CuratedWindow>({
+  kind: "relative",
+  period: manifest.value.defaultRelativePeriod,
+  widthUs: periodWidthUs(manifest.value.defaultRelativePeriod),
+});
+
+const range = ref(materialize(selectedWindow.value));
 const checkedAtUs = ref<number | null>(null);
 
 const currentTimeObj = computed(() => ({
@@ -78,9 +91,25 @@ const currentTimeObj = computed(() => ({
   },
 }));
 
+/** A period string the picker cannot parse still has to yield a window, so the arithmetic falls back to its width. */
+function periodWidthUs(period: string): number {
+  const consumable = getConsumableRelativeTime(period);
+  return consumable ? consumable.endTime - consumable.startTime : DEFAULT_WINDOW_US;
+}
+
+function materialize(window: CuratedWindow): { from: number; to: number } {
+  if (window.kind === "absolute") return { from: window.from, to: window.to };
+  const consumable = getConsumableRelativeTime(window.period);
+  if (consumable) return { from: consumable.startTime, to: consumable.endTime };
+  const now = Date.now() * 1000;
+  return { from: now - window.widthUs, to: now };
+}
+
 const runRefresh = async (force = false) => {
   // An unregistered workload resolves nothing, so it must also fetch nothing.
   if (!hasPack.value) return;
+  // Re-anchored per refresh: a relative window frozen at page load empties every range-plotted panel as the clock advances.
+  range.value = materialize(selectedWindow.value);
   await refresh({ orgId: orgId.value, start: range.value.from, end: range.value.to, force });
   checkedAtUs.value = Date.now() * 1000;
 };
@@ -252,24 +281,37 @@ const checkedAtLabel = computed(() =>
 
 /** Navigation only — it creates, copies, imports and forks nothing (§6.5). */
 const openDashboardsList = () => {
-  router.push({
-    name: "dashboards",
-    query: {
-      org_identifier: orgId.value,
-      from: String(range.value.from),
-      to: String(range.value.to),
-    },
-  });
+  const window = selectedWindow.value;
+  // A relative window travels as its PERIOD, so the destination re-anchors it rather than inheriting our materialized bounds.
+  const query =
+    window.kind === "relative"
+      ? { org_identifier: orgId.value, period: window.period }
+      : { org_identifier: orgId.value, from: String(window.from), to: String(window.to) };
+  router.push({ name: "dashboards", query });
 };
 
 // ── Range, focus and org-switch triggers ────────────────────────────────────
 
 let rangeTimer: ReturnType<typeof setTimeout> | undefined;
 
-const onDateChange = (date: { startTime: number; endTime: number; userChangedValue?: boolean }) => {
-  // DateTime replays on mount with userChangedValue:false — "do not fetch".
+const onDateChange = (date: {
+  startTime: number;
+  endTime: number;
+  relativeTimePeriod?: string | null;
+  valueType?: string;
+  userChangedValue?: boolean;
+}) => {
+  const isRelative = date.valueType !== "absolute" && !!date.relativeTimePeriod;
+  selectedWindow.value = isRelative
+    ? {
+        kind: "relative",
+        period: date.relativeTimePeriod!,
+        widthUs: Math.max(0, date.endTime - date.startTime),
+      }
+    : { kind: "absolute", from: date.startTime, to: date.endTime };
+  range.value = materialize(selectedWindow.value);
+  // DateTime replays on mount with userChangedValue:false — "do not fetch"; the selection above is still recorded.
   if (date.userChangedValue === false) return;
-  range.value = { from: date.startTime, to: date.endTime };
   // The ONE debounce seam: refresh() itself is never delayed, so org switches and Retry stay immediate.
   if (rangeTimer) clearTimeout(rangeTimer);
   rangeTimer = setTimeout(() => void runRefresh(false), 300);
