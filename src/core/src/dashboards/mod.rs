@@ -57,7 +57,7 @@ use o2_openfga::{
 };
 
 #[cfg(feature = "enterprise")]
-use crate::auth::check_permissions;
+use crate::auth::{check_folder_write_permissions, check_permissions};
 
 /// An error that occurs interacting with dashboards.
 #[derive(Debug, thiserror::Error)]
@@ -628,6 +628,9 @@ pub async fn move_dashboard(
         )
         .await
         {
+            return Err(DashboardError::PermissionDenied);
+        }
+        if !check_folder_write_permissions(org_id, _user_id, "folders", to_folder).await {
             return Err(DashboardError::PermissionDenied);
         }
     }

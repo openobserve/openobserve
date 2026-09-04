@@ -692,6 +692,39 @@ pub async fn check_permissions(
     true
 }
 
+#[cfg(not(feature = "enterprise"))]
+pub async fn check_folder_write_permissions(
+    _org_id: &str,
+    _user_id: &str,
+    _folder_type: &str,
+    _folder_id: &str,
+) -> bool {
+    true
+}
+
+/// A source-folder check proves the caller may take the object out, never that
+/// they may put it into a destination folder they cannot otherwise reach.
+#[cfg(feature = "enterprise")]
+pub async fn check_folder_write_permissions(
+    org_id: &str,
+    user_id: &str,
+    folder_type: &str,
+    folder_id: &str,
+) -> bool {
+    check_permissions(
+        folder_id,
+        org_id,
+        user_id,
+        folder_type,
+        "PUT",
+        None,
+        false,
+        false,
+        true,
+    )
+    .await
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn extract_auth_expiry_and_user_id(
     parts: &Parts,
@@ -1009,6 +1042,18 @@ mod tests {
         .await;
 
         assert!(!result);
+    }
+
+    // OSS has no folder boundary to cross, so the destination check must never
+    // block a move there — only enterprise+OpenFGA gates folders.
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_check_folder_write_permissions_non_enterprise_allows() {
+        let result =
+            check_folder_write_permissions("test_org", "test_user", "alert_folders", "dst_folder")
+                .await;
+
+        assert!(result);
     }
 
     #[test]

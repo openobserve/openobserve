@@ -28,6 +28,8 @@ use axum::{
 };
 use config::meta::slo::{Slo, SloStatusView};
 use openobserve_api_common::extractors::Headers;
+#[cfg(feature = "enterprise")]
+use openobserve_core::auth::check_folder_write_permissions;
 use openobserve_core::{auth::UserEmail, slo::service as slo_service};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -142,6 +144,20 @@ pub async fn create_slo(
     if slo.id.is_empty() {
         slo.id = config::ider::generate();
     }
+    // Same reason as org above: the gate authorized the `?folder=` folder, so a
+    // body folder_id must be authorized before it can be written.
+    #[cfg(feature = "enterprise")]
+    if !slo.folder_id.is_empty()
+        && !check_folder_write_permissions(
+            &slo.org,
+            &user_email.user_id,
+            "alert_folders",
+            &slo.folder_id,
+        )
+        .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
     if slo.folder_id.is_empty() {
         slo.folder_id = config::meta::folder::DEFAULT_FOLDER.to_string();
     }
@@ -193,6 +209,19 @@ pub async fn update_slo(
     // the permission check ran against.
     slo.org = org_id;
     slo.id = slo_id;
+    // An update carrying a folder_id is also a move, so the destination needs its own check.
+    #[cfg(feature = "enterprise")]
+    if !slo.folder_id.is_empty()
+        && !check_folder_write_permissions(
+            &slo.org,
+            &user_email.user_id,
+            "alert_folders",
+            &slo.folder_id,
+        )
+        .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
     if slo.owner.is_none() {
         slo.owner = Some(user_email.user_id.clone());
     }
@@ -280,6 +309,19 @@ pub async fn move_slos(
         )
         .into_response();
     }
+    // SLOs share the alert folder namespace, so the destination is an alert folder.
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(
+        &org_id,
+        &user_email.user_id,
+        "alert_folders",
+        &req_body.dst_folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
     match slo_service::move_to_folder(
         &org_id,
         &req_body.slo_ids,

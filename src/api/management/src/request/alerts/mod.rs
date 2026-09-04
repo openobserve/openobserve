@@ -41,7 +41,7 @@ use openobserve_core::{
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use {
-    openobserve_core::auth::check_permissions,
+    openobserve_core::auth::{check_folder_write_permissions, check_permissions},
     openobserve_core::authz::{StreamPermissionResourceType, check_stream_permissions},
 };
 
@@ -1155,12 +1155,9 @@ async fn create_anomaly_alert(
         alert_enabled: anomaly_fields.alert_enabled,
         alert_destinations: req_body.alert.destinations,
         enabled: Some(req_body.alert.enabled),
-        // Prefer explicit folder_id in JSON body; fall back to the ?folder= query param
-        // (same mechanism regular alerts use — the UI sends folder as a query param).
-        folder_id: req_body
-            .folder_id
-            .filter(|f| !f.is_empty())
-            .or_else(|| Some(query_folder_id.to_string()).filter(|f| !f.is_empty())),
+        // The route's permission gate resolves `?folder=`, so the write must use the same value — a
+        // body folder_id would create the config in an unauthorized folder.
+        folder_id: Some(query_folder_id.to_string()).filter(|f| !f.is_empty()),
         owner,
         // Feature 2: anomaly configs take the same triage metadata as
         // alerts, threaded from the shared request body.
@@ -1593,6 +1590,21 @@ pub async fn clone_alert(
             return MetaHttpResponse::not_found(format!("invalid alert id {alert_id}"));
         }
     };
+    // The route gates `?folder=`, but every clone branch writes this body folder and the create
+    // paths set ownership with no check of their own.
+    #[cfg(feature = "enterprise")]
+    if let Some(dst_folder) = req_body.folder_id.as_deref().filter(|f| !f.is_empty())
+        && !check_folder_write_permissions(
+            &org_id,
+            &user_email.user_id,
+            "alert_folders",
+            dst_folder,
+        )
+        .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
     let client = get_orm_client_rw().await;
 
     // Check if this is a regular alert first
@@ -1780,6 +1792,13 @@ async fn build_and_run_anomaly_update(
     alert: crate::models::alerts::Alert,
 ) -> Response {
     use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+
+    // A folder_id on the update is a move, and the route gate only covers `?folder=`.
+    if let Some(folder) = fields.folder_id.as_deref().filter(|f| !f.is_empty())
+        && !check_folder_write_permissions(org_id, &user_id, "alert_folders", folder).await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
 
     let owner = fields
         .owner
@@ -3302,6 +3321,20 @@ pub async fn move_alerts(
     }
     #[cfg(feature = "enterprise")]
     let anomaly_ids: Vec<Ksuid> = req_body.anomaly_config_ids;
+
+    // The route is bypass:true, so the destination is only authorized here — the
+    // anomaly and composite branches below have no folder check of their own.
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(
+        &org_id,
+        &user_email.user_id,
+        "alert_folders",
+        &req_body.dst_folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
 
     // Move anomaly configs first (enterprise only) so that if this fails,
     // regular alerts have not yet been relocated (reduces partial-move risk).

@@ -30,7 +30,7 @@ use crate::service::auth::UserEmail;
 // rather than relying on it — per-resource RBAC is enterprise, and an OSS build
 // must not 403 its way through a feature it ships.
 #[cfg(feature = "enterprise")]
-use crate::service::auth::check_permissions;
+use crate::service::auth::{check_folder_write_permissions, check_permissions};
 
 // ── Local query / body types ──────────────────────────────────────────────────
 
@@ -476,6 +476,22 @@ pub async fn update_synthetic(
     {
         return MetaHttpResponse::forbidden("Forbidden");
     }
+
+    // An update carrying a folder_id is also a move, and the check above only covers the `?folder=`
+    // gate folder.
+    #[cfg(feature = "enterprise")]
+    if !body.folder_id.is_empty()
+        && !check_folder_write_permissions(
+            &org_id,
+            &user_email.user_id,
+            "synthetic_folder",
+            &body.folder_id,
+        )
+        .await
+    {
+        return MetaHttpResponse::forbidden("Forbidden");
+    }
+
     match openobserve_synthetics::service::update_synthetic(&org_id, &id, body).await {
         Ok(check) => MetaHttpResponse::json(check),
         Err(e) => {
@@ -629,6 +645,19 @@ pub async fn move_synthetics(
             return MetaHttpResponse::forbidden("Forbidden");
         }
     }
+
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(
+        &org_id,
+        &user_email.user_id,
+        "synthetic_folder",
+        &body.dst_folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Forbidden");
+    }
+
     match openobserve_synthetics::service::move_synthetics(
         &org_id,
         &body.synthetic_ids,

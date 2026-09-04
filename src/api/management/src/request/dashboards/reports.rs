@@ -27,7 +27,7 @@ use config::meta::{
 use db::scheduler;
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use openobserve_core::auth::check_permissions;
+use openobserve_core::auth::{check_folder_write_permissions, check_permissions};
 use openobserve_core::{
     auth::UserEmail,
     dashboards::reports::{self, ReportError},
@@ -913,6 +913,13 @@ pub async fn move_reports(
         {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(&org_id, &_user_id, "report_folders", &req.dst_folder_id)
+        .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
     }
 
     match reports::move_to_folder(&org_id, &req.report_ids, &req.dst_folder_id).await {
