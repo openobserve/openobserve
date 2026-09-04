@@ -1768,9 +1768,9 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
 /// Spelled here rather than as a `from_str` on the meta type: parsing a query
 /// parameter is this surface's problem, and the enum is shared with the engine.
 #[cfg(feature = "enterprise")]
-const SUBJECT_TYPES: [config::meta::oncall::SubjectType; 4] = {
-    use config::meta::oncall::SubjectType::{Alert, Anomaly, Incident, Synthetic};
-    [Alert, Incident, Synthetic, Anomaly]
+const SUBJECT_TYPES: [config::meta::oncall::SubjectType; 2] = {
+    use config::meta::oncall::SubjectType::{Alert, Incident};
+    [Alert, Incident]
 };
 
 #[cfg(feature = "enterprise")]
@@ -5111,12 +5111,8 @@ mod tests {
             parse_subject_type(" incident "),
             Some(SubjectType::Incident)
         );
-        assert_eq!(
-            parse_subject_type("synthetic"),
-            Some(SubjectType::Synthetic)
-        );
-        assert_eq!(parse_subject_type("anomaly"), Some(SubjectType::Anomaly));
         assert_eq!(parse_subject_type("Alert"), None, "wire values are exact");
+        assert_eq!(parse_subject_type("synthetic"), None);
         assert_eq!(parse_subject_type("dashboard"), None);
     }
 

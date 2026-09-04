@@ -34,8 +34,6 @@ use utoipa::ToSchema;
 pub enum SubjectType {
     Alert,
     Incident,
-    Synthetic,
-    Anomaly,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,8 +51,6 @@ impl SubjectType {
         match self {
             Self::Alert => 1,
             Self::Incident => 2,
-            Self::Synthetic => 3,
-            Self::Anomaly => 4,
         }
     }
 
@@ -62,8 +58,6 @@ impl SubjectType {
         match v {
             1 => Some(Self::Alert),
             2 => Some(Self::Incident),
-            3 => Some(Self::Synthetic),
-            4 => Some(Self::Anomaly),
             _ => None,
         }
     }
@@ -72,8 +66,6 @@ impl SubjectType {
         match self {
             Self::Alert => "alert",
             Self::Incident => "incident",
-            Self::Synthetic => "synthetic",
-            Self::Anomaly => "anomaly",
         }
     }
 }
@@ -92,8 +84,6 @@ impl std::str::FromStr for SubjectType {
         match token.to_ascii_lowercase().as_str() {
             "alert" => Ok(Self::Alert),
             "incident" => Ok(Self::Incident),
-            "synthetic" => Ok(Self::Synthetic),
-            "anomaly" => Ok(Self::Anomaly),
             _ => Err(SubjectError::UnknownType(token.to_string())),
         }
     }
@@ -192,12 +182,7 @@ mod tests {
 
     use super::*;
 
-    const ALL: [SubjectType; 4] = [
-        SubjectType::Alert,
-        SubjectType::Incident,
-        SubjectType::Synthetic,
-        SubjectType::Anomaly,
-    ];
+    const ALL: [SubjectType; 2] = [SubjectType::Alert, SubjectType::Incident];
 
     /// Fails loudly on a renumber — every persisted record would change
     /// meaning.
@@ -205,8 +190,6 @@ mod tests {
     fn test_storage_ids_are_pinned() {
         assert_eq!(SubjectType::Alert.to_i32(), 1);
         assert_eq!(SubjectType::Incident.to_i32(), 2);
-        assert_eq!(SubjectType::Synthetic.to_i32(), 3);
-        assert_eq!(SubjectType::Anomaly.to_i32(), 4);
     }
 
     #[test]
@@ -214,7 +197,7 @@ mod tests {
         for t in ALL {
             assert_eq!(SubjectType::from_i32(t.to_i32()), Some(t));
         }
-        for v in [-1, 0, 5, 99] {
+        for v in [-1, 0, 3, 4, 99] {
             assert_eq!(SubjectType::from_i32(v), None);
         }
     }
@@ -223,8 +206,8 @@ mod tests {
     fn test_parses_case_insensitively() {
         assert_eq!(SubjectType::from_str("Alert").unwrap(), SubjectType::Alert);
         assert_eq!(
-            SubjectType::from_str("  synthetic ").unwrap(),
-            SubjectType::Synthetic
+            SubjectType::from_str("  Incident ").unwrap(),
+            SubjectType::Incident
         );
         assert!(SubjectType::from_str("report").is_err());
     }
@@ -252,8 +235,8 @@ mod tests {
 
     #[test]
     fn test_storage_key_pairs_type_id_with_subject_id() {
-        let s = SubjectRef::new(SubjectType::Synthetic, "syn_login", 7);
-        assert_eq!(s.storage_key(), (3, "syn_login#7".to_string()));
+        let s = SubjectRef::new(SubjectType::Incident, "inc_login", 7);
+        assert_eq!(s.storage_key(), (2, "inc_login#7".to_string()));
     }
 
     #[test]
@@ -308,7 +291,7 @@ mod tests {
 
     #[test]
     fn test_subject_ref_round_trips_through_json() {
-        let s = SubjectRef::new(SubjectType::Anomaly, "an_lat", 5);
+        let s = SubjectRef::new(SubjectType::Incident, "inc_lat", 5);
         let back: SubjectRef = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
         assert_eq!(back, s);
     }
