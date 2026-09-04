@@ -19,8 +19,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use config::meta::self_reporting::llm_experiments::ExperimentExecutionRecord;
 pub use domain::DEFAULT_COMPARISON_THRESHOLD;
-use openobserve_core::llm_evaluations::{
-    experiment_comparison as domain, experiment_results::ScoringStatus,
+use openobserve_core::llm_evaluations::experiments::{
+    comparison as domain, results::ScoringStatus,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

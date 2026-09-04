@@ -96,6 +96,23 @@ describe("unwrapList — three response shapes", () => {
 });
 
 describe("URL construction", () => {
+  it("tests inline provider configuration and unwraps the response message", async () => {
+    const payload = {
+      name: "Test provider",
+      providerType: "openai",
+      defaultModel: "gpt-4o-mini",
+      availableModels: ["gpt-4o-mini"],
+      authConfig: { api_key: "test-key" },
+      isDefault: false,
+    };
+    mockPost.mockResolvedValue({ data: { code: 200, message: "Connected" } });
+
+    const result = await onlineEvalsService.providers.testConfig("acme", payload);
+
+    expect(mockPost).toHaveBeenCalledWith("/api/acme/providers/test", payload);
+    expect(result).toBe("Connected");
+  });
+
   it("providers.list hits /api/{orgId}/providers", async () => {
     mockGet.mockResolvedValue({ data: [] });
     await onlineEvalsService.providers.list("acme");
