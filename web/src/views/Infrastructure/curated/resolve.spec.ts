@@ -536,6 +536,31 @@ describe("token substitution", () => {
       expect(q).not.toMatch(/,\s*\}/);
       expect(q).not.toContain("$cluster");
     }
+
+    // THE PANELS MUST STILL RENDER. Asserting only over allQueries(dashboard) was
+    // vacuous: it walks surviving panels, so five panels silently vanishing from
+    // the page passed it. An unresolvable OPTIONAL ${scope:} collapses its matcher
+    // — a cluster-less org is a normal org, and its node charts are fleet-wide,
+    // not missing.
+    const scopeOnly = [
+      "k8s_ov_fleet_cpu",
+      "k8s_ov_node_cpu_top",
+      "k8s_nd_cpu",
+      "k8s_nd_memory",
+      "k8s_nd_network",
+    ];
+    for (const id of scopeOnly) {
+      const panel = resolution.panels.find((p: any) => p.id === id);
+      expect(panel, `${id} must exist in the manifest`).toBeDefined();
+      expect(panel!.hidden, `${id} must not hide over an optional cluster scope`).toBe(false);
+    }
+    const builtIds = (dashboard.tabs as any[]).flatMap((tab) =>
+      tab.panels.map((panel: any) => panel.id),
+    );
+    for (const id of scopeOnly) expect(builtIds).toContain(id);
+
+    // ...and it is not reported as a problem either — one normal org, three warnings.
+    expect(resolution.warnings.filter((w: any) => w.kind === "field-unresolved")).toEqual([]);
   });
 });
 
@@ -1529,6 +1554,185 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
       expect(query).toContain('host_name="host-1"');
       expect(query).not.toContain("${f:");
       expect(query).not.toContain("${scope:");
+    }
+  });
+
+  // ── B2: the disabled flag must ride the CLONE (design §6.4) ────────────────
+  describe("scope-picker disabled state is built in, not mutated on", () => {
+    // curatedDisabled is stamped INSIDE the built variables (resolve.ts
+    // buildVariable), NOT mutated onto them afterwards: useVariablesManager
+    // clones every variable on initialize (:141-148, :414) and re-initializes
+    // only on a new dashboardData IDENTITY, so a post-build mutation was
+    // invisible to the rendered picker on every tab after the first. These pins
+    // therefore assert the BUILT object and require a rebuild on tab switch.
+    it("buildDashboard stamps curatedDisabled on a picker the ACTIVE section omits", () => {
+      const resolution = resolveManifest({
+        manifest: kubernetesPage,
+        streams: fullK8sStreams(),
+        semanticGroups: defaultSemanticGroups as FieldAlias[],
+        range: RANGE,
+        now: NOW_US,
+      });
+      const overviewScoped =
+        kubernetesPage.sections.find((s) => s.id === "overview")?.scopedBy ?? [];
+
+      const built: any = buildDashboard(
+        kubernetesPage,
+        resolution,
+        {},
+        { timezone: "UTC", nowUs: NOW_US, activeSectionId: "overview" },
+      );
+      expect(built.variables.list.length).toBeGreaterThan(0);
+      for (const variable of built.variables.list) {
+        const applicable = overviewScoped.includes(variable.name);
+        expect(variable.curatedDisabled).toBe(!applicable);
+        expect(variable.curatedDisabledTooltipKey).toBe(
+          applicable ? undefined : "infra.curated.pickerNotApplicable",
+        );
+      }
+    });
+
+    it("a DIFFERENT active section flips the flag in the built object — the tab-switch case", () => {
+      const resolution = resolveManifest({
+        manifest: kubernetesPage,
+        streams: fullK8sStreams(),
+        semanticGroups: defaultSemanticGroups as FieldAlias[],
+        range: RANGE,
+        now: NOW_US,
+      });
+      const build = (sectionId: string) =>
+        buildDashboard(
+          kubernetesPage,
+          resolution,
+          {},
+          {
+            timezone: "UTC",
+            nowUs: NOW_US,
+            activeSectionId: sectionId,
+          },
+        ) as any;
+
+      // A picker that at least one section scopes and another does not — otherwise
+      // this asserts nothing about the section keying.
+      const sections = kubernetesPage.sections;
+      const flags = (dashboard: any) =>
+        Object.fromEntries(dashboard.variables.list.map((v: any) => [v.name, v.curatedDisabled]));
+      const differing = sections.find(
+        (section) =>
+          JSON.stringify(flags(build(section.id))) !==
+          JSON.stringify(flags(build(sections[0]!.id))),
+      );
+      expect(differing).toBeDefined();
+
+      // ...and the two builds are DIFFERENT OBJECTS, which is what makes the
+      // renderer re-initialize (and therefore re-clone) at all.
+      expect(build(sections[0]!.id)).not.toBe(build(differing!.id));
+    });
+  });
+
+  // ── B4: a dead group is "stopped reporting", never "not found" ─────────────
+  it("all-dead streams tag every missingStreams entry `stale`, never `absent`", () => {
+    // The measured sweep: 23.9h => present+badged; past the 24h liveness floor
+    // the group hides, but the ENTRIES stay tagged stale so the strip renders
+    // "stopped reporting" (restart the collector) and not "not found" (install one).
+    const H = 60 * 60 * 1_000_000;
+    const build = (ageHours: number) => {
+      const streams = fullK8sStreams();
+      for (const entry of streams.metrics) {
+        entry.stats = { doc_time_max: NOW_US - ageHours * H };
+      }
+      return resolve({ streams });
+    };
+
+    const fresh = build(23.9);
+    expect(fresh.presentGroupIds).toContain("kubelet-node");
+    expect(fresh.staleGroups.map((g: any) => g.group.id)).toContain("kubelet-node");
+
+    for (const ageHours of [24.1, 120]) {
+      const dead = build(ageHours);
+      expect(dead.presentGroupIds).toEqual([]);
+      // Only streams the fixture actually LISTS can be "stale" — a name the org
+      // never had is genuinely absent, and conflating the two is the bug's mirror image.
+      const listed = new Set(fullK8sStreams().metrics.map((entry: any) => entry.name));
+      const entries = dead.hiddenGroups
+        .flatMap((h: any) => h.missingStreams)
+        .filter((entry: any) => listed.has(entry.name));
+      expect(entries.length).toBeGreaterThan(0);
+      for (const entry of entries) {
+        expect(entry.state, `${entry.name} at ${ageHours}h`).toBe("stale");
+        expect(entry.lastSeenUs).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  // ── M2: the drilldown must open the SAME window the panel shows ────────────
+  it("threads the page range onto every explorer drilldown URL", () => {
+    const resolution = resolve({});
+    const relative: any = buildDashboard(
+      kubernetesPage,
+      resolution,
+      {},
+      {
+        timezone: "UTC",
+        nowUs: NOW_US,
+        drilldownRange: { period: "3h" },
+      },
+    );
+    const urls = (dashboard: any) =>
+      (dashboard.tabs as any[])
+        .flatMap((tab) => tab.panels)
+        .flatMap((panel: any) => panel.config.drilldown ?? [])
+        .filter((entry: any) => entry.name === "openInMetricsExplorer")
+        .map((entry: any) => entry.data.url as string);
+
+    const relativeUrls = urls(relative);
+    expect(relativeUrls.length).toBeGreaterThan(0);
+    // A relative window travels as its PERIOD so the destination re-anchors it.
+    for (const url of relativeUrls) expect(url).toContain("period=3h");
+
+    const absolute: any = buildDashboard(
+      kubernetesPage,
+      resolution,
+      {},
+      {
+        timezone: "UTC",
+        nowUs: NOW_US,
+        drilldownRange: { from: 111, to: 222 },
+      },
+    );
+    for (const url of urls(absolute)) {
+      expect(url).toContain("from=111");
+      expect(url).toContain("to=222");
+      expect(url).not.toContain("period=");
+    }
+  });
+
+  // ── M4: one clock — the badge carries lastSeenUs so the reader recomputes ──
+  it("the stale badge carries lastSeenUs, not only a build-time count", () => {
+    // A count baked at build time froze while the page banner kept counting, so
+    // the two numbers on one screen disagreed. The raw timestamp travels instead.
+    const streams = fullK8sStreams();
+    for (const entry of streams.metrics) entry.stats = { doc_time_max: NOW_US - 30 * 60_000_000 };
+    const resolution = resolve({ streams, range: { start: NOW_US - 60_000_000, end: NOW_US } });
+    expect(resolution.staleGroups.length).toBeGreaterThan(0);
+
+    const dashboard: any = buildDashboard(
+      kubernetesPage,
+      resolution,
+      {},
+      {
+        timezone: "UTC",
+        nowUs: NOW_US,
+      },
+    );
+    const badges = (dashboard.tabs as any[])
+      .flatMap((tab) => tab.panels)
+      .map((panel: any) => panel.config.curated_badge)
+      .filter(Boolean);
+    expect(badges.length).toBeGreaterThan(0);
+    for (const badge of badges) {
+      expect(typeof badge.lastSeenUs).toBe("number");
+      expect(badge.lastSeenUs).toBe(NOW_US - 30 * 60_000_000);
     }
   });
 });

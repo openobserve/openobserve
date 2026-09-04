@@ -305,18 +305,28 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     return [...text.matchAll(pattern)].map((match) => match[1]);
   };
 
-  const conceptsUsedBy = (panel: CuratedPanelDef, variant: PanelVariant): string[] => {
-    const ids = new Set<string>();
+  /**
+   * Required ids come from `${f:}` tokens — a panel cannot query without them.
+   * Scope-derived ids are OPTIONAL: a `${scope:}` token whose picker cannot
+   * resolve collapses to nothing (substituteQuery returns "" and tidyMatchers
+   * cleans the braces), so hiding the panel would lose a fleet-wide chart that
+   * renders perfectly well unscoped. An id used BOTH ways stays required.
+   */
+  const conceptsUsedBy = (variant: PanelVariant): { required: string[]; optional: string[] } => {
+    const required = new Set<string>();
+    const optional = new Set<string>();
     for (const query of variant.queries) {
-      for (const id of tokensIn(query.query, "f")) ids.add(id);
-      for (const id of tokensIn(query.legend ?? "", "f")) ids.add(id);
+      for (const id of tokensIn(query.query, "f")) required.add(id);
+      for (const id of tokensIn(query.legend ?? "", "f")) required.add(id);
       for (const name of tokensIn(query.query, "scope")) {
         const picker = manifest.scopePickers.find((p) => p.name === name);
-        if (picker) ids.add(picker.group);
+        if (picker) optional.add(picker.group);
       }
     }
-    void panel;
-    return [...ids];
+    return {
+      required: [...required],
+      optional: [...optional].filter((id) => !required.has(id)),
+    };
   };
 
   // Which candidate the COUNT runs against is decidable off the lists alone: present + live + carries every probe column.
@@ -422,7 +432,8 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     const schemaWasFetched = anchorFields !== undefined;
 
     let unresolved = false;
-    for (const gid of conceptsUsedBy(panel, base.selectedVariant!)) {
+    const { required, optional } = conceptsUsedBy(base.selectedVariant!);
+    for (const gid of required) {
       const { field, display } = resolveConcept(
         gid,
         group,
@@ -437,6 +448,13 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
         base.unresolvedConcepts.push({ groupId: gid, display });
         pushWarning("field-unresolved", raw(`no ${display} field found on ${schemaStream ?? ""}`));
       }
+    }
+    // An unresolvable OPTIONAL scope collapses its matcher and the panel renders
+    // fleet-wide. It raises no warning either: a cluster-less org is a normal org,
+    // not a misconfiguration, and warning per panel warned three times over one fact.
+    for (const gid of optional) {
+      const { field } = resolveConcept(gid, group, anchorFields, schemaStream, schemaWasFetched);
+      if (field) base.resolvedFields[gid] = field;
     }
 
     base.hidden = unresolved;
@@ -602,7 +620,13 @@ export function buildDashboard(
   manifest: CuratedPageManifest,
   resolution: CuratedResolution,
   pins: CuratedPagePins,
-  opts: { timezone: string; nowUs: number },
+  opts: {
+    timezone: string;
+    nowUs: number;
+    activeSectionId?: string;
+    /** Threaded onto every drilldown URL so the explorer opens the SAME window. */
+    drilldownRange?: { period?: string; from?: number; to?: number };
+  },
 ): Record<string, unknown> {
   const staleByPanelId = new Map<string, StaleGroupInfo>();
   for (const stale of resolution.staleGroups) {
@@ -629,6 +653,7 @@ export function buildDashboard(
             staleByPanelId,
             opts.timezone,
             opts.nowUs,
+            opts.drilldownRange,
           ),
         ),
       };
@@ -643,7 +668,9 @@ export function buildDashboard(
     role: "",
     owner: "",
     variables: {
-      list: resolution.pickers.map((picker) => buildVariable(picker, resolution)),
+      list: resolution.pickers.map((picker) =>
+        buildVariable(picker, resolution, manifest, opts.activeSectionId ?? tabs[0]?.tabId),
+      ),
       showDynamicFilters: false,
     },
     tabs,
@@ -855,10 +882,6 @@ function tidyMatchers(query: string): string {
     .replace(/\{\s*\}/g, "");
 }
 
-function pinnedScopeStream(panel: ResolvedPanel): string {
-  return panel.queryStream ?? "";
-}
-
 function buildPanel(
   panel: ResolvedPanel,
   index: number,
@@ -869,11 +892,12 @@ function buildPanel(
   staleByPanelId: Map<string, StaleGroupInfo>,
   timezone: string,
   nowUs: number,
+  drilldownRange?: { period?: string; from?: number; to?: number },
 ): Record<string, unknown> {
   const variant = panel.selectedVariant!;
   const stale = staleByPanelId.get(panel.id);
   const layout = flowLayout(siblings, index);
-  const probeStream = pinnedScopeStream(panel);
+  const probeStream = panel.queryStream ?? "";
 
   const queries = variant.queries.map((query) => ({
     query: tidyMatchers(
@@ -893,7 +917,7 @@ function buildPanel(
     // Rebuilt from the SUBSTITUTED query and the variant that won — the authored one carries tokens and variant 1's stream.
     drilldown: (panel.def.drilldown ?? []).map((entry) =>
       entry.name === "openInMetricsExplorer" && queries[0]
-        ? explorerDrilldown(panel.queryStream ?? "", queries[0].query)
+        ? explorerDrilldown(panel.queryStream ?? "", queries[0].query, drilldownRange)
         : entry,
     ),
   };
@@ -902,6 +926,10 @@ function buildPanel(
     config.curated_badge = {
       key: stale.noDataYet ? "infra.curated.staleNoDataBadge" : "infra.curated.staleBadge",
       date: timestampToTimezoneDate(Math.floor(stale.lastSeenUs / 1000), timezone),
+      // lastSeenUs travels so the CONSUMER computes elapsed time at render time.
+      // Baking the count here froze it at build time, so the badge counted from
+      // one clock while the page banner counted from another and they drifted apart.
+      lastSeenUs: stale.lastSeenUs,
       duration: durationParts(stale.lastSeenUs, nowUs),
     };
   }
@@ -964,6 +992,8 @@ function flowLayout(
 function buildVariable(
   picker: ResolvedPicker,
   resolution: CuratedResolution,
+  manifest: CuratedPageManifest,
+  activeSectionId: string | undefined,
 ): Record<string, unknown> {
   const def = picker.def;
   const parent = def.chainedOn?.[0]?.picker;
@@ -971,7 +1001,19 @@ function buildVariable(
     ? resolution.pickers.find((entry) => entry.def.name === parent)
     : undefined;
 
+  // useVariablesManager CLONES every variable on initialize (:141-148) and again
+  // at :414, and initialize is driven by dashboardData IDENTITY — so a disabled
+  // flag mutated onto these objects after the build is invisible to the rendered
+  // picker. It has to be stamped HERE, inside the built object, to ride the clone.
+  const activeSection = manifest.sections.find((section) => section.id === activeSectionId);
+  const scopedBy = activeSection?.scopedBy ?? [];
+  const curatedDisabled = activeSection ? !scopedBy.includes(def.name) : false;
+
   return {
+    curatedDisabled,
+    ...(curatedDisabled ? { curatedDisabledTooltipKey: "infra.curated.pickerNotApplicable" } : {}),
+    curatedPickerLabel: picker.label,
+    curatedSectionLabel: activeSection?.titleKey ?? "",
     name: def.name,
     label: def.labelKey ? "" : picker.label,
     ...(def.labelKey ? { labelKey: def.labelKey } : {}),

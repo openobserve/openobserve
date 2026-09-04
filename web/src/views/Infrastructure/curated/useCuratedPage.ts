@@ -55,7 +55,7 @@ export const PROBE_TIMEOUT_MS = 4000;
 const BUCKET_US = 5 * 60 * 1_000_000;
 
 export interface UseCuratedPageResult {
-  face: ComputedRef<"unknown" | "undetected" | "ready">;
+  face: ComputedRef<"unknown" | "undetected" | "dormant" | "ready">;
   l0State: Ref<WorkloadState>;
   loadError: Ref<boolean>;
   dashboard: Ref<Record<string, unknown> | null>;
@@ -65,8 +65,12 @@ export interface UseCuratedPageResult {
   warnings: Ref<CuratedWarning[]>;
   lastDataUs: Ref<number | null>;
   stripAutoExpand: Ref<boolean>;
+  /** Groups with ≥1 rendering panel — a strip row for one of these is a FIELD gap, not a missing collector. */
+  presentGroupIds: Ref<string[]>;
   /** start/end are MICROSECOND epochs — the native unit of stats.doc_time_max. */
   refresh: (args: { orgId: string; start: number; end: number; force?: boolean }) => Promise<void>;
+  /** Re-emits the dashboard from the last resolution (tab switch) — no network. */
+  rebuild: () => void;
 }
 
 export function useCuratedPage(
@@ -74,6 +78,10 @@ export function useCuratedPage(
   opts?: {
     pins?: MaybeRefOrGetter<CuratedPagePins | undefined>;
     lastSeenUs?: MaybeRefOrGetter<number | undefined>;
+    /** Drives which pickers the BUILT variables mark disabled — see buildVariable. */
+    activeSectionId?: MaybeRefOrGetter<string | undefined>;
+    /** The page's SELECTED window, threaded onto drilldown URLs (§6.6). */
+    drilldownRange?: MaybeRefOrGetter<{ period?: string; from?: number; to?: number } | undefined>;
   },
 ): UseCuratedPageResult {
   const store = useStore();
@@ -82,6 +90,8 @@ export function useCuratedPage(
   // Read per refresh, never snapshotted: the drawer is reused across ?host= switches and lastSeenUs lands after mount.
   const readPins = (): CuratedPagePins => toValue(opts?.pins) ?? {};
   const readLastSeenUs = (): number | undefined => toValue(opts?.lastSeenUs);
+  const readActiveSectionId = (): string | undefined => toValue(opts?.activeSectionId);
+  const readDrilldownRange = () => toValue(opts?.drilldownRange);
 
   const loadError = ref(false);
   const dashboard = shallowRef<Record<string, unknown> | null>(null);
@@ -128,11 +138,21 @@ export function useCuratedPage(
     lastDataUs.value = null;
   };
 
-  const face = computed<"unknown" | "undetected" | "ready">(() => {
+  const face = computed<"unknown" | "undetected" | "dormant" | "ready">(() => {
     // `ready` flips on the FIRST passing group; `undetected` claims ABSENCE, so it waits for every ladder to settle.
     if (presentGroupIds.value.length > 0) return "ready";
     if (!listsLoaded.value) return "unknown";
     if (settledGroupIds.value.length < manifest.groups.length) return "unknown";
+    // The streams EXIST and merely stopped reporting — "install a collector" is
+    // the wrong instruction for an org that already has one. `state: "stale"` is
+    // positive evidence off a successfully fetched list, so this is not a guess.
+    if (
+      hiddenGroups.value.some((hidden) =>
+        hidden.missingStreams.some((entry) => entry.state === "stale"),
+      )
+    ) {
+      return "dormant";
+    }
     return "undetected";
   });
 
@@ -199,6 +219,8 @@ export function useCuratedPage(
       }
       cachedLists = lists;
       // DELIBERATELY not awaited: these only colour the setup face's copy and must never hold a page that can resolve.
+      // ALIAS of the shared cache, safe only because l0OnlyTypes is the strict
+      // COMPLEMENT of streamTypes — these writes add keys the resolution never reads.
       const settled = lists;
       for (const type of l0OnlyTypes) {
         void getStreams(type, false, false, force)
@@ -422,7 +444,8 @@ export function useCuratedPage(
             org_identifier: args.orgId,
             query: {
               query: {
-                sql: `SELECT COUNT(*) as zo_count FROM "${resolved}" WHERE (${group.probe!.sqlFilter})`,
+                // Author-controlled and list-validated today; escaped so a stream name carrying a quote cannot break out.
+                sql: `SELECT COUNT(*) as zo_count FROM "${resolved.replace(/"/g, '""')}" WHERE (${group.probe!.sqlFilter})`,
                 start_time: args.start,
                 end_time: args.end,
                 from: 0,
@@ -472,7 +495,20 @@ export function useCuratedPage(
     return { ...collected };
   };
 
+  let lastResolution: CuratedResolution | null = null;
+
+  /**
+   * Re-emits the dashboard from the LAST resolution — no network, no re-resolve.
+   * The built variables carry per-section disabled flags (buildVariable), and the
+   * renderer only re-reads them when dashboardData changes identity, so a tab
+   * switch has to produce a new object.
+   */
+  const rebuild = () => {
+    if (lastResolution) applyResolution(lastResolution);
+  };
+
   const applyResolution = (resolution: CuratedResolution) => {
+    lastResolution = resolution;
     hiddenGroups.value = resolution.hiddenGroups;
     partialGroups.value = resolution.partialGroups;
     staleGroups.value = resolution.staleGroups;
@@ -485,12 +521,15 @@ export function useCuratedPage(
     warnings.value = merged;
 
     // Swapped only when resolution output changed (the renderer re-inits on ANY new object); pins are hashed because they substitute INTO the queries.
-    const key = resolutionHash(resolution, readPins());
+    const activeSectionId = readActiveSectionId();
+    const key = resolutionHash(resolution, readPins(), activeSectionId);
     if (key !== resolutionKey || dashboard.value === null) {
       resolutionKey = key;
       const built = buildDashboard(manifest, resolution, readPins(), {
         timezone: store.state.timezone ?? "UTC",
         nowUs: Date.now() * 1000,
+        activeSectionId,
+        drilldownRange: readDrilldownRange(),
       });
       // buildDashboard emits KEYS, so titles are resolved here — outside the pure layer, once per build.
       dashboard.value = translateTitles(built, manifest);
@@ -608,7 +647,9 @@ export function useCuratedPage(
     warnings,
     lastDataUs,
     stripAutoExpand,
+    presentGroupIds,
     refresh,
+    rebuild,
   };
 }
 
@@ -656,13 +697,30 @@ function unknownFieldFrom(error: any): string | null {
 }
 
 /** Selected variants + resolved fields + surviving pickers/sections + badges + pins. */
-function resolutionHash(resolution: CuratedResolution, pins: CuratedPagePins): string {
+function resolutionHash(
+  resolution: CuratedResolution,
+  pins: CuratedPagePins,
+  activeSectionId?: string,
+): string {
   return JSON.stringify({
     pins,
+    // The built variables mark pickers disabled per SECTION, so the section is a build input.
+    activeSectionId,
     panels: resolution.panels
       .filter((panel) => !panel.hidden)
-      .map((panel) => [panel.id, panel.queryStream, panel.unit, panel.resolvedFields]),
+      // subtitleKey and noDataYet both branch what buildPanel emits, so both must move the hash.
+      .map((panel) => [
+        panel.id,
+        panel.queryStream,
+        panel.unit,
+        panel.resolvedFields,
+        panel.def.subtitleKey ?? null,
+      ]),
     pickers: resolution.pickers.map((picker) => [picker.def.name, picker.field, picker.label]),
-    stale: resolution.staleGroups.map((stale) => [stale.group.id, stale.lastSeenUs]),
+    stale: resolution.staleGroups.map((stale) => [
+      stale.group.id,
+      stale.lastSeenUs,
+      stale.noDataYet === true,
+    ]),
   });
 }

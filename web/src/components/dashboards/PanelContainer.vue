@@ -66,10 +66,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="amber-soft"
           size="sm"
           data-test="dashboard-panel-curated-badge"
-          data-tooltip-key="infra.curated.staleBadgeTooltip"
           :title="t('infra.curated.staleBadgeTooltip')"
         >
           {{ t(curatedBadge.key, curatedBadgeParams) }}
+          <OTooltip :content="t('infra.curated.staleBadgeTooltip')" side="bottom" />
         </OTag>
         <div class="flex-1" />
 
@@ -477,6 +477,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
+import { durationParts } from "@/views/Infrastructure/curated/resolve";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -554,17 +555,23 @@ export default defineComponent({
           | {
               key: string;
               date: string;
+              lastSeenUs?: number;
               duration: { key: string; count: number };
             }
           | undefined,
     );
-    // The duration arrives as a KEY + count, so the elapsed time is pluralized
-    // and localized here rather than baked into a string at build time.
+    // The duration is recomputed HERE, from lastSeenUs, against the same clock
+    // the page banner uses. Rendering the build-time count instead froze the
+    // badge while the banner beside it kept counting, so the two disagreed.
     const curatedBadgeParams = computed(() => {
       const badge = curatedBadge.value;
       if (!badge) return {};
-      const duration = badge.duration
-        ? t(`infra.curated.${badge.duration.key}` as never, { count: badge.duration.count })
+      const parts =
+        badge.lastSeenUs != null
+          ? durationParts(badge.lastSeenUs, Date.now() * 1000)
+          : badge.duration;
+      const duration = parts
+        ? t(`infra.curated.${parts.key}` as never, { count: parts.count })
         : "";
       return { duration, date: badge.date };
     });
@@ -572,14 +579,27 @@ export default defineComponent({
       () => props.data?.config?.curated_subtitle_key as string | undefined,
     );
 
-    const curatedSeriesCount = ref<number | null>(null);
-    const onCuratedSeriesData = (data: any) => {
+    // need PanleSchemaRendererRef for table download as a csv
+    const PanleSchemaRendererRef: any = ref(null);
+
+    // Counting `options.series` cannot answer this: for a `metric` panel — the very type the
+    // curated tiles use — convertPromQLData emits exactly ONE synthetic rendering series whether
+    // the result is empty or not (`_metricText: "0.00"` vs `"5.00"`), so a length test reads every
+    // empty metric tile as populated. The renderer already owns the type-aware, loading-aware
+    // verdict (PanelSchemaRenderer.vue:1448-1480) and exposes it; this reuses it, exactly as the
+    // legends button above already does.
+    const curatedSeriesEmpty = ref<boolean | null>(null);
+    const onCuratedSeriesData = () => {
       if (!props.data?.config?.curated_no_data_eligible) return;
-      curatedSeriesCount.value = Array.isArray(data) ? data.length : data == null ? 0 : 1;
+      // Read AFTER the renderer's own conversion settled — the emit is that signal.
+      const verdict = PanleSchemaRendererRef.value?.noData;
+      if (verdict === undefined) return;
+      curatedSeriesEmpty.value = verdict === "No Data";
     };
     /** Only ever claimed after a load actually settled — never while pending. */
     const curatedNoData = computed(
-      () => props.data?.config?.curated_no_data_eligible === true && curatedSeriesCount.value === 0,
+      () =>
+        props.data?.config?.curated_no_data_eligible === true && curatedSeriesEmpty.value === true,
     );
     const metaData = ref();
     const showViewPanel = ref(false);
@@ -626,9 +646,6 @@ export default defineComponent({
     };
 
     const showText = ref(false);
-
-    // need PanleSchemaRendererRef for table download as a csv
-    const PanleSchemaRendererRef: any = ref(null);
 
     //check if dependent adhoc variable exists
     const dependentAdHocVariable = computed(() => {

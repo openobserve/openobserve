@@ -16336,6 +16336,8 @@
       "hiddenPanelCount": "{count} panel hidden | {count} panels hidden",
       "setUp": "Set up",
       "staleBanner": "{capability} stopped {duration} ago (last seen {date}). Values below are from before then.",
+      "dormantHeadline": "{workload} has stopped reporting",
+      "dormantBody": "Every data source for this page exists but stopped sending data. The collector is installed — it is no longer running, or it lost access. Restart it and refresh.",
       "staleBadge": "no data for {duration} (last seen {date})",
       "staleNoDataBadge": "no data yet",
       "staleBadgeTooltip": "As of the last stream-list refresh.",
