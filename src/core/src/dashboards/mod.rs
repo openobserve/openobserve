@@ -363,15 +363,12 @@ pub async fn create_dashboard(
         .await;
         Ok(saved)
     } else if folder_id == DEFAULT_FOLDER {
-        let folder = Folder {
-            folder_id: DEFAULT_FOLDER.to_string(),
-            name: DEFAULT_FOLDER.to_string(),
-            description: DEFAULT_FOLDER.to_string(),
-            icon: None,
-        };
-        folders::save_folder(org_id, folder, FolderType::Dashboards, true)
+        folders::ensure_default_folder(org_id, FolderType::Dashboards)
             .await
-            .map_err(|_| DashboardError::CreateDefaultFolder)?;
+            .map_err(|e| {
+                log::error!("[dashboards] creating default folder for org {org_id}: {e}");
+                DashboardError::CreateDefaultFolder
+            })?;
         let dashboard_id = ider::generate();
         let saved = put(org_id, &dashboard_id, folder_id, None, dashboard, None).await?;
         set_ownership(
