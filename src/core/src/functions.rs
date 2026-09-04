@@ -245,16 +245,20 @@ async fn test_run_js_function(
     function: String,
     events: Vec<Value>,
 ) -> Result<HttpResponse, anyhow::Error> {
-    // Check if function uses #ResultArray# marker
-    let apply_over_array = RESULT_ARRAY.is_match(&function);
+    let org_id = org_id.to_string();
+    // Synchronous QuickJS evaluation must run off the HTTP worker thread so it cannot starve the
+    // pool.
+    match tokio::task::spawn_blocking(move || run_js_test(&org_id, &function, events)).await? {
+        Ok(results) => Ok(MetaHttpResponse::json(TestVRLResponse { results })),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
 
-    // Compile the JS function
-    let js_config = match transform::js::compile_js_function(&function, org_id) {
-        Ok(config) => config,
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
+fn run_js_test(org_id: &str, function: &str, events: Vec<Value>) -> Result<Vec<VRLResult>, String> {
+    let apply_over_array = RESULT_ARRAY.is_match(function);
+
+    let js_config =
+        transform::js::compile_js_function(function, org_id).map_err(|e| e.to_string())?;
 
     let mut transformed_events = vec![];
 
@@ -304,11 +308,7 @@ async fn test_run_js_function(
         }
     }
 
-    let results = TestVRLResponse {
-        results: transformed_events,
-    };
-
-    Ok(MetaHttpResponse::json(results))
+    Ok(transformed_events)
 }
 
 #[tracing::instrument(skip(func))]
