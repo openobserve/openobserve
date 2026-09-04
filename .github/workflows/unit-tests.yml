@@ -77,12 +77,12 @@ jobs:
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
           shared-key: unit-tests
@@ -133,18 +133,18 @@ jobs:
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@v2.87.0
+      - uses: taiki-e/install-action@37f7c5781271959fb65b6b35224e28652ff2b63d # v2.87.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           tool: nextest,cargo-llvm-cov
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
           shared-key: unit-tests
@@ -197,18 +197,18 @@ jobs:
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@v2.87.0
+      - uses: taiki-e/install-action@37f7c5781271959fb65b6b35224e28652ff2b63d # v2.87.0
         env:
           GITHUB_TOKEN: ${{ github.token }}
         with:
           tool: nextest,cargo-llvm-cov
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cache-on-failure: true
           shared-key: unit-tests

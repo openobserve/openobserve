@@ -179,7 +179,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # Which platform's files changed in this PR? (only evaluated for pull_request events)
-      - uses: dorny/paths-filter@v4
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         if: github.event_name == 'pull_request'
         with:
@@ -348,7 +348,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/github-auth
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        with:
+          toolchain: stable
       - name: Install Protoc
         run: bash ./.github/protoc.sh
       - uses: actions/setup-node@v4
@@ -396,7 +398,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/github-auth
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        with:
+          toolchain: stable
       - name: Install Protoc (macOS)
         run: brew install protobuf || true
       - uses: actions/setup-node@v4
@@ -482,8 +486,7 @@ jobs:
         with: { distribution: temurin, java-version: "17" }
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
-      - uses: gradle/actions/setup-gradle@v6
-
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
       - name: Install Maestro
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
@@ -581,7 +584,7 @@ jobs:
         run: gradle --no-daemon assembleDebug
 
       - name: Boot emulator, install apps, run suite
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 35
           target: google_apis
@@ -660,7 +663,7 @@ jobs:
           esac
 
       # Pin Xcode so a runner-image update can't silently move the toolchain under the alpha SDK.
-      - uses: maxim-lobanov/setup-xcode@v1
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           # Pin 16.4 explicitly: macos-15's 'latest-stable' is now Xcode 26, which dropped the Swift
           # compatibility libs the SDK's static libs force-load → arm64 link error. 16.x still ships them.
