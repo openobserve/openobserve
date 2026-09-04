@@ -25,9 +25,10 @@ import {
 
 const route = reactive({ params: { id: "exp-1" }, query: {} }) as any;
 const push = vi.fn();
+const back = vi.fn();
 vi.mock("vue-router", () => ({
   useRoute: () => route,
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, back }),
 }));
 vi.mock("vuex", () => ({
   useStore: () => ({ state: { selectedOrganization: { identifier: "acme" } } }),
@@ -68,6 +69,36 @@ beforeEach(() => {
 });
 
 describe("ExperimentDetailPage", () => {
+  it("shows task and scoring costs under the full total and labels task latency", async () => {
+    get.mockResolvedValue(
+      makeExperimentDetail(makeExperiment(), {
+        results: {
+          executions: [],
+          scores: [],
+          aggregateSummary: {
+            p50LatencyMs: 4511,
+            totalCost: 0.118156603,
+            taskCost: 0.040630363,
+            scoringCost: 0.07752624,
+            costIncomplete: false,
+            incomplete: false,
+            incompleteTaskSlots: 0,
+            incompleteScoreDimensions: 0,
+            errorTaskSlots: 0,
+          },
+        },
+      }),
+    );
+    const wrapper = mount(ExperimentDetailPage);
+    await flushPromises();
+    const cost = wrapper.get('[data-test="ai-experiment-detail-cost"]').text();
+    expect(cost).toContain("$0.1182");
+    expect(cost).toContain("Task $0.0406 · Scoring $0.0775");
+    expect(wrapper.get('[data-test="ai-experiment-detail-p50"]').text()).toContain(
+      "P50 Task Latency",
+    );
+  });
+
   it("renders the experiment without runtime errors", async () => {
     const experiment = makeExperiment({ id: "exp-1", name: "run one", datasetId: "ds-1" });
     get.mockResolvedValue(makeExperimentDetail(experiment, {}));
@@ -79,6 +110,21 @@ describe("ExperimentDetailPage", () => {
     expect(errors).toEqual([]);
     expect(get).toHaveBeenCalled();
     expect(wrapper.text()).toContain("run one");
+  });
+
+  it("uses real browser back when there's history to pop, instead of the bare Experiments list", async () => {
+    window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
+    const experiment = makeExperiment({ id: "exp-1", name: "run one", datasetId: "ds-1" });
+    get.mockResolvedValue(makeExperimentDetail(experiment, {}));
+    const wrapper = mount(ExperimentDetailPage);
+    await flushPromises();
+    push.mockClear();
+
+    await wrapper.get('[data-test="app-page-header-back"]').trigger("click");
+
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
+    window.history.replaceState(null, "");
   });
 
   // The meta line contains an "@", which vue-i18n parses as a linked message
@@ -365,9 +411,9 @@ describe("ExperimentDetailPage", () => {
     });
     await flushPromises();
 
-    expect(wrapper.text()).toContain("0.718");
-    expect(wrapper.text()).toContain("false");
-    expect(wrapper.text()).toContain("safe");
+    expect(
+      wrapper.findAll("tbody tr")[2].findAll("td").map((cell) => cell.text()),
+    ).toEqual(expect.arrayContaining(["0.718", "false", "safe"]));
     // Text labels keep row status accessible without relying on color.
     const chipText = taskStatuses.map((_, index) =>
       wrapper.get(`[data-test="ai-experiment-row-status-row-${index}"]`).text(),

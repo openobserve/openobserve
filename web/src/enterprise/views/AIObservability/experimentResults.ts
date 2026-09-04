@@ -31,7 +31,7 @@ export function experimentScoreValue(score: Record<string, unknown> | null | und
 }
 
 /** Render a type-aware Score aggregate as a compact value rather than JSON. */
-export function experimentScoreSummaryValue(value: unknown): string {
+export function experimentScoreSummaryValue(value: unknown, trialCount?: number): string {
   if (value === null || value === undefined) return EMPTY_SCORE;
   if (typeof value !== "object" || Array.isArray(value)) return String(value);
   const aggregate = value as Record<string, unknown>;
@@ -41,13 +41,20 @@ export function experimentScoreSummaryValue(value: unknown): string {
   if (aggregate.kind === "boolean") {
     const trueCount = Number(aggregate.trueCount ?? aggregate.true_count ?? 0);
     const falseCount = Number(aggregate.falseCount ?? aggregate.false_count ?? 0);
+    if (trialCount === 1) {
+      if (trueCount + falseCount === 0) return EMPTY_SCORE;
+      if (trueCount + falseCount === 1) return String(trueCount === 1);
+    }
     return `true × ${trueCount} · false × ${falseCount}`;
   }
   if (aggregate.kind === "categorical") {
     const counts = aggregate.counts;
     if (counts && typeof counts === "object" && !Array.isArray(counts)) {
-      return Object.entries(counts as Record<string, unknown>)
-        .sort((left, right) => Number(right[1]) - Number(left[1]))
+      const entries = Object.entries(counts as Record<string, unknown>);
+      if (trialCount === 1) {
+        return entries.find(([, count]) => Number(count) > 0)?.[0] ?? EMPTY_SCORE;
+      }
+      return entries.sort((left, right) => Number(right[1]) - Number(left[1]))
         .map(([category, count]) => `${category} × ${Number(count)}`)
         .join(" · ");
     }

@@ -379,6 +379,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -603,9 +604,8 @@ const versionColumns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
-function goBack() {
-  void router.push(aiRemoteTasksRoute(orgId.value));
-}
+// Real browser back when there's history to pop.
+const { goBack } = useSmartBack(() => aiRemoteTasksRoute(orgId.value));
 
 function openEdit() {
   if (!canEdit.value) return;

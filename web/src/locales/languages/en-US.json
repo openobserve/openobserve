@@ -11069,8 +11069,10 @@
       "addToDataset": "Add",
       "detail": {
         "by": "by {user}",
-        "p50Latency": "P50 Latency",
+        "p50Latency": "P50 Task Latency",
         "totalCost": "Total Cost",
+        "costBreakdown": "Task {task} · Scoring {scoring}",
+        "partialCostBreakdown": "Task {task} · Scoring {scoring} · Partial",
         "highDispersion": "High-Dispersion Cases",
         "highDispersionHint": "Rows where trials disagree",
         "scoredRows": "{scored}/{total} rows scored",
@@ -11193,6 +11195,13 @@
           "typeCategorical": "Categorical",
           "typeBoolean": "Boolean",
           "threshold": "Threshold",
+          "outcomeDimensions": "Outcome criteria",
+          "outcomeDimensionsHint": "Choose which columns determine each row's outcome. All columns remain visible. Selecting none marks matching rows as Not Compared.",
+          "allOutcomeDimensions": "All eligible columns",
+          "noOutcomeDimensions": "No columns",
+          "selectedOutcomeDimensions": "{count} column | {count} columns",
+          "outcomeDimensionUnavailable": "{name} (no comparison policy)",
+          "dimensionExcludedHint": "This column is excluded from outcomes. Select it under Outcome criteria to include it.",
           "measurePerRow": "Mean per row, over trials",
           "dimensionImproved": "{count} row improved | {count} rows improved",
           "dimensionUnchanged": "{count} row unchanged | {count} rows unchanged",
@@ -12187,7 +12196,8 @@
       "remove": "Remove",
       "save": "Save",
       "saveAsDraft": "Save as Draft",
-      "createAndActivate": "Save & Activate"
+      "createAndActivate": "Save & Activate",
+      "testConnection": "Test Connection"
     },
     "scorerTypeDialog": {
       "title": "Create a New Scorer",
@@ -12213,15 +12223,19 @@
       "availableModelsLabel": "Available models",
       "apiKeyLabel": "API Key",
       "apiKeyPlaceholder": "Enter API key",
-      "apiKeyHelp": "Stored encrypted at rest and never read back. Leave blank when editing to keep the existing key.",
+      "apiKeyHelp": "Stored encrypted at rest and never read back. Leave blank when saving edits to keep the existing key.",
       "authSection": "Authentication",
-      "authEditNote": "Credentials cannot be read back. Re-enter the API key only if you want to rotate it.",
+      "authEditNote": "Credentials cannot be read back. To test a provider that requires authentication, enter its API key.",
       "cannotRename": "Cannot be renamed after creation.",
       "availableModelsHelp": "Optional. Comma-separated list of models available on this Provider.",
       "saveError": "Failed to save provider",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Testing connection...",
+      "testPassed": "Connected",
+      "testFailed": "Connection failed",
+      "testError": "Failed to test connection"
     },
     "scoreConfig": {
       "gteSymbol": "≥",

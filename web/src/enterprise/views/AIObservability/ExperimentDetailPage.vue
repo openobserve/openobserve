@@ -300,6 +300,7 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { gt, raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -365,9 +366,14 @@ const rowDrawerOpen = ref(false);
 const retryingRow = ref(false);
 const selectedRowDetail = ref<ExperimentRowDetail | null>(null);
 
+// Real browser back when there's history to pop — returns to the Experiments
+// list with whatever filter (e.g. a dataset) the user actually arrived
+// through, not just the bare list. The fallback only fires with no history
+// to pop (direct link / reload).
+const { goBack: backToExperiments } = useSmartBack(() => aiExperimentsRoute(orgId.value));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.experiments"),
-  to: aiExperimentsRoute(orgId.value),
+  onClick: backToExperiments,
 }));
 const isMultiTrial = computed(() => (detail.value?.experiment.trialCount ?? 1) > 1);
 
@@ -436,7 +442,7 @@ const tableRows = computed(() =>
     const violations: Record<string, boolean> = {};
     for (const id of scorerIds.value) {
       const summary = row.scoreSummaries.find((candidate) => candidate.scorerId === id);
-      scores[`score:${id}`] = experimentScoreSummaryValue(summary?.value ?? null);
+      scores[`score:${id}`] = experimentScoreSummaryValue(summary?.value ?? null, row.trialCount);
       const healthy = scorerHealthyBoolean.value[id];
       const aggregate = summary?.value as Record<string, unknown> | null | undefined;
       if (healthy !== undefined && aggregate?.kind === "boolean") {
@@ -577,6 +583,15 @@ const metricCards = computed<MetricCard[]>(() => {
     key: "cost",
     label: t("aiObservability.experiments.detail.totalCost"),
     value: aggregate?.totalCost == null ? "—" : `$${aggregate.totalCost.toFixed(4)}`,
+    footer: t(
+      aggregate?.costIncomplete
+        ? "aiObservability.experiments.detail.partialCostBreakdown"
+        : "aiObservability.experiments.detail.costBreakdown",
+      {
+        task: formatCost(aggregate?.taskCost ?? aggregate?.totalCost),
+        scoring: formatCost(aggregate?.scoringCost),
+      },
+    ),
     icon: "payments" as IconName,
     dataTest: "ai-experiment-detail-cost",
   });
@@ -612,6 +627,10 @@ const metricCards = computed<MetricCard[]>(() => {
   }
   return cards;
 });
+
+function formatCost(cost: number | null | undefined): string {
+  return cost == null ? "—" : `$${cost.toFixed(4)}`;
+}
 
 function isMetricCardActionable(card: MetricCard) {
   return card.key === "dispersion" && isMultiTrial.value;

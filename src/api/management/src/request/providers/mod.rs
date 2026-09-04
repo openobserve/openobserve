@@ -215,55 +215,54 @@ pub async fn delete_provider(Path((org_id, provider_id)): Path<(String, String)>
     }
 }
 
-/// TestProvider
 #[utoipa::path(
     post,
-    path = "/{org_id}/providers/{provider_id}/test",
+    path = "/{org_id}/providers/test",
     context_path = "/api",
     tag = "Providers",
-    operation_id = "TestProvider",
-    summary = "Test LLM provider connection",
-    description = "Tests connectivity to the configured provider endpoint by making a lightweight API call.",
+    operation_id = "TestProviderConfig",
+    summary = "Test an inline LLM provider configuration",
+    description = "Tests connectivity using the submitted provider configuration directly, without persisting it — useful for validating settings before creating or updating the provider.",
     security(("Authorization" = [])),
-    params(
-        ("org_id" = String, Path, description = "Organization name"),
-        ("provider_id" = String, Path, description = "Provider ID"),
-    ),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = inline(ProviderRequestBody), description = "Provider configuration to test"),
     responses(
-        (status = 200, description = "Test result", body = String),
-        (status = 404, description = "Not Found", body = ()),
+        (status = 200, description = "Connection succeeded", body = inline(MetaHttpResponse)),
+        (status = 400, description = "Invalid configuration or connection failed", body = inline(MetaHttpResponse)),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Providers", "operation": "test"})),
     ),
 )]
-pub async fn test_provider(Path((org_id, provider_id)): Path<(String, String)>) -> Response {
-    match test_provider_connection(&org_id, &provider_id).await {
+pub async fn test_provider_config(
+    Path(_org_id): Path<String>,
+    axum::Json(body): axum::Json<ProviderRequestBody>,
+) -> Response {
+    let provider: infra::table::providers::Provider = body.into();
+    match test_provider_connection_config(provider).await {
         Ok(msg) => MetaHttpResponse::ok(msg),
         Err(err) => err.into(),
     }
 }
 
-async fn test_provider_connection(
-    org_id: &str,
-    provider_id: &str,
+async fn test_provider_connection_config(
+    provider: infra::table::providers::Provider,
 ) -> Result<String, ProviderError> {
     #[cfg(feature = "enterprise")]
     {
-        let provider = providers::get_provider(org_id, provider_id).await?;
         let provider =
-            o2_enterprise::enterprise::llm_evaluations::provider::PreparedProvider::parse(
+            o2_enterprise::enterprise::llm_evaluations::providers::PreparedProvider::parse(
                 (&provider).into(),
             )
             .map_err(|e| ProviderError::InvalidConfig(e.to_string()))?;
         provider
             .test_connection()
             .await
-            .map_err(|e| ProviderError::InfraError(infra::errors::Error::Message(e.to_string())))
+            .map_err(|e| ProviderError::InvalidConfig(e.to_string()))
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, provider_id);
+        let _ = provider;
         Err(ProviderError::NotFound)
     }
 }
@@ -271,6 +270,26 @@ async fn test_provider_connection(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_inline_provider_rejects_missing_credentials() {
+        let body: ProviderRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "Test provider",
+            "providerType": "openai",
+            "authConfig": {"api_key": ""},
+        }))
+        .unwrap();
+
+        let response = test_provider_config(Path("test-org".to_string()), axum::Json(body)).await;
+
+        assert_eq!(response.status().as_u16(), 400);
+        let bytes = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert!(body["message"].as_str().unwrap().contains("No API key"));
+    }
 
     #[test]
     fn test_provider_error_conversion() {

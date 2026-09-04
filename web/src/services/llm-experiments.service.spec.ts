@@ -34,6 +34,12 @@ beforeEach(() => {
 });
 
 describe("llm-experiments compare()", () => {
+  it.each([{ ids: ["cost", "latency"] }, { ids: [] }])("sends explicit column selections, including none: $ids", async ({ ids }) => {
+    await llmExperimentsService.compare("acme", "base", "cand", 0.15, ids);
+    expect(mockClient.get.mock.calls[0][1].params).toEqual({
+      baselineId: "base", candidateId: "cand", threshold: 0.15, outcomeDimensions: ids.join(","),
+    });
+  });
   // The server owns the neutral threshold (0.05). Sending a client-side default
   // silently overrides it, and a 0 makes every movement a regression.
   it("omits the threshold entirely when the caller does not pick one", async () => {
@@ -54,6 +60,25 @@ describe("llm-experiments compare()", () => {
 });
 
 describe("get() slot status", () => {
+  it.each([
+    { total_cost: 0.1182, task_cost: 0.0406, scoring_cost: 0.0776, cost_incomplete: true },
+    { totalCost: 0.1182, taskCost: 0.0406, scoringCost: 0.0776, costIncomplete: true },
+  ])("preserves the run cost breakdown: %o", async (aggregate) => {
+    mockClient.get.mockResolvedValue({
+      data: {
+        experiment: { id: "exp-1" },
+        results: { aggregate_summary: aggregate },
+      },
+    });
+    const detail = await llmExperimentsService.get("acme", "exp-1");
+    expect(detail.results.aggregateSummary).toMatchObject({
+      totalCost: 0.1182,
+      taskCost: 0.0406,
+      scoringCost: 0.0776,
+      costIncomplete: true,
+    });
+  });
+
   it("keeps the server rollup and derives one when the field is absent", async () => {
     const slot = (extra: Record<string, unknown>) => ({
       row_id: "r1",
@@ -157,6 +182,15 @@ describe("listRows()", () => {
 });
 
 describe("normalizeExperimentComparison()", () => {
+  it("preserves empty selection and eligibility independently of selected gating", () => {
+    const normalized = normalizeExperimentComparison({
+      outcome_dimensions: [],
+      dimensions: [{ id: "cost", kind: "cost", can_affect_outcome: true, gating: false }],
+    });
+    expect(normalized.outcomeDimensions).toEqual([]);
+    expect(normalized.dimensions[0]).toMatchObject({ id: "cost", canAffectOutcome: true, gating: false });
+    expect(normalizeExperimentComparison({ outcomeDimensions: ["latency"] }).outcomeDimensions).toEqual(["latency"]);
+  });
   it("normalizes score-config metadata and aggregate oriented deltas", () => {
     const dimension = {
       name: "internal-producer-id · v1",

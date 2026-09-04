@@ -133,6 +133,44 @@
       <footer
         class="border-border-default bg-surface-base sticky bottom-0 z-1 flex shrink-0 items-center justify-end gap-2 border-t px-5.5 py-3"
       >
+        <div
+          v-if="testState !== 'idle'"
+          class="mr-auto flex min-w-0 items-center gap-2"
+          data-test="provider-form-test-result"
+        >
+          <span v-if="testState === 'running'" class="text-text-secondary text-xs">
+            {{ t("onlineEvals.provider.testRunning") }}
+          </span>
+          <template v-else>
+            <OTag :variant="testState === 'passed' ? 'success-soft' : 'error-soft'" dot>
+              {{
+                testState === "passed"
+                  ? t("onlineEvals.provider.testPassed")
+                  : t("onlineEvals.provider.testFailed")
+              }}
+            </OTag>
+            <span
+              v-if="testMessage"
+              class="truncate text-xs"
+              :class="testState === 'failed' ? 'text-status-error-text' : 'text-text-secondary'"
+              :title="testMessage"
+            >
+              {{ testMessage }}
+            </span>
+          </template>
+        </div>
+
+        <OButton
+          data-test="provider-form-test-btn"
+          type="button"
+          variant="outline"
+          size="sm-action"
+          :loading="testState === 'running'"
+          :disabled="isSubmitting"
+          @click="testConnection"
+        >
+          {{ t("onlineEvals.buttons.testConnection") }}
+        </OButton>
         <OButton
           data-test="provider-form-cancel-btn"
           type="button"
@@ -158,10 +196,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -215,16 +254,13 @@ const providerTypeOptions = computed(() => [
   { label: t("ingestion.otherLabel"), value: "other" },
 ]);
 
-// Default API endpoint for each provider type, shown as a placeholder to hint
-// the expected URL. Providers without a canonical public endpoint (self-hosted
-// or generic) fall back to the static i18n placeholder.
 const DEFAULT_ENDPOINTS: Record<string, string> = {
-  openai: "https://api.openai.com/v1",
-  deepseek: "https://api.deepseek.com/v1",
-  anthropic: "https://api.anthropic.com/v1",
+  openai: "https://api.openai.com/v1/chat/completions",
+  deepseek: "https://api.deepseek.com/chat/completions",
+  anthropic: "https://api.anthropic.com/v1/messages",
   azure_openai: "https://{resource}.openai.azure.com/openai/deployments/{deployment}",
-  ollama: "http://localhost:11434/v1",
-  vllm: "http://localhost:8000/v1",
+  ollama: "http://localhost:11434/api/generate",
+  vllm: "http://localhost:8000/v1/chat/completions",
 };
 
 const endpointPlaceholder = computed(
@@ -257,30 +293,35 @@ function initForm(row: Provider | null): ProviderForm {
   };
 }
 
+// Shared by save() and testConnection() — both send the same shape, just to
+// different endpoints. `value` carries the RAW field values (the schema
+// validates but does not transform), so trim/split here.
+function buildPayload(value: ProviderForm) {
+  return {
+    name: value.name.trim(),
+    providerType: value.providerType,
+    endpoint: value.endpoint.trim() || null,
+    defaultModel: value.defaultModel.trim(),
+    availableModels: splitCsv(value.availableModels),
+    // Backend expects an authConfig object; the form only collects an
+    // API key, which is the only auth secret the supported providers
+    // need today. Wrap it as { api_key: <value> }. Trim it — a pasted key
+    // with trailing whitespace/newline must not be sent verbatim.
+    authConfig: { api_key: value.apiKey.trim() },
+    // `isDefault` is not surfaced in the form. Always send false;
+    // backend defaults to non-default and the user manages default-ness
+    // (if ever needed) outside this create/edit flow.
+    isDefault: false,
+  };
+}
+
 // @submit handler — OForm only calls this once the whole schema passes, so the
-// schema (not a manual guard) gates the save. `value` carries the RAW field
-// values (the schema validates but does not transform), so trim/split here.
-// OForm awaits this promise → the Save button spinner spans the whole save
-// (no manual `isSaving` ref).
+// schema (not a manual guard) gates the save. OForm awaits this promise → the
+// Save button spinner spans the whole save (no manual `isSaving` ref).
 async function save(value: ProviderForm) {
   if (!props.orgId) return;
   try {
-    const payload = {
-      name: value.name.trim(),
-      providerType: value.providerType,
-      endpoint: value.endpoint.trim() || null,
-      defaultModel: value.defaultModel.trim(),
-      availableModels: splitCsv(value.availableModels),
-      // Backend expects an authConfig object; the form only collects an
-      // API key, which is the only auth secret the supported providers
-      // need today. Wrap it as { api_key: <value> }. Trim it — a pasted key
-      // with trailing whitespace/newline must not be sent verbatim.
-      authConfig: { api_key: value.apiKey.trim() },
-      // `isDefault` is not surfaced in the form. Always send false;
-      // backend defaults to non-default and the user manages default-ness
-      // (if ever needed) outside this create/edit flow.
-      isDefault: false,
-    };
+    const payload = buildPayload(value);
 
     if (props.mode === "edit" && props.row) {
       await onlineEvalsService.providers.update(props.orgId, props.row.id, payload);
@@ -294,6 +335,26 @@ async function save(value: ProviderForm) {
     emit("saved");
   } catch (err: any) {
     showError(err, t("onlineEvals.provider.saveError"));
+  }
+}
+
+const testState = ref<"idle" | "running" | "passed" | "failed">("idle");
+const testMessage = ref<string | null>(null);
+
+// The backend validates test settings independently of the save form.
+async function testConnection() {
+  if (!props.orgId) return;
+  testState.value = "running";
+  testMessage.value = null;
+  const value = formValues.value;
+  try {
+    const message = await onlineEvalsService.providers.testConfig(props.orgId, buildPayload(value));
+    testState.value = "passed";
+    testMessage.value = raw(message);
+  } catch (err: any) {
+    testState.value = "failed";
+    testMessage.value =
+      raw(err?.response?.data?.message || err?.message) || t("onlineEvals.provider.testError");
   }
 }
 </script>

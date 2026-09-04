@@ -12,6 +12,7 @@
     <PlaygroundMessageList
       :variant="variant"
       :var-names="varNames"
+      :vars="vars"
       @update="onMessageUpdate"
       @remove="onMessageRemove"
       @add="onMessageAdd"
@@ -38,6 +39,8 @@ const props = defineProps<{
   variant: PlaygroundVariant;
   /** Every `{{variable}}` on the bench — the completion list offered after `{{`. */
   varNames: string[];
+  /** Values, for the hover-value popover when the caret sits inside a token. */
+  vars: Record<string, string>;
 }>();
 
 const emit = defineEmits<{

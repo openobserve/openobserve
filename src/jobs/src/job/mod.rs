@@ -744,7 +744,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         );
 
-        o2_enterprise::enterprise::llm_evaluations::experiment_runner::register_execution_record_writer(
+        o2_enterprise::enterprise::llm_evaluations::experiments::runner::register_execution_record_writer(
             |org_id, records| {
                 Box::pin(async move {
                     openobserve_core::self_reporting::llm_experiment_schema::ensure_llm_experiment_stream_initialized(&org_id)
@@ -929,12 +929,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_experiment_task_runner(
             |pointer| {
                 Box::pin(async move {
-                    o2_enterprise::enterprise::llm_evaluations::experiment_runner::run_scorer_task(pointer).await
+                    o2_enterprise::enterprise::llm_evaluations::experiments::runner::run_scorer_task(pointer).await
                 })
             },
         );
 
-        o2_enterprise::enterprise::llm_evaluations::provider::register_provider_cost_calculator(
+        o2_enterprise::enterprise::llm_evaluations::providers::register_provider_cost_calculator(
             |org_id, model, input_tokens, output_tokens, timestamp| {
                 let entries = db::model_pricing::get_org_pricing_entries(org_id);
                 let definition =
@@ -956,7 +956,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::start_eval_task_consumers();
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::start_eval_scheduler();
-        o2_enterprise::enterprise::llm_evaluations::experiment_runner::start();
+        o2_enterprise::enterprise::llm_evaluations::experiments::runner::start();
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
             |org_id, sql, start, end, cfg_id, stream_type| {

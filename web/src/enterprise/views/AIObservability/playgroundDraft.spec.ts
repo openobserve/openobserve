@@ -18,6 +18,7 @@ import {
   scorerEvidence,
   snapshotPayload,
   starterDraft,
+  tokenAtCaret,
   variantLabel,
   withFieldInserted,
   withRole,
@@ -75,6 +76,29 @@ describe("renderTemplate", () => {
 
   it("substitutes every occurrence, not just the first", () => {
     expect(renderTemplate("{{a}}-{{a}}", { a: "x" })).toBe("x-x");
+  });
+});
+
+describe("tokenAtCaret", () => {
+  it("names the token the caret sits inside", () => {
+    expect(tokenAtCaret("Hello {{input}}!", 10)).toBe("input");
+  });
+
+  it("matches at either edge of the token", () => {
+    expect(tokenAtCaret("{{input}}", 0)).toBe("input");
+    expect(tokenAtCaret("{{input}}", 9)).toBe("input");
+  });
+
+  it("returns null outside any token", () => {
+    expect(tokenAtCaret("Hello {{input}}!", 2)).toBeNull();
+  });
+
+  it("returns null when there is no token at all", () => {
+    expect(tokenAtCaret("Hello!", 3)).toBeNull();
+  });
+
+  it("picks the token the caret is actually inside, among several", () => {
+    expect(tokenAtCaret("{{a}} {{b}} {{c}}", 8)).toBe("b");
   });
 });
 

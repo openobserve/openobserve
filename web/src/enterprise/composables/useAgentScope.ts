@@ -137,6 +137,15 @@ export interface UseAgentScopeReturn {
    * No-op — returns false — outside cascade mode or when no agent matches.
    */
   selectAgentByName: (name: string) => boolean;
+  /**
+   * Seed the cascade from an exact (env, name, version) triple — the fuller
+   * restore path when all three dimensions were persisted, so a same-named
+   * agent under a different env/version doesn't get picked by mistake. Falls
+   * back to `selectAgentByName` (first match by name) when no agent matches
+   * the exact triple, e.g. the persisted version no longer exists for this
+   * window. Returns true when either resolved.
+   */
+  selectAgentByScope: (env: string, name: string, version: string) => boolean;
 }
 
 export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
@@ -262,6 +271,18 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
     return true;
   }
 
+  function selectAgentByScope(env: string, name: string, version: string): boolean {
+    if (!cascade) return false;
+    const exact = agents.value.find(
+      (a) => agentEnv(a) === env && a.name === name && agentVersion(a) === version,
+    );
+    if (!exact) return selectAgentByName(name);
+    selectedEnv.value = env;
+    selectedAgentName.value = name;
+    selectedVersion.value = version;
+    return true;
+  }
+
   const agentSelectOptions = computed(() =>
     buildAgentSelectOptions(agents.value, opts.t, {
       includeAllAgents: allAgents,
@@ -370,5 +391,6 @@ export function useAgentScope(opts: UseAgentScopeOptions): UseAgentScopeReturn {
     selectedAgentName,
     selectedVersion,
     selectAgentByName,
+    selectAgentByScope,
   };
 }

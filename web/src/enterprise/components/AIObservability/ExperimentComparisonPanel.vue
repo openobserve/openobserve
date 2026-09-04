@@ -36,6 +36,29 @@
             <!-- Label sits outside so the control stays a single line, the same
                  shape as the Baseline / Candidate pickers in the page header. -->
             <div class="flex shrink-0 items-center gap-2">
+              <OTooltip
+                :content="t('aiObservability.experiments.comparePage.panel.outcomeDimensionsHint')"
+              >
+                <span class="text-text-tertiary text-xs">
+                  {{ t("aiObservability.experiments.comparePage.panel.outcomeDimensions") }}
+                </span>
+              </OTooltip>
+              <OSelect
+                :model-value="selectedDimensions"
+                :options="outcomeOptions"
+                :aria-label="t('aiObservability.experiments.comparePage.panel.outcomeDimensions')"
+                :disabled="loading"
+                :searchable="true"
+                multiple
+                select-all
+                option-tooltip
+                size="md"
+                width="sm"
+                data-test="ai-experiment-comparison-outcome-dimensions"
+                @update:model-value="selectOutcomeDimensions"
+              >
+                <template #trigger>{{ selectionLabel }}</template>
+              </OSelect>
               <span class="text-text-tertiary text-xs">
                 {{ t("aiObservability.experiments.comparePage.panel.threshold") }}
               </span>
@@ -43,6 +66,7 @@
                 :model-value="comparison.threshold"
                 :options="thresholdOptions"
                 :searchable="false"
+                :disabled="loading"
                 size="md"
                 width="xs"
                 data-test="ai-experiment-comparison-threshold"
@@ -91,6 +115,7 @@
 import { computed, h, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -102,6 +127,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ExperimentDimensionHeader from "./ExperimentDimensionHeader.vue";
 import {
   dimensionIdentity,
+  dimensionLabel,
   dimensionMovementCounts,
   dimensionSideValue,
 } from "./experimentRowContent";
@@ -112,10 +138,15 @@ import type {
   ExperimentComparisonRow,
 } from "@/services/llm-experiments.service";
 
-const props = defineProps<{ comparison: ExperimentComparison }>();
+const props = defineProps<{
+  comparison: ExperimentComparison;
+  outcomeDimensions?: string[];
+  loading?: boolean;
+}>();
 const emit = defineEmits<{
   inspect: [row: ExperimentComparisonRow, siblings: ExperimentComparisonRow[]];
   "apply-threshold": [threshold: number];
+  "select-outcome-dimensions": [dimensions: string[]];
 }>();
 
 const { t } = useI18nTyped();
@@ -201,6 +232,38 @@ const thresholdOptions = computed(() => {
 function selectThreshold(next: SelectModelValue) {
   if (typeof next === "number" && next !== props.comparison.threshold) {
     emit("apply-threshold", next);
+  }
+}
+
+const selectedDimensions = computed(() => props.outcomeDimensions ?? props.comparison.outcomeDimensions);
+
+const outcomeOptions = computed(() => props.comparison.dimensions.map((dimension) => {
+  const label = dimension.kind === "cost"
+    ? t("aiObservability.experiments.comparePage.panel.tileCost")
+    : dimension.kind === "latency"
+      ? t("aiObservability.experiments.comparePage.panel.tileLatency")
+      : dimensionLabel(dimension);
+  return {
+    value: dimension.id,
+    label: dimension.canAffectOutcome
+      ? label
+      : t("aiObservability.experiments.comparePage.panel.outcomeDimensionUnavailable", { name: label }),
+    disabled: !dimension.canAffectOutcome,
+  };
+}));
+
+const selectionLabel = computed(() => {
+  const count = selectedDimensions.value.length;
+  if (count === 0) return t("aiObservability.experiments.comparePage.panel.noOutcomeDimensions");
+  if (count === outcomeOptions.value.filter((option) => !option.disabled).length) {
+    return t("aiObservability.experiments.comparePage.panel.allOutcomeDimensions");
+  }
+  return t("aiObservability.experiments.comparePage.panel.selectedOutcomeDimensions", { count });
+});
+
+function selectOutcomeDimensions(next: SelectModelValue) {
+  if (Array.isArray(next) && next.every((id): id is string => typeof id === "string")) {
+    emit("select-outcome-dimensions", next);
   }
 }
 

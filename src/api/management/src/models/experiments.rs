@@ -17,24 +17,24 @@ use std::collections::BTreeMap;
 
 use openobserve_core::llm_evaluations::{
     datasets::{DatasetItemSource, DatasetSnapshotFilter},
-    experiment_cost::ExperimentCostEstimate,
-    experiment_dispersion::{DimensionDispersion, RowDispersion},
-    experiment_evidence::{ExperimentApplicabilityPreview, ExperimentScorerApplicabilityPreview},
-    experiment_ingest::{
-        ClientExecutionRecord, ClientExecutionStatus, ClientScore, PartError, PartResult,
-        RecordBatch, RecordBatchResult,
-    },
-    experiment_results::{
-        ExperimentAggregateSummary, ExperimentClientScoreSummary, ExperimentProgress,
-        ExperimentResultScore, ExperimentResultScoreStatus, ExperimentResultSlot,
-        ExperimentResultTaskStatus, ExperimentScoreSummary, ExperimentSkipSummary,
-        ExperimentSlotStatus, ScoringStatus,
-    },
     experiments::{
         CloneExperimentOverrides, CreateExperiment, CreateExperimentResult, Experiment,
         ExperimentPreview, ExperimentScorerRef, ExperimentSlot, ExperimentSlotPage,
         ExperimentStatus, ExperimentTaskConfig, PinnedExperimentScorer, PromptMessage,
         RemoteTaskOverrides,
+        cost::ExperimentCostEstimate,
+        dispersion::{DimensionDispersion, RowDispersion},
+        evidence::{ExperimentApplicabilityPreview, ExperimentScorerApplicabilityPreview},
+        ingest::{
+            ClientExecutionRecord, ClientExecutionStatus, ClientScore, PartError, PartResult,
+            RecordBatch, RecordBatchResult,
+        },
+        results::{
+            ExperimentAggregateSummary, ExperimentClientScoreSummary, ExperimentProgress,
+            ExperimentResultScore, ExperimentResultScoreStatus, ExperimentResultSlot,
+            ExperimentResultTaskStatus, ExperimentScoreSummary, ExperimentSkipSummary,
+            ExperimentSlotStatus, ScoringStatus,
+        },
     },
 };
 use serde::{Deserialize, Serialize};
@@ -1247,6 +1247,9 @@ pub struct ExperimentClientScoreSummaryBody {
 pub struct ExperimentAggregateSummaryBody {
     pub p50_latency_ms: Option<u64>,
     pub total_cost: f64,
+    pub task_cost: f64,
+    pub scoring_cost: Option<f64>,
+    pub cost_incomplete: bool,
     pub incomplete: bool,
     pub incomplete_task_slots: u64,
     pub incomplete_score_dimensions: u64,
@@ -1386,6 +1389,9 @@ impl From<ExperimentAggregateSummary> for ExperimentAggregateSummaryBody {
         Self {
             p50_latency_ms: value.p50_latency_ms,
             total_cost: value.total_cost,
+            task_cost: value.task_cost,
+            scoring_cost: value.scoring_cost,
+            cost_incomplete: value.cost_incomplete,
             incomplete: value.incomplete,
             incomplete_task_slots: value.incomplete_task_slots,
             incomplete_score_dimensions: value.incomplete_score_dimensions,

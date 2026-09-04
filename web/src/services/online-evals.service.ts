@@ -273,6 +273,8 @@ const onlineEvalsService = {
     delete: async (orgId: string, providerId: string): Promise<void> => {
       await http().delete(`/api/${orgId}/providers/${providerId}`);
     },
+    testConfig: async (orgId: string, payload: ProviderPayload): Promise<string> =>
+      (await http().post(`/api/${orgId}/providers/test`, payload)).data.message,
   },
 
   scoreConfigs: {

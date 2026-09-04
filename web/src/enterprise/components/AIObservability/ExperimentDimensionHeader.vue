@@ -75,7 +75,10 @@ const absent = computed(() =>
       }
     : {
         label: t("aiObservability.experiments.comparePage.panel.dimensionNotCounted"),
-        hint: t("aiObservability.experiments.comparePage.panel.dimensionNotCountedHint"),
+        hint:
+          props.dimension.canAffectOutcome
+            ? t("aiObservability.experiments.comparePage.panel.dimensionExcludedHint")
+            : t("aiObservability.experiments.comparePage.panel.dimensionNotCountedHint"),
       },
 );
 

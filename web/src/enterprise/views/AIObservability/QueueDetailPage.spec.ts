@@ -25,6 +25,7 @@ const mockGetQueue = vi.fn();
 const mockListItems = vi.fn();
 const mockToast = vi.fn();
 const mockPush = vi.fn();
+const mockBack = vi.fn();
 
 vi.mock("@/services/llm-queues.service", () => ({
   default: {
@@ -42,7 +43,7 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("vue-router", () => ({
-  useRouter: vi.fn(() => ({ push: mockPush })),
+  useRouter: vi.fn(() => ({ push: mockPush, back: mockBack })),
   useRoute: vi.fn(() => ({ params: { id: "q1" }, query: {} })),
 }));
 
@@ -54,7 +55,11 @@ vi.mock("@/types/i18n", async (importOriginal) => {
 vi.mock("@/lib/core/PageLayout/OPageLayout.vue", () => ({
   default: {
     name: "OPageLayout",
-    template: `<div class="o-page-layout"><slot name="actions" /><slot name="subnav" /><slot /></div>`,
+    props: ["back"],
+    template: `<div class="o-page-layout">
+      <button v-if="back" data-test="app-page-header-back" @click="back.onClick?.()" />
+      <slot name="actions" /><slot name="subnav" /><slot />
+    </div>`,
   },
 }));
 
@@ -112,9 +117,22 @@ beforeEach(() => {
   mockListItems.mockReset().mockResolvedValue(ITEMS);
   mockToast.mockReset();
   mockPush.mockReset();
+  mockBack.mockReset();
 });
 
 describe("QueueDetailPage", () => {
+  it("uses real browser back when there's history to pop, instead of the bare Queues list", async () => {
+    window.history.pushState({ back: "/previous" }, "", "/previous-fake-url");
+    const wrapper = await mountPage();
+    mockPush.mockClear();
+
+    await wrapper.get('[data-test="app-page-header-back"]').trigger("click");
+
+    expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockPush).not.toHaveBeenCalled();
+    window.history.replaceState(null, "");
+  });
+
   it("loads the queue and its items, and derives the status counts", async () => {
     const wrapper = await mountPage();
 

@@ -902,6 +902,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, reactive, onMounted, nextTick, computed, defineAsyncComponent } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatDate } from "@/utils/date";
@@ -1608,27 +1609,32 @@ async function load() {
   }
 }
 
-function goBack() {
-  // When opened from the AI/LLM Sessions page, return there (stays in the AI
-  // menu) instead of dropping into the Traces sessions tab.
+// Real history back, when there is one, instead of a hand-built push: the
+// list's own URL (filters, page, stream/agent mode) round-trips exactly as
+// the user left it, whichever of the several pages that open a session
+// (AI Sessions, Discovery, Queue Workbench) it actually was. The fallback
+// below only fires with no history to pop (direct link / reload), so it only
+// needs to be a SANE landing spot, not an exact one.
+const { goBack } = useSmartBack(() => {
+  // When opened from the AI/LLM Sessions page, return there (stays in
+  // the AI menu) instead of dropping into the Traces sessions tab.
   if (route.name === "aiSessionDetails") {
-    router.push({
+    return {
       name: "aiSessions",
       query: {
         org_identifier: store.state.selectedOrganization?.identifier,
       },
-    });
-    return;
+    };
   }
-  router.push({
+  return {
     name: "traces",
     query: {
       tab: "sessions",
       stream: streamName.value,
       org_identifier: store.state.selectedOrganization?.identifier,
     },
-  });
-}
+  };
+});
 
 function copySessionId() {
   if (!detail.value) return;

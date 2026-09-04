@@ -19,6 +19,7 @@ vi.mock("@/services/online-evals.service", () => ({
     providers: {
       create: vi.fn(),
       update: vi.fn(),
+      testConfig: vi.fn(),
     },
   },
 }));
@@ -61,6 +62,7 @@ describe("ProviderFormPage", () => {
     vi.clearAllMocks();
     (onlineEvalsService.providers.create as any).mockResolvedValue({});
     (onlineEvalsService.providers.update as any).mockResolvedValue({});
+    (onlineEvalsService.providers.testConfig as any).mockResolvedValue("Connection OK");
   });
 
   afterEach(() => {
@@ -183,6 +185,85 @@ describe("ProviderFormPage", () => {
         availableModels: ["claude-3", "claude-3-haiku"],
         authConfig: { api_key: "" },
         isDefault: false,
+      });
+    });
+  });
+
+  describe("Test Connection", () => {
+    const testBtn = (w: any) => w.find('[data-test="provider-form-test-btn"]');
+    const result = (w: any) => w.find('[data-test="provider-form-test-result"]');
+
+    it("tests the current (unsaved) form values, not a create call, in create mode", async () => {
+      wrapper = createWrapper();
+      setField(wrapper, "name", "Prod OpenAI");
+      setField(wrapper, "defaultModel", "gpt-4o-mini");
+      setField(wrapper, "apiKey", "sk-secret");
+      await testBtn(wrapper).trigger("click");
+      await flushPromises();
+
+      expect(onlineEvalsService.providers.testConfig).toHaveBeenCalledWith(
+        "test-org",
+        expect.objectContaining({ name: "Prod OpenAI", authConfig: { api_key: "sk-secret" } }),
+      );
+      expect(onlineEvalsService.providers.create).not.toHaveBeenCalled();
+    });
+
+    it("shows the backend's message once the test passes", async () => {
+      (onlineEvalsService.providers.testConfig as any).mockResolvedValue("Reached the endpoint.");
+      wrapper = createWrapper();
+      await testBtn(wrapper).trigger("click");
+      await flushPromises();
+
+      expect(result(wrapper).text()).toContain("Reached the endpoint.");
+    });
+
+    it("shows the backend's error once the test fails", async () => {
+      (onlineEvalsService.providers.testConfig as any).mockRejectedValue({
+        response: { data: { message: "401 Unauthorized" } },
+      });
+      wrapper = createWrapper();
+      await testBtn(wrapper).trigger("click");
+      await flushPromises();
+
+      expect(result(wrapper).text()).toContain("401 Unauthorized");
+    });
+
+    describe("edit mode", () => {
+      const row: any = {
+        id: "prov-1",
+        name: "Existing",
+        provider_type: "anthropic",
+        endpoint: "https://api.anthropic.com",
+        default_model: "claude-3",
+        available_models: ["claude-3", "claude-3-haiku"],
+      };
+
+      it("tests unsaved edits inline even when the API key is left blank", async () => {
+        wrapper = createWrapper({ mode: "edit", row });
+        setField(wrapper, "endpoint", "https://proxy.example.com/v1/messages");
+        await testBtn(wrapper).trigger("click");
+        await flushPromises();
+
+        expect(onlineEvalsService.providers.testConfig).toHaveBeenCalledWith(
+          "test-org",
+          expect.objectContaining({
+            endpoint: "https://proxy.example.com/v1/messages",
+            authConfig: { api_key: "" },
+          }),
+        );
+        expect(onlineEvalsService.providers.update).not.toHaveBeenCalled();
+      });
+
+      it("tests the current form values (including the rotated key) once a new API key is typed", async () => {
+        wrapper = createWrapper({ mode: "edit", row });
+        setField(wrapper, "apiKey", "sk-new-secret");
+        await testBtn(wrapper).trigger("click");
+        await flushPromises();
+
+        expect(onlineEvalsService.providers.testConfig).toHaveBeenCalledWith(
+          "test-org",
+          expect.objectContaining({ authConfig: { api_key: "sk-new-secret" } }),
+        );
       });
     });
   });
