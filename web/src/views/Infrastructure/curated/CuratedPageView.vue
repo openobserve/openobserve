@@ -31,6 +31,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import DateTime from "@/components/DateTime.vue";
 import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
+import type { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { getConsumableRelativeTime } from "@/utils/date";
 import type { WorkloadId } from "@/composables/useWorkloadDetection";
@@ -284,6 +285,34 @@ watch(selectedTabId, (next, previous) => {
   if (next !== previous) page.rebuild();
 });
 
+/**
+ * Panels query COMMITTED variable state (RenderDashboardCharts
+ * getCommittedVariablesForPanel), and a selection only reaches it through
+ * commitAll — which every other embedder triggers from its own Refresh
+ * (ViewDashboard :1254, AppPerformance :326, TracesAnalysisDashboard :782).
+ * A curated page has no such button for pickers: PanelContainer's per-panel
+ * "refresh to apply variables" control is `v-if="!viewOnly"` (:204) and this
+ * page is viewOnly, so an uncommitted selection would be unappliable. Commit
+ * on the selection itself instead — the picker IS the apply gesture here.
+ */
+type VariablesManager = ReturnType<typeof useVariablesManager>;
+const variablesManager = ref<VariablesManager | null>(null);
+let stopCommitWatch: (() => void) | undefined;
+
+const onVariablesManagerReady = (manager: VariablesManager) => {
+  variablesManager.value = manager;
+  stopCommitWatch?.();
+  // Values ONLY: options and loading flags churn on every fetch, and committing
+  // on those would re-run panels for a picker the user never touched.
+  stopCommitWatch = watch(
+    () => manager.variablesData.global.map((variable) => variable.value),
+    () => manager.commitAll(),
+    { deep: true },
+  );
+};
+
+onBeforeUnmount(() => stopCommitWatch?.());
+
 /** A single-cluster org loses its picker, so the name renders as static text. */
 const singleClusterName = computed(() => {
   const cluster = variableList.value.find((variable) => variable.name === "cluster");
@@ -509,6 +538,7 @@ watch(
         :showTabs="showTabs"
         :frame="false"
         @variablesData="page.rememberPickerOptions"
+        @variablesManagerReady="onVariablesManagerReady"
       >
         <template #before_panels>
           <div class="flex flex-col gap-2 pb-2">

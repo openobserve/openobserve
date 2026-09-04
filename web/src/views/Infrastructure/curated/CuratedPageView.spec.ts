@@ -24,11 +24,24 @@ import { createRouter, createMemoryHistory } from "vue-router";
 import { defineComponent, ref, isRef, inject, watchEffect, type Ref } from "vue";
 import CuratedPageView from "./CuratedPageView.vue";
 import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
+import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import { b64DecodeUnicodeSafe } from "@/utils/formatters";
 import { kubernetesPage } from "./packs/kubernetes.page";
 import i18n from "@/locales";
 
 const { useCuratedPageMock } = vi.hoisted(() => ({ useCuratedPageMock: vi.fn() }));
 vi.mock("./useCuratedPage", () => ({ useCuratedPage: useCuratedPageMock }));
+
+// The values query's transport, stubbed at the LAST seam before the network so
+// buildQueryContext — the code that turns a `filter` row into SQL — runs for real.
+const { streamingMock } = vi.hoisted(() => ({ streamingMock: vi.fn(async () => {}) }));
+vi.mock("@/composables/useStreamingSearch", () => ({
+  default: () => ({
+    fetchQueryDataWithHttpStream: streamingMock,
+    cancelStreamQueryBasedOnRequestId: vi.fn(),
+    resetAuthToken: vi.fn(),
+  }),
+}));
 
 const NOW_US = 1_800_000_000_000_000;
 const HOUR_US = 60 * 60 * 1_000_000;
@@ -1104,6 +1117,274 @@ describe("CuratedPageView", () => {
       const label = wrapper.find('[data-test="curated-single-cluster"]');
       expect(label.exists()).toBe(true);
       expect(label.text()).toContain("production");
+    });
+  });
+
+  // ── Chained narrowing: the SQL a child picker actually sends (§6.4) ──────
+
+  describe("a chained picker's values query carries the parent's selection", () => {
+    // resolve.spec.ts pins the built `filter` ROW; this pins what the shared
+    // selector turns that row into on the wire, because the row alone proves
+    // nothing — the value travels as base64 SQL in the `sql` field of the
+    // _values_stream body (VariablesValueSelector buildQueryContext :1839-1931),
+    // and substitution happens AFTER the row is compiled to SQL. Verified live
+    // against o2.introspect: namespace=argocd -> 13 pods, ziox -> 27,
+    // argocd+ziox -> 40, a bogus namespace -> 0, and the backend rewrites the
+    // _o2_all_ sentinel to `true` (remove_dashboard_placeholder.rs) so ALL
+    // -> the unfiltered 500. The bundled host_metrics dashboard's own chain
+    // behaves identically on the same backend (6 mountpoints -> 2 for one host).
+    /** Keyed by the field being fetched, so the parent's own load cannot be mistaken for the child's. */
+    const capturedSql: { field: string; sql: string }[] = [];
+
+    const chainedVariables = () => [
+      {
+        name: "namespace",
+        label: "K8s Namespace",
+        type: "query_values",
+        multiSelect: true,
+        scope: "global",
+        value: ["argocd"],
+        isVariablePartialLoaded: true,
+        isLoading: false,
+        isVariableLoadingPending: false,
+        options: [{ label: "argocd", value: "argocd" }],
+        query_data: {
+          stream: "k8s_pod_memory_usage",
+          stream_type: "metrics",
+          field: "k8s_namespace_name",
+          max_record_size: 100,
+          filter: [],
+        },
+      },
+      {
+        name: "pod",
+        label: "K8s Pod",
+        type: "query_values",
+        multiSelect: true,
+        scope: "global",
+        value: [],
+        isVariablePartialLoaded: false,
+        isLoading: false,
+        isVariableLoadingPending: true,
+        options: [],
+        // The exact row resolve.ts buildVariable emits for a chainedOn picker.
+        query_data: {
+          stream: "k8s_pod_memory_usage",
+          stream_type: "metrics",
+          field: "k8s_pod_name",
+          max_record_size: 100,
+          filter: [{ name: "k8s_namespace_name", operator: "IN", value: "$namespace" }],
+        },
+      },
+    ];
+
+    const loadPodValues = async (variables: any[]) => {
+      capturedSql.length = 0;
+      const store = createStore({
+        state: {
+          selectedOrganization: { identifier: "test-org" },
+          timezone: "UTC",
+          zoConfig: { timestamp_column: "_timestamp" },
+        },
+      });
+      const selector = mount(VariablesValueSelector, {
+        props: {
+          variablesConfig: { list: variables },
+          showDynamicFilters: false,
+          selectedTimeDate: {
+            start_time: new Date(NOW_US / 1000 - 3 * 60 * 60 * 1000),
+            end_time: new Date(NOW_US / 1000),
+          },
+        },
+        global: {
+          plugins: [store, i18n],
+          stubs: { VariableQueryValueSelector: querySelectorStub },
+        },
+      });
+      (selector.vm as any).variablesData.values = variables;
+      await flushPromises();
+      await (selector.vm as any).loadVariableOptions(variables[1]);
+      await flushPromises();
+      selector.unmount();
+      return capturedSql
+        .filter((entry) => entry.field === "k8s_pod_name")
+        .map((entry) => b64DecodeUnicodeSafe(entry.sql));
+    };
+
+    beforeEach(() => {
+      streamingMock.mockImplementation(async (payload: any) => {
+        if (payload?.type !== "values") return;
+        capturedSql.push({
+          field: payload.queryReq.fields?.[0] ?? "",
+          sql: payload.queryReq.sql,
+        });
+      });
+    });
+
+    it("substitutes the parent's CONCRETE selection into the child's SQL filter", async () => {
+      const sent = await loadPodValues(chainedVariables());
+      expect(sent).toHaveLength(1);
+      // Narrowed, and narrowed to what the user picked — the literal `$namespace`
+      // token surviving to the wire is the failure this pin exists to catch.
+      expect(sent[0]).toContain(`"k8s_namespace_name" IN ('argocd')`);
+      expect(sent[0]).not.toContain("$namespace");
+    });
+
+    it("a MULTI-value parent selection becomes an IN list, not just its first value", async () => {
+      const variables = chainedVariables();
+      variables[0].value = ["argocd", "ziox"];
+      const sent = await loadPodValues(variables);
+      expect(sent[0]).toContain("'argocd'");
+      expect(sent[0]).toContain("'ziox'");
+    });
+
+    it("the ALL sentinel travels verbatim — the BACKEND rewrites it to `true`", async () => {
+      // Deliberately NOT stripped client-side: remove_dashboard_placeholder.rs
+      // turns `IN ('_o2_all_')` into `true`, measured live as the unfiltered
+      // 500-pod list. Stripping it here would fork behaviour from every stored
+      // dashboard, which sends the sentinel too.
+      const variables = chainedVariables();
+      variables[0].value = ["_o2_all_"];
+      const sent = await loadPodValues(variables);
+      expect(sent[0]).toContain("_o2_all_");
+    });
+  });
+
+  // ── Panel reactivity to a picker change (§6.4) ───────────────────────────
+
+  describe("panels re-query when a picker selection changes", () => {
+    // The REAL useVariablesManager, not a hand-rolled fake: panels read
+    // getCommittedVariablesForPanel, and a selection only reaches committed
+    // state through commitAll(). Every other embedder of RenderDashboardCharts
+    // (ViewDashboard :1254, AppPerformance :326, TracesAnalysisDashboard :782)
+    // holds a ref and calls commitAllVariables() — the curated page must too,
+    // and it cannot lean on the per-panel "refresh to apply" button because
+    // PanelContainer hides that behind `v-if="!viewOnly"` (:204) and the
+    // curated page is viewOnly.
+    const workloadsDashboard = () => ({
+      ...dashboardFixture(["overview", "workloads"]),
+      variables: {
+        showDynamicFilters: false,
+        list: [
+          {
+            name: "namespace",
+            label: "K8s Namespace",
+            type: "query_values",
+            multiSelect: true,
+            scope: "global",
+            value: [],
+            options: [
+              { label: "argocd", value: "argocd" },
+              { label: "ziox", value: "ziox" },
+            ],
+            query_data: {
+              stream: "k8s_pod_memory_usage",
+              stream_type: "metrics",
+              field: "k8s_namespace_name",
+              max_record_size: 100,
+              filter: [],
+            },
+          },
+        ],
+      },
+    });
+
+    /**
+     * The real manager, initialized and committed exactly as
+     * RenderDashboardCharts does before it emits (:1134-1149) — the emit's
+     * payload is that manager object verbatim, so this IS the real contract.
+     */
+    const readyManager = async (dashboardData: any) => {
+      const manager = useVariablesManager();
+      await manager.initialize(dashboardData.variables.list, dashboardData);
+      manager.commitAll();
+      return manager;
+    };
+
+    it("the emitted payload really is a manager exposing what the view drives it by", () => {
+      // Guards the shape the view depends on: if RenderDashboardCharts ever
+      // emits something narrower, the pins below would still pass on a fake.
+      const manager = useVariablesManager();
+      expect(typeof manager.commitAll).toBe("function");
+      expect(typeof manager.updateVariableValue).toBe("function");
+      expect(typeof manager.getCommittedVariablesForPanel).toBe("function");
+      expect(Array.isArray(manager.variablesData.global)).toBe(true);
+    });
+
+    const committedValue = (manager: any, name: string) =>
+      manager
+        .getCommittedVariablesForPanel("workloads_p1", "workloads")
+        .find((v: any) => v.name === name)?.value;
+
+    it("re-setting the SAME selection commits nothing new — no gratuitous panel re-query", async () => {
+      // RenderDashboardCharts already auto-commits the first load (:1228), so
+      // this watcher fires on that same transition. commitAll is a pure
+      // live->committed clone, so the second call must be a no-op in effect;
+      // if it were not, every page load would double-query every panel.
+      const dashboardData = workloadsDashboard();
+      wrapper = await mountView({}, { dashboard: ref(dashboardData) });
+
+      const manager = await readyManager(dashboardData);
+      wrapper
+        .findComponent({ name: "RenderDashboardCharts" })
+        .vm.$emit("variablesManagerReady", manager);
+      await flushPromises();
+
+      manager.updateVariableValue("namespace", "global", undefined, undefined, ["argocd"]);
+      await flushPromises();
+      const afterFirst = committedValue(manager, "namespace");
+
+      manager.updateVariableValue("namespace", "global", undefined, undefined, ["argocd"]);
+      await flushPromises();
+
+      expect(committedValue(manager, "namespace")).toEqual(afterFirst);
+      expect(manager.hasUncommittedChanges.value).toBe(false);
+    });
+
+    it("a picker selection reaches COMMITTED state, which is what panels query on", async () => {
+      const dashboardData = workloadsDashboard();
+      wrapper = await mountView({}, { dashboard: ref(dashboardData) });
+
+      const manager = await readyManager(dashboardData);
+      wrapper
+        .findComponent({ name: "RenderDashboardCharts" })
+        .vm.$emit("variablesManagerReady", manager);
+      await flushPromises();
+
+      expect(committedValue(manager, "namespace")).toEqual([]);
+
+      // Exactly what VariablesValueSelector does on a user pick.
+      manager.updateVariableValue("namespace", "global", undefined, undefined, ["argocd"]);
+      await flushPromises();
+
+      // Live state moved...
+      expect(manager.getVariable("namespace", "global")?.value).toEqual(["argocd"]);
+      // ...and the page must have pushed it through to what panels read.
+      expect(committedValue(manager, "namespace")).toEqual(["argocd"]);
+    });
+
+    it("a picker change does NOT re-resolve or rebuild — only the selection moved", async () => {
+      // The counterweight: committing must not be smuggled in via a full
+      // refresh()/rebuild(), which would remount every panel and drop the
+      // pickers' own loaded options.
+      const dashboardData = workloadsDashboard();
+      wrapper = await mountView({}, { dashboard: ref(dashboardData) });
+
+      const manager = await readyManager(dashboardData);
+      wrapper
+        .findComponent({ name: "RenderDashboardCharts" })
+        .vm.$emit("variablesManagerReady", manager);
+      await flushPromises();
+      refreshSpy.mockClear();
+      rebuildSpy.mockClear();
+      const identityBefore = captured.dashboardData;
+
+      manager.updateVariableValue("namespace", "global", undefined, undefined, ["ziox"]);
+      await flushPromises();
+
+      expect(refreshSpy).not.toHaveBeenCalled();
+      expect(rebuildSpy).not.toHaveBeenCalled();
+      expect(captured.dashboardData).toBe(identityBefore);
     });
   });
 
