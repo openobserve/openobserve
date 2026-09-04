@@ -17,6 +17,7 @@ mod aggregate;
 mod call;
 mod columns;
 mod selector;
+mod streaming;
 use std::sync::Arc;
 
 use async_recursion::async_recursion;

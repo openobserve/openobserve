@@ -15,20 +15,28 @@
 
 //! Aggregation dispatch over the fused and generic evaluators.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::value::*;
 use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::{Call, Expr as PromExpr, LabelModifier, token};
+use promql_parser::parser::{
+    Call, Expr as PromExpr, LabelModifier, MatrixSelector, VectorSelector, token,
+};
 
 use super::Engine;
 use crate::{aggregations, functions, fused};
 
-/// A recognized `agg(range_func(...))` expression, the shape the fused evaluators accept.
+/// A recognized fused shape: `agg(range_func(...))`, or `agg(instant_selector)` read as
+/// `last_over_time` over the lookback window.
 struct FusedAggShape<'a> {
     op: fused::FusedAggOp,
     func: Arc<dyn functions::RangeFunc>,
-    range_arg: &'a PromExpr,
+    /// The range function's argument to materialize; `None` for the instant shape, which has
+    /// no range function and stays generic when it cannot stream.
+    range_arg: Option<&'a PromExpr>,
+    /// The plain selector under the shape, when it can be planned as ordered shard streams;
+    /// a `None` range is the instant lookback.
+    selector: Option<(&'a VectorSelector, Option<Duration>)>,
 }
 
 impl Engine {
@@ -41,29 +49,34 @@ impl Engine {
     ) -> Result<Value> {
         // fused shapes fold the range function into the aggregation; others stay generic
         if let Some(shape) = fused_agg_shape(op, expr) {
-            // only a plain matrix selector can be planned as ordered shard streams
-            if let PromExpr::MatrixSelector(matrix_selector) = shape.range_arg
-                && let Some(value) = self
+            if let Some((selector, range)) = shape.selector {
+                let range =
+                    range.unwrap_or_else(|| Duration::from_micros(self.ctx.lookback_delta as u64));
+                if let Some(value) = self
                     .try_streaming_fused_agg(
-                        matrix_selector,
+                        selector,
+                        range,
                         modifier,
                         shape.func.clone(),
                         shape.op,
                     )
                     .await?
-            {
-                return Ok(value);
+                {
+                    return Ok(value);
+                }
             }
-            let range_input = self.exec_expr(shape.range_arg).await?;
-            return fused::matrix::fused_agg(
-                modifier,
-                range_input,
-                shape.func,
-                shape.op,
-                &self.eval_ctx,
-                self.ctx.query_ctx.timeout,
-            )
-            .await;
+            if let Some(range_arg) = shape.range_arg {
+                let range_input = self.exec_expr(range_arg).await?;
+                return fused::matrix::fused_agg(
+                    modifier,
+                    range_input,
+                    shape.func,
+                    shape.op,
+                    &self.eval_ctx,
+                    self.ctx.query_ctx.timeout,
+                )
+                .await;
+            }
         }
 
         let input = self.exec_expr(expr).await?;
@@ -148,16 +161,75 @@ fn fused_agg_shape<'a>(op: &token::TokenType, expr: &'a PromExpr) -> Option<Fuse
         return None;
     }
     let agg_op = fused::FusedAggOp::from_token(op.id())?;
-    let PromExpr::Call(Call { func, args }) = expr else {
-        return None;
-    };
-    let [range_arg] = args.args.as_slice() else {
-        return None;
-    };
-    let range_func = functions::fusable_range_func(func.name)?;
-    Some(FusedAggShape {
-        op: agg_op,
-        func: Arc::from(range_func),
-        range_arg,
-    })
+    match expr {
+        PromExpr::Call(Call { func, args }) => {
+            let [range_arg] = args.args.as_slice() else {
+                return None;
+            };
+            let range_arg: &PromExpr = range_arg;
+            let range_func = functions::fusable_range_func(func.name)?;
+            let selector = match range_arg {
+                PromExpr::MatrixSelector(MatrixSelector { vs, range }) => Some((vs, Some(*range))),
+                _ => None,
+            };
+            Some(FusedAggShape {
+                op: agg_op,
+                func: Arc::from(range_func),
+                range_arg: Some(range_arg),
+                selector,
+            })
+        }
+        // an instant selector picks the last sample in the lookback window and keeps the metric
+        // name, which is exactly last_over_time
+        PromExpr::VectorSelector(selector) => Some(FusedAggShape {
+            op: agg_op,
+            func: Arc::from(functions::fusable_range_func("last_over_time")?),
+            range_arg: None,
+            selector: Some((selector, None)),
+        }),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use promql_parser::parser::{AggregateExpr, parse};
+
+    use super::*;
+
+    fn shape(query: &str) -> Option<(String, bool, Option<Option<Duration>>)> {
+        let PromExpr::Aggregate(AggregateExpr { op, expr, .. }) = parse(query).unwrap() else {
+            panic!("{query} is not an aggregation");
+        };
+        fused_agg_shape(&op, &expr).map(|shape| {
+            (
+                shape.func.name().to_string(),
+                shape.range_arg.is_some(),
+                shape.selector.map(|(_, range)| range),
+            )
+        })
+    }
+
+    #[test]
+    fn test_fused_agg_shape_recognizes_range_and_instant_selectors() {
+        assert_eq!(
+            shape("sum(rate(m[5m]))"),
+            Some((
+                "rate".to_string(),
+                true,
+                Some(Some(Duration::from_secs(300)))
+            ))
+        );
+        // a range function over a non-selector materializes but cannot stream
+        assert_eq!(
+            shape("sum(rate((m)[5m:1m]))"),
+            Some(("rate".to_string(), true, None))
+        );
+        assert_eq!(
+            shape("sum by(instance) (m{job=\"a\"} offset 1m)"),
+            Some(("last_over_time".to_string(), false, Some(None)))
+        );
+        assert_eq!(shape("sum(abs(m))"), None);
+        assert_eq!(shape("topk(3, rate(m[5m]))"), None);
+    }
 }
