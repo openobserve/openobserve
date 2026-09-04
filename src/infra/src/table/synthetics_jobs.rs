@@ -49,6 +49,11 @@ pub struct EnqueueParams<'a> {
     /// onto the row: the ack clamps the probe's count at `steps_configured x
     /// (retries + 1)`, so a live read would let an in-flight edit reprice work.
     pub steps_configured: i32,
+    /// What gate 3 actually deducted from the org's one-time grant, or 0 when it
+    /// deducted nothing — a refused deduct, an ungated org, a private venue.
+    /// Frozen because nothing else records it: the ack reads it to bill the run
+    /// free or as overage, and the reaper to size a refund.
+    pub steps_reserved: i32,
     /// Serialized `JobMetadata` — check-level context copied at enqueue time.
     pub metadata: &'a str,
 }
@@ -83,6 +88,8 @@ pub struct LeasedRow {
     /// Steps frozen at enqueue (1 for protocol checks). The ack's clamp ceiling
     /// comes from THIS, never the current check — see `EnqueueParams`.
     pub steps_configured: i32,
+    /// What the enqueue reserved from the grant, frozen — see `EnqueueParams`.
+    pub steps_reserved: i32,
     pub metadata: String,
 }
 
@@ -104,6 +111,9 @@ pub struct DeadLetteredRow {
     /// Steps frozen at enqueue — what the reservation was computed from. See
     /// `scheduled_ts` for why the reaper needs it.
     pub steps_configured: i32,
+    /// What the enqueue took out of the grant for this job, frozen — the number
+    /// the reaper gives back, and 0 when it took nothing.
+    pub steps_reserved: i32,
     /// Engine+device combos frozen onto this job (`None` for protocol checks) —
     /// the other half of `configured x combos`.
     pub browser_devices: Option<String>,
@@ -166,8 +176,8 @@ pub async fn enqueue<C: ConnectionTrait>(
         INSERT INTO synthetics_jobs
             (id, synthetics_id, synthetics_name, org_id, location, pool,
              scheduled_ts, valid_until, status, dispatch_attempts, run_id, browser_devices,
-             steps_configured, metadata)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, 0, $9, $10, $11, $12)
+             steps_configured, steps_reserved, metadata)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0, 0, $9, $10, $11, $12, $13)
         ON CONFLICT (synthetics_id, location, scheduled_ts) DO NOTHING
     "#;
 
@@ -188,6 +198,7 @@ pub async fn enqueue<C: ConnectionTrait>(
                 .map(Value::from)
                 .unwrap_or(Value::from(None::<String>)),
             Value::from(p.steps_configured),
+            Value::from(p.steps_reserved),
             Value::from(p.metadata),
         ],
     ))
@@ -204,7 +215,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
     let sql = r#"
         SELECT id, synthetics_id, synthetics_name, org_id, location, pool,
                scheduled_ts, valid_until, dispatch_attempts, run_id, browser_devices,
-               steps_configured, metadata
+               steps_configured, steps_reserved, metadata
         FROM synthetics_jobs
         WHERE id = $1
     "#;
@@ -232,6 +243,7 @@ pub async fn get_by_id<C: ConnectionTrait>(
                 run_id: row.try_get("", "run_id")?,
                 browser_devices: row.try_get("", "browser_devices")?,
                 steps_configured: row.try_get("", "steps_configured")?,
+                steps_reserved: row.try_get("", "steps_reserved")?,
                 metadata: row.try_get("", "metadata").unwrap_or_default(),
             })
         })
@@ -380,6 +392,7 @@ pub async fn lease_batch<C: ConnectionTrait>(
             run_id: m.run_id,
             browser_devices: m.browser_devices,
             steps_configured: m.steps_configured,
+            steps_reserved: m.steps_reserved,
             metadata: m.metadata,
         })
         .collect())
@@ -565,7 +578,8 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
     // the CAS can require the row not to have moved under us.
     let select_sql = r#"
         SELECT id, synthetics_id, synthetics_name, org_id, location, scheduled_ts,
-               steps_configured, browser_devices, dispatch_attempts, run_id, metadata, status
+               steps_configured, steps_reserved, browser_devices, dispatch_attempts, run_id,
+               metadata, status
         FROM synthetics_jobs
         WHERE (status = 1 AND lease_expires_at < $1 AND (dispatch_attempts >= $2 OR valid_until < $1))
            OR (status = 0 AND valid_until < $1)
@@ -608,6 +622,7 @@ pub async fn dead_letter_expired<C: ConnectionTrait>(
                     // if reached, `enqueue_reservation` floors it at 1 — the
                     // refund is short, never inverted.
                     steps_configured: row.try_get("", "steps_configured").unwrap_or_default(),
+                    steps_reserved: row.try_get("", "steps_reserved").unwrap_or_default(),
                     browser_devices: row.try_get("", "browser_devices").unwrap_or_default(),
                     dispatch_attempts,
                     run_id: row.try_get("", "run_id").ok()?,
@@ -965,6 +980,7 @@ mod tests {
                 r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"desktop"}]"#,
             ),
             steps_configured: 14,
+            steps_reserved: 28,
             metadata: r#"{"tags":["prod","checkout"]}"#,
         };
         assert_eq!(p.synthetics_id, "mon-1");
@@ -972,6 +988,7 @@ mod tests {
         assert_eq!(p.run_id, "3Fzn001XXXXXXXXXXXXXXXX");
         assert!(p.browser_devices.is_some());
         assert_eq!(p.steps_configured, 14);
+        assert_eq!(p.steps_reserved, 28);
     }
 
     #[test]
@@ -989,6 +1006,7 @@ mod tests {
             run_id: "3Fzn001XXXXXXXXXXXXXXXX".to_string(),
             browser_devices: None,
             steps_configured: 1,
+            steps_reserved: 1,
             metadata: "{}".to_string(),
         };
         assert_eq!(row.id, "2MNfNTxePfZ1pnY5gKVLkwsVRXv");
@@ -1040,6 +1058,7 @@ mod tests {
                 r#"[{"execution_id":"3Fze001XX","engine":"chromium","device":"desktop"}]"#,
             ),
             steps_configured,
+            steps_reserved: steps_configured,
             metadata: r#"{"tags":["prod"],"synthetic_type":"browser"}"#,
         }
     }

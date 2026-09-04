@@ -31,6 +31,11 @@ pub struct Model {
     /// here rather than read live at ack: the ack clamps the probe's count at
     /// `steps_configured x (retries + 1)`, so an edit would reprice dispatched work.
     pub steps_configured: i32,
+    /// Steps the enqueue actually took out of the org's one-time grant — 0 when
+    /// gate 3's deduct was refused, when no pool gates this org, or on a private
+    /// venue. The ONLY record that the reservation happened, so the ack and the
+    /// reaper cannot disagree with the enqueue about it.
+    pub steps_reserved: i32,
     /// JSON blob of check metadata copied at enqueue time e.g. {"tags": ["prod"]}.
     pub metadata: String,
     /// JSON execution summaries written at ack time (no full step data — that's in the stream).
@@ -72,6 +77,7 @@ mod tests {
                     .to_string(),
             ),
             steps_configured: 14,
+            steps_reserved: 14,
             metadata: "{}".to_string(),
             result: None,
             started_at: None,
@@ -83,6 +89,7 @@ mod tests {
         assert_eq!(m.status, 0);
         assert_eq!(m.pool, "aws-browser");
         assert_eq!(m.steps_configured, 14);
+        assert_eq!(m.steps_reserved, 14);
         assert!(m.claimed_by.is_none());
     }
 }

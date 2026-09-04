@@ -15,13 +15,31 @@
 
 use sea_orm::{
     ColumnTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
-    sea_query::{Expr, Func, OnConflict},
+    sea_query::{Expr, ExprTrait, Func, OnConflict, SimpleExpr},
 };
 
 use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     table::entity::trial_quota_usage,
 };
+
+/// `usage_count + delta`, floored at zero.
+///
+/// The in-memory counter is a `u64` that saturates, the column is a signed
+/// `bigint` that does not: a refund of steps the deduct never took drove the row
+/// NEGATIVE, and `fold_db_records` then read it as zero on the next restart —
+/// handing the org back a one-time grant it had already spent. Both sides must
+/// clamp the same way or the two answers diverge with nothing to reconcile them.
+fn floored_count(delta: i64) -> SimpleExpr {
+    let bumped = || {
+        Expr::col((
+            trial_quota_usage::Entity,
+            trial_quota_usage::Column::UsageCount,
+        ))
+        .add(delta)
+    };
+    Expr::case(bumped().lt(0), 0).finally(bumped()).into()
+}
 
 /// Batch increment quota records by delta. Each tuple is (org_id, feature, delta).
 /// Upserts: if the row exists, adds delta to usage_count; otherwise inserts with
@@ -52,14 +70,7 @@ pub async fn batch_increment(records: Vec<(String, String, i64)>) -> Result<(), 
                     trial_quota_usage::Column::OrgId,
                     trial_quota_usage::Column::Feature,
                 ])
-                .value(
-                    trial_quota_usage::Column::UsageCount,
-                    Expr::col((
-                        trial_quota_usage::Entity,
-                        trial_quota_usage::Column::UsageCount,
-                    ))
-                    .add(delta),
-                )
+                .value(trial_quota_usage::Column::UsageCount, floored_count(delta))
                 .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
                 .to_owned(),
             )

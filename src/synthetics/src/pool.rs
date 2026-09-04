@@ -39,15 +39,6 @@ pub struct StepPoolHooks {
     pub try_deduct: fn(org_id: &str, is_browser: bool, steps: u64) -> bool,
     /// Give `steps` back — the enqueue did not happen (E10/E11, T29).
     pub refund: fn(org_id: &str, is_browser: bool, steps: u64),
-    /// Steps left in the org's one-time grant — SPEC §6.1.
-    ///
-    /// Read by the REAPER, not the enqueue, to ask what neither side records:
-    /// *did* the enqueue reserve anything? Zero means the grant is spent, and
-    /// BOTH sides must read it the same way — the ack calls that state
-    /// [`crate::job_api::StepPoolView::Spent`] and does not reconcile, the
-    /// reaper does not refund. A job either acks or is reaped; it must not be
-    /// treated as funded by one path and unfunded by the other.
-    pub remaining: fn(org_id: &str, is_browser: bool) -> u64,
     /// Give back the reservation of a job that will NEVER ack — SPEC §6.3, E10.
     ///
     /// Idempotent, unlike [`Self::refund`]: applied at most once per
