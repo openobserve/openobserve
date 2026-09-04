@@ -1677,9 +1677,12 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
     // isVariableLoadingPending === true. useVariablesManager.initialize marks an
     // independent query_values pending only when it has NO custom/all default
     // (:479-491), so an all-sentinel picker is born unpending, never fetches, and
-    // renders <ALL> over an empty option list forever. Chained CHILDREN are
-    // fast-tracked at :530, which is why `pod` loads and its parent does not.
-    it("every built picker is marked pending by the real manager, parents included", async () => {
+    // renders <ALL> over an empty option list forever. A chained CHILD is NOT
+    // fast-tracked here: its parent carries loadOptionsWithAllDefault and so
+    // really does fetch, and starting the child in parallel sends its filter with
+    // `$namespace` never substituted. The child is released by the parent's
+    // completion notification instead.
+    it("every INDEPENDENT built picker is marked pending by the real manager", async () => {
       const resolution = resolveManifest({
         manifest: kubernetesPage,
         streams: fullK8sStreams(),
@@ -1703,12 +1706,22 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
       // pack that later drops the chain cannot make this pass vacuously.
       const independent = managed.filter((v) => !v.query_data?.filter?.length);
       expect(independent.map((v) => v.name)).toContain("namespace");
-
-      for (const variable of managed) {
+      for (const variable of independent) {
         expect(
           variable.isVariableLoadingPending,
           `${variable.name} must be pending or it never fetches its values`,
         ).toBe(true);
+      }
+
+      // A chained child WAITS: firing it now would race its parent and ship the
+      // filter with `$namespace` unsubstituted, yielding no values at all.
+      const chained = managed.filter((v) => v.query_data?.filter?.length);
+      expect(chained.map((v) => v.name)).toContain("pod");
+      for (const variable of chained) {
+        expect(
+          variable.isVariableLoadingPending,
+          `${variable.name} must wait for its parent's values`,
+        ).toBe(false);
       }
     });
 

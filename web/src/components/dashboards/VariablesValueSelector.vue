@@ -415,17 +415,19 @@ export default defineComponent({
         if (valueChanged) {
           // Update oldVariablesData
           oldVariablesData[variableObject.name] = currentValue;
+        }
 
-          // Notify manager if using manager mode - this ensures children get updated even with no data
-          if (useManager && manager) {
-            const variableKey = getVariableKey(
-              variableObject.name,
-              variableObject.scope || "global",
-              variableObject.tabId,
-              variableObject.panelId,
-            );
-            manager.onVariablePartiallyLoaded(variableKey);
-          }
+        // Notified on COMPLETION, not on a changed value: an all-sentinel parent
+        // holds `_o2_all_` across its own fetch, so gating this left its children
+        // never triggered and their pickers permanently empty.
+        if (useManager && manager) {
+          const variableKey = getVariableKey(
+            variableObject.name,
+            variableObject.scope || "global",
+            variableObject.tabId,
+            variableObject.panelId,
+          );
+          manager.onVariablePartiallyLoaded(variableKey);
         }
 
         finalizeVariableLoading(variableObject, true);
@@ -581,20 +583,22 @@ export default defineComponent({
                 // Update oldVariablesData ONLY when value changes
                 // This prevents duplicate child loads when value hasn't actually changed
                 oldVariablesData[variableObject.name] = variableObject.value;
+              }
 
-                // Notify manager if using manager mode
-                if (useManager && manager) {
-                  const variableKey = getVariableKey(
-                    variableObject.name,
-                    variableObject.scope || "global",
-                    variableObject.tabId,
-                    variableObject.panelId,
-                  );
-                  manager.onVariablePartiallyLoaded(variableKey);
-                } else {
-                  // Only use legacy child loading if not using manager
-                  finalizePartialVariableLoading(variableObject, true);
-                }
+              // Same completion-not-change rule as the streaming path above: an
+              // all-sentinel parent never changes value, and its children would
+              // otherwise never be told the options had arrived.
+              if (useManager && manager) {
+                const variableKey = getVariableKey(
+                  variableObject.name,
+                  variableObject.scope || "global",
+                  variableObject.tabId,
+                  variableObject.panelId,
+                );
+                manager.onVariablePartiallyLoaded(variableKey);
+              } else if (hasValueChanged) {
+                // Only use legacy child loading if not using manager
+                finalizePartialVariableLoading(variableObject, true);
               }
             }
           } else {

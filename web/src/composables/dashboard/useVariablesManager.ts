@@ -524,12 +524,16 @@ export const useVariablesManager = (t: TranslateFn) => {
           // Parent is non-API type if:
           // - It's a custom type variable (custom, constant, textbox, dynamic_filters)
           // - OR it's a query_values with custom/all default (no API call needed)
+          // loadOptionsWithAllDefault makes an "all" parent genuinely fetch, so it
+          // is NOT synchronous: pre-marking its child races the parent's response
+          // and ships the child's filter with the parent placeholder unsubstituted.
           const parentIsNonAPIType =
             parentVar.type === "custom" ||
             parentVar.type === "constant" ||
             parentVar.type === "textbox" ||
             parentVar.type === "dynamic_filters" ||
             (parentVar.type === "query_values" &&
+              parentVar.loadOptionsWithAllDefault !== true &&
               (parentVar.selectAllValueForMultiSelect === "custom" ||
                 parentVar.selectAllValueForMultiSelect === "all"));
 
