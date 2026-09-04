@@ -126,6 +126,7 @@ export class GenAiTracesIngestionPage {
    * @param {string} operationName - the span's unique `name` (the poll marker)
    * @param {number} [maxAttempts=20]
    * @returns {Promise<boolean>} true once the span is searchable
+   * @throws if the span is not searchable within maxAttempts
    */
   async pollForSpan(streamName, operationName, maxAttempts = 20) {
     const headers = getAuthHeaders();
@@ -167,7 +168,8 @@ export class GenAiTracesIngestionPage {
       }
     }
 
-    testLogger.warn(`pollForSpan: span "${operationName}" not searchable after ${maxAttempts} attempts`);
-    return false;
+    throw new Error(
+      `pollForSpan: span "${operationName}" not searchable in stream ${streamName} after ${maxAttempts} attempts`
+    );
   }
 }
