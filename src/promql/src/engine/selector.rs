@@ -289,6 +289,9 @@ impl Engine {
             drop(super_tx);
         }
 
+        let mut label_selector = self.label_selector.clone();
+        label_selector.extend(self.ctx.label_selector.iter().cloned());
+
         let ctxs = match ctxs {
             Some(ctxs) => ctxs,
             None => {
@@ -299,7 +302,7 @@ impl Engine {
                         table_name,
                         (start, end),
                         selector.matchers.clone(),
-                        self.label_selector.clone(),
+                        label_selector.clone(),
                         &mut filters,
                     )
                     .await?
@@ -319,9 +322,6 @@ impl Engine {
         } else {
             ctxs
         };
-
-        let mut label_selector = self.label_selector.clone();
-        label_selector.extend(self.ctx.label_selector.iter().cloned());
 
         // Calculate step and lookback for the optimization
         let start = self.eval_ctx.start - offset_modifier;
@@ -479,11 +479,8 @@ impl Engine {
         Ok(metrics)
     }
 
-    /// Attempts the streaming fused path: series arrive whole from
-    /// `(__hash__, _timestamp)` ordered scans and fold straight into the
-    /// aggregation, so the sample matrix is never materialized. `None` means
-    /// the query shape requires the materializing path; once a context exists
-    /// the materializing fold runs on it here instead of creating another.
+    /// Streams the fused aggregation when the layout allows it, otherwise materializes on the
+    /// same contexts; `None` only when the query shape rules the streaming path out up front.
     pub(super) async fn try_streaming_fused_agg(
         &mut self,
         matrix_selector: &MatrixSelector,
@@ -492,7 +489,7 @@ impl Engine {
         op: fused::FusedAggOp,
     ) -> Result<Option<Value>> {
         let query_ctx = &self.ctx.query_ctx;
-        // need_wal bails early: WAL would split series and double the context-creation cost
+        // need_wal bails early: WAL would split series across contexts
         if !config::get_config()
             .search
             .feature_metrics_streaming_agg_enabled
@@ -1238,7 +1235,7 @@ mod tests {
             }
         }
 
-        /// The flag defaults to off; flip it once for this process before the engine reads it.
+        /// Pins the flag on so a local env override cannot turn the streaming path off.
         fn enable_streaming() {
             static ENABLE: std::sync::Once = std::sync::Once::new();
             ENABLE.call_once(|| {
